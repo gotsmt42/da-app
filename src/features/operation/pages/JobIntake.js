@@ -305,13 +305,64 @@ function DocBox({ title, hint, tone, children }) {
   );
 }
 
+/**
+ * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ส่วนนี้ซ้ำซ้อนกับการดำเนินงานไหม จัดการยังไงไม่ให้สับสน ทำงานซ้ำซ้อน" → เลือก "แบ่งหน้าที่ชัด")
+ *    หน้ารับงาน = รับงานจนส่งลงตาราง + สิ่งที่หน้านี้ยังต้องตามต่อเอง (ส่งของ→วางบิล · ใบเสนอราคาที่รอผล)
+ *    งานเข้าหน้างานที่ลงตารางแล้ว (มอบทีม · เข้างาน · ปิดงาน) ทำที่หน้า "การดำเนินงาน" ที่เดียว
+ *    → แท็บ "ส่งต่อแล้ว" = รายการสั้นอ่านอย่างเดียว ไว้ดูว่างานที่รับมาไปถึงไหน + ปุ่มไปหน้าการดำเนินงาน
+ *    แต่ละงานอยู่แท็บเดียวเสมอ (ต้องติดตาม มาก่อน ส่งต่อแล้ว/เสร็จแล้ว)
+ */
+const needsFollow = (s, oc) => s.i >= 1 && s.i <= 4 && ((s.nv && s.i === 2) || Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)));
 const TABS = [
   { key: "waiting", label: "รอดำเนินการ", short: "รอเริ่ม", test: (s) => s.i === 0 },
-  { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
-  { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
+  { key: "follow", label: "ต้องติดตาม", short: "ติดตาม", test: (s, oc) => needsFollow(s, oc) },
+  { key: "handed", label: "ส่งต่อการดำเนินงานแล้ว", short: "ส่งต่อแล้ว", test: (s, oc) => s.i >= 1 && s.i <= 3 && !needsFollow(s, oc) },
+  { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s, oc) => s.i === 4 && !needsFollow(s, oc) },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
   { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
 ];
+
+/**
+ * แท็บ "ส่งต่อแล้ว" — รายการสั้นอ่านอย่างเดียว: วันเข้างาน · งาน · ทีม · ขั้นตอนตอนนี้ · ไปหน้าการดำเนินงาน
+ * (มอบทีม/เข้างาน/ปิดงาน ทำที่หน้าการดำเนินงาน — ไม่ทำซ้ำที่นี่)
+ */
+function HandedList({ rows }) {
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden" }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5, py: 1, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
+        <Typography sx={{ flex: 1, fontSize: "0.76rem", color: MUTED }}>
+          งานที่ส่งลงตารางแล้ว — มอบทีม · เข้างาน · ปิดงาน ทำที่หน้า <Box component={Link} to="/operation" sx={{ color: ACCENT, fontWeight: 800, textDecoration: "none" }}>การดำเนินงาน</Box>
+        </Typography>
+      </Stack>
+      {rows.map(({ j, s: st }, i) => {
+        const nx = nextStepOf(j, "admin");
+        const team = j.team || "";
+        return (
+          <ButtonBase key={j._id} component={Link} to={`/operation/${j._id}`}
+            sx={{ width: "100%", display: "flex", alignItems: "center", gap: 1.25, px: 1.5, py: 1.1, textAlign: "left", borderTop: i ? `1px solid ${LINE}` : 0, "&:hover": { bgcolor: "#f8fafc" } }}>
+            <Box sx={{ width: 44, flexShrink: 0, textAlign: "center" }}>
+              <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{moment(j.start).format("D")}</Typography>
+              <Typography sx={{ fontSize: "0.64rem", fontWeight: 700, color: MUTED }}>{formatThai(moment(j.start), "MMM YY")}</Typography>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>
+                {[j.title, j.system].filter(Boolean).join(" · ") || "งาน"}
+                <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: "#94a3b8" }}>{j.jobNo || ""}</Box>
+              </Typography>
+              <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>
+                {[j.site && j.site !== "-" ? j.site : j.company, team ? `ทีม ${team}` : "ยังไม่มีทีม"].filter(Boolean).join(" · ")}
+              </Typography>
+              {nx && <Typography noWrap sx={{ fontSize: "0.72rem", color: "#475569", mt: 0.15 }}><Box component="span" sx={{ fontWeight: 800 }}>ถัดไป:</Box> {nx.title}</Typography>}
+            </Box>
+            <Box sx={{ flexShrink: 0, display: { xs: "none", sm: "block" } }}><StageChip st={st} /></Box>
+            <Box sx={{ flexShrink: 0, display: { xs: "block", sm: "none" }, width: 9, height: 9, borderRadius: 99, bgcolor: st.color }} />
+            <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", flexShrink: 0 }} />
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+}
 
 /** ข้อความกำหนดการสั้นๆ (ใช้ในตาราง) */
 const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(moment(j.intakeAt), "D MMM YY")}`
@@ -1616,8 +1667,8 @@ export default function JobIntake() {
   const reqReady = !canQueue || (approveN !== null && reqCounts !== null);
   useEffect(() => {
     if (!jobs || tabPicked || !reqReady) return;
-    setTab(canQueue && reqTotal > 0 ? "requests" : counts.waiting > 0 ? "waiting" : "active");
-  }, [jobs, counts.waiting, tabPicked, reqReady, canQueue, reqTotal]);
+    setTab(canQueue && reqTotal > 0 ? "requests" : counts.waiting > 0 ? "waiting" : counts.follow > 0 ? "follow" : "handed");
+  }, [jobs, counts.waiting, counts.follow, tabPicked, reqReady, canQueue, reqTotal]);
   const tabsShown = [
     ...(canQueue && (reqTotal > 0 || tab === "requests") ? [{ key: "requests", label: "คำขอ · รออนุมัติ", short: "คำขอ" }] : []),
     ...TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key),
@@ -1634,7 +1685,7 @@ export default function JobIntake() {
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
       .sort(({ j: a }, { j: b }) => (tab === "done"
         ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
-        : tab === "active"
+        : tab === "handed"
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
   }, [withStage, tab, q]);
@@ -1681,7 +1732,7 @@ export default function JobIntake() {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => { setTabPicked(true); setTab(t.key); }} sx={{
-              flex: { xs: "1 1 0", sm: "0 0 auto" }, minWidth: 0, height: { xs: 34, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: { xs: 2, sm: 2.5 },
+              flex: { xs: "1 0 auto", sm: "0 0 auto" }, minWidth: 0, height: { xs: 34, sm: 40 }, px: { xs: 0.9, sm: 1.75 }, borderRadius: { xs: 2, sm: 2.5 },
               flexDirection: "row", fontSize: { xs: "0.78rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.45, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
               border: { xs: 0, sm: `1.5px solid ${on ? ACCENT : LINE}` },
               bgcolor: on ? { xs: "#fff", sm: alpha(ACCENT, 0.07) } : { xs: "transparent", sm: "#fff" },
@@ -1754,7 +1805,12 @@ export default function JobIntake() {
       {tab === "requests" ? null : !jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        view === "table" ? (
+        tab === "handed" ? (
+          <>
+          <HandedList rows={pg.rows} />
+          <PageBar {...pg} setPage={goPage} unit="งาน" />
+          </>
+        ) : view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
           <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
@@ -1771,7 +1827,7 @@ export default function JobIntake() {
         )
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "follow" ? "ไม่มีงานที่ต้องติดตาม" : tab === "handed" ? "ยังไม่มีงานที่ส่งต่อ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
