@@ -276,7 +276,7 @@ export const baht = (n) => {
  * "14 ก.ย. 2569 · ค่าแรง"
  */
 export const itemTitle = (it) =>
-  (it?.workDate ? [thaiDate(it.workDate), it.timeFrom || it.timeTo ? `${it.timeFrom || "?"}–${it.timeTo || "?"} น.` : "", String(it.description || "").trim()].filter(Boolean).join(" · ") : String(it?.description || ""));
+  (it?.workDate ? [thaiDate(it.workDate), it.timeFrom || it.timeTo ? `${it.timeFrom || "?"}–${it.timeTo || "?"} น.` : "", Number(it.people) > 0 ? `${it.people} คน` : "", String(it.description || "").trim()].filter(Boolean).join(" · ") : String(it?.description || ""));
 
 export const itemAmount = (it) => money((Number(it?.qty) || 0) * (Number(it?.unitPrice) || 0));
 export const itemsTotal = (items) => money((items || []).reduce((s, it) => s + itemAmount(it), 0));

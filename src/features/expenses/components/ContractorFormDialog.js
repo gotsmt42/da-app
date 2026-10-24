@@ -51,16 +51,19 @@ const blankItem = () => ({ key: nextKey(), category: "labor", description: "", d
 /** แถวค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ผู้ใช้: "อยากได้ใส่วันที่ เพราะเขาเบิกเป็นวัน") */
 const DEFAULT_FROM = "08:30";
 const DEFAULT_TO = "17:30";
-// 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใบเบิกผู้รับเหมา ใส่จำนวนคนต่อวันได้ จะได้อ้างอิงได้") จำนวน = จำนวนคน · ราคา = ค่าแรงต่อคนต่อวัน
+// 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใส่จำนวนคนต่อวันได้ จะได้อ้างอิงได้" → "ไม่ต้องใส่ค่าแรง/คน ใส่รวมเลย บางทีค่าแรงต่อคนไม่เท่ากัน")
+//    1 แถว = 1 วัน · ยอดเงิน = ค่าแรงรวมของวันนั้น (qty 1) · จำนวนคนเก็บแยกไว้อ้างอิง (people)
 const dayItem = (workDate = "", unitPrice = "", auto = false, people = 1) => ({
-  key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: people || 1, unit: "คน", unitPrice, workDate, auto,
+  key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: 1, unit: "วัน", people: people || 1, unitPrice, workDate, auto,
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ใส่เวลาได้ด้วย default 08.30-17.30")
   timeFrom: DEFAULT_FROM, timeTo: DEFAULT_TO,
 });
 const fromDoc = (it) => ({
   key: nextKey(), category: it.category || "labor", description: it.description || "", detail: it.detail || "",
   qty: it.qty ?? 1, unit: it.unit || "", unitPrice: it.unitPrice ?? "", workDate: it.workDate ? moment(it.workDate).format("YYYY-MM-DD") : "",
-  timeFrom: it.timeFrom || "", timeTo: it.timeTo || "",
+  timeFrom: it.timeFrom || "", timeTo: it.timeTo || "", people: it.people || "",
+  // ใบที่บันทึกแบบ "คน × ค่าแรงต่อคน" ช่วงสั้นๆ ก่อนเปลี่ยนเป็นยอดรวม → แปลงเป็นยอดรวมของวัน
+  ...(it.workDate && it.unit === "คน" ? { people: it.qty, qty: 1, unit: "วัน", unitPrice: (Number(it.qty) || 0) * (Number(it.unitPrice) || 0) } : {}),
 });
 /** วันทำงานทุกวันของช่วงงาน — end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" (เหมือน jobRangeText) */
 const daysOfRange = (r) => {
@@ -330,18 +333,18 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const dupDates = [...new Set(dates.filter((d, i) => dates.indexOf(d) !== i))];
   const dayCount = rateMode === "daily" ? validItems.filter((it) => it.workDate).length : 0;
   // แรงงานรวม (คน-วัน) — ไว้อ้างอิง/ตรวจกับใบลงเวลา
-  const manDays = rateMode === "daily" ? validItems.filter((it) => it.workDate).reduce((n, it) => n + (Number(it.qty) || 0), 0) : 0;
+  const manDays = rateMode === "daily" ? validItems.filter((it) => it.workDate).reduce((n, it) => n + (Number(it.people) || 0), 0) : 0;
 
   /** ใช้ค่าแรงต่อวันกับทุกวันในรายการ */
   const applyDailyRate = (v) => {
     setDailyRate(v);
-    setItems((rows) => rows.map((r) => ({ ...r, unitPrice: v, unit: "คน" })));
+    setItems((rows) => rows.map((r) => ({ ...r, unitPrice: v, qty: 1, unit: "วัน" })));
   };
   /** ใช้จำนวนคนกับทุกวันในรายการ */
   const applyDailyPeople = (v) => {
     setDailyPeople(v);
     const n = Number(v);
-    if (n > 0) setItems((rows) => rows.map((r) => ({ ...r, qty: n, unit: "คน" })));
+    if (n > 0) setItems((rows) => rows.map((r) => ({ ...r, people: n })));
   };
   /**
    * ✅ ผู้ใช้สั่ง: "อยากให้ทำง่าย คำนวณกรอกวันที่เองอัตโนมัติ"
@@ -369,7 +372,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const addNextDay = () => setItems((rows) => {
     const last = rows.map((r) => r.workDate).filter(Boolean).sort().pop();
     const rate = dailyRate || ([...rows].reverse().find((r) => Number(r.unitPrice) > 0)?.unitPrice ?? "");
-    const people = Number(dailyPeople) || Number([...rows].reverse().find((r) => Number(r.qty) > 0)?.qty) || 1;
+    const people = Number(dailyPeople) || Number([...rows].reverse().find((r) => Number(r.people) > 0)?.people) || 1;
     return [...rows, dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate, false, people)];
   });
   const taxDigits = digitsOnly(cTaxId);
@@ -665,19 +668,23 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
             <ToggleButton value="daily">คิดรายวัน (ใส่วันที่)</ToggleButton>
             <ToggleButton value="lump">เหมางาน</ToggleButton>
           </ToggleButtonGroup>
+          {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "จัดวางฟอร์มใหม่ ให้เข้าใจง่าย สวยงาม ใช้งานง่าย")
+              ค่าเริ่มต้นทุกวัน (กล่องเทา) → การ์ดวันละใบ (หัว: วันที่ + ลบ · เวลา/คน/ค่าแรงรวม · งานที่ทำ · บันทึกเข้างานจริง) → สรุปท้าย */}
           {rateMode === "daily" && (
-            <Box sx={{ display: "grid", gap: 1.5, alignItems: "center", gridTemplateColumns: { xs: "110px 1fr", sm: "130px 200px 1fr" }, mb: 1.5 }}>
-              <TextField size="small" label="จำนวนคน/วัน" type="number" value={dailyPeople}
-                onChange={(e) => applyDailyPeople(e.target.value)} inputProps={{ min: 1, step: 1, ...numberField }}
-                InputProps={{ endAdornment: <InputAdornment position="end">คน</InputAdornment> }} />
-              <TextField size="small" label="ค่าแรง/คน/วัน" type="number" value={dailyRate}
-                onChange={(e) => applyDailyRate(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
-                InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
-              <Typography variant="caption" sx={{ color: TEXT_SUB, gridColumn: { xs: "1 / -1", sm: "auto" } }}>
-                ใช้กับทุกวัน (แก้เฉพาะวันได้ด้านล่าง) ·{" "}
+            <Box sx={{ mb: 1.5, p: 1.25, borderRadius: 2.5, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mb: 1 }}>ค่าเริ่มต้นทุกวัน <Box component="span" sx={{ fontWeight: 500, color: TEXT_SUB }}>· แก้เฉพาะวันได้ในการ์ดด้านล่าง</Box></Typography>
+              <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1.4fr", sm: "140px 200px" } }}>
+                <TextField size="small" label="จำนวนคน/วัน" type="number" value={dailyPeople}
+                  onChange={(e) => applyDailyPeople(e.target.value)} inputProps={{ min: 1, step: 1, ...numberField }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">คน</InputAdornment> }} sx={{ bgcolor: "#fff" }} />
+                <TextField size="small" label="ค่าแรงรวม/วัน" type="number" value={dailyRate}
+                  onChange={(e) => applyDailyRate(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} sx={{ bgcolor: "#fff" }} />
+              </Box>
+              <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: TEXT_SUB }}>
                 {jobs.length
-                  ? "ระบบใส่วันที่ให้ครบทุกวันตามช่วงงานที่เลือกแล้ว — ลบวันที่ไม่ได้มา หรือแก้ค่าแรงเฉพาะวันได้"
-                  : "เลือกงาน/ช่วงวันที่ด้านบน ระบบจะใส่วันที่ทำงานให้อัตโนมัติ · หรือกด “เพิ่มวัน” เอง"}
+                  ? "วันที่ทำงานใส่ให้ครบตามช่วงงานที่เลือกแล้ว — ลบวันที่ไม่ได้มา หรือแก้เฉพาะวันได้"
+                  : "เลือกงาน/ช่วงวันที่ด้านบน ระบบจะใส่วันที่ให้อัตโนมัติ · หรือกด “เพิ่มวัน”"}
               </Typography>
             </Box>
           )}
@@ -685,43 +692,43 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
             <Alert severity="warning" sx={{ mb: 1, py: 0 }}>วันที่ซ้ำกัน: {dupDates.map((d) => thaiDate(d)).join(", ")}</Alert>
           )}
           {gallery.dialog}
-          <Stack spacing={rateMode === "daily" ? 0.75 : 1.25}>
-            {rateMode === "daily" && items.map((row) => (
+          <Stack spacing={rateMode === "daily" ? 1 : 1.25}>
+            {rateMode === "daily" && items.map((row, idx) => (
               <Box key={row.key} sx={{
-                display: "grid", gap: 1, alignItems: "center", p: 1, bgcolor: "#fff", borderRadius: 2,
-                border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`,
-                gridTemplateColumns: { xs: "1fr 1fr 1fr auto", md: "160px 1fr 190px 76px 118px 100px auto" },
+                p: 1.25, bgcolor: "#fff", borderRadius: 2.5,
+                border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `4px solid ${ACCENT}`,
+                display: "grid", gap: 1, alignItems: "center",
+                gridTemplateColumns: { xs: "1fr 1fr", md: "minmax(0, 330px) 90px 200px 1fr" },
               }}>
-                <Box sx={{ gridColumn: { xs: "1 / 4", md: "auto" } }}>
-                  <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
-                    error={touched && !row.workDate} />
-                </Box>
-                <Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end" }}>
+                {/* หัวการ์ด: วันที่ + ลบ */}
+                <Stack direction="row" alignItems="center" gap={1} sx={{ gridColumn: "1 / -1" }}>
+                  <Box sx={{ minWidth: 26, height: 26, px: 0.75, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT, fontSize: "0.74rem", fontWeight: 900 }}>{idx + 1}</Box>
+                  <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 240 } }}>
+                    <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
+                      error={touched && !row.workDate} />
+                  </Box>
+                  <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
+                  <Typography sx={{ display: { xs: "none", sm: "block" }, fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", whiteSpace: "nowrap" }}>{fmtMoney(itemAmount(row))} บาท</Typography>
                   <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1}
                     onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
-                </Box>
-                <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
-                  inputProps={{ maxLength: 300 }} placeholder="ค่าแรง" error={touched && !String(row.description).trim()}
-                  sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} />
-                {/* เวลาทำงานของวันนั้น (ค่าเริ่มต้น 08:30–17:30) */}
+                </Stack>
+                {/* เวลา · คน · ค่าแรงรวม */}
                 <Stack direction="row" alignItems="center" gap={0.5} sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}>
-                  <TextField size="small" label="เริ่ม" type="time" value={row.timeFrom || ""} onChange={(e) => setItem(row.key, { timeFrom: e.target.value, auto: false })}
+                  <TextField size="small" label="เวลาเริ่ม" type="time" value={row.timeFrom || ""} onChange={(e) => setItem(row.key, { timeFrom: e.target.value, auto: false })}
                     InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
                   <Typography sx={{ color: TEXT_SUB }}>–</Typography>
                   <TextField size="small" label="ถึง" type="time" value={row.timeTo || ""} onChange={(e) => setItem(row.key, { timeTo: e.target.value, auto: false })}
                     InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
                 </Stack>
-                <TextField size="small" label="คน" type="number" value={row.qty} onChange={(e) => setItem(row.key, { qty: e.target.value, unit: "คน", auto: false })}
-                  inputProps={{ min: 1, step: 1, ...numberField }} error={Number(row.qty) <= 0} />
-                <TextField size="small" label="บาท/คน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, unit: "คน", auto: false })}
-                  inputProps={{ min: 0, step: "any", ...numberField }} />
-                {/* รวมของวันนั้น = คน × ค่าแรงต่อคน — เห็นทั้งมือถือและจอคอม */}
-                <Box sx={{ textAlign: "right", gridColumn: { xs: "3 / -1", md: "auto" } }}>
-                  <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, lineHeight: 1.2 }}>รวมวันนี้</Typography>
-                  <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.3 }}>{fmtMoney(itemAmount(row))}</Typography>
-                </Box>
-                <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1} sx={{ display: { xs: "none", md: "inline-flex" } }}
-                  onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
+                <TextField size="small" label="คน" type="number" value={row.people ?? ""} onChange={(e) => setItem(row.key, { people: e.target.value, auto: false })}
+                  inputProps={{ min: 0, step: 1, ...numberField }} />
+                {/* ค่าแรงรวมของวันนั้น (ทั้งทีม) — ค่าแรงแต่ละคนไม่เท่ากัน จึงกรอกยอดรวม */}
+                <TextField size="small" label="ค่าแรงรวมวันนี้" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, qty: 1, unit: "วัน", auto: false })}
+                  inputProps={{ min: 0, step: "any", ...numberField }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
+                <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
+                  inputProps={{ maxLength: 300 }} placeholder="เช่น เดินสาย ติดตั้งอุปกรณ์" error={touched && !String(row.description).trim()}
+                  sx={{ gridColumn: "1 / -1" }} />
                 {/* บันทึกเข้างานจริงของวันนั้น (งานที่อ้างอิง) — เวลา · ผู้บันทึก · รูปหน้างาน */}
                 {row.workDate && <AttendanceDayStrip entries={attByDay.get(row.workDate)} hasJobs={jobs.length > 0} onOpen={gallery.open} />}
               </Box>
