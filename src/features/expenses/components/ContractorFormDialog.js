@@ -47,8 +47,9 @@ let keySeq = 0;
 const nextKey = () => `c${Date.now()}_${(keySeq += 1)}`;
 const blankItem = () => ({ key: nextKey(), category: "labor", description: "", detail: "", qty: 1, unit: "งาน", unitPrice: "", workDate: "" });
 /** แถวค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ผู้ใช้: "อยากได้ใส่วันที่ เพราะเขาเบิกเป็นวัน") */
-const dayItem = (workDate = "", unitPrice = "", auto = false) => ({
-  key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: 1, unit: "วัน", unitPrice, workDate, auto,
+// 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใบเบิกผู้รับเหมา ใส่จำนวนคนต่อวันได้ จะได้อ้างอิงได้") จำนวน = จำนวนคน · ราคา = ค่าแรงต่อคนต่อวัน
+const dayItem = (workDate = "", unitPrice = "", auto = false, people = 1) => ({
+  key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: people || 1, unit: "คน", unitPrice, workDate, auto,
 });
 const fromDoc = (it) => ({
   key: nextKey(), category: it.category || "labor", description: it.description || "", detail: it.detail || "",
@@ -135,6 +136,8 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [rateMode, setRateMode] = useState("daily");
   /** ค่าแรงต่อวัน — กรอกครั้งเดียวใช้กับทุกวัน (แก้รายวันทีหลังได้) */
   const [dailyRate, setDailyRate] = useState("");
+  /** จำนวนคนต่อวัน — กรอกครั้งเดียวใช้กับทุกวัน (แก้รายวันได้) */
+  const [dailyPeople, setDailyPeople] = useState(1);
   const [vatRate, setVatRate] = useState(0);
   const [whtRate, setWhtRate] = useState(3);
   const [deposit, setDeposit] = useState("");
@@ -147,7 +150,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const draft = useFormDraft({
     key: editing ? `contractor:edit:${expense._id}` : `contractor:new:${presetJob?._id || "-"}`,
     enabled: Boolean(open),
-    data: { docDate, to, position, subject, jobs, cName, cTaxId, cPhone, cAddress, cIsCompany, instNo, instTotal, contractValue, items, rateMode, dailyRate, vatRate, whtRate, deposit, payMode, bankCode, accountNo, accountName },
+    data: { docDate, to, position, subject, jobs, cName, cTaxId, cPhone, cAddress, cIsCompany, instNo, instTotal, contractValue, items, rateMode, dailyRate, dailyPeople, vatRate, whtRate, deposit, payMode, bankCode, accountNo, accountName },
     restore: (d) => {
       if (d.docDate) setDocDate(d.docDate);
       setTo(d.to || ""); setPosition(d.position || ""); setSubject(d.subject || "");
@@ -156,7 +159,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       setInstNo(d.instNo || ""); setInstTotal(d.instTotal || ""); setContractValue(d.contractValue || "");
       if (Array.isArray(d.items)) setItems(d.items.map((it) => ({ ...it, key: nextKey() })));
       if (d.rateMode) setRateMode(d.rateMode);
-      setDailyRate(d.dailyRate || ""); setVatRate(d.vatRate ?? 0); setWhtRate(d.whtRate ?? 3); setDeposit(d.deposit || "");
+      setDailyRate(d.dailyRate || ""); setDailyPeople(Number(d.dailyPeople) || 1); setVatRate(d.vatRate ?? 0); setWhtRate(d.whtRate ?? 3); setDeposit(d.deposit || "");
       if (d.payMode) setPayMode(d.payMode);
       setBankCode(d.bankCode || ""); setAccountNo(d.accountNo || ""); setAccountName(d.accountName || "");
     },
@@ -312,11 +315,19 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const dates = items.map((it) => it.workDate).filter(Boolean);
   const dupDates = [...new Set(dates.filter((d, i) => dates.indexOf(d) !== i))];
   const dayCount = rateMode === "daily" ? validItems.filter((it) => it.workDate).length : 0;
+  // แรงงานรวม (คน-วัน) — ไว้อ้างอิง/ตรวจกับใบลงเวลา
+  const manDays = rateMode === "daily" ? validItems.filter((it) => it.workDate).reduce((n, it) => n + (Number(it.qty) || 0), 0) : 0;
 
   /** ใช้ค่าแรงต่อวันกับทุกวันในรายการ */
   const applyDailyRate = (v) => {
     setDailyRate(v);
-    setItems((rows) => rows.map((r) => ({ ...r, unitPrice: v, qty: 1, unit: "วัน" })));
+    setItems((rows) => rows.map((r) => ({ ...r, unitPrice: v, unit: "คน" })));
+  };
+  /** ใช้จำนวนคนกับทุกวันในรายการ */
+  const applyDailyPeople = (v) => {
+    setDailyPeople(v);
+    const n = Number(v);
+    if (n > 0) setItems((rows) => rows.map((r) => ({ ...r, qty: n, unit: "คน" })));
   };
   /**
    * ✅ ผู้ใช้สั่ง: "อยากให้ทำง่าย คำนวณกรอกวันที่เองอัตโนมัติ"
@@ -332,9 +343,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       const manual = rows.filter((r) => !r.auto && (r.workDate || Number(r.unitPrice) > 0));
       const byDate = new Map(rows.filter((r) => r.workDate).map((r) => [r.workDate, r]));
       const auto = days.filter((d) => !manual.some((m) => m.workDate === d))
-        .map((d) => (byDate.get(d)?.auto ? byDate.get(d) : dayItem(d, dailyRate, true)));
+        .map((d) => (byDate.get(d)?.auto ? byDate.get(d) : dayItem(d, dailyRate, true, Number(dailyPeople) || 1)));
       const next = [...manual, ...auto].sort((a, b) => String(a.workDate || "9").localeCompare(String(b.workDate || "9"))).slice(0, MAX_ITEMS);
-      return next.length ? next : [dayItem("", dailyRate)];
+      return next.length ? next : [dayItem("", dailyRate, false, Number(dailyPeople) || 1)];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- สร้างใหม่เฉพาะตอนช่วงงานที่เลือกเปลี่ยน
   }, [open, editing, rateMode, jobsKey]);
@@ -343,7 +354,8 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const addNextDay = () => setItems((rows) => {
     const last = rows.map((r) => r.workDate).filter(Boolean).sort().pop();
     const rate = dailyRate || ([...rows].reverse().find((r) => Number(r.unitPrice) > 0)?.unitPrice ?? "");
-    return [...rows, dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate)];
+    const people = Number(dailyPeople) || Number([...rows].reverse().find((r) => Number(r.qty) > 0)?.qty) || 1;
+    return [...rows, dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate, false, people)];
   });
   const taxDigits = digitsOnly(cTaxId);
   const bankError = payMode === "transfer" && bankCode ? validateAccount(bankCode, digitsOnly(accountNo)) : "";
@@ -639,11 +651,15 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
             <ToggleButton value="lump">เหมางาน</ToggleButton>
           </ToggleButtonGroup>
           {rateMode === "daily" && (
-            <Box sx={{ display: "grid", gap: 1.5, alignItems: "center", gridTemplateColumns: { xs: "1fr", sm: "220px 1fr" }, mb: 1.5 }}>
-              <TextField size="small" label="ค่าแรงต่อวัน (ใช้กับทุกวัน)" type="number" value={dailyRate}
+            <Box sx={{ display: "grid", gap: 1.5, alignItems: "center", gridTemplateColumns: { xs: "110px 1fr", sm: "130px 200px 1fr" }, mb: 1.5 }}>
+              <TextField size="small" label="จำนวนคน/วัน" type="number" value={dailyPeople}
+                onChange={(e) => applyDailyPeople(e.target.value)} inputProps={{ min: 1, step: 1, ...numberField }}
+                InputProps={{ endAdornment: <InputAdornment position="end">คน</InputAdornment> }} />
+              <TextField size="small" label="ค่าแรง/คน/วัน" type="number" value={dailyRate}
                 onChange={(e) => applyDailyRate(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
                 InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
-              <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, gridColumn: { xs: "1 / -1", sm: "auto" } }}>
+                ใช้กับทุกวัน (แก้เฉพาะวันได้ด้านล่าง) ·{" "}
                 {jobs.length
                   ? "ระบบใส่วันที่ให้ครบทุกวันตามช่วงงานที่เลือกแล้ว — ลบวันที่ไม่ได้มา หรือแก้ค่าแรงเฉพาะวันได้"
                   : "เลือกงาน/ช่วงวันที่ด้านบน ระบบจะใส่วันที่ทำงานให้อัตโนมัติ · หรือกด “เพิ่มวัน” เอง"}
@@ -658,9 +674,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               <Box key={row.key} sx={{
                 display: "grid", gap: 1, alignItems: "center", p: 1, bgcolor: "#fff", borderRadius: 2,
                 border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`,
-                gridTemplateColumns: { xs: "1fr 1fr auto", md: "190px 1fr 140px 96px auto" },
+                gridTemplateColumns: { xs: "1fr 1fr 1fr auto", md: "170px 1fr 92px 130px 110px auto" },
               }}>
-                <Box sx={{ gridColumn: { xs: "1 / 3", md: "auto" } }}>
+                <Box sx={{ gridColumn: { xs: "1 / 4", md: "auto" } }}>
                   <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
                     error={touched && !row.workDate} />
                 </Box>
@@ -669,11 +685,18 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                     onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
                 </Box>
                 <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
-                  inputProps={{ maxLength: 300 }} placeholder="ค่าแรง" error={touched && !String(row.description).trim()} />
-                <TextField size="small" label="ค่าแรง/วัน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, qty: 1, unit: "วัน", auto: false })}
+                  inputProps={{ maxLength: 300 }} placeholder="ค่าแรง" error={touched && !String(row.description).trim()}
+                  sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} />
+                <TextField size="small" label="คน" type="number" value={row.qty} onChange={(e) => setItem(row.key, { qty: e.target.value, unit: "คน", auto: false })}
+                  inputProps={{ min: 1, step: 1, ...numberField }} error={Number(row.qty) <= 0} />
+                <TextField size="small" label="ค่าแรง/คน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, unit: "คน", auto: false })}
                   inputProps={{ min: 0, step: "any", ...numberField }}
                   InputProps={{ endAdornment: <InputAdornment position="end">฿</InputAdornment> }} />
-                <Typography sx={{ display: { xs: "none", md: "block" }, fontWeight: 800, fontSize: "0.95rem", textAlign: "right" }}>{fmtMoney(itemAmount(row))}</Typography>
+                {/* รวมของวันนั้น = คน × ค่าแรงต่อคน — เห็นทั้งมือถือและจอคอม */}
+                <Box sx={{ textAlign: "right", gridColumn: { xs: "3 / -1", md: "auto" } }}>
+                  <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, lineHeight: 1.2 }}>รวมวันนี้</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.3 }}>{fmtMoney(itemAmount(row))}</Typography>
+                </Box>
                 <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1} sx={{ display: { xs: "none", md: "inline-flex" } }}
                   onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
               </Box>
@@ -715,7 +738,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               {rateMode === "daily" ? "เพิ่มวัน" : "เพิ่มรายการ"}
             </Button>
             {rateMode === "daily" && dayCount > 0 && (
-              <Typography variant="caption" sx={{ color: TEXT_SUB, ml: "auto", fontWeight: 700 }}>รวม {dayCount} วัน · {baht(gross)}</Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, ml: "auto", fontWeight: 700 }}>รวม {dayCount} วัน · {manDays.toLocaleString()} แรง (คน-วัน) · {baht(gross)}</Typography>
             )}
           </Stack>
         </Section>
