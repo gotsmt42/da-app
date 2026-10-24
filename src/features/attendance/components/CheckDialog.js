@@ -84,10 +84,11 @@ function GpsRequired({ kind, perm, secure, onRetry, onRequest, onSkip, skipped }
             </Typography>
           </Box>
         </Stack>
+        {/* ลิงก์ทดสอบ http เท่านั้น (ระบบจริงเป็น https เสมอ) — server จริงไม่รับบันทึกที่ไม่มีพิกัด */}
         {!skipped ? (
-          <Button fullWidth variant="outlined" onClick={onSkip} sx={{ ...MBTN.outline("#64748b"), mt: 1.75, minHeight: 42 }}>บันทึกโดยไม่มีพิกัด</Button>
+          <Button fullWidth variant="outlined" onClick={onSkip} sx={{ ...MBTN.outline("#64748b"), mt: 1.75, minHeight: 42 }}>ทดสอบต่อโดยไม่มีพิกัด</Button>
         ) : (
-          <Typography sx={{ mt: 1.25, textAlign: "center", fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>จะบันทึกแบบ “ไม่มีพิกัด”</Typography>
+          <Typography sx={{ mt: 1.25, textAlign: "center", fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>โหมดทดสอบ — บันทึกแบบไม่มีพิกัด</Typography>
         )}
       </Box>
     );
@@ -130,15 +131,11 @@ function GpsRequired({ kind, perm, secure, onRetry, onRequest, onSkip, skipped }
         <Typography sx={{ mt: 0.75, textAlign: "center", fontSize: "0.72rem", color: FAINT }}>เปิดสิทธิ์แล้ว ระบบจะหาตำแหน่งให้อัตโนมัติ</Typography>
         </>
         )}
-        {!skipped ? (
-          <ButtonBase onClick={onSkip} sx={{ display: "block", mx: "auto", mt: 1.25, px: 1, py: 0.5, borderRadius: 1, fontFamily: "inherit", fontSize: "0.76rem", color: MUTED, textDecoration: "underline" }}>
-            เปิดไม่ได้จริงๆ — บันทึกโดยไม่มีพิกัด
-          </ButtonBase>
-        ) : (
-          <Typography sx={{ mt: 1.25, textAlign: "center", fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>
-            จะบันทึกแบบ “ไม่มีพิกัด” — แอดมินจะเห็นว่าไม่ได้ยืนยันตำแหน่ง
-          </Typography>
-        )}
+        {/* 🔒 (24 ต.ค. 2569 ผู้ใช้: "ไม่อนุญาตถ้าไม่เปิดตำแหน่ง") ไม่มีทางเลือกบันทึกโดยไม่มีพิกัดอีกแล้ว */}
+        <Stack direction="row" gap={0.75} alignItems="center" justifyContent="center" sx={{ mt: 1.25 }}>
+          <LocationOffRounded sx={{ fontSize: 15, color: AMBER }} />
+          <Typography sx={{ fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>ต้องเปิดตำแหน่งก่อน จึงจะกดบันทึกเข้างานได้</Typography>
+        </Stack>
       </Box>
     </Box>
   );
@@ -301,7 +298,8 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   const gpsSettling = pos === null || (pos.gps === "ok" && pos.accuracy > GPS_GOOD_M && waitedMs < GPS_MIN_WAIT_MS);
   // ต้องเปิด GPS ก่อน — ไม่มีพิกัดจะบันทึกได้เฉพาะเมื่อผู้ใช้กด "เปิดไม่ได้จริงๆ" เอง
   const gpsMissing = pos !== null && pos.gps !== "ok";
-  const gpsBlocked = gpsMissing && !skipGps;
+  // 🔒 ลิงก์จริง (https) ต้องมีพิกัดเสมอ · ข้ามได้เฉพาะลิงก์ทดสอบ http ที่ใช้ GPS ไม่ได้
+  const gpsBlocked = gpsMissing && !(skipGps && !secure);
   const canSubmit = !saving && !uploading && !gpsSettling && !gpsBlocked && !needPhoto;
 
   const submit = async () => {
@@ -457,7 +455,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         <Button variant="contained" disableElevation onClick={submit} disabled={!canSubmit}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <LoginRounded />}
           sx={{ ...MBTN.primary, flex: { xs: 1, sm: "0 0 auto" }, px: 3.5 }}>
-          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "กำลังหาตำแหน่ง…" : gpsBlocked ? "เปิด GPS ก่อนบันทึก" : "ยืนยันเข้างาน"}
+          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "กำลังหาตำแหน่ง…" : gpsBlocked ? "เปิดตำแหน่งก่อน จึงบันทึกได้" : "ยืนยันเข้างาน"}
         </Button>
       </DialogActions>
     </Dialog>
