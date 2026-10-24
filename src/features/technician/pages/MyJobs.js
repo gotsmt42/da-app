@@ -44,7 +44,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined,
-  Close,
+  Close, Today,
 } from "@mui/icons-material";
 
 // 🔁 (21 ต.ค. 2569) กล่องดูไฟล์ตัวกลาง — เลื่อนดูไฟล์อื่นในช่องเดียวกัน (← → · ปัด · แถบรูปย่อ)
@@ -245,6 +245,9 @@ const STATUS_DOT = { กำลังรอยืนยัน: "#f59e0b", ยื�
 
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "งานของฉันควรมีแถบงานวันนี้ ให้ทำงานง่าย ดูข้อมูลง่าย") — แถบแรก เปิดหน้ามาเจอก่อน
+  //    งานทุกงานที่มีวันเข้างานเป็นวันนี้ (รวมวันที่ 2,3… ของงานหลายวัน) ที่ยังไม่ปิดงาน — ซ้อนกับแถบอื่นได้ (เป็นมุมมอง "วันนี้")
+  { key: "today", label: "งานวันนี้", short: "วันนี้", icon: <Today sx={{ fontSize: 15 }} />, color: "#0f766e" },
   { key: "active", label: "งานที่ต้องทำ", short: "ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#2563eb" },
   // ✅ เดิมไม่มีทางเห็นงานค้างแยกจากงานทั่วไปเลยในหน้านี้ (ต้องไปเปิดหน้า Operation ต่างหาก) —
   // เพิ่มแท็บนี้โดยตรง ใช้เกณฑ์เดียวกับหน้า Operation เป๊ะๆ (เลยกำหนด 1 สัปดาห์ขึ้นไป, งานหลายวัน
@@ -265,7 +268,52 @@ const SUBS = [
   { key: "กำลังดำเนินการ", label: "กำลังดำเนินการ", color: "#7c3aed" },
 ];
 
-const matchesGroup = (event, group, daysPastDueMap) => {
+/**
+ * แถบสรุปงานวันนี้ — วันที่ · จำนวนงาน · ความคืบหน้า (เข้างานแล้ว/ขอปิดงานแล้ว จากทั้งหมด)
+ * ตัวเลขชัด สีน้อย: ส้ม = ยังไม่เข้างาน · น้ำเงิน = เข้างานแล้ว · ฟ้าอมเขียว = ขอปิดงานแล้ว
+ */
+function TodaySummary({ s }) {
+  const done = s.checked + s.requested;
+  const pct = s.total ? Math.round((done / s.total) * 100) : 0;
+  const now = moment().utcOffset(7);
+  const items = [
+    { n: s.waiting, t: "ยังไม่เข้างาน", c: "#d97706" },
+    { n: s.checked, t: "เข้างานแล้ว", c: "#2563eb" },
+    { n: s.requested, t: "ขอปิดงานแล้ว", c: "#0891b2" },
+  ];
+  return (
+    <Box sx={{ mb: 1.25, p: { xs: 1.25, md: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+      <Stack direction="row" alignItems="baseline" gap={1} sx={{ mb: 1 }}>
+        <Typography sx={{ fontWeight: 900, fontSize: { xs: "0.95rem", md: "1.02rem" }, color: "#0f172a" }}>
+          วัน{now.format("dddd")}ที่ {now.format("D MMMM")} {now.year() + 543}
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <Typography sx={{ fontSize: "0.8rem", color: "#64748b", whiteSpace: "nowrap" }}>
+          เข้างานแล้ว <Box component="span" sx={{ fontWeight: 900, color: "#0f172a" }}>{done}/{s.total}</Box>
+        </Typography>
+      </Stack>
+      <Box sx={{ height: 6, borderRadius: 99, bgcolor: "#eef2f6", overflow: "hidden", mb: 1 }}>
+        <Box sx={{ width: `${pct}%`, height: "100%", borderRadius: 99, bgcolor: "#2563eb", transition: "width .4s ease" }} />
+      </Box>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
+        {items.map((x) => (
+          <Box key={x.t} sx={{ px: 1, py: 0.6, borderRadius: 2, bgcolor: "#f8fafc", minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", lineHeight: 1.2, color: x.n ? x.c : "#94a3b8" }}>{x.n}</Typography>
+            <Typography noWrap sx={{ fontSize: "0.7rem", color: "#64748b" }}>{x.t}</Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+/** งานที่นับเป็น "งานวันนี้" (ยังไม่ปิด/ไม่ถูกยกเลิก/ไม่ถูกปฏิเสธ) */
+const isTodayOpen = (e) => isTodayJob(e) && e.status !== "ดำเนินการเสร็จสิ้น" && !e.cancelledAt
+  && e.approvalStatus !== "rejected" && e.department !== "sales";
+
+const matchesGroup = (event, group, daysPastDueMap, todayKeys) => {
+  // งานหลายวัน: มีวันไหนของงานเป็นวันนี้ → เอาทั้งงาน (การ์ดเดียวเห็นครบทุกวัน)
+  if (group === "today") return Boolean(todayKeys?.has(getOverdueGroupKey(event))) && event.status !== "ดำเนินการเสร็จสิ้น";
   if (group === "pending") return event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
   if (group === "closed") return event.status === "ดำเนินการเสร็จสิ้น";
   const isOverdue = isFlaggedDays(daysPastDueMap.get(event._id)?.days);
@@ -285,7 +333,7 @@ export default function MyJobs() {
   const [loading, setLoading] = useState(true);
   const [, setLastRefreshed] = useState(null);
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState("active");
+  const [group, setGroup] = useState("today");
   const [sub, setSub] = useState("all");
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
 
@@ -367,8 +415,9 @@ export default function MyJobs() {
   // ตัวเลขบนแท็บเพี้ยนสูงกว่าจำนวนงานจริง (1 งานเข้า 3 วัน ขึ้นเป็น "3 งาน") — จัดกลุ่มด้วย
   // getOverdueGroupKey ก่อนนับ นับแค่ 1 ครั้งต่อกลุ่ม (ทุกวันในกลุ่มเดียวกันควรมีสถานะตรงกันอยู่แล้ว
   // จากการ propagate ทั้งกลุ่มทุกครั้งที่อัปเดต จึงใช้แถวไหนของกลุ่มมาตัดสินก็ได้ผลลัพธ์เดียวกัน)
+  const todayKeys = useMemo(() => new Set(events.filter(isTodayOpen).map(getOverdueGroupKey)), [events]);
   const groupCounts = useMemo(() => {
-    const counts = { active: 0, overdue: 0, pending: 0, closed: 0 };
+    const counts = { today: todayKeys.size, active: 0, overdue: 0, pending: 0, closed: 0 };
     const seen = new Set();
     events.forEach((e) => {
       const key = getOverdueGroupKey(e);
@@ -380,7 +429,25 @@ export default function MyJobs() {
       else if (matchesGroup(e, "closed", daysPastDueMap)) counts.closed += 1;
     });
     return counts;
-  }, [events, daysPastDueMap]);
+  }, [events, daysPastDueMap, todayKeys]);
+
+  /** สรุปงานวันนี้ (แถบบนสุดของแท็บ "วันนี้") — เข้างานแล้ว · ยังไม่เข้างาน · ขอปิดงานแล้ว */
+  const todaySummary = useMemo(() => {
+    const byKey = new Map();
+    events.forEach((e) => {
+      const k = getOverdueGroupKey(e);
+      if (!todayKeys.has(k)) return;
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k).push(e);
+    });
+    let checked = 0; let requested = 0; let waiting = 0;
+    byKey.forEach((ss) => {
+      if (ss.some((e) => e.closeRequested)) requested += 1;
+      else if (todayCheckedIds && ss.some((e) => todayCheckedIds.has(String(e._id)))) checked += 1;
+      else waiting += 1;
+    });
+    return { total: byKey.size, checked, requested, waiting };
+  }, [events, todayKeys, todayCheckedIds]);
 
   const subCounts = useMemo(() => {
     const c = { all: 0, "กำลังรอยืนยัน": 0, "ยืนยันแล้ว": 0, "กำลังดำเนินการ": 0 };
@@ -409,13 +476,15 @@ export default function MyJobs() {
     autoPickedRef.current = true;
     const target = focusJobId && events.find((e) => String(e._id) === focusJobId);
     if (target) {
-      const g = GROUPS.find((x) => matchesGroup(target, x.key, daysPastDueMap));
+      const g = GROUPS.find((x) => matchesGroup(target, x.key, daysPastDueMap, todayKeys));
       if (g) setGroup(g.key);
       setHighlightJob(focusJobId);
       return;
     }
-    if (groupCounts.active === 0 && groupCounts.overdue > 0) setGroup("overdue");
-  }, [loading, events, groupCounts, focusJobId, daysPastDueMap]);
+    // เปิดหน้ามา: มีงานวันนี้ → แท็บวันนี้ · ไม่มี → งานที่ต้องทำ (ว่างแต่มีงานค้าง → ค้างงาน)
+    if (groupCounts.today > 0) return;
+    setGroup(groupCounts.active === 0 && groupCounts.overdue > 0 ? "overdue" : "active");
+  }, [loading, events, groupCounts, focusJobId, daysPastDueMap, todayKeys]);
   useEffect(() => {
     if (!highlightJob) return undefined;
     const t1 = setTimeout(() => document.getElementById(`myjob-${highlightJob}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
@@ -426,7 +495,7 @@ export default function MyJobs() {
   const filteredJobs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const list = events.filter((e) => {
-      if (!matchesGroup(e, group, daysPastDueMap)) return false;
+      if (!matchesGroup(e, group, daysPastDueMap, todayKeys)) return false;
       if (group === "active" && sub !== "all" && e.status !== sub) return false;
       if (!keyword) return true;
       return [e.company, e.site, e.title, e.system, e.docNo]
@@ -437,7 +506,7 @@ export default function MyJobs() {
         ? moment(b.start).valueOf() - moment(a.start).valueOf()
         : moment(a.start).valueOf() - moment(b.start).valueOf()
     );
-  }, [events, group, search, daysPastDueMap, sub]);
+  }, [events, group, search, daysPastDueMap, sub, todayKeys]);
 
   // ✅ รวมงานที่เข้าหลายวันไม่ติดกัน (jobGroupId/ลายเซ็นเดียวกัน) เป็นการ์ดเดียว แทนที่จะแยกโชว์
   // ซ้ำกันทุกวัน — ลำดับกลุ่มยึดตามลำดับที่ปรากฏครั้งแรกใน filteredJobs (เรียงตามวันที่อยู่แล้ว)
@@ -623,9 +692,11 @@ export default function MyJobs() {
       <PageHeader
         icon={<WorkOutline />}
         title="งานของฉัน"
-        subtitle={loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
-          ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อย`
-          : groupCounts.active > 0 ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน` : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
+        subtitle={loading ? "กำลังโหลดงาน…" : [
+          groupCounts.today > 0 ? `วันนี้ ${groupCounts.today} งาน` : "วันนี้ไม่มีงานเข้า",
+          groupCounts.active > 0 ? `ต้องทำทั้งหมด ${groupCounts.active}` : "",
+          groupCounts.overdue > 0 ? `ค้าง ${groupCounts.overdue}` : "",
+        ].filter(Boolean).join(" · ")}
         actions={(
           <>
             <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
@@ -646,7 +717,7 @@ export default function MyJobs() {
       {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แถบด้านบนยังรก กินพื้นที่ ไม่สวย ปรับให้กะทัดรัด แต่ยังดูง่าย")
           • ลิงก์ "ประวัติเข้างาน" ย้ายเป็นปุ่มไอคอนบนหัวหน้า (ไม่กินแถว)
           • หมวด 4 ช่อง = แถบแบ่งช่องแถวเดียวในกรอบเทา (ชื่อ + จำนวน สูง 36) ชุดเดียวกับหน้างานเข้า — ค้างงานตัวเลขแดง */}
-      <Stack direction="row" sx={{ mb: 1, p: 0.4, gap: 0.4, borderRadius: 2.5, bgcolor: "#eef2f6" }}>
+      <Stack direction="row" sx={{ mb: 1, p: 0.4, gap: 0.4, borderRadius: 2.5, bgcolor: "#eef2f6", overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
         {GROUPS.map((g) => {
           const on = group === g.key;
           const n = groupCounts[g.key];
@@ -654,7 +725,7 @@ export default function MyJobs() {
           return (
             <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                flex: "1 1 0", minWidth: 0, height: { xs: 34, md: 38 }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.5,
+                flex: { xs: "1 0 auto", sm: "1 1 0" }, minWidth: 0, px: { xs: 0.9, sm: 0.5 }, height: { xs: 34, md: 38 }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.5,
                 font: "inherit", cursor: "pointer", border: 0, borderRadius: 2, whiteSpace: "nowrap", overflow: "hidden",
                 fontSize: { xs: "0.76rem", md: "0.86rem" }, fontWeight: 800,
                 bgcolor: on ? "#fff" : "transparent", color: on ? "#0f172a" : "#64748b",
@@ -668,6 +739,8 @@ export default function MyJobs() {
           );
         })}
       </Stack>
+
+      {group === "today" && !loading && todaySummary.total > 0 && <TodaySummary s={todaySummary} />}
 
       {group === "active" && subCounts.all > 0 && (
         <Stack direction="row" gap={0.5} sx={{ mb: 1, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
@@ -735,7 +808,7 @@ export default function MyJobs() {
               <Typography variant="body2" fontWeight={600} color="text.secondary">
                 {search
                   ? "ไม่พบงานที่ตรงกับคำค้นหา"
-                  : `ยังไม่มีงานในหมวด "${activeGroup?.label}"`}
+                  : group === "today" ? "วันนี้ไม่มีงานเข้า" : `ยังไม่มีงานในหมวด "${activeGroup?.label}"`}
               </Typography>
 
               {search ? (

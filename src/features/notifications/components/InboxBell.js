@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/features/auth/AuthContext";
 import { departmentOf } from "@/shared/utils/roles";
 import useInbox, { markInboxRead, markAllInboxRead, clearReadInbox, loadMoreInbox } from "@/shared/hooks/useInbox";
+import { SHEET_DURATION, SHEET_EASING } from "@/shared/ui/MobileSheet";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -224,7 +225,8 @@ export default function InboxBell({ dark = false }) {
       </Tooltip>
       {isMobile ? (
         <Drawer anchor="bottom" open={open} onClose={close}
-          PaperProps={{ sx: { height: "88vh", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" } }}>
+          transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
+          PaperProps={{ sx: { height: "100dvh", pt: "env(safe-area-inset-top)", borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" } }}>
           {content}
         </Drawer>
       ) : (

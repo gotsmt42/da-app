@@ -81,9 +81,11 @@ export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, ti
           <Typography noWrap sx={{ fontSize: { xs: "0.72rem", sm: "0.78rem" }, color: MUTED }}>{sub || "นัดเข้าพบลูกค้า · สำรวจหน้างาน · นำเสนอ · ติดตามผล"}</Typography>
         </Box>
         {onExport && (
-          <Button variant="outlined" onClick={onExport} disabled={exportDisabled} startIcon={<FileDownloadOutlined />}
-            sx={{ display: { xs: "none", sm: "inline-flex" }, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
-            Excel
+          // ✅ (24 ต.ค. 2569 ผู้ใช้: "ทำไมไม่มีปุ่ม export excel ในมือถือ") มือถือ = ปุ่มไอคอน (ไม่กินที่) · จอใหญ่ = ไอคอน + คำว่า Excel
+          <Button variant="outlined" onClick={onExport} disabled={exportDisabled} aria-label="ส่งออก Excel"
+            sx={{ flexShrink: 0, minWidth: { xs: 38, sm: 64 }, height: { xs: 36, sm: "auto" }, px: { xs: 0, sm: 1.5 }, gap: 0.6, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
+            <FileDownloadOutlined sx={{ fontSize: 20 }} />
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
           </Button>
         )}
         <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>

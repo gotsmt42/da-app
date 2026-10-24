@@ -81,7 +81,7 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
-import MobileSheet from "@/shared/ui/MobileSheet";
+import MobileSheet, { SHEET_DURATION, SHEET_EASING } from "@/shared/ui/MobileSheet";
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
@@ -3848,10 +3848,11 @@ const Operation = () => {
         onClose={() => setDetailJobId(null)}
         onOpen={() => {}}
         disableSwipeToOpen
-        transitionDuration={{ enter: 260, exit: 200 }}
+        transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
         PaperProps={{ className: "tt-swipe-native", sx: {
           width: isMobile ? "100%" : "min(640px, 92vw)",
-          height: isMobile ? "92dvh" : "100%",
+          // เต็มจอบนมือถือ (24 ต.ค. 2569 "เลื่อนขึ้นจนเต็ม")
+          height: isMobile ? "100dvh" : "100%", pt: isMobile ? "env(safe-area-inset-top)" : 0,
           borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,
           bgcolor: "#f8fafc", overflow: "hidden",
         } }}

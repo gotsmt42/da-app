@@ -29,7 +29,7 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress,
 } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -63,6 +63,8 @@ import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 
 const AMBER = "#d97706";
@@ -988,9 +990,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         if (e.target.closest("button, a, input, label, textarea, [role=button]")) return;
         setSheetOpen(true); // 🔁 (21 ต.ค. 2569) จอคอมก็เปิดเป็นหน้าต่าง (เดิมกางลงในการ์ด)
       }}
-      sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+      sx={inSheet ? { bgcolor: "transparent" } : inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
-      <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
+      <Box sx={inSheet ? {} : { px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
         <Stack direction="row" gap={1.5} sx={{ minWidth: 0 }}>
           {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้บอกด้วยว่างานอะไร ส่งของ จดงาน เข้างาน") — ไอคอน + ชื่อรูปแบบงานใต้ไอคอน */}
           {!inRow && (
@@ -1149,34 +1151,100 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             <Collapse in={showMore} timeout={inRow ? 0 : "auto"} unmountOnExit>
             {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดไม่ตรง ไม่ครบถ้วน · ให้ดูง่ายสวยงาม") หน้าต่างรายละเอียด: สรุปข้อมูลงานครบในกล่องเดียว
                 (กำหนดการ · สถานะ · รับงานจาก · เลขที่ใบแจ้ง · ผู้รับผิดชอบ · หัวหน้าทีม · ผู้ติดต่อ · โครงการ) */}
+            {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "การจัดวางข้อมูลยาวเกินไป ไม่มืออาชีพ ไม่ทันสมัย ทำให้สวย ดูง่าย")
+                เดิม = ตารางป้าย/ค่า บรรทัดละเรื่อง 9 แถว (ยาวทั้งจอ · ซ้ำกับหัวหน้าต่าง: เลขที่งาน/โครงการ)
+                ใหม่ = 3 กลุ่มกะทัดรัด: กำหนดการ+สถานะ (เด่น) · การรับงาน (3 ช่องแถวเดียว) · ผู้เกี่ยวข้อง (รูป/ไอคอน + ปุ่มโทร) */}
             {inSheet && !job.intakeNote && (() => {
               const t = scheduleTagOf(job, schedule);
-              const late = due && moment(job.dueDate).isBefore(moment(), "day");
-              const cells = [
-                ["กำหนดการ", <>{t.text}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 700, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
-                ["สถานะ", <StageChip st={st} />],
-                due ? ["เสร็จภายใน", <>{due}{late && st.i < 4 && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
-                ["เลขที่งาน", job.jobNo || <Box component="span" sx={{ color: "#94a3b8" }}>—</Box>],
+              const late = due && st.i < 4 && moment(job.dueDate).isBefore(moment(), "day");
+              const card = { bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, px: 1.5, py: 1.25 };
+              const secTitle = (txt) => <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, mb: 0.5 }}>{txt}</Typography>;
+              const intake = [
                 job.intakeSource ? ["รับงานจาก", sourceText(job)] : null,
+                job.intakeAt ? ["วันที่รับงาน", formatThai(moment(job.intakeAt), "D MMM YY")] : null,
                 job.dispatchNo ? ["ใบแจ้งงาน", job.dispatchNo] : null,
-                job.intakeAt ? ["วันที่รับงาน", formatThai(moment(job.intakeAt), "D MMM YYYY")] : null,
-                ["ผู้รับผิดชอบ", job.responsiblePerson
-                  ? <Stack direction="row" alignItems="center" gap={0.75}><PersonPic name={job.responsiblePerson} owner={owner} size={22} /><span>{job.responsiblePerson}</span>{owner && <Box component="span" sx={{ color: MUTED, fontWeight: 500, fontSize: "0.74rem" }}>{owner.position || rankLabel(owner)}</Box>}</Stack>
-                  : <Box component="span" sx={{ color: AMBER }}>ยังไม่ระบุ</Box>],
-                !job.unscheduled && !job.noVisit ? ["หัวหน้าทีม", team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>] : null,
-                ["ผู้ติดต่อ", job.contactName || job.contactTel ? <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}{job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box>}</> : <Box component="span" sx={{ color: "#94a3b8" }}>—</Box>],
-                place ? ["โครงการ / ลูกค้า", place] : null,
+              ].filter(Boolean);
+              const members = (job.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== job.team);
+              const people = [
+                {
+                  k: "resp", label: "ผู้รับผิดชอบ",
+                  pic: job.responsiblePerson ? <PersonPic name={job.responsiblePerson} owner={owner} size={34} /> : null, icon: PersonOutlineOutlined,
+                  value: job.responsiblePerson || <Box component="span" sx={{ color: AMBER }}>ยังไม่ระบุ</Box>,
+                  sub: owner ? (owner.position || rankLabel(owner)) : "",
+                },
+                !job.unscheduled && !job.noVisit ? {
+                  k: "team", label: "หัวหน้าทีม", icon: GroupsOutlined,
+                  value: job.team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>,
+                  sub: members.length ? `ลูกทีม ${members.join(", ")}` : "",
+                } : null,
+                job.contactName || job.contactTel ? {
+                  k: "contact", label: "ผู้ติดต่อหน้างาน", icon: PhoneOutlined,
+                  value: job.contactName || job.contactTel, sub: job.contactName ? job.contactTel : "", tel: job.contactTel,
+                } : null,
               ].filter(Boolean);
               return (
-                <Box sx={{ mb: 1.5, display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "repeat(2, minmax(0,1fr))", md: "repeat(3, minmax(0,1fr))" },
-                  border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden", bgcolor: "#fff" }}>
-                  {cells.map(([k, v]) => (
-                    <Box key={k} sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${LINE}`, borderRight: { sm: `1px solid ${LINE}` }, minWidth: 0, mb: "-1px", mr: "-1px" }}>
-                      <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: MUTED, mb: 0.25 }}>{k}</Typography>
-                      <Typography component="div" sx={{ fontSize: "0.86rem", fontWeight: 700, color: INK, overflowWrap: "anywhere", lineHeight: 1.45 }}>{v}</Typography>
+                <Stack spacing={1} sx={{ mb: 1 }}>
+                  {/* จอคอม: กำหนดการ | การรับงาน คู่กัน · ผู้เกี่ยวข้องเรียงแนวนอน */}
+                  <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "minmax(0,1fr)", md: intake.length ? "repeat(2, minmax(0,1fr))" : "minmax(0,1fr)" } }}>
+                  {/* กำหนดการ + สถานะ */}
+                  <Box sx={{ ...card, display: "flex", alignItems: "center", gap: 1.25 }}>
+                    <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(t.accent || st.color, 0.1), color: t.accent || st.color }}>
+                      <t.icon sx={{ fontSize: 21 }} />
                     </Box>
-                  ))}
-                </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: INK, lineHeight: 1.3 }}>
+                        {t.text}{t.rel && <Box component="span" sx={{ ml: 0.6, fontSize: "0.8rem", fontWeight: 700, color: t.accent || MUTED }}>· {t.rel}</Box>}
+                      </Typography>
+                      {due && (
+                        <Typography sx={{ fontSize: "0.76rem", color: late ? RED : MUTED, fontWeight: late ? 800 : 500, mt: 0.15 }}>
+                          เสร็จภายใน {due}{late ? " · เลยกำหนด" : ""}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Box sx={{ flexShrink: 0 }}><StageChip st={st} /></Box>
+                  </Box>
+
+                  {/* การรับงาน — ช่องเท่ากันแถวเดียว */}
+                  {intake.length > 0 && (
+                    <Box sx={card}>
+                      {secTitle("การรับงาน")}
+                      <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${intake.length}, minmax(0,1fr))`, gap: 1 }}>
+                        {intake.map(([k, v], i) => (
+                          <Box key={k} sx={{ minWidth: 0, pl: i ? 1 : 0, borderLeft: i ? `1px solid ${LINE}` : 0 }}>
+                            <Typography noWrap sx={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>{k}</Typography>
+                            <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, lineHeight: 1.35, overflowWrap: "anywhere" }}>{v}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                  </Box>
+
+                  {/* ผู้เกี่ยวข้อง */}
+                  <Box sx={{ ...card, py: 0.5, display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", md: `repeat(${people.length}, minmax(0,1fr))` } }}>
+                    {people.map((x, i) => (
+                      <Stack key={x.k} direction="row" alignItems="center" gap={1.25}
+                        sx={{ py: 0.85, minWidth: 0, borderTop: { xs: i ? `1px solid ${LINE}` : 0, md: 0 }, borderLeft: { md: i ? `1px solid ${LINE}` : 0 }, pl: { md: i ? 1.5 : 0 }, pr: { md: 1 } }}>
+                        {x.pic || (
+                          <Box sx={{ width: 34, height: 34, borderRadius: 99, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: SURFACE, color: "#64748b" }}>
+                            <x.icon sx={{ fontSize: 18 }} />
+                          </Box>
+                        )}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600, lineHeight: 1.3 }}>{x.label}</Typography>
+                          <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>{x.value}</Typography>
+                          {x.sub && <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.35 }}>{x.sub}</Typography>}
+                        </Box>
+                        {x.tel && (
+                          <IconButton component="a" href={`tel:${x.tel}`} aria-label={`โทร ${x.tel}`}
+                            sx={{ flexShrink: 0, width: 36, height: 36, color: GREEN, bgcolor: alpha(GREEN, 0.1), "&:hover": { bgcolor: alpha(GREEN, 0.18) } }}>
+                            <PhoneOutlined sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    ))}
+                  </Box>
+                </Stack>
               );
             })()}
             {/* บันทึกงานในแถวตาราง: แสดงข้อความบันทึกเต็ม + ทำเสร็จเมื่อไร/โดยใคร (หัวการ์ดถูกซ่อน) */}
@@ -1195,8 +1263,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {inRow && job.intakeNote && <NoteFiles job={job} outcome={outcome} readOnly={readOnly} onChanged={onNoteChanged} />}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
             {!job.intakeNote && (
-              <Box sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
-                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.25 }}>{job.noVisit ? "รายการที่ต้องส่ง" : "รายละเอียดงาน"}</Typography>
+              <Box sx={{ mt: 1, px: inSheet ? 1.5 : 1.25, py: inSheet ? 1.1 : 0.9, borderRadius: inSheet ? 3 : 2, bgcolor: inSheet ? "#fff" : SURFACE, border: `1px solid ${LINE}` }}>
+                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: inSheet ? MUTED : "#94a3b8", mb: 0.25 }}>{job.noVisit ? "รายการที่ต้องส่ง" : "รายละเอียดงาน"}</Typography>
                 <Typography sx={{ fontSize: "0.82rem", color: job.description ? "#334155" : "#94a3b8", lineHeight: 1.5, whiteSpace: "pre-line", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                   {job.description || "ยังไม่ได้ใส่รายละเอียด — กด “แก้ไข” เพื่อเพิ่ม"}
                 </Typography>
@@ -1275,9 +1343,12 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
 
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
-        sx={{ px: { xs: 1.75, sm: 2.25 }, py: { xs: 0.85, sm: 1.1 }, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
+        sx={inSheet
+          ? { mt: 1, px: 1.5, py: 1.25, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3 }
+          : { px: { xs: 1.75, sm: 2.25 }, py: { xs: 0.85, sm: 1.1 }, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
         <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.25, md: 1 } }}>
-          <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><StageChip st={st} /></Box>
+          {/* ในหน้าต่างรายละเอียด สถานะอยู่บนกล่องกำหนดการแล้ว — ไม่ซ้ำ */}
+          <Box sx={{ display: inSheet && !job.intakeNote ? "none" : inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><StageChip st={st} /></Box>
           {nx && !inRow && showMore && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
           {nx && (
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere",
@@ -1573,6 +1644,25 @@ export default function JobIntake() {
   useEffect(() => { setPage(1); }, [tab, q, view, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "ต้องการปุ่ม Excel หน้ารับงาน") ส่งออกงานตามแท็บ + คำค้นที่เห็นอยู่
+  const [exporting, setExporting] = useState(false);
+  const exportExcel = async () => {
+    if (exporting || !list.length) return;
+    setExporting(true);
+    try {
+      const { exportIntakeToExcel } = await import("@/features/operation/utils/intakeExcelExport");
+      await exportIntakeToExcel({
+        rows: list, meta: { tabLabel: (TABS.find((x) => x.key === tab) || TABS[0]).label, search: q.trim() },
+        sourceText, scheduleText: scheduleShort,
+      });
+    } catch {
+      Swal.fire({ icon: "error", title: "ส่งออก Excel ไม่สำเร็จ", text: "กรุณาลองใหม่" });
+    } finally {
+      setExporting(false);
+    }
+  };
+  const canExport = tab !== "requests" && list.length > 0;
+
   return (
     // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500)
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
@@ -1616,6 +1706,16 @@ export default function JobIntake() {
             sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
           {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
         </Box>
+        <Tooltip title={canExport ? `ส่งออก Excel (${list.length} งาน)` : "ไม่มีงานให้ส่งออก"}>
+          <span>
+            <ButtonBase onClick={exportExcel} disabled={!canExport || exporting} aria-label="ส่งออก Excel"
+              sx={{ height: 40, px: { xs: 1.1, sm: 1.4 }, gap: 0.6, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff", fontFamily: "inherit",
+                fontSize: "0.8rem", fontWeight: 800, color: "#047857", opacity: canExport ? 1 : 0.45, "&:hover": { bgcolor: "#f0fdf4" } }}>
+              {exporting ? <CircularProgress size={15} sx={{ color: "#047857" }} /> : <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16 }} />}
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
+            </ButtonBase>
+          </span>
+        </Tooltip>
         <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
             <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
