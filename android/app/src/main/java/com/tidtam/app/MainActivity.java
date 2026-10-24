@@ -42,6 +42,11 @@ public class MainActivity extends BridgeActivity {
         statusBg.setBackgroundColor(HEADER_COLOR);
         root.addView(statusBg, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, Gravity.TOP));
 
+        // ✅ (24 ต.ค. 2569 ผู้ใช้: "ขนาดตัวอักษรใน apk ใหญ่กว่าเว็บ ดูล้น") WebView ขยายตัวอักษรตาม "ขนาดแบบอักษร" ของเครื่อง
+        //    (ตั้งใหญ่ไว้ = ทุกหน้าในแอปใหญ่ตาม แต่ Chrome ไม่ขยายแบบนี้) → ล็อก 100% ให้เท่ากับเว็บเสมอ
+        //    (ยังซูมด้วยสองนิ้วไม่ได้เหมือนเดิม · หน้าเว็บออกแบบขนาดตัวอักษรให้อ่านง่ายบนมือถืออยู่แล้ว)
+        getBridge().getWebView().getSettings().setTextZoom(100);
+
         View webView = getBridge().getWebView();
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, insets) -> {
             Insets sys = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
