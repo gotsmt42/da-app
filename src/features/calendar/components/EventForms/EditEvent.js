@@ -1038,8 +1038,31 @@ function injectStyles() {
     /* 🔁 (20 ต.ค. 2569) สถานะเดินตามขั้นตอน — ปุ่มสถานะที่ล็อก = ป้ายอ่านอย่างเดียว (ไม่จาง ไม่มีลูกศร) · ลิงก์แก้เองของแอดมิน */
     .swal-edit-event .ee-pick-btn--status:disabled { opacity: 1; cursor: default; }
     .swal-edit-event .ee-pick-btn--status:disabled .ee-pick-caret { display: none; }
-    .swal-edit-event .ee-status-unlock { flex-shrink: 0; border: 0; background: none; padding: 4px 6px; font: inherit; font-size: 12px; font-weight: 700; color: #64748b; text-decoration: underline; cursor: pointer; }
-    .swal-edit-event .ee-status-unlock:hover { color: #2563eb; }
+    /* 🔁 (24 ต.ค. 2569 ผู้ใช้: "แก้ไข UX/UI การกดแก้ไขสถานะ ให้สวยงาม ดูง่าย สื่อความหมาย") ปุ่มเส้นขอบ + หน้าต่างเลือกสถานะในกล่อง */
+    .swal-edit-event .ee-status-unlock { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; }
+    .swal-edit-event .ee-status-unlock:hover { border-color: #2563eb; color: #2563eb; }
+    .ee-st-overlay { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15,23,42,.45); animation: eeStFade .15s ease; }
+    @keyframes eeStFade { from { opacity: 0 } to { opacity: 1 } }
+    .ee-st-card { width: 100%; max-width: 420px; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px -12px rgba(15,23,42,.45); overflow: hidden; text-align: left; }
+    .ee-st-head { padding: 16px 18px 10px; }
+    .ee-st-title { font-size: 16px; font-weight: 900; color: #0f172a; }
+    .ee-st-sub { margin-top: 4px; font-size: 12.5px; color: #64748b; line-height: 1.55; }
+    .ee-st-flow { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; font-weight: 700; color: #475569; }
+    .ee-st-flow span { padding: 2px 8px; border-radius: 99px; background: #f1f5f9; }
+    .ee-st-list { padding: 4px 12px 8px; display: grid; gap: 6px; }
+    .ee-st-opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+    .ee-st-opt:hover { border-color: var(--c); background: var(--soft); }
+    .ee-st-opt.is-cur { border-color: var(--c); background: var(--soft); cursor: default; }
+    .ee-st-ico { width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; display: grid; place-items: center; color: var(--c); background: var(--soft); }
+    .ee-st-ico svg { width: 16px; height: 16px; }
+    .ee-st-txt { flex: 1; min-width: 0; }
+    .ee-st-txt b { display: block; font-size: 14px; font-weight: 800; color: #0f172a; }
+    .ee-st-txt small { display: block; font-size: 12px; color: #64748b; margin-top: 1px; }
+    .ee-st-badge { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--c); padding: 2px 8px; border-radius: 99px; background: #fff; border: 1px solid var(--c); }
+    .ee-st-foot { padding: 8px 18px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .ee-st-note { font-size: 11.5px; color: #94a3b8; }
+    .ee-st-cancel { height: 36px; padding: 0 16px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer; }
+    .ee-st-changed { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #b45309; }
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
@@ -1938,7 +1961,7 @@ export const getEditEvent = async ({
              ช่องนี้จึงล็อกเป็นป้ายอ่านอย่างเดียว · แอดมินแก้เองได้ด้วยปุ่ม "แก้สถานะเอง" (ยืนยันก่อน กันข้ามขั้นตอนโดยไม่ตั้งใจ) */""}
         <select id="editStatus" disabled title="สถานะเปลี่ยนตามขั้นตอนงานอัตโนมัติ" data-can-edit="${canEditStatus ? "1" : ""}">${statusOptions}</select>
       </div>
-      ${canEditStatus && isAdminOrManagerUser ? '<button type="button" id="ee-status-unlock" class="ee-status-unlock" title="เปลี่ยนสถานะเองโดยไม่ผ่านขั้นตอน">แก้สถานะเอง</button>' : ""}
+      ${canEditStatus && isAdminOrManagerUser ? '<button type="button" id="ee-status-unlock" class="ee-status-unlock" title="เปลี่ยนสถานะเองโดยไม่ผ่านขั้นตอน"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm17.71-10.21a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>แก้สถานะ</button>' : ""}
       <span class="ee-head-owner" title="ผู้สร้างแผนงาน">สร้างโดย ${footerName}</span>
     </div>
   </div>
@@ -2865,17 +2888,69 @@ export const getEditEvent = async ({
         });
         {
           const unlock = document.getElementById("ee-status-unlock");
-          unlock?.addEventListener("click", () => {
-            const ok = window.confirm("แก้สถานะเอง?\nปกติสถานะเปลี่ยนตามขั้นตอนอัตโนมัติ (รับทราบ › ยืนยันนัด › เข้างาน › ขอปิดงาน › อนุมัติ)\nใช้เฉพาะกรณีแก้ข้อมูลผิด — ระบบบันทึกประวัติว่าใครเปลี่ยน");
-            if (!ok) return;
+          // 🔁 (24 ต.ค. 2569 ผู้ใช้: "การกดแก้ไขสถานะ ให้สวยงาม ดูง่าย สื่อความหมาย") — เดิมเป็นกล่อง confirm ของเบราว์เซอร์
+          //    → หน้าต่างเลือกสถานะในกล่องเดียวกัน: อธิบายสั้น + ขั้นตอนปกติ + สถานะทั้งหมดพร้อมความหมาย · เลือกแล้วกดบันทึกเพื่อยืนยัน
+          const STATUS_MEANING = {
+            "กำลังรอยืนยัน": "ยังไม่ได้ยืนยันนัดกับลูกค้า",
+            "ยืนยันแล้ว": "นัดลูกค้าแล้ว รอเข้างาน",
+            "กำลังดำเนินการ": "เข้างานแล้ว อยู่ระหว่างทำงาน/แนบเอกสาร",
+            "ดำเนินการเสร็จสิ้น": "ปิดงานเรียบร้อย",
+          };
+          const openStatusPicker = () => {
             const sel = document.getElementById("editStatus");
-            if (!sel) return;
-            sel.disabled = false;
-            sel.title = "";
-            sel.dispatchEvent(new Event("change", { bubbles: true }));
-            unlock.remove();
-            setTimeout(() => sel.nextElementSibling?.click?.(), 0);
-          });
+            const popup = Swal.getPopup();
+            if (!sel || !popup || popup.querySelector(".ee-st-overlay")) return;
+            const cur = sel.value;
+            const ov = document.createElement("div");
+            ov.className = "ee-st-overlay";
+            ov.innerHTML = `
+              <div class="ee-st-card" role="dialog" aria-label="แก้สถานะงาน">
+                <div class="ee-st-head">
+                  <div class="ee-st-title">แก้สถานะงานเอง</div>
+                  <div class="ee-st-sub">ปกติสถานะเปลี่ยนเองตามขั้นตอนงาน ใช้เมนูนี้เฉพาะเมื่อสถานะไม่ตรงกับความจริง · ระบบบันทึกประวัติว่าใครเปลี่ยน</div>
+                  <div class="ee-st-flow"><span>รับทราบ</span>›<span>ยืนยันนัด</span>›<span>เข้างาน</span>›<span>ขอปิดงาน</span>›<span>อนุมัติปิด</span></div>
+                </div>
+                <div class="ee-st-list">
+                  ${[...sel.options].map((o) => {
+                    const c = STATUS_CONFIG[o.value] || {};
+                    const isCur = o.value === cur;
+                    return `<button type="button" class="ee-st-opt${isCur ? " is-cur" : ""}" data-v="${escapeHtml(o.value)}" style="--c:${c.color || "#64748b"};--soft:${c.soft || "#f8fafc"}">
+                      <span class="ee-st-ico">${c.icon || ""}</span>
+                      <span class="ee-st-txt"><b>${escapeHtml(o.value)}</b><small>${escapeHtml(STATUS_MEANING[o.value] || "")}</small></span>
+                      ${isCur ? '<span class="ee-st-badge">ตอนนี้</span>' : ""}
+                    </button>`;
+                  }).join("")}
+                </div>
+                <div class="ee-st-foot">
+                  <span class="ee-st-note">เลือกแล้วกด “บันทึก” ด้านล่างเพื่อยืนยัน</span>
+                  <button type="button" class="ee-st-cancel">ยกเลิก</button>
+                </div>
+              </div>`;
+            const close = () => ov.remove();
+            ov.addEventListener("click", (ev) => { if (ev.target === ov) close(); });
+            ov.querySelector(".ee-st-cancel").addEventListener("click", close);
+            ov.querySelectorAll(".ee-st-opt").forEach((b) => b.addEventListener("click", () => {
+              const v = b.getAttribute("data-v");
+              close();
+              if (v === cur) return;
+              sel.disabled = false;
+              sel.title = "";
+              sel.value = v;
+              sel.dispatchEvent(new Event("change", { bubbles: true }));
+              sel.disabled = true; // ยังเปลี่ยนผ่านปุ่มนี้เท่านั้น (ค่าที่เลือกถูกส่งตอนบันทึก)
+              let tag = document.getElementById("ee-status-changed");
+              if (!tag) {
+                tag = document.createElement("span");
+                tag.id = "ee-status-changed";
+                tag.className = "ee-st-changed";
+                unlock.insertAdjacentElement("afterend", tag);
+              }
+              tag.textContent = "เปลี่ยนแล้ว — กดบันทึกเพื่อยืนยัน";
+            }));
+            popup.style.position = popup.style.position || "relative";
+            popup.appendChild(ov);
+          };
+          unlock?.addEventListener("click", openStatusPicker);
         }
         const imgByName = new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""]));
         enhanceSelect(document.getElementById("ee-teamSelect"), {
