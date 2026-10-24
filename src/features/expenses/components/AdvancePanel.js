@@ -6,7 +6,6 @@
  * ✅ พื้นสีเขียวอมฟ้าของ Advance ตลอดทั้งแผง — วางข้างใบเคลม (ม่วง) แล้วแยกออกทันทีว่าฝั่งไหนคือใบไหน
  */
 import { Box, Stack, Typography, Chip, Button, Divider, Tooltip } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import { OpenInNew, AddCircleOutline, AttachFile } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
@@ -38,8 +37,9 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
 
   return (
     <Box sx={{
-      borderRadius: 2.5, bgcolor: M.soft, border: `1px solid ${alpha(M.color, 0.35)}`,
-      borderTop: `4px solid ${M.color}`, p: 1.5, ...sx,
+      // 🔁 (24 ต.ค. 2569 ผู้ใช้: "สีสันรกเกินไป") การ์ดขาวขอบเทา · สีประจำ Advance เหลือแค่ป้าย/เส้นบนบางๆ
+      borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0",
+      borderTop: `3px solid ${M.color}`, p: 1.5, ...sx,
     }}>
       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
         <KindBadge kind="advance" />
@@ -63,7 +63,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
       {advance.dueClearAt && <Row label="กำหนดเคลียร์">{thaiDate(advance.dueClearAt)}</Row>}
       {advance.approvedBy?.name && <Row label="อนุมัติโดย">{personFullName(advance.approvedBy)}</Row>}
 
-      <Divider sx={{ my: 1, borderColor: alpha(M.color, 0.25) }} />
+      <Divider sx={{ my: 1, borderColor: "#e2e8f0" }} />
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: M.dark, mb: 0.5 }}>รายการที่ตั้งเบิก ({advance.items?.length || 0})</Typography>
       <Stack spacing={0.6}>
         {(advance.items || []).map((it, i) => {
@@ -71,7 +71,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
           const cat = categoryMeta(it.category);
           return (
             <Stack key={it._id || i} direction="row" spacing={0.75} alignItems="flex-start"
-              sx={{ opacity: used ? 1 : 0.75, p: 0.6, borderRadius: 1.5, bgcolor: used ? "rgba(255,255,255,0.7)" : "transparent", border: used ? "none" : `1px dashed ${alpha(M.color, 0.45)}` }}>
+              sx={{ opacity: used ? 1 : 0.75, p: 0.6, borderRadius: 1.5, bgcolor: used ? "#f8fafc" : "transparent", border: used ? "none" : "1px dashed #cbd5e1" }}>
               <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: cat.color, mt: 0.8, flexShrink: 0 }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>{it.description}{it.person?.name ? ` · ${it.person.name}` : ""}</Typography>
@@ -93,7 +93,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
           );
         })}
       </Stack>
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${alpha(M.color, 0.25)}` }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 1, pt: 1, borderTop: "1px solid #e2e8f0" }}>
         <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: M.dark }}>ยอดเบิก Advance</Typography>
         <Typography sx={{ fontSize: "1.1rem", fontWeight: 900, color: M.dark }}>{baht(advance.total)}</Typography>
       </Stack>

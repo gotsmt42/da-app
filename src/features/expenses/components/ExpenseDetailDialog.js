@@ -40,7 +40,7 @@ import {
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
-import BankLogo from "./BankLogo";
+import BankLogo from "./BankLogo";
 import { confirmDelete } from "@/shared/ui/swal";
 
 /**
@@ -288,8 +288,6 @@ const Steps = ({ steps, color }) => (
  * แถวที่ตั้งเบิกไว้แต่ไม่ได้ใช้ยังโชว์ (ขีดจาง) ผู้ตรวจจะได้เห็นว่ามีรายการหายไป ไม่ใช่เห็นแค่ยอดรวมที่ลดลง
  */
 const CompareTable = ({ items, advanceItems, wide }) => {
-  const A = KIND_META.advance;
-  const C = KIND_META.claim;
   const { rows, plannedTotal, actualTotal } = compareItems(items || [], advanceItems || []);
   const diffTotal = money(actualTotal - plannedTotal);
   const diffColor = (d) => (d === 0 ? TEXT_SUB : d > 0 ? "#1d4ed8" : "#d97706");
@@ -314,25 +312,25 @@ const CompareTable = ({ items, advanceItems, wide }) => {
                 {r.actual ? ` · ${qtyText(r.actual)}` : ""}{r.receiptNo ? ` · ใบเสร็จ ${r.receiptNo}` : ""}
               </Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.8fr", gap: 0.5, mt: 0.75 }}>
-                <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: A.soft }}>
-                  <Typography sx={{ fontSize: "0.62rem", color: A.dark, fontWeight: 800 }}>ตั้งเบิก</Typography>
-                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: A.dark }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
+                <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: "#f8fafc" }}>
+                  <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ตั้งเบิก</Typography>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#334155" }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
                 </Box>
-                <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: C.soft }}>
-                  <Typography sx={{ fontSize: "0.62rem", color: C.dark, fontWeight: 800 }}>ใช้จริง</Typography>
-                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: C.dark }}>{fmtMoney(r.actualAmount)}</Typography>
+                <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: "#f8fafc" }}>
+                  <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ใช้จริง</Typography>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f172a" }}>{fmtMoney(r.actualAmount)}</Typography>
                 </Box>
                 <Box sx={{ px: 0.75, py: 0.4, textAlign: "right" }}>
                   <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ต่าง</Typography>
-                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: diffColor(r.diff) }}>{diffText(r.diff)}</Typography>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: TEXT_SUB }}>{diffText(r.diff)}</Typography>
                 </Box>
               </Box>
             </Box>
           );
         })}
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.8fr", gap: 0.5, p: 1, borderRadius: 2, bgcolor: "#f1f5f9" }}>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: A.dark }}>{fmtMoney(plannedTotal)}</Typography>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: C.dark }}>{fmtMoney(actualTotal)}</Typography>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#334155" }}>{fmtMoney(plannedTotal)}</Typography>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: "#0f172a" }}>{fmtMoney(actualTotal)}</Typography>
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, textAlign: "right", color: diffColor(diffTotal) }}>{diffText(diffTotal)}</Typography>
         </Box>
       </Stack>
@@ -347,8 +345,9 @@ const CompareTable = ({ items, advanceItems, wide }) => {
       <Box sx={{ display: "grid", gridTemplateColumns: grid, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER_MAIN}` }}>
         <Typography sx={head}>#</Typography>
         <Typography sx={head}>รายการ</Typography>
-        <Typography sx={{ ...head, textAlign: "right", bgcolor: A.soft, color: A.dark }}>ตั้งเบิก (Advance)</Typography>
-        <Typography sx={{ ...head, textAlign: "right", bgcolor: C.soft, color: C.dark }}>ใช้จริง (Claim)</Typography>
+        {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "เอกสารใบเคลมสีสันดูรกเกินไป") คอลัมน์ไม่ระบายสี — ตัวเลขใช้จริงตัวเข้ม · สีเหลือแค่ส่วนต่างรวม */}
+        <Typography sx={{ ...head, textAlign: "right" }}>ตั้งเบิก</Typography>
+        <Typography sx={{ ...head, textAlign: "right" }}>ใช้จริง</Typography>
         <Typography sx={{ ...head, textAlign: "right" }}>ส่วนต่าง</Typography>
       </Box>
       {rows.map((r, i) => {
@@ -368,17 +367,17 @@ const CompareTable = ({ items, advanceItems, wide }) => {
                 {r.receiptNo ? ` · ใบเสร็จ ${r.receiptNo}` : ""}{r.detail ? ` · ${r.detail}` : ""}
               </Typography>
             </Box>
-            <Typography sx={{ ...cell, textAlign: "right", bgcolor: A.soft, color: A.dark, fontWeight: 800 }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
-            <Typography sx={{ ...cell, textAlign: "right", bgcolor: C.soft, color: C.dark, fontWeight: 800 }}>{fmtMoney(r.actualAmount)}</Typography>
-            <Typography sx={{ ...cell, textAlign: "right", color: diffColor(r.diff), fontWeight: 800 }}>{diffText(r.diff)}</Typography>
+            <Typography sx={{ ...cell, textAlign: "right", color: TEXT_SUB, fontWeight: 600 }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
+            <Typography sx={{ ...cell, textAlign: "right", color: "#0f172a", fontWeight: 800 }}>{fmtMoney(r.actualAmount)}</Typography>
+            <Typography sx={{ ...cell, textAlign: "right", color: TEXT_SUB, fontWeight: 600 }}>{diffText(r.diff)}</Typography>
           </Box>
         );
       })}
       <Box sx={{ display: "grid", gridTemplateColumns: grid, bgcolor: "#f1f5f9" }}>
         <Box />
         <Typography sx={{ ...cell, fontWeight: 900 }}>รวม</Typography>
-        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: A.dark, bgcolor: alpha(A.color, 0.12) }}>{fmtMoney(plannedTotal)}</Typography>
-        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: C.dark, bgcolor: alpha(C.color, 0.12) }}>{fmtMoney(actualTotal)}</Typography>
+        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 800, color: "#334155" }}>{fmtMoney(plannedTotal)}</Typography>
+        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: "#0f172a" }}>{fmtMoney(actualTotal)}</Typography>
         <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: diffColor(diffTotal) }}>{diffText(diffTotal)}</Typography>
       </Box>
     </Box>
@@ -925,8 +924,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
         <DialogTitle sx={{ p: 0 }}>
           {/* ✅ หัวกล่องเป็นสีประจำชนิดใบ — Advance เขียวอมฟ้า / Claim ม่วง พร้อมป้าย ADVANCE/CLAIM */}
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{
-            px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${alpha(meta.color, 0.25)}`,
-            borderTop: `5px solid ${meta.color}`, bgcolor: meta.soft,
+            px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${BORDER_MAIN}`,
+            borderTop: `4px solid ${meta.color}`, bgcolor: "#fff",
           }}>
             <Box sx={{
               width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -983,7 +982,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     {isCtr && <Typography variant="caption" sx={{ color: TEXT_SUB }}>ค่าจ้าง {baht(e.total)}</Typography>}
                   </Box>
                 </Stack>
-                {nextStep && <Alert severity={nextStep.severity} sx={{ mt: 1.5, borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.84rem", fontWeight: 600 } }}>{nextStep.text}</Alert>}
+                {nextStep && <Alert severity={nextStep.severity} sx={{ mt: 1.5, borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.84rem", fontWeight: 600 },
+                  ...(nextStep.severity === "info" ? { bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155", "& .MuiAlert-icon": { color: "#2563eb" } } : {}) }}>{nextStep.text}</Alert>}
                 {e.status !== "cancelled" && <Steps steps={steps} color={meta.color} />}
               </Card>
 
@@ -1069,15 +1069,15 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     const d = differenceMeta(e.difference, slip);
                     return (
                       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1, mb: 1.5 }}>
-                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: KIND_META.advance.soft, border: `1px solid ${alpha(KIND_META.advance.color, 0.3)}` }}>
-                          <Typography variant="caption" sx={{ color: KIND_META.advance.dark, fontWeight: 800 }}>ยอดเบิก Advance</Typography>
-                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: KIND_META.advance.dark }}>{baht(e.advance?.total)}</Typography>
+                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
+                          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>ยอดเบิก Advance</Typography>
+                          <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#334155" }}>{baht(e.advance?.total)}</Typography>
                         </Box>
-                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: KIND_META.claim.soft, border: `1px solid ${alpha(KIND_META.claim.color, 0.3)}` }}>
-                          <Typography variant="caption" sx={{ color: KIND_META.claim.dark, fontWeight: 800 }}>ใช้จ่ายจริง</Typography>
-                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: KIND_META.claim.dark }}>{baht(e.total)}</Typography>
+                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
+                          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>ใช้จ่ายจริง</Typography>
+                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: "#0f172a" }}>{baht(e.total)}</Typography>
                         </Box>
-                        <Box sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, p: 1, borderRadius: 2, bgcolor: alpha(d.color, 0.08), border: `1px solid ${alpha(d.color, 0.3)}` }}>
+                        <Box sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderLeft: `4px solid ${d.color}` }}>
                           <Typography variant="caption" sx={{ color: d.color, fontWeight: 800 }}>{d.label}</Typography>
                           <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: d.color }}>{d.amount ? baht(d.amount) : "—"}</Typography>
                         </Box>
@@ -1094,7 +1094,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 <Box sx={{ mb: 1.5 }}>
                   <Button fullWidth onClick={() => setPanelOpen((v) => !v)}
                     endIcon={<ExpandMore sx={{ transform: panelOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
-                    sx={{ justifyContent: "space-between", textTransform: "none", fontWeight: 800, color: KIND_META.advance.dark, bgcolor: KIND_META.advance.soft, border: `1px solid ${alpha(KIND_META.advance.color, 0.35)}`, borderRadius: 2.5, px: 1.5 }}>
+                    sx={{ justifyContent: "space-between", textTransform: "none", fontWeight: 800, color: "#334155", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, px: 1.5 }}>
                     {panelOpen ? "ซ่อนรายละเอียดใบ Advance" : `ดูรายละเอียดใบ Advance ${e.advance?.docNo || ""}`}
                   </Button>
                   <Collapse in={panelOpen} unmountOnExit>
@@ -1418,7 +1418,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 <span>
                   <Button variant="contained" disabled={selfBlocked} onClick={() => setAction(kind === "advance" ? "pay" : "settle")}
                     startIcon={kind === "advance" ? <Payments sx={{ fontSize: 18 }} /> : <TaskAlt sx={{ fontSize: 18 }} />}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: mustReturn ? "#c2410c" : meta.color, "&:hover": { bgcolor: mustReturn ? "#9a3412" : meta.dark, boxShadow: "none" } }}>
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
                     {mustReturn ? "ยืนยันรับเงินคืน" : "อนุมัติเบิกจ่าย"}
                   </Button>
                 </span>
