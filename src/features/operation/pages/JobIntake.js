@@ -309,10 +309,10 @@ function DocBox({ title, hint, tone, children }) {
  * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ส่วนนี้ซ้ำซ้อนกับการดำเนินงานไหม จัดการยังไงไม่ให้สับสน ทำงานซ้ำซ้อน" → เลือก "แบ่งหน้าที่ชัด")
  *    หน้ารับงาน = รับงานจนส่งลงตาราง + สิ่งที่หน้านี้ยังต้องตามต่อเอง (ส่งของ→วางบิล · ใบเสนอราคาที่รอผล)
  *    งานเข้าหน้างานที่ลงตารางแล้ว (มอบทีม · เข้างาน · ปิดงาน) ทำที่หน้า "การดำเนินงาน" ที่เดียว
- *    → แท็บ "ส่งต่อแล้ว" = รายการสั้นอ่านอย่างเดียว ไว้ดูว่างานที่รับมาไปถึงไหน + ปุ่มไปหน้าการดำเนินงาน
- *    แต่ละงานอยู่แท็บเดียวเสมอ (ต้องทำ มาก่อน ส่งต่อแล้ว/เสร็จแล้ว)
+ *    → แท็บ "ลงตารางแล้ว" = รายการสั้นอ่านอย่างเดียว ไว้ดูว่างานที่รับมาไปถึงไหน + ปุ่มไปหน้าการดำเนินงาน
+ *    แต่ละงานอยู่แท็บเดียวเสมอ (ต้องทำ มาก่อน ลงตารางแล้ว/เสร็จแล้ว)
  * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ทำไมมีหลายแถบกว่าเดิม จะไม่สับสนหรอ") รวม "รอเริ่ม" + "ต้องติดตาม" เป็นแท็บเดียว "ต้องทำ"
- *    (แบ่งหัวข้อในแท็บ: รอลงตาราง/ส่งของ → ติดตามผล) — เหลือ 3 แท็บหลักเท่าเดิม: ต้องทำ · ส่งต่อแล้ว · เสร็จแล้ว (+ ยกเลิก เมื่อมี)
+ *    (แบ่งหัวข้อในแท็บ: รอลงตาราง/ส่งของ → ติดตามผล) — เหลือ 3 แท็บหลักเท่าเดิม: ต้องทำ · ลงตารางแล้ว · เสร็จแล้ว (+ ยกเลิก เมื่อมี)
  */
 /**
  * ✅ (24 ต.ค. 2569 ผู้ใช้: "แถบตามใบเสนอราคาให้กดดูง่ายๆ แบบเดิมยังไง ดูยากกว่าเดิม")
@@ -320,21 +320,23 @@ function DocBox({ title, hint, tone, children }) {
  */
 const TODO_SUBS = [
   { key: "all", label: "ทั้งหมด", color: "#475569" },
-  { key: "start", label: "รอลงตาราง / ส่งของ", short: "รอลงตาราง", color: AMBER, test: (s) => s.i === 0 },
-  { key: "quote", label: "ใบเสนอราคา รอผล", short: "ใบเสนอราคา", color: "#7c3aed", test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
+  { key: "start", label: "รอลงตาราง / ส่งของ", short: "รอลงตาราง", color: ACCENT, test: (s) => s.i === 0 },
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำว่า รายการที่มีใบเสนอราคาเพิ่มเติม · เป็นแถบสีส้ม")
+  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "รายการที่มีใบเสนอราคาเพิ่มเติม", color: "#ea580c", tint: true, test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
   { key: "bill", label: "รอวางบิล", short: "รอวางบิล", color: "#0891b2", test: (s) => Boolean(s.nv && s.i === 2) },
 ];
 const needsFollow = (s, oc) => s.i >= 1 && s.i <= 4 && ((s.nv && s.i === 2) || Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)));
 const TABS = [
   { key: "waiting", label: "ต้องทำ", short: "ต้องทำ", test: (s, oc) => s.i === 0 || needsFollow(s, oc) },
-  { key: "handed", label: "ส่งต่อแล้ว", short: "ส่งต่อแล้ว", test: (s, oc) => s.i >= 1 && s.i <= 3 && !needsFollow(s, oc) },
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำสื่อความหมาย ส่งต่อแล้วคืออะไร") → "ลงตารางแล้ว" (งานเข้าหน้างานที่ส่งลงตารางแล้ว กำลังดำเนินการ)
+  { key: "handed", label: "ลงตารางแล้ว", short: "ลงตารางแล้ว", test: (s, oc) => s.i >= 1 && s.i <= 3 && !needsFollow(s, oc) },
   { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s, oc) => s.i === 4 && !needsFollow(s, oc) },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
   { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
 ];
 
 /**
- * แท็บ "ส่งต่อแล้ว" — รายการสั้นอ่านอย่างเดียว: วันเข้างาน · งาน · ทีม · ขั้นตอนตอนนี้ · ไปหน้าการดำเนินงาน
+ * แท็บ "ลงตารางแล้ว" — รายการสั้นอ่านอย่างเดียว: วันเข้างาน · งาน · ทีม · ขั้นตอนตอนนี้ · ไปหน้าการดำเนินงาน
  * (มอบทีม/เข้างาน/ปิดงาน ทำที่หน้าการดำเนินงาน — ไม่ทำซ้ำที่นี่)
  */
 function HandedList({ rows }) {
@@ -345,7 +347,7 @@ function HandedList({ rows }) {
     <Stack spacing={1.25}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 0.9, borderRadius: 2.5, bgcolor: alpha(ACCENT, 0.05), border: `1px solid ${alpha(ACCENT, 0.18)}` }}>
         <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
-          มอบทีม · เข้างาน · ปิดงาน <Box component="span" sx={{ color: MUTED }}>ทำต่อที่หน้าการดำเนินงาน</Box>
+          งานที่ลงตารางแล้ว <Box component="span" sx={{ color: MUTED }}>— มอบทีม · เข้างาน · ปิดงาน ทำต่อที่หน้าการดำเนินงาน</Box>
         </Typography>
         <Button component={Link} to="/operation" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
           sx={{ ...BTN, height: 30, px: 1.1, fontSize: "0.76rem", flexShrink: 0, color: ACCENT, bgcolor: "#fff", border: `1px solid ${alpha(ACCENT, 0.35)}`, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
@@ -1786,7 +1788,7 @@ export default function JobIntake() {
             return (
               <ButtonBase key={x.key} onClick={() => setTodoSub(x.key)}
                 sx={{ flexShrink: 0, gap: 0.6, height: { xs: 30, sm: 32 }, px: 1.2, borderRadius: 99, fontFamily: "inherit", fontSize: { xs: "0.76rem", sm: "0.8rem" }, fontWeight: on ? 800 : 600,
-                  color: on ? x.color : "#475569", bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : LINE}` }}>
+                  color: on || x.tint ? x.color : "#475569", bgcolor: on ? alpha(x.color, 0.14) : x.tint ? alpha(x.color, 0.06) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.7) : x.tint ? alpha(x.color, 0.35) : LINE}` }}>
                 {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
                 <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{x.short || x.label}</Box>
                 <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{x.label}</Box>
@@ -1797,7 +1799,7 @@ export default function JobIntake() {
           })}
           {todoSub === "quote" && (
             <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
-              sx={{ flexShrink: 0, ml: "auto", textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#7c3aed", whiteSpace: "nowrap" }}>
+              sx={{ flexShrink: 0, ml: "auto", textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#ea580c", whiteSpace: "nowrap" }}>
               ใบเสนอราคาทั้งหมด
             </Button>
           )}
@@ -1881,13 +1883,13 @@ export default function JobIntake() {
             {tab === "waiting" && todoSub === "all" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
               const first = st.i === 0;
               const n = list.filter((x) => (x.s.i === 0) === first).length;
-              const c = first ? AMBER : ACCENT;
+              const c = first ? ACCENT : "#ea580c";
               return (
                 <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, mt: i ? 1 : 0 }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: c }} />
                   <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: INK }}>{first ? "รอลงตาราง / รอส่งของ" : "ติดตามผล"}</Typography>
                   <Box component="span" sx={{ px: 0.8, borderRadius: 99, bgcolor: alpha(c, 0.1), color: c, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
-                  <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{first ? "รับงานแล้ว ยังไม่ได้ส่งต่อ" : "วางบิล · ผลใบเสนอราคา"}</Typography>
+                  <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{first ? "รับงานแล้ว ยังไม่ได้ลงตาราง" : "ใบเสนอราคาเพิ่มเติมรอผล · รอวางบิล"}</Typography>
                   <Box sx={{ flex: 1, height: 1, bgcolor: LINE }} />
                 </Stack>
               );
@@ -1899,7 +1901,7 @@ export default function JobIntake() {
         )
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานที่ต้องทำ" : tab === "handed" ? "ยังไม่มีงานที่ส่งต่อ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานที่ต้องทำ" : tab === "handed" ? "ยังไม่มีงานที่ลงตาราง" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
