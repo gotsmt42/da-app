@@ -313,12 +313,12 @@ const CompareTable = ({ items, advanceItems, wide }) => {
               </Typography>
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.8fr", gap: 0.5, mt: 0.75 }}>
                 <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: "#f8fafc" }}>
-                  <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ตั้งเบิก</Typography>
-                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#334155" }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
+                  <Typography sx={{ fontSize: "0.62rem", color: KIND_META.advance.dark, fontWeight: 800 }}>ตั้งเบิก</Typography>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: KIND_META.advance.dark }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
                 </Box>
                 <Box sx={{ px: 0.75, py: 0.4, borderRadius: 1.5, bgcolor: "#f8fafc" }}>
-                  <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ใช้จริง</Typography>
-                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f172a" }}>{fmtMoney(r.actualAmount)}</Typography>
+                  <Typography sx={{ fontSize: "0.62rem", color: KIND_META.claim.dark, fontWeight: 800 }}>ใช้จริง</Typography>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: KIND_META.claim.dark }}>{fmtMoney(r.actualAmount)}</Typography>
                 </Box>
                 <Box sx={{ px: 0.75, py: 0.4, textAlign: "right" }}>
                   <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB, fontWeight: 800 }}>ต่าง</Typography>
@@ -329,8 +329,8 @@ const CompareTable = ({ items, advanceItems, wide }) => {
           );
         })}
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 0.8fr", gap: 0.5, p: 1, borderRadius: 2, bgcolor: "#f1f5f9" }}>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#334155" }}>{fmtMoney(plannedTotal)}</Typography>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: "#0f172a" }}>{fmtMoney(actualTotal)}</Typography>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: KIND_META.advance.dark }}>{fmtMoney(plannedTotal)}</Typography>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, color: KIND_META.claim.dark }}>{fmtMoney(actualTotal)}</Typography>
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 900, textAlign: "right", color: diffColor(diffTotal) }}>{diffText(diffTotal)}</Typography>
         </Box>
       </Stack>
@@ -346,8 +346,9 @@ const CompareTable = ({ items, advanceItems, wide }) => {
         <Typography sx={head}>#</Typography>
         <Typography sx={head}>รายการ</Typography>
         {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "เอกสารใบเคลมสีสันดูรกเกินไป") คอลัมน์ไม่ระบายสี — ตัวเลขใช้จริงตัวเข้ม · สีเหลือแค่ส่วนต่างรวม */}
-        <Typography sx={{ ...head, textAlign: "right" }}>ตั้งเบิก</Typography>
-        <Typography sx={{ ...head, textAlign: "right" }}>ใช้จริง</Typography>
+        {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "แยกสีบ้าง แต่ไม่เยอะ") สีอยู่ที่หัวคอลัมน์และตัวเลข ไม่ระบายพื้น */}
+        <Typography sx={{ ...head, textAlign: "right", color: KIND_META.advance.dark }}>ตั้งเบิก</Typography>
+        <Typography sx={{ ...head, textAlign: "right", color: KIND_META.claim.dark }}>ใช้จริง</Typography>
         <Typography sx={{ ...head, textAlign: "right" }}>ส่วนต่าง</Typography>
       </Box>
       {rows.map((r, i) => {
@@ -367,8 +368,8 @@ const CompareTable = ({ items, advanceItems, wide }) => {
                 {r.receiptNo ? ` · ใบเสร็จ ${r.receiptNo}` : ""}{r.detail ? ` · ${r.detail}` : ""}
               </Typography>
             </Box>
-            <Typography sx={{ ...cell, textAlign: "right", color: TEXT_SUB, fontWeight: 600 }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
-            <Typography sx={{ ...cell, textAlign: "right", color: "#0f172a", fontWeight: 800 }}>{fmtMoney(r.actualAmount)}</Typography>
+            <Typography sx={{ ...cell, textAlign: "right", color: KIND_META.advance.dark, fontWeight: 700 }}>{r.planned ? fmtMoney(r.plannedAmount) : "-"}</Typography>
+            <Typography sx={{ ...cell, textAlign: "right", color: KIND_META.claim.dark, fontWeight: 800 }}>{fmtMoney(r.actualAmount)}</Typography>
             <Typography sx={{ ...cell, textAlign: "right", color: TEXT_SUB, fontWeight: 600 }}>{diffText(r.diff)}</Typography>
           </Box>
         );
@@ -376,8 +377,8 @@ const CompareTable = ({ items, advanceItems, wide }) => {
       <Box sx={{ display: "grid", gridTemplateColumns: grid, bgcolor: "#f1f5f9" }}>
         <Box />
         <Typography sx={{ ...cell, fontWeight: 900 }}>รวม</Typography>
-        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 800, color: "#334155" }}>{fmtMoney(plannedTotal)}</Typography>
-        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: "#0f172a" }}>{fmtMoney(actualTotal)}</Typography>
+        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: KIND_META.advance.dark }}>{fmtMoney(plannedTotal)}</Typography>
+        <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: KIND_META.claim.dark }}>{fmtMoney(actualTotal)}</Typography>
         <Typography sx={{ ...cell, textAlign: "right", fontWeight: 900, color: diffColor(diffTotal) }}>{diffText(diffTotal)}</Typography>
       </Box>
     </Box>
@@ -1069,13 +1070,13 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     const d = differenceMeta(e.difference, slip);
                     return (
                       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1, mb: 1.5 }}>
-                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
-                          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>ยอดเบิก Advance</Typography>
-                          <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#334155" }}>{baht(e.advance?.total)}</Typography>
+                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderLeft: `4px solid ${KIND_META.advance.color}` }}>
+                          <Typography variant="caption" sx={{ color: KIND_META.advance.dark, fontWeight: 800 }}>ยอดเบิก Advance</Typography>
+                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: KIND_META.advance.dark }}>{baht(e.advance?.total)}</Typography>
                         </Box>
-                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
-                          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>ใช้จ่ายจริง</Typography>
-                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: "#0f172a" }}>{baht(e.total)}</Typography>
+                        <Box sx={{ p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderLeft: `4px solid ${KIND_META.claim.color}` }}>
+                          <Typography variant="caption" sx={{ color: KIND_META.claim.dark, fontWeight: 800 }}>ใช้จ่ายจริง</Typography>
+                          <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: KIND_META.claim.dark }}>{baht(e.total)}</Typography>
                         </Box>
                         <Box sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, p: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderLeft: `4px solid ${d.color}` }}>
                           <Typography variant="caption" sx={{ color: d.color, fontWeight: 800 }}>{d.label}</Typography>
