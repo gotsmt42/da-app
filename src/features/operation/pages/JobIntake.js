@@ -29,7 +29,7 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress, useMediaQuery,
 } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -322,7 +322,7 @@ const TODO_SUBS = [
   { key: "all", label: "ทั้งหมด", color: "#475569" },
   { key: "start", label: "รอลงตาราง / ส่งของ", short: "รอลงตาราง", color: ACCENT, test: (s) => s.i === 0 },
   // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำว่า รายการที่มีใบเสนอราคาเพิ่มเติม · เป็นแถบสีส้ม")
-  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "รายการที่มีใบเสนอราคาเพิ่มเติม", color: "#ea580c", tint: true, test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
+  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "ใบเสนอราคาเพิ่มเติม", color: "#ea580c", test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
   { key: "bill", label: "รอวางบิล", short: "รอวางบิล", color: "#0891b2", test: (s) => Boolean(s.nv && s.i === 2) },
 ];
 const needsFollow = (s, oc) => s.i >= 1 && s.i <= 4 && ((s.nv && s.i === 2) || Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)));
@@ -1540,7 +1540,10 @@ export default function JobIntake() {
   const [q, setQ] = useState("");
   const [todoSub, setTodoSub] = useState("all");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
-  const [view, setView] = useState(() => initialViewMode("tt-intake-view"));
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ดูล้นๆ กดใช้งานยาก") มือถือใช้การ์ดเสมอ (ตารางหลายคอลัมน์ล้นจอแคบ) · จอใหญ่เลือกได้
+  const [viewPref, setView] = useState(() => initialViewMode("tt-intake-view"));
+  const isPhone = useMediaQuery("(max-width:599.95px)");
+  const view = isPhone ? "card" : viewPref;
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-intake-view", v); } catch { /* ignore */ } };
   const groupOf = (arr) => {
     const m = new Map();
@@ -1781,29 +1784,49 @@ export default function JobIntake() {
         })}
       </Stack>
 
+      {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "ดูล้นๆ กดใช้งานยาก ไม่ดึงดูด") ปุ่มกรองแบบแถวเดียวที่ล้นจอ → กล่องสรุป 3 ช่องเต็มความกว้าง
+          ตัวเลขใหญ่ + ชื่อเต็ม (ตัดบรรทัดได้) · กดเพื่อกรอง · กดซ้ำ = กลับไปดูทั้งหมด · ช่องใบเสนอราคาเป็นสีส้มเสมอ */}
       {tab === "waiting" && todoCounts.all > 0 && (
-        <Stack direction="row" alignItems="center" gap={0.6} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-          {TODO_SUBS.filter((x) => x.key === "all" || todoCounts[x.key] > 0 || todoSub === x.key).map((x) => {
-            const on = todoSub === x.key;
-            return (
-              <ButtonBase key={x.key} onClick={() => setTodoSub(x.key)}
-                sx={{ flexShrink: 0, gap: 0.6, height: { xs: 30, sm: 32 }, px: 1.2, borderRadius: 99, fontFamily: "inherit", fontSize: { xs: "0.76rem", sm: "0.8rem" }, fontWeight: on ? 800 : 600,
-                  color: on || x.tint ? x.color : "#475569", bgcolor: on ? alpha(x.color, 0.14) : x.tint ? alpha(x.color, 0.06) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.7) : x.tint ? alpha(x.color, 0.35) : LINE}` }}>
-                {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
-                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{x.short || x.label}</Box>
-                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{x.label}</Box>
-                <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 900,
-                  bgcolor: on ? x.color : SURFACE, color: on ? "#fff" : MUTED }}>{todoCounts[x.key]}</Box>
-              </ButtonBase>
-            );
-          })}
-          {todoSub === "quote" && (
-            <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
-              sx={{ flexShrink: 0, ml: "auto", textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#ea580c", whiteSpace: "nowrap" }}>
-              ใบเสนอราคาทั้งหมด
-            </Button>
+        <Box sx={{ mb: 1.25 }}>
+          {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใหญ่ไป บังรายการ" · "เหมือนปุ่มที่โดนกดอยู่ ไม่ควร") แถวเดียวสูง 36 — ตัวเลขสี + ชื่อ · พื้นขาวทุกช่อง มีพื้นสีเฉพาะช่องที่กดเลือก */}
+          <Box sx={{ display: "grid", gap: 0.6, gridTemplateColumns: { xs: "1fr 1.5fr 1fr", sm: "repeat(3, max-content)" } }}>
+            {TODO_SUBS.filter((x) => x.key !== "all").map((x) => {
+              const on = todoSub === x.key;
+              const n = todoCounts[x.key] || 0;
+              const live = n > 0 || on;
+              return (
+                <ButtonBase key={x.key} disabled={!live} onClick={() => setTodoSub(on ? "all" : x.key)} aria-pressed={on} title={x.label}
+                  sx={{ justifyContent: "flex-start", gap: 0.6, minWidth: 0, height: 36, px: 1.1, borderRadius: 2, fontFamily: "inherit",
+                    bgcolor: on ? alpha(x.color, 0.12) : "#fff",
+                    border: `1.5px solid ${on ? x.color : LINE}`, opacity: live ? 1 : 0.5,
+                    transition: "background-color .15s, border-color .15s" }}>
+                  <Typography component="span" sx={{ fontSize: "0.95rem", fontWeight: 900, color: live ? x.color : "#94a3b8", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{n}</Typography>
+                  <Typography component="span" noWrap sx={{ minWidth: 0, fontSize: { xs: "0.72rem", sm: "0.8rem" }, fontWeight: 800, color: on ? x.color : "#334155" }}>
+                    <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{x.short || x.label}</Box>
+                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{x.label}</Box>
+                  </Typography>
+                </ButtonBase>
+              );
+            })}
+          </Box>
+          {todoSub !== "all" && (
+            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.75, px: 0.25 }}>
+              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: MUTED, visibility: { xs: "hidden", sm: "visible" } }}>
+                แสดงเฉพาะ <Box component="span" sx={{ fontWeight: 800, color: INK }}>{TODO_SUBS.find((x) => x.key === todoSub)?.label}</Box>
+              </Typography>
+              {todoSub === "quote" && (
+                <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
+                  sx={{ flexShrink: 0, minWidth: 0, textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#ea580c", whiteSpace: "nowrap" }}>
+                  ใบเสนอราคาทั้งหมด
+                </Button>
+              )}
+              <Button size="small" onClick={() => setTodoSub("all")}
+                sx={{ flexShrink: 0, minWidth: 0, textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: ACCENT, whiteSpace: "nowrap" }}>
+                ดูทั้งหมด ({todoCounts.all})
+              </Button>
+            </Stack>
           )}
-        </Stack>
+        </Box>
       )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
@@ -1824,7 +1847,7 @@ export default function JobIntake() {
             </ButtonBase>
           </span>
         </Tooltip>
-        <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff", display: tab === "handed" ? "none" : "flex" }}>
+        <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff", display: { xs: "none", sm: tab === "handed" ? "none" : "flex" } }}>
           {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
             <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
               sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
