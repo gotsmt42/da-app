@@ -314,6 +314,16 @@ function DocBox({ title, hint, tone, children }) {
  * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ทำไมมีหลายแถบกว่าเดิม จะไม่สับสนหรอ") รวม "รอเริ่ม" + "ต้องติดตาม" เป็นแท็บเดียว "ต้องทำ"
  *    (แบ่งหัวข้อในแท็บ: รอลงตาราง/ส่งของ → ติดตามผล) — เหลือ 3 แท็บหลักเท่าเดิม: ต้องทำ · ส่งต่อแล้ว · เสร็จแล้ว (+ ยกเลิก เมื่อมี)
  */
+/**
+ * ✅ (24 ต.ค. 2569 ผู้ใช้: "แถบตามใบเสนอราคาให้กดดูง่ายๆ แบบเดิมยังไง ดูยากกว่าเดิม")
+ *    ปุ่มกรองในแท็บ "ต้องทำ" — กดทีเดียวเห็นเฉพาะเรื่องนั้น: รอลงตาราง/ส่งของ · รอวางบิล · ใบเสนอราคา
+ */
+const TODO_SUBS = [
+  { key: "all", label: "ทั้งหมด", color: "#475569" },
+  { key: "start", label: "รอลงตาราง / ส่งของ", short: "รอลงตาราง", color: AMBER, test: (s) => s.i === 0 },
+  { key: "quote", label: "ใบเสนอราคา รอผล", short: "ใบเสนอราคา", color: "#7c3aed", test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
+  { key: "bill", label: "รอวางบิล", short: "รอวางบิล", color: "#0891b2", test: (s) => Boolean(s.nv && s.i === 2) },
+];
 const needsFollow = (s, oc) => s.i >= 1 && s.i <= 4 && ((s.nv && s.i === 2) || Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)));
 const TABS = [
   { key: "waiting", label: "ต้องทำ", short: "ต้องทำ", test: (s, oc) => s.i === 0 || needsFollow(s, oc) },
@@ -1526,6 +1536,7 @@ export default function JobIntake() {
   const [scheduling, setScheduling] = useState(null);
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
+  const [todoSub, setTodoSub] = useState("all");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
   const [view, setView] = useState(() => initialViewMode("tt-intake-view"));
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-intake-view", v); } catch { /* ignore */ } };
@@ -1695,7 +1706,8 @@ export default function JobIntake() {
     const kw = q.trim().toLowerCase();
     const hit = (j) => !kw || [j.title, j.system, j.site, j.company, j.jobNo, j.intakeDocNo, j.responsiblePerson, j.description]
       .some((v) => String(v || "").toLowerCase().includes(kw));
-    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j))
+    const sub = tab === "waiting" && todoSub !== "all" ? TODO_SUBS.find((x) => x.key === todoSub) : null;
+    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j) && (!sub || sub.test(x.s, x.oc)))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
       // แท็บต้องทำ: งานรอลงตาราง/ส่งของ (ขั้นแรก) ขึ้นก่อน งานติดตามผลตามหลัง
@@ -1704,11 +1716,13 @@ export default function JobIntake() {
         : tab === "handed"
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
-  }, [withStage, tab, q]);
+  }, [withStage, tab, q, todoSub]);
+  const todoCounts = useMemo(() => Object.fromEntries(TODO_SUBS.map((x) => [x.key,
+    withStage.filter((w) => TABS[0].test(w.s, w.oc) && (!x.test || x.test(w.s, w.oc))).length])), [withStage]);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าด้วยให้สมบูรณ์") การ์ด 10 / ตาราง 20 ต่อหน้า · เปลี่ยนแท็บ/ค้นหา/มุมมอง = กลับหน้า 1
   const pg = usePaged(list, view === "table" ? 20 : 10);
   const { setPage } = pg;
-  useEffect(() => { setPage(1); }, [tab, q, view, setPage]);
+  useEffect(() => { setPage(1); }, [tab, q, view, todoSub, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ต้องการปุ่ม Excel หน้ารับงาน") ส่งออกงานตามแท็บ + คำค้นที่เห็นอยู่
@@ -1764,6 +1778,31 @@ export default function JobIntake() {
           );
         })}
       </Stack>
+
+      {tab === "waiting" && todoCounts.all > 0 && (
+        <Stack direction="row" alignItems="center" gap={0.6} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+          {TODO_SUBS.filter((x) => x.key === "all" || todoCounts[x.key] > 0 || todoSub === x.key).map((x) => {
+            const on = todoSub === x.key;
+            return (
+              <ButtonBase key={x.key} onClick={() => setTodoSub(x.key)}
+                sx={{ flexShrink: 0, gap: 0.6, height: { xs: 30, sm: 32 }, px: 1.2, borderRadius: 99, fontFamily: "inherit", fontSize: { xs: "0.76rem", sm: "0.8rem" }, fontWeight: on ? 800 : 600,
+                  color: on ? x.color : "#475569", bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : LINE}` }}>
+                {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
+                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{x.short || x.label}</Box>
+                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{x.label}</Box>
+                <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 900,
+                  bgcolor: on ? x.color : SURFACE, color: on ? "#fff" : MUTED }}>{todoCounts[x.key]}</Box>
+              </ButtonBase>
+            );
+          })}
+          {todoSub === "quote" && (
+            <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
+              sx={{ flexShrink: 0, ml: "auto", textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#7c3aed", whiteSpace: "nowrap" }}>
+              ใบเสนอราคาทั้งหมด
+            </Button>
+          )}
+        </Stack>
+      )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
       <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
@@ -1839,7 +1878,7 @@ export default function JobIntake() {
           <>
           <Stack spacing={1.25}>{pg.rows.map(({ j, oc, s: st }, i) => <Box key={j._id}>
             {/* แท็บต้องทำ: หัวข้อแบ่ง 2 กลุ่ม — ทำอะไรก่อนเห็นชัด */}
-            {tab === "waiting" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
+            {tab === "waiting" && todoSub === "all" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
               const first = st.i === 0;
               const n = list.filter((x) => (x.s.i === 0) === first).length;
               const c = first ? AMBER : ACCENT;
