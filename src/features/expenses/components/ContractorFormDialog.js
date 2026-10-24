@@ -357,13 +357,15 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   useEffect(() => {
     if (!open || editing || rateMode !== "daily") return;
     const days = [...new Set(jobs.flatMap(daysOfRange))].sort();
+    // 🐛 (24 ต.ค. 2569 ผู้ใช้: "วันเข้างานไม่ตามงาน แสดงมาเกิน ผิดเพี้ยน") เดิมแถวที่เคยแก้อะไรไปนิดเดียว (เวลา/คน/ค่าแรง)
+    //    ถูกนับเป็น "เพิ่มเอง" แล้วค้างอยู่แม้เปลี่ยนไปผูกงานอื่น → วันเกินจากงานจริง
+    //    ✅ วันของงาน = ตามช่วงงานที่เลือกเท่านั้น (ค่าที่แก้ไว้ของวันเดียวกันยังอยู่) · เก็บเพิ่มเฉพาะวันที่กด "เพิ่มวัน" เอง
+    if (!days.length) return;
     setItems((rows) => {
-      const manual = rows.filter((r) => !r.auto && (r.workDate || Number(r.unitPrice) > 0));
       const byDate = new Map(rows.filter((r) => r.workDate).map((r) => [r.workDate, r]));
-      const auto = days.filter((d) => !manual.some((m) => m.workDate === d))
-        .map((d) => (byDate.get(d)?.auto ? byDate.get(d) : dayItem(d, dailyRate, true, Number(dailyPeople) || 1)));
-      const next = [...manual, ...auto].sort((a, b) => String(a.workDate || "9").localeCompare(String(b.workDate || "9"))).slice(0, MAX_ITEMS);
-      return next.length ? next : [dayItem("", dailyRate, false, Number(dailyPeople) || 1)];
+      const fromJobs = days.map((d) => byDate.get(d) || dayItem(d, dailyRate, true, Number(dailyPeople) || 1));
+      const extra = rows.filter((r) => r.added && r.workDate && !days.includes(r.workDate));
+      return [...fromJobs, ...extra].sort((x, y) => String(x.workDate || "9").localeCompare(String(y.workDate || "9"))).slice(0, MAX_ITEMS);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- สร้างใหม่เฉพาะตอนช่วงงานที่เลือกเปลี่ยน
   }, [open, editing, rateMode, jobsKey]);
@@ -373,7 +375,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     const last = rows.map((r) => r.workDate).filter(Boolean).sort().pop();
     const rate = dailyRate || ([...rows].reverse().find((r) => Number(r.unitPrice) > 0)?.unitPrice ?? "");
     const people = Number(dailyPeople) || Number([...rows].reverse().find((r) => Number(r.people) > 0)?.people) || 1;
-    return [...rows, dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate, false, people)];
+    return [...rows, { ...dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate, false, people), added: true }];
   });
   const taxDigits = digitsOnly(cTaxId);
   const bankError = payMode === "transfer" && bankCode ? validateAccount(bankCode, digitsOnly(accountNo)) : "";
