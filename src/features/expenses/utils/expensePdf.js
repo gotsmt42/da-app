@@ -170,9 +170,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     y = drawLetterhead(doc) + 2.6;
   }
   // ✅ เส้นคั่นหัวกระดาษเป็นสีประจำชนิดใบ — แยก Advance (เขียวอมฟ้า) กับ Claim (ม่วง) ได้ตั้งแต่มองไกลๆ
-  const tint = kind.pdf;
-  doc.setDrawColor(...tint.main);
-  doc.setLineWidth(0.8);
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "หน้า PDF ยังดูไม่มืออาชีพ รก") เอกสารโทนเดียว — หมึกเข้ม เส้นเทา หัวตารางเทาอ่อน
+  //    สีประจำชนิดใบเหลือแค่เส้นคั่นหัวกระดาษบางๆ (แยก Advance/Claim ได้) — ไม่ระบายพื้นคอลัมน์/กล่องอีก
+  const tint = { main: [15, 23, 42], head: [241, 245, 249], fill: [248, 250, 252], accent: kind.pdf.main };
+  doc.setDrawColor(...tint.accent);
+  doc.setLineWidth(0.6);
   doc.line(L, y, R, y);
 
   // ── ชื่อเอกสาร + ป้ายชนิดใบ ───────────────────────────────────────────
@@ -184,9 +186,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     doc.setFontSize(11 * k);
     const bw = doc.getTextWidth(kind.badge) + 6;
     const bh = 6 * k;
-    doc.setFillColor(...tint.main);
-    doc.roundedRect(R - bw, y - bh + 1.4, bw, bh, bh / 2, bh / 2, "F");
-    doc.setTextColor(255, 255, 255);
+    // ป้ายชนิดใบแบบเส้นขอบ (ไม่ระบายพื้น)
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(R - bw, y - bh + 1.4, bw, bh, 1.2, 1.2, "S");
+    doc.setTextColor(71, 85, 105);
     doc.text(kind.badge, R - bw / 2, y - bh / 2 + 1.4 + 1.3 * k, { align: "center" });
   }
   color(SLATE);
@@ -273,7 +277,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   const isReimburse = slip === "reimburse";
   const isClearClaim = isClaim && !isReimburse;
   const advDoc = e.advanceDoc || null;
-  const advTint = KIND_META.advance.pdf;
+  const advTint = { main: [51, 65, 85], head: [241, 245, 249], fill: [248, 250, 252] }; // โทนเดียวกับทั้งเอกสาร
   if (isClearClaim) {
     // ✅ ผู้ใช้ขอให้ใบเคลมมีรายละเอียดของ Advance "ข้างๆ" เพื่อตรวจสอบง่าย — บนกระดาษทำเป็นกรอบสีของ
     // Advance (เขียวอมฟ้า) ก่อนตาราง และในตารางมีคอลัมน์ "ตั้งเบิก" คู่กับ "ใช้จริง" ทุกบรรทัด
@@ -296,8 +300,8 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     doc.setDrawColor(...advTint.main);
     doc.setLineWidth(0.3);
     doc.roundedRect(L, y, W, boxH, 1.5, 1.5, "FD");
-    doc.setFillColor(...advTint.main);
-    doc.rect(L, y + 0.4, 1.4, boxH - 0.8, "F");
+    doc.setFillColor(148, 163, 184);
+    doc.rect(L, y + 0.4, 1, boxH - 0.8, "F");
     let by = y + 5 * s;
     bold(true); size(13); color(advTint.main);
     doc.text("อ้างอิงใบเบิกเงินล่วงหน้า (Advance)", L + 4, by);
@@ -335,11 +339,6 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.25);
   doc.rect(L, y, W, headH, "FD");
-  if (hasPlanned) {
-    // คอลัมน์ตั้งเบิกเป็นสีของ Advance — ตาเห็นทันทีว่าช่องไหนคือตัวเลขจากใบต้นทาง
-    doc.setFillColor(...advTint.head);
-    doc.rect(col("planned").x, y, col("planned").w, headH, "F");
-  }
   size(hasPlanned ? 12.5 : 13.5); bold(true); color(SLATE);
   cols.forEach((c, i) => {
     doc.text(headers[c.key], c.x + c.w / 2, y + headH / 2 + 1.5 * s, { align: "center" });
@@ -367,10 +366,6 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     const rh = Math.max(minRowH, 2.6 * s + descLines.length * lineH + detailLines.length * detailH);
     const base = y + 5.1 * s;
 
-    if (hasPlanned) {
-      doc.setFillColor(...advTint.fill);
-      doc.rect(col("planned").x, y, col("planned").w, rh, "F");
-    }
     color(unused ? GRAY : SLATE); size(14);
     doc.text(String(idx + 1), col("no").x + col("no").w / 2, base, { align: "center" });
     descLines.forEach((ln, i) => doc.text(ln, col("desc").x + 1.8, base + i * lineH));
@@ -400,10 +395,6 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     doc.line(L, y, R, y);
   });
   for (let i = rows.length; i < filler; i += 1) {
-    if (hasPlanned) {
-      doc.setFillColor(...advTint.fill);
-      doc.rect(col("planned").x, y, col("planned").w, minRowH, "F");
-    }
     y += minRowH;
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.15);
@@ -433,10 +424,6 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     if (fill) {
       doc.setFillColor(...fill);
       doc.rect(labelX, y, R - labelX, h, "F");
-    }
-    if (withPlanned) {
-      doc.setFillColor(...advTint.head);
-      doc.rect(col("planned").x, y, col("planned").w, h, "F");
     }
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.25);
@@ -581,11 +568,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     const amount = Math.abs(money(e.difference));
     const boxH = 15 * s;
     y += 4 * s;
-    doc.setFillColor(255, 247, 237);
-    doc.setDrawColor(251, 146, 60);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(L, y, W, boxH, 2.2, 2.2, "FD");
-    size(12.5); bold(true); color([154, 52, 18]);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(L, y, W, boxH, 1.5, 1.5, "FD");
+    size(12.5); bold(true); color(SLATE);
     doc.text(spaceThaiLatin("ผู้เบิกต้องคืนเงินให้บริษัท"), L + 4 * s, y + 6 * s);
     size(17);
     doc.text(`${fmtMoney(amount)} บาท`, L + 4 * s, y + 12.4 * s);
