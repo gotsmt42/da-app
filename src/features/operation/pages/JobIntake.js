@@ -315,22 +315,24 @@ function DocBox({ title, hint, tone, children }) {
  *    (แบ่งหัวข้อในแท็บ: รอลงตาราง/ส่งของ → ติดตามผล) — เหลือ 3 แท็บหลักเท่าเดิม: ต้องทำ · ลงตารางแล้ว · เสร็จแล้ว (+ ยกเลิก เมื่อมี)
  */
 /**
- * ✅ (24 ต.ค. 2569 ผู้ใช้: "แถบตามใบเสนอราคาให้กดดูง่ายๆ แบบเดิมยังไง ดูยากกว่าเดิม")
- *    ปุ่มกรองในแท็บ "ต้องทำ" — กดทีเดียวเห็นเฉพาะเรื่องนั้น: รอลงตาราง/ส่งของ · รอวางบิล · ใบเสนอราคา
+ * 🐛 (24 ต.ค. 2569 ผู้ใช้: "ทำไมแถบทำแล้ว มาอยู่ที่ต้องทำ สับสน ย้อนแย้ง")
+ *    เดิมเอางานที่ "ใบเสนอราคาเพิ่มเติมรอผล" ไปรวมในแท็บต้องทำ — งานที่ทำเสร็จ/ปิดแล้วจึงโผล่ในต้องทำพร้อมป้าย "ทำแล้ว"
+ *    ✅ แท็บตามสถานะงานจริงเท่านั้น (งานหนึ่งอยู่แท็บเดียว):
+ *       ต้องทำ = ยังไม่ได้ลงตาราง/ส่งของ (+ บันทึกที่ยังไม่ทำ) และงานส่งของที่รอวางบิล — สิ่งที่หน้านี้ต้องลงมือ
+ *       ลงตารางแล้ว = งานเข้าหน้างานระหว่างดำเนินการ · เสร็จแล้ว = จบงานแล้ว · ยกเลิก
+ *    ✅ ใบเสนอราคาเพิ่มเติม = แท็บ "มุมมอง" แยกสีส้ม (ไม่ใช่สถานะงาน) — รวมทุกงานที่ยังรอผลใบเสนอราคา
+ *       ไม่ว่างานจะอยู่ขั้นไหน (งานเสร็จแล้วก็ยังต้องตามผลใบเสนอราคา) · บนการ์ดแสดงสถานะงานจริง
  */
-const TODO_SUBS = [
-  { key: "all", label: "ทั้งหมด", color: "#475569" },
-  { key: "start", label: "รอลงตาราง / ส่งของ", short: "รอลงตาราง", color: ACCENT, test: (s) => s.i === 0 },
-  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำว่า รายการที่มีใบเสนอราคาเพิ่มเติม · เป็นแถบสีส้ม")
-  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "ใบเสนอราคาเพิ่มเติม", color: "#ea580c", test: (s, oc) => s.i >= 1 && !(s.nv && s.i === 2) && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)) },
-  { key: "bill", label: "รอวางบิล", short: "รอวางบิล", color: "#0891b2", test: (s) => Boolean(s.nv && s.i === 2) },
-];
-const needsFollow = (s, oc) => s.i >= 1 && s.i <= 4 && ((s.nv && s.i === 2) || Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group)));
+const isBilling = (s) => Boolean(s.nv && s.i === 2);
+const hasOpenQuote = (s, oc) => s.i >= 1 && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group));
+const QUOTE_TAB_COLOR = "#ea580c";
 const TABS = [
-  { key: "waiting", label: "ต้องทำ", short: "ต้องทำ", test: (s, oc) => s.i === 0 || needsFollow(s, oc) },
-  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำสื่อความหมาย ส่งต่อแล้วคืออะไร") → "ลงตารางแล้ว" (งานเข้าหน้างานที่ส่งลงตารางแล้ว กำลังดำเนินการ)
-  { key: "handed", label: "ลงตารางแล้ว", short: "ลงตารางแล้ว", test: (s, oc) => s.i >= 1 && s.i <= 3 && !needsFollow(s, oc) },
-  { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s, oc) => s.i === 4 && !needsFollow(s, oc) },
+  { key: "waiting", label: "ต้องทำ", short: "ต้องทำ", test: (s) => s.i === 0 || isBilling(s) },
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำสื่อความหมาย ส่งต่อแล้วคืออะไร") → "ลงตารางแล้ว"
+  { key: "handed", label: "ลงตารางแล้ว", short: "ลงตารางแล้ว", test: (s) => s.i >= 1 && s.i <= 3 && !isBilling(s) },
+  { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "แถบตามใบเสนอราคาให้กดดูง่ายๆ · ใช้คำว่า รายการที่มีใบเสนอราคาเพิ่มเติม · สีส้ม")
+  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "ใบเสนอราคาเพิ่มเติม", test: hasOpenQuote, color: QUOTE_TAB_COLOR, hideEmpty: true },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
   { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
 ];
@@ -1538,7 +1540,6 @@ export default function JobIntake() {
   const [scheduling, setScheduling] = useState(null);
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
-  const [todoSub, setTodoSub] = useState("all");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
   // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ดูล้นๆ กดใช้งานยาก") มือถือใช้การ์ดเสมอ (ตารางหลายคอลัมน์ล้นจอแคบ) · จอใหญ่เลือกได้
   const [viewPref, setView] = useState(() => initialViewMode("tt-intake-view"));
@@ -1711,8 +1712,7 @@ export default function JobIntake() {
     const kw = q.trim().toLowerCase();
     const hit = (j) => !kw || [j.title, j.system, j.site, j.company, j.jobNo, j.intakeDocNo, j.responsiblePerson, j.description]
       .some((v) => String(v || "").toLowerCase().includes(kw));
-    const sub = tab === "waiting" && todoSub !== "all" ? TODO_SUBS.find((x) => x.key === todoSub) : null;
-    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j) && (!sub || sub.test(x.s, x.oc)))
+    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
       // แท็บต้องทำ: งานรอลงตาราง/ส่งของ (ขั้นแรก) ขึ้นก่อน งานติดตามผลตามหลัง
@@ -1721,13 +1721,11 @@ export default function JobIntake() {
         : tab === "handed"
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
-  }, [withStage, tab, q, todoSub]);
-  const todoCounts = useMemo(() => Object.fromEntries(TODO_SUBS.map((x) => [x.key,
-    withStage.filter((w) => TABS[0].test(w.s, w.oc) && (!x.test || x.test(w.s, w.oc))).length])), [withStage]);
+  }, [withStage, tab, q]);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าด้วยให้สมบูรณ์") การ์ด 10 / ตาราง 20 ต่อหน้า · เปลี่ยนแท็บ/ค้นหา/มุมมอง = กลับหน้า 1
   const pg = usePaged(list, view === "table" ? 20 : 10);
   const { setPage } = pg;
-  useEffect(() => { setPage(1); }, [tab, q, view, todoSub, setPage]);
+  useEffect(() => { setPage(1); }, [tab, q, view, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ต้องการปุ่ม Excel หน้ารับงาน") ส่งออกงานตามแท็บ + คำค้นที่เห็นอยู่
@@ -1772,61 +1770,30 @@ export default function JobIntake() {
               border: { xs: 0, sm: `1.5px solid ${on ? ACCENT : LINE}` },
               bgcolor: on ? { xs: "#fff", sm: alpha(ACCENT, 0.07) } : { xs: "transparent", sm: "#fff" },
               boxShadow: on ? { xs: "0 1px 3px rgba(15,23,42,.14)", sm: "none" } : "none",
-              color: on ? { xs: INK, sm: ACCENT } : { xs: MUTED, sm: "#334155" },
+              color: on ? { xs: t.color || INK, sm: t.color || ACCENT } : t.color ? t.color : { xs: MUTED, sm: "#334155" },
+              ...(t.color && on ? { border: { xs: 0, sm: `1.5px solid ${t.color}` }, bgcolor: { xs: "#fff", sm: alpha(t.color, 0.07) } } : {}),
             }}>
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
               <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{t.short}</Box>
               <Box component="span" sx={{ minWidth: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 }, px: 0.55, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: { xs: "0.68rem", sm: "0.72rem" },
-                bgcolor: on ? ACCENT : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : MUTED,
+                bgcolor: on ? (t.color || ACCENT) : t.color ? alpha(t.color, 0.12) : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : t.color || MUTED,
                 ...(t.key === "requests" && !on && reqTotal > 0 ? { bgcolor: "#d97706", color: "#fff" } : {}) }}>{tabCount(t.key)}</Box>
             </ButtonBase>
           );
         })}
       </Stack>
 
-      {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "ดูล้นๆ กดใช้งานยาก ไม่ดึงดูด") ปุ่มกรองแบบแถวเดียวที่ล้นจอ → กล่องสรุป 3 ช่องเต็มความกว้าง
-          ตัวเลขใหญ่ + ชื่อเต็ม (ตัดบรรทัดได้) · กดเพื่อกรอง · กดซ้ำ = กลับไปดูทั้งหมด · ช่องใบเสนอราคาเป็นสีส้มเสมอ */}
-      {tab === "waiting" && todoCounts.all > 0 && (
-        <Box sx={{ mb: 1.25 }}>
-          {/* 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใหญ่ไป บังรายการ" · "เหมือนปุ่มที่โดนกดอยู่ ไม่ควร") แถวเดียวสูง 36 — ตัวเลขสี + ชื่อ · พื้นขาวทุกช่อง มีพื้นสีเฉพาะช่องที่กดเลือก */}
-          <Box sx={{ display: "grid", gap: 0.6, gridTemplateColumns: { xs: "1fr 1.5fr 1fr", sm: "repeat(3, max-content)" } }}>
-            {TODO_SUBS.filter((x) => x.key !== "all").map((x) => {
-              const on = todoSub === x.key;
-              const n = todoCounts[x.key] || 0;
-              const live = n > 0 || on;
-              return (
-                <ButtonBase key={x.key} disabled={!live} onClick={() => setTodoSub(on ? "all" : x.key)} aria-pressed={on} title={x.label}
-                  sx={{ justifyContent: "flex-start", gap: 0.6, minWidth: 0, height: 36, px: 1.1, borderRadius: 2, fontFamily: "inherit",
-                    bgcolor: on ? alpha(x.color, 0.12) : "#fff",
-                    border: `1.5px solid ${on ? x.color : LINE}`, opacity: live ? 1 : 0.5,
-                    transition: "background-color .15s, border-color .15s" }}>
-                  <Typography component="span" sx={{ fontSize: "0.95rem", fontWeight: 900, color: live ? x.color : "#94a3b8", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{n}</Typography>
-                  <Typography component="span" noWrap sx={{ minWidth: 0, fontSize: { xs: "0.72rem", sm: "0.8rem" }, fontWeight: 800, color: on ? x.color : "#334155" }}>
-                    <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{x.short || x.label}</Box>
-                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{x.label}</Box>
-                  </Typography>
-                </ButtonBase>
-              );
-            })}
-          </Box>
-          {todoSub !== "all" && (
-            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.75, px: 0.25 }}>
-              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: MUTED, visibility: { xs: "hidden", sm: "visible" } }}>
-                แสดงเฉพาะ <Box component="span" sx={{ fontWeight: 800, color: INK }}>{TODO_SUBS.find((x) => x.key === todoSub)?.label}</Box>
-              </Typography>
-              {todoSub === "quote" && (
-                <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
-                  sx={{ flexShrink: 0, minWidth: 0, textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: "#ea580c", whiteSpace: "nowrap" }}>
-                  ใบเสนอราคาทั้งหมด
-                </Button>
-              )}
-              <Button size="small" onClick={() => setTodoSub("all")}
-                sx={{ flexShrink: 0, minWidth: 0, textTransform: "none", fontWeight: 800, fontSize: "0.76rem", color: ACCENT, whiteSpace: "nowrap" }}>
-                ดูทั้งหมด ({todoCounts.all})
-              </Button>
-            </Stack>
-          )}
-        </Box>
+      {/* แท็บใบเสนอราคาเพิ่มเติม: บอกชัดว่าเป็นมุมมองติดตามผล (สถานะงานบนการ์ด = สถานะจริง) */}
+      {tab === "quote" && (
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25, px: 1.25, py: 0.8, borderRadius: 2.5, bgcolor: alpha(QUOTE_TAB_COLOR, 0.05), border: `1px solid ${alpha(QUOTE_TAB_COLOR, 0.25)}` }}>
+          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
+            ใบเสนอราคาเพิ่มเติมที่ยังรอผล <Box component="span" sx={{ color: MUTED }}>— งานจะอยู่ที่นี่จนรู้ผล แม้งานจะเสร็จแล้ว</Box>
+          </Typography>
+          <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
+            sx={{ ...BTN, height: 30, px: 1.1, fontSize: "0.76rem", flexShrink: 0, color: QUOTE_TAB_COLOR, bgcolor: "#fff", border: `1px solid ${alpha(QUOTE_TAB_COLOR, 0.4)}`, "&:hover": { bgcolor: alpha(QUOTE_TAB_COLOR, 0.06) } }}>
+            ติดตามใบเสนอราคา
+          </Button>
+        </Stack>
       )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
@@ -1903,16 +1870,16 @@ export default function JobIntake() {
           <>
           <Stack spacing={1.25}>{pg.rows.map(({ j, oc, s: st }, i) => <Box key={j._id}>
             {/* แท็บต้องทำ: หัวข้อแบ่ง 2 กลุ่ม — ทำอะไรก่อนเห็นชัด */}
-            {tab === "waiting" && todoSub === "all" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
+            {tab === "waiting" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
               const first = st.i === 0;
               const n = list.filter((x) => (x.s.i === 0) === first).length;
-              const c = first ? ACCENT : "#ea580c";
+              const c = first ? ACCENT : "#0891b2";
               return (
                 <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, mt: i ? 1 : 0 }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: c }} />
-                  <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: INK }}>{first ? "รอลงตาราง / รอส่งของ" : "ติดตามผล"}</Typography>
+                  <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: INK }}>{first ? "รอลงตาราง / รอส่งของ" : "รอวางบิล"}</Typography>
                   <Box component="span" sx={{ px: 0.8, borderRadius: 99, bgcolor: alpha(c, 0.1), color: c, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
-                  <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{first ? "รับงานแล้ว ยังไม่ได้ลงตาราง" : "ใบเสนอราคาเพิ่มเติมรอผล · รอวางบิล"}</Typography>
+                  <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{first ? "รับงานแล้ว ยังไม่ได้ลงตาราง/ส่งของ" : "ส่งของแล้ว แนบใบวางบิล"}</Typography>
                   <Box sx={{ flex: 1, height: 1, bgcolor: LINE }} />
                 </Stack>
               );
@@ -1924,7 +1891,7 @@ export default function JobIntake() {
         )
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานที่ต้องทำ" : tab === "handed" ? "ยังไม่มีงานที่ลงตาราง" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานที่ต้องทำ" : tab === "quote" ? "ไม่มีใบเสนอราคาที่รอผล" : tab === "handed" ? "ยังไม่มีงานที่ลงตาราง" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
