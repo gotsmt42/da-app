@@ -38,9 +38,9 @@ const fmtAt = (d) => (d ? new Date(d).toLocaleString("th-TH", { day: "numeric", 
 // ─── ชิ้นส่วนแสดงผล ─────────────────────────────────────────────────────────
 const Section = ({ n, title, children, right }) => (
   <Box sx={{ mt: 2 }}>
-    <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 0.75 }}>
+    <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 0.75 }}>
       <Box sx={{ minWidth: 22, height: 22, px: 0.5, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: ACCENT_SOFT, color: ACCENT, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
-      <Typography sx={{ flex: 1, fontWeight: 900, fontSize: "0.95rem", color: INK }}>{title}</Typography>
+      <Typography sx={{ flex: 1, fontWeight: 900, fontSize: "0.95rem", color: INK, whiteSpace: "nowrap" }}>{title}</Typography>
       {right}
     </Stack>
     {children}
@@ -183,12 +183,15 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
     setScanning(true);
     try {
       const r = await EventService.ScanServiceReport(id, force);
-      setState((s) => ({ ...s, summary: r.summary }));
+      setState((s) => ({ ...s, summary: r.summary, rescanLeft: r.rescanLeft ?? s.rescanLeft }));
       setEditing(false);
       onChanged?.(r.summary?.status || "draft");
     } catch (err) {
       const res = err?.response?.data;
-      if (err?.response?.status === 409 && res?.needForce) {
+      if (err?.response?.status === 429) {
+        setState((s) => ({ ...s, rescanLeft: 0 }));
+        Swal.fire({ icon: "warning", title: "อ่านใหม่ครบโควตาวันนี้แล้ว", text: res?.message });
+      } else if (err?.response?.status === 409 && res?.needForce) {
         const ok = await Swal.fire({ icon: "warning", title: "อ่านใหม่ทับสรุปเดิม?", text: res.message, showCancelButton: true, confirmButtonText: "อ่านใหม่", cancelButtonText: "ยกเลิก" });
         if (ok.isConfirmed) { setScanning(false); scan(true); return; }
       } else {
@@ -243,6 +246,8 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
   };
 
   const files = state.files || [];
+  // 💰 อ่านใหม่ได้ 3 ครั้ง/วัน/งาน (เซิร์ฟเวอร์บังคับ — หน้าจอบอกให้รู้ก่อนกด)
+  const rescanLeft = state.rescanLeft ?? 3;
   const confirmed = summary?.status === "confirmed";
   const lowConfidence = data.confidence === "low";
 
@@ -299,6 +304,9 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
               )}
               <Typography sx={{ fontSize: "0.74rem", color: FAINT, mb: 1 }}>
                 อ่านจาก {meta.fileCount} ไฟล์ · {fmtAt(summary.scannedAt)}{summary.scannedBy ? ` โดย ${summary.scannedBy}` : ""}
+                {/* 💰 ค่า AI ที่ใช้จริง (25 ต.ค. 2569 ผู้ใช้: "ทำให้ประหยัดขึ้น 2 เท่า") — อ่านใหม่ = จ่ายเพิ่ม จึงบอกยอดสะสมด้วย */}
+                {summary.usage?.costUsd > 0 ? ` · ค่า AI ~$${summary.usage.costUsd.toFixed(3)}` : ""}
+                {summary.scanCount > 1 ? ` (รวม $${(summary.totalCostUsd || 0).toFixed(3)} จาก ${summary.scanCount} ครั้ง)` : ""}
                 {summary.editedAt ? ` · แก้ไขล่าสุด ${fmtAt(summary.editedAt)} ${summary.editedBy}` : ""}
                 {confirmed ? ` · ยืนยันโดย ${summary.confirmedBy} ${fmtAt(summary.confirmedAt)}` : ""}
               </Typography>
@@ -318,7 +326,14 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
               </>
             ) : (
               <>
-                {state.canEdit && <Button startIcon={<Refresh />} onClick={() => scan(false)} disabled={!state.enabled} sx={{ ...BTN, color: MUTED }}>อ่านใหม่</Button>}
+                {state.canEdit && <Button startIcon={<Refresh />} onClick={async () => {
+                  // 💰 อ่านใหม่ = จ่ายค่า AI อีกรอบ — ถามก่อน กันกดเล่น/กดพลาด
+                  const c = summary.usage?.costUsd;
+                  const ok = await Swal.fire({ icon: "question", title: "ให้ AI อ่านใหม่?",
+                    text: `ใช้เครดิต AI อีกครั้ง${c ? ` (ประมาณ $${c.toFixed(3)})` : ""} · วันนี้อ่านใหม่ได้อีก ${rescanLeft} ครั้ง`,
+                    showCancelButton: true, confirmButtonText: "อ่านใหม่", cancelButtonText: "ยกเลิก" });
+                  if (ok.isConfirmed) scan(false);
+                }} disabled={!state.enabled || rescanLeft <= 0} sx={{ ...BTN, color: MUTED }}>{rescanLeft <= 0 ? "อ่านใหม่ (ครบวันนี้)" : `อ่านใหม่ (${rescanLeft})`}</Button>}
                 {state.canEdit && <Button startIcon={<EditOutlined />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
                 <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
                 {/* มือถือ: ปุ่มรองแถวบน · ยืนยัน/สร้าง PDF แถวล่างเต็มกว้าง */}
