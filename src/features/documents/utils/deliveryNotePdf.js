@@ -745,7 +745,7 @@ export const drawDocTitle = (doc, y, th, en, draw = true) => {
     setBold(doc, true); doc.setFontSize(19); ink(doc);
     doc.text(th, 105, y + 8.5, { align: "center" });
     setBold(doc, false); doc.setFontSize(9.5); ink(doc, SUB_RGB);
-    doc.text(en, 105, y + 13, { align: "center", charSpace: 0.8 });
+    if (en) doc.text(en, 105, y + 13, { align: "center", charSpace: 0.8 });
     ink(doc);
   }
   return y + 19;

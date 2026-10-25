@@ -2,6 +2,8 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
+import { addServiceReportSheets } from "@/features/documents/utils/serviceReportExcel";
+import { jobInfoOf, issueStats } from "@/features/documents/utils/serviceReportData";
 
 /**
  * operationExcelExport.js — ส่งออกรายการ "แผนการดำเนินงาน" เป็นไฟล์ Excel (.xlsx) พร้อมรูปแบบ/สี
@@ -49,8 +51,9 @@ const thinBorder = {
 /**
  * @param stepOf     (sessions) => "รับทราบ" | "ยืนยันนัด" | "เข้างาน" | "เอกสาร" | "ขอปิดงาน" | "เสร็จสิ้น" — ขั้นตอนเดียวกับแถบบนหน้าจอ
  * @param roundLabel (event) => "1/4 - 2569-70" — ครั้งที่แบบเดียวกับหน้าจอ
+ * @param srOf       (sessions) => สรุป Service Report ของงาน { status, data } | null — มี = เพิ่มชีตสรุป/ปัญหาที่พบ
  */
-export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel }) {
+export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel, srOf }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
   wb.created = new Date();
@@ -90,6 +93,10 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     { key: "docQuotation", header: "ใบเสนอราคา", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docInvoice", header: "ใบวางบิล", width: 12, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docCompletion", header: "ใบส่งมอบงาน", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
+    // ✅ (25 ต.ค. 2569) สรุป Service Report ด้วย AI — รายละเอียดเต็มอยู่ชีต "สรุป Service Report" / "ปัญหาที่พบ"
+    { key: "srStatus", header: "สรุป Service Report", width: 15, group: "สรุป Service Report (AI)", align: "center" },
+    { key: "srIssues", header: "ปัญหาที่พบ (รายการ)", width: 12, group: "สรุป Service Report (AI)", align: "center" },
+    { key: "srPending", header: "ยังค้าง / ต้องเสนอราคา", width: 14, group: "สรุป Service Report (AI)", align: "center" },
   ];
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const lastCol = cols.length;
@@ -162,7 +169,12 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     const approvalState = !a.approvalStatus || a.approvalStatus === "approved" ? "อนุมัติแล้ว"
       : a.approvalStatus === "pending" ? "รออนุมัติ" : "ไม่อนุมัติ";
 
+    const sr = srOf ? srOf(sessions) : null;
+    const srSt = sr ? issueStats(sr.data?.issues || []) : null;
     const row = ws.addRow({
+      srStatus: sr ? (sr.status === "confirmed" ? "ยืนยันแล้ว" : "ร่าง") : "—",
+      srIssues: srSt ? srSt.total : "",
+      srPending: srSt ? srSt.pending + srSt.needQuote : "",
       status: a.status || "-",
       step: stepOf ? stepOf(sessions) : "",
       jobNo: a.jobNo || "",
@@ -217,6 +229,12 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       if (colDef.key === "approval" && approvalState !== "อนุมัติแล้ว") {
         cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: approvalState === "รออนุมัติ" ? C.warn : C.danger } };
       }
+      if (colDef.key === "srStatus") {
+        cell.font = { name: "Tahoma", size: 10, bold: Boolean(sr), color: { argb: !sr ? C.muted : sr.status === "confirmed" ? C.ok : C.warn } };
+      }
+      if (colDef.key === "srPending" && srSt && srSt.pending + srSt.needQuote > 0) {
+        cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.warn } };
+      }
       if (colDef.key === "closeState") {
         cell.font = {
           name: "Tahoma", size: 10, bold: closeState !== "ยังไม่ปิด",
@@ -235,6 +253,15 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   ws.views = [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 0 }];
   if (jobs.length > 0) {
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW + jobs.length, column: lastCol } };
+  }
+
+  // ✅ ชีตสรุป Service Report — เฉพาะงานที่มีสรุปแล้ว เรียงตามลำดับเดียวกับชีตหลัก
+  const srJobs = srOf ? jobs.map((job) => ({ sessions: job.sessions, summary: srOf(job.sessions) })).filter((x) => x.summary?.data) : [];
+  if (srJobs.length) {
+    addServiceReportSheets(wb, srJobs.map(({ sessions, summary }) => ({
+      info: { ...jobInfoOf(sessions[0], sessions), jobType: [sessions[0].title, sessions[0].time && roundLabel ? `ครั้งที่ ${roundLabel(sessions[0])}` : ""].filter(Boolean).join(" ") },
+      summary,
+    })), `${meta.groupLabel}  ·  ${meta.filterSummary}`);
   }
 
   const buf = await wb.xlsx.writeBuffer();

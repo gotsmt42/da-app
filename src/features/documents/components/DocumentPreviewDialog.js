@@ -59,6 +59,8 @@ const DocumentPreviewDialog = ({
   const isMobile = useMediaQuery("(max-width:600px)");
   const imageMode = useMemo(() => prefersImagePrint(), []);
   const [pages, setPages] = useState(null);
+  // ✅ (25 ต.ค. 2569 "แก้อาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf") หน้าที่วาดเสร็จแล้วแสดงทันทีทีละหน้า — ปุ่มพิมพ์ยังรอ pages (ครบ + เตรียมพิมพ์แล้ว)
+  const [shown, setShown] = useState(null);
   const [rasterFailed, setRasterFailed] = useState(false);
   const [notice, setNotice] = useState("");
   const [mailOpen, setMailOpen] = useState(false);
@@ -68,13 +70,13 @@ const DocumentPreviewDialog = ({
   // ✅ มือถือ: วาดหน้าเอกสารเป็นภาพทุกครั้งที่ไฟล์เปลี่ยน (ตัวอย่าง → ฉบับออกจริง)
   useEffect(() => {
     setNotice("");
-    if (!open || !imageMode || !preview?.blob) { setPages(null); setRasterFailed(false); return undefined; }
+    if (!open || !imageMode || !preview?.blob) { setPages(null); setShown(null); setRasterFailed(false); return undefined; }
     let alive = true;
     const owned = { pages: null, printer: null };
-    setPages(null); setRasterFailed(false);
+    setPages(null); setShown(null); setRasterFailed(false);
     (async () => {
       try {
-        const imgs = await renderPdfToImages(preview.blob);
+        const imgs = await renderPdfToImages(preview.blob, { startDelay: 260, isCancelled: () => !alive, onPage: (soFar) => { owned.pages = soFar; setShown(soFar); } });
         owned.pages = imgs;
         if (!alive) { revokePageImages(imgs); return; }
         const printer = await preparePagePrint(imgs, { title: preview.fileName });
@@ -192,10 +194,10 @@ const DocumentPreviewDialog = ({
         )}
 
         <Box sx={{ flex: 1, minHeight: 0, position: "relative", overflow: imageMode ? "auto" : "hidden" }}>
-          {imageMode && pages ? (
+          {imageMode && (pages || shown)?.length ? (
             <Stack spacing={1.5} alignItems="center" sx={{ p: { xs: 1, sm: 2 } }}>
-              {pages.map((p, i) => (
-                <Box key={p.url} component="img" src={p.url} alt={`หน้า ${i + 1}`}
+              {(pages || shown).map((p, i) => (
+                <Box key={p.url} component="img" src={p.url} decoding="async" alt={`หน้า ${i + 1}`}
                   sx={{ display: "block", width: "100%", maxWidth: 820, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)" }} />
               ))}
             </Stack>

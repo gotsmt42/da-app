@@ -48,6 +48,8 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   const imageMode = useMemo(() => prefersImagePrint(), []);
   const [pdf, setPdf] = useState(null);
   const [pages, setPages] = useState(null);
+  // ✅ (25 ต.ค. 2569 "แก้อาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf") หน้าที่วาดเสร็จแล้วแสดงทันทีทีละหน้า — ปุ่มพิมพ์ยังรอ pages (ครบ + เตรียมพิมพ์แล้ว)
+  const [shown, setShown] = useState(null);
   const [rasterFailed, setRasterFailed] = useState(false);
   const [formInfo, setFormInfo] = useState(null);
   const [error, setError] = useState("");
@@ -79,7 +81,7 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
     if (!open || (!expense && !blank)) return undefined;
     let alive = true;
     const owned = { url: "", pages: null, printer: null };
-    setPdf(null); setPages(null); setRasterFailed(false); setFormInfo(null); setError(""); setNotice("");
+    setPdf(null); setPages(null); setShown(null); setRasterFailed(false); setFormInfo(null); setError(""); setNotice("");
 
     (async () => {
       let out;
@@ -123,7 +125,7 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
 
       if (!imageMode) return;
       try {
-        const imgs = await renderPdfToImages(out.blob);
+        const imgs = await renderPdfToImages(out.blob, { startDelay: 260, isCancelled: () => !alive, onPage: (soFar) => { owned.pages = soFar; setShown(soFar); } });
         owned.pages = imgs;
         if (!alive) { revokePageImages(imgs); return; }
         const printer = await preparePagePrint(imgs, { title: out.safeName });
@@ -267,11 +269,11 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
           </Alert>
         )}
         <Box sx={{ flex: 1, minHeight: 0, position: "relative", overflow: imageMode ? "auto" : "hidden" }}>
-          {imageMode && pages ? (
+          {imageMode && (pages || shown)?.length ? (
             // ✅ มือถือ: แสดงภาพหน้าเอกสาร (iframe PDF เป็นหน้าว่างบน Android) — ซูมด้วยนิ้วได้ตามปกติ
             <Stack spacing={1.5} alignItems="center" sx={{ p: { xs: 1, sm: 2 } }}>
-              {pages.map((p, i) => (
-                <Box key={p.url} component="img" src={p.url} alt={`หน้า ${i + 1}`}
+              {(pages || shown).map((p, i) => (
+                <Box key={p.url} component="img" src={p.url} decoding="async" alt={`หน้า ${i + 1}`}
                   sx={{ display: "block", width: "100%", maxWidth: 820, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)" }} />
               ))}
             </Stack>

@@ -6,6 +6,11 @@
  *    จึงขึ้นแค่ไอคอน PDF + ชื่อไฟล์เป็นรหัสมั่ว + ปุ่ม "เปิด" ที่กดแล้วไม่ไปไหน
  * ✅ มือถือ/Safari: วาดทุกหน้าเป็นภาพด้วย pdf.js (ระบบเดียวกับหน้าพิมพ์เอกสาร — shared/utils/pdfRaster)
  *    จอคอม: ใช้ตัวอ่าน PDF ของเบราว์เซอร์ตามเดิม (เลือกข้อความ/ค้นหาได้)
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "แก้ไขอาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf")
+ *    • รอท่าเปิดกล่องจบก่อนค่อยเริ่มวาด (เดิมวาดชนกับท่าเลื่อนขึ้น = สะดุด)
+ *    • หน้าแรกขึ้นทันทีที่วาดเสร็จ หน้าต่อไปทยอยตามมา (เดิมรอครบทุกหน้า) · มีแถบบอกความคืบหน้า
+ *    • ดูอย่างเดียว ใช้ 150 dpi + JPEG — งานวาด/ถอดภาพเบากว่าเดิมราวครึ่งหนึ่ง ยังซูมอ่านตัวเล็กได้
+ *    • จอคอม: ฝัง iframe หลังท่าเปิดกล่องจบ (ตัวอ่าน PDF ของเบราว์เซอร์หนัก โหลดพร้อมท่าเปิดแล้วกระตุก)
  */
 import { useEffect, useMemo, useState } from "react";
 import { Box, Stack, Button, Typography } from "@mui/material";
@@ -13,23 +18,38 @@ import { OpenInNew } from "@mui/icons-material";
 import PageLoader from "@/shared/ui/PageLoader";
 import { renderPdfToImages, revokePageImages, prefersImagePrint } from "@/shared/utils/pdfRaster";
 
+const OPEN_DELAY = 280; // ≈ ท่าเปิดกล่อง (Dialog/แผ่นเลื่อนขึ้น) ของทั้งแอป
+
 export default function PdfBlobView({ url, height = 780, title = "PDF" }) {
   const imageMode = useMemo(() => prefersImagePrint(), []);
   const [pages, setPages] = useState(null);
+  const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [frameOn, setFrameOn] = useState(false);
+
+  useEffect(() => {
+    if (imageMode || !url) return undefined;
+    setFrameOn(false);
+    const t = setTimeout(() => setFrameOn(true), OPEN_DELAY);
+    return () => clearTimeout(t);
+  }, [imageMode, url]);
 
   useEffect(() => {
     if (!imageMode || !url) return undefined;
     let alive = true;
     let owned = null;
-    setPages(null); setFailed(false);
+    setPages(null); setDone(false); setFailed(false);
     (async () => {
       try {
         const blob = await (await fetch(url)).blob();
-        const imgs = await renderPdfToImages(blob);
+        const imgs = await renderPdfToImages(blob, {
+          dpi: 150, type: "image/jpeg", quality: 0.88, startDelay: OPEN_DELAY,
+          isCancelled: () => !alive,
+          onPage: (soFar) => { owned = soFar; setPages(soFar); },
+        });
         owned = imgs;
         if (!alive) { revokePageImages(imgs); return; }
-        setPages(imgs);
+        setPages(imgs); setDone(true);
       } catch (err) {
         console.error("แปลง PDF เป็นภาพไม่สำเร็จ:", err);
         if (alive) setFailed(true);
@@ -40,6 +60,7 @@ export default function PdfBlobView({ url, height = 780, title = "PDF" }) {
 
   if (!url) return null;
   if (!imageMode) {
+    if (!frameOn) return <PageLoader variant="inline" label="กำลังเปิดไฟล์ PDF…" />;
     return <iframe src={url} width="100%" height={`${height}px`} style={{ border: "none", display: "block" }} title={title} />;
   }
   if (failed) {
@@ -55,10 +76,13 @@ export default function PdfBlobView({ url, height = 780, title = "PDF" }) {
   return (
     <Stack spacing={1.25} alignItems="center" sx={{ p: { xs: 1, sm: 2 }, bgcolor: "#525659", minHeight: "100%" }}>
       {pages.map((pg, i) => (
-        <Box key={pg.url} component="img" src={pg.url} alt={`หน้า ${i + 1}`}
-          sx={{ display: "block", width: "100%", maxWidth: 900, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)" }} />
+        <Box key={pg.url} component="img" src={pg.url} alt={`หน้า ${i + 1}`} decoding="async" width={pg.width} height={pg.height}
+          sx={{ display: "block", width: "100%", maxWidth: 900, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)",
+            animation: "pdfPageIn .22s ease-out", "@keyframes pdfPageIn": { from: { opacity: 0 }, to: { opacity: 1 } } }} />
       ))}
-      <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,.75)", pb: 1 }}>{pages.length} หน้า · ซูมด้วยสองนิ้วได้</Typography>
+      <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,.75)", pb: 1 }}>
+        {done ? `${pages.length} หน้า · ซูมด้วยสองนิ้วได้` : `กำลังเปิดหน้าถัดไป… (${pages.length} หน้าแล้ว)`}
+      </Typography>
     </Stack>
   );
 }

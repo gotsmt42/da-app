@@ -2,11 +2,12 @@
  * serviceReportSummaryPdf.js — PDF "สรุปรายงานบริการ" (Service Report Summary) จากข้อมูลที่ AI อ่าน + คนตรวจแล้ว
  *
  * ✅ (25 ต.ค. 2569 ผู้ใช้: "ให้อ่าน Service Report ของช่าง แล้วกดสร้างสรุปออกมาเป็น PDF ทำให้สมบูรณ์ที่สุด")
+ * 🔁 (25 ต.ค. 2569 ผู้ใช้: "เอาแค่เนื้อหารายละเอียดงานที่ทำ ไม่ต้องอ่านหัวกระดาษ และท้ายกระดาษ ... และสรุปปัญหาที่พบ")
+ *    • ไม่มีตารางข้อมูลงาน — เลขที่งานอยู่ท้ายกระดาษ (info จากระบบ ใช้แค่ชื่อไฟล์/ท้ายกระดาษ)
+ *    • เนื้อหา 2 หัวข้อ: 1) รายละเอียดงานที่ทำ  2) สรุปปัญหาที่พบ (ย่อหน้าสรุป + ตารางทีละจุด/ทีละอุปกรณ์)
  *    หน้าตาชุดเดียวกับเอกสารบริษัท (ใบแจ้งเข้าปฏิบัติงาน / ใบส่งมอบงาน): หัวกระดาษบริษัท · ชื่อเอกสารกลางหน้า ·
- *    ตารางเส้นบาง · ตัวอักษรไม่ต่ำกว่า 13pt · ยาวเกินหน้า = ขึ้นหน้าใหม่พร้อมหัวกระดาษและหัวตารางซ้ำ
- *    ลำดับเนื้อหา: ข้อมูลงาน → ผลการทำงาน → บทสรุป/ประเด็นสำคัญ → สถานะระบบก่อน/หลัง → ผลตรวจเช็ค →
- *    รายละเอียดงานที่ทำ → ปัญหาที่พบ/อุปกรณ์ที่ต้องเปลี่ยน → ข้อเสนอแนะ/การติดตาม → ลูกค้า/ผู้ให้บริการ
- *    หัวข้อที่ไม่มีข้อมูลไม่พิมพ์ (ไม่มีตารางว่างให้ดูไม่เรียบร้อย) · เลขหัวข้อเรียงใหม่ตามที่พิมพ์จริง
+ *    ตารางเส้นบาง · ยาวเกินหน้า = ขึ้นหน้าใหม่พร้อมหัวกระดาษและหัวตารางซ้ำ
+ * ⚠️ ตัวช่วยข้อมูลงาน/ปัญหา (jobInfoOf · issueStats · splitQty) อยู่ที่ serviceReportData.js ใช้ร่วมกับ Excel — ตัวเลขตรงกันทุกที่
  */
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -14,29 +15,12 @@ import {
   preparePrintAssets, createDocument, drawLetterheadModern, drawDocTitle, drawFooter, outputDocument,
   createFlow, flowTable, setBold, spaceThaiLatin, wrapText, LM, CW, ISSUER,
 } from "./deliveryNotePdf";
+import { ISSUE_STATUS, issueStats } from "./serviceReportData";
 
-export const RESULT_META = {
-  normal: { label: "ปกติ ใช้งานได้", rgb: [21, 128, 61], fill: [240, 253, 244] },
-  working_with_issues: { label: "ใช้งานได้ แต่มีจุดต้องแก้ไข", rgb: [180, 83, 9], fill: [255, 251, 235] },
-  not_working: { label: "ใช้งานไม่ได้", rgb: [185, 28, 28], fill: [254, 242, 242] },
-  unknown: { label: "ไม่ระบุ", rgb: [100, 116, 139], fill: [248, 250, 252] },
-};
-export const ISSUE_STATUS = { fixed: "แก้แล้ว", pending: "ยังค้าง", need_quote: "ต้องเสนอราคา", unknown: "-" };
-export const CHECK_RESULT = { normal: "ปกติ", abnormal: "ผิดปกติ", unknown: "-" };
-
+const beYear = (m) => m.year() + 543;
 const INK = [30, 41, 59];
 const SUB = [100, 116, 139];
 const ACCENT = [37, 99, 235];
-
-const thDate = (iso) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ""))) return String(iso || "");
-  const m = moment(iso, "YYYY-MM-DD");
-  return `${m.date()} ${m.locale("th").format("MMM")} ${m.year() + 543}`;
-};
-/** วันที่ + เวลาเข้า-ออก ทุกวัน ในบรรทัดเดียว เช่น "22 ต.ค. 2569 09:00–17:00 น. · 23 ต.ค. 2569" */
-export const datesText = (dates = []) => dates
-  .map((d) => [thDate(d.date), d.timeIn || d.timeOut ? `${d.timeIn || "-"}–${d.timeOut || "-"} น.` : ""].filter(Boolean).join(" "))
-  .filter(Boolean).join(" · ");
 
 /** ฟอนต์ TH Sarabun ไม่มีลูกศร (→ ⇒ ➜ ←) — AI ชอบใช้ เช่น "291 → 174" ทำให้ใน PDF หายเป็นช่องว่าง จึงแทนเป็น "->" */
 const pdfSafe = (v) => {
@@ -47,21 +31,23 @@ const pdfSafe = (v) => {
 };
 
 /**
- * @param data  ข้อมูลสรุป (รูปแบบเดียวกับ ServiceReportScan ฝั่งเซิร์ฟเวอร์)
- * @param meta  { jobNo, company, site, system, title, preparedBy, confirmedBy, confirmedAt, fileCount, status }
+ * @param data  ข้อมูลสรุป { summary, workDone[], issueSummary, issues[] } (รูปแบบเดียวกับ ServiceReportScan ฝั่งเซิร์ฟเวอร์)
+ * @param info  ข้อมูลงานจากระบบ — jobInfoOf()
+ * @param meta  { confirmedBy, confirmedAt, fileCount }
  */
-export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, data, meta = {}, mode = "blob" }) => {
+export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, data, info = {}, meta = {}, mode = "blob" }) => {
   moment.locale("th");
   await preparePrintAssets();
   const doc = createDocument(jsPDF, thSarabunFont);
   const headerY = drawLetterheadModern(doc);
   const d = pdfSafe(data || {});
-  const job = d.job || {};
   const title = "สรุปรายงานบริการ";
   const fs = 13.5;
   const lh = 6.1;
-  const f = createFlow(doc, { draw: true, fs, lh, y: 0, title, docNumber: meta.jobNo || "-", headerY });
-  f.y = drawDocTitle(doc, headerY, title, "SERVICE REPORT SUMMARY", true) + 1;
+  const f = createFlow(doc, { draw: true, fs, lh, y: 0, title, docNumber: info.jobNo || "-", headerY });
+  // 🔁 (25 ต.ค. 2569 ผู้ใช้: "หัวกระดาษสรุปรายงาน ไม่ต้องมีภาษาอังกฤษ" · "ตรงบริษัทยังต้องมีนะ")
+  //    ตัดเฉพาะชื่อเอกสารภาษาอังกฤษ (SERVICE REPORT SUMMARY) — หัวกระดาษบริษัทคงครบเหมือนเอกสารอื่น
+  f.y = drawDocTitle(doc, headerY, title, "", true) - 3;
   setBold(doc, false); doc.setFontSize(fs);
 
   const color = (rgb) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
@@ -86,15 +72,13 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
     wrapText(doc, t, CW - indent).forEach((ln) => { f.need(0); doc.text(ln, LM + indent, f.y); f.y += lh; });
     doc.setFontSize(fs); color(INK);
   };
-  /** รายการแบบมีหัวข้อย่อย (• หรือ 1. 2. 3.) — บรรทัดที่ตัดต่อเยื้องตรงกับข้อความ */
-  const list = (items, numbered = false) => {
+  /** รายการเลขข้อ — บรรทัดที่ตัดต่อเยื้องตรงกับข้อความ */
+  const list = (items) => {
     items.filter(Boolean).forEach((it, i) => {
-      const mark = numbered ? `${i + 1}.` : "•";
-      const ind = numbered ? 8 : 6;
-      const lines = wrapText(doc, spaceThaiLatin(it), CW - ind);
+      const lines = wrapText(doc, spaceThaiLatin(it), CW - 8);
       f.need(lh * Math.min(lines.length, 2) - lh);
-      doc.text(mark, LM + 1, f.y);
-      lines.forEach((ln) => { f.need(0); doc.text(ln, LM + ind, f.y); f.y += lh; });
+      doc.text(`${i + 1}.`, LM + 1, f.y);
+      lines.forEach((ln) => { f.need(0); doc.text(ln, LM + 8, f.y); f.y += lh; });
     });
   };
   /** ตาราง (flowTable คาด f.y = ขอบบนของตาราง) */
@@ -105,103 +89,46 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
     f.y += lh * 0.95;
   };
 
-  // ── ข้อมูลงาน (ตาราง 2 คู่ต่อแถว) ──────────────────────────────────────────
-  const info = [
-    ["โครงการ / สถานที่", job.project || meta.site || "-"],
-    ["ลูกค้า", meta.company && meta.company !== (job.project || meta.site) ? meta.company : ""],
-    ["ระบบ", job.system || meta.system || "-"],
-    ["ประเภทงาน", [job.jobType || meta.title, job.pmRound ? `ครั้งที่ ${job.pmRound}` : ""].filter(Boolean).join(" ") || "-"],
-    ["เลขที่งาน", meta.jobNo || "-"],
-    ["วันที่เข้างาน", datesText(job.dates) || "-"],
-    ["ผู้ติดต่อ", [job.contactName, job.contactPosition, job.contactPhone].filter(Boolean).join(" · ")],
-    ["ช่างผู้ให้บริการ", (d.technicians || []).join(", ")],
-  ].filter(([, v]) => v);
-  f.y += 1.5;
-  table([{ title: "หัวข้อ", w: 40 }, { title: "รายละเอียด" }], info);
+  // 🔁 (25 ต.ค. 2569 ผู้ใช้: "ส่วนตรงนี้ไม่ต้องอ่าน ไม่ต้องสรุปมาให้เปลือง") — ไม่มีตารางข้อมูลงาน (เลขที่/โครงการ/วันที่/ช่าง)
+  //    เนื้อหาเริ่มที่รายละเอียดงานที่ทำเลย · เลขที่งานยังอยู่ที่ท้ายกระดาษและหัวหน้าต่อ
 
-  // ── ผลการทำงาน (กล่องสี) ───────────────────────────────────────────────────
-  const rm = RESULT_META[d.result] || RESULT_META.unknown;
-  f.need(lh * 2.2);
-  const boxY = f.y - lh * 0.75;
-  doc.setFillColor(rm.fill[0], rm.fill[1], rm.fill[2]); doc.setDrawColor(rm.rgb[0], rm.rgb[1], rm.rgb[2]); doc.setLineWidth(0.35);
-  doc.roundedRect(LM, boxY, CW, lh * 1.55, 1.6, 1.6, "FD");
-  setBold(doc, true); color(INK); doc.text("ผลการทำงาน :", LM + 3, boxY + lh * 1.02);
-  const lw = doc.getTextWidth("ผลการทำงาน :") + 5;
-  color(rm.rgb); doc.text(rm.label, LM + 3 + lw, boxY + lh * 1.02);
-  setBold(doc, false); color(INK);
-  const fu = d.followUp || {};
-  const tags = [fu.revisit ? `ต้องเข้าอีก${fu.revisitDate ? ` ${thDate(fu.revisitDate)}` : ""}` : "", fu.needQuotation ? "ต้องเสนอราคา" : ""].filter(Boolean).join(" · ");
-  if (tags) { doc.setFontSize(fs - 1); color(SUB); doc.text(tags, LM + CW - 3, boxY + lh * 1.02, { align: "right" }); doc.setFontSize(fs); color(INK); }
-  f.y = boxY + lh * 1.55 + lh * 0.9;
+  // ── 1. รายละเอียดงานที่ทำ ─────────────────────────────────────────────────
+  const work = d.workDone || [];
+  section("รายละเอียดงานที่ทำ");
+  if (d.summary) { para(d.summary); f.y += lh * 0.25; }
+  if (work.length) list(work);
+  if (!d.summary && !work.length) para("- ไม่มีรายละเอียดในเอกสาร -", { sub: true });
 
-  // ── บทสรุป ────────────────────────────────────────────────────────────────
-  if (d.summary || (d.highlights || []).length) {
-    section("บทสรุป");
-    para(d.summary);
-    if ((d.highlights || []).length) { f.y += lh * 0.2; list(d.highlights); }
+  // ── 2. สรุปปัญหาที่พบ ─────────────────────────────────────────────────────
+  const issues = d.issues || [];
+  section("สรุปปัญหาที่พบ");
+  if (!issues.length && !d.issueSummary) {
+    para("ไม่พบปัญหา");
+  } else {
+    if (d.issueSummary) para(d.issueSummary);
+    if (issues.length) {
+      const st = issueStats(issues);
+      para([`รวม ${st.total} รายการ`, st.pending ? `ยังค้าง ${st.pending}` : "", st.needQuote ? `ต้องเสนอราคา ${st.needQuote}` : "", st.fixed ? `แก้แล้ว ${st.fixed}` : ""]
+        .filter(Boolean).join(" · "), { sub: true, size: fs - 1 });
+      f.y += lh * 0.35;
+      table([
+        { title: "ลำดับ", w: 12, align: "center" }, { title: "ตำแหน่ง", w: 30 }, { title: "ปัญหา / อาการ", w: 52 },
+        { title: "อุปกรณ์ / รุ่น", w: 34 }, { title: "จำนวน", w: 18, align: "center" }, { title: "สถานะ", align: "center" },
+      ], issues.map((r, i) => [String(i + 1), r.location || "-", r.problem || "-", r.part || "-", r.qty || "-", ISSUE_STATUS[r.status] || "-"]));
+    }
   }
 
-  // ── สถานะระบบ ก่อน → หลัง ─────────────────────────────────────────────────
-  if ((d.systemStatus || []).length) {
-    section("สถานะระบบ ก่อนเข้า / หลังเสร็จ");
-    table([{ title: "รายการ", w: 70 }, { title: "ก่อนเข้า", w: 50, align: "center" }, { title: "หลังเสร็จ", align: "center" }],
-      d.systemStatus.map((r) => [r.item, r.before || "-", r.after || "-"]));
-  }
-
-  // ── ผลตรวจเช็คพื้นฐาน ─────────────────────────────────────────────────────
-  if ((d.checks || []).length) {
-    section("ผลตรวจเช็คพื้นฐาน");
-    table([{ title: "รายการ", w: 55 }, { title: "ค่าที่วัด / ข้อมูล", w: 85 }, { title: "ผล", align: "center" }],
-      d.checks.map((r) => [r.item, r.value || "-", CHECK_RESULT[r.result] || "-"]));
-  }
-
-  // ── รายละเอียดงานที่ทำ ─────────────────────────────────────────────────────
-  if ((d.workDone || []).length) {
-    section("รายละเอียดงานที่ทำ");
-    list(d.workDone, true);
-  }
-
-  // ── ปัญหาที่พบ / อุปกรณ์ที่ต้องเปลี่ยน ─────────────────────────────────────
-  if ((d.issues || []).length) {
-    section("ปัญหาที่พบ / อุปกรณ์ที่ต้องเปลี่ยน");
-    table([
-      { title: "ลำดับ", w: 12, align: "center" }, { title: "ตำแหน่ง", w: 30 }, { title: "ปัญหา / อาการ", w: 52 },
-      { title: "อุปกรณ์ / รุ่น", w: 34 }, { title: "จำนวน", w: 18, align: "center" }, { title: "สถานะ", align: "center" },
-    ], d.issues.map((r, i) => [String(i + 1), r.location || "-", r.problem || "-", r.part || "-", r.qty || "-", ISSUE_STATUS[r.status] || "-"]));
-  }
-
-  // ── ข้อเสนอแนะ / การติดตาม ─────────────────────────────────────────────────
-  const follow = [
-    ...(d.recommendations || []),
-    fu.revisit ? `นัดเข้าดำเนินการอีกครั้ง${fu.revisitDate ? ` วันที่ ${thDate(fu.revisitDate)}` : ""}` : "",
-    fu.needQuotation ? "จัดทำใบเสนอราคาสำหรับอุปกรณ์/งานที่ต้องเปลี่ยนตามรายการข้างต้น" : "",
-    fu.coordinateWith ? `ประสานงานกับ ${fu.coordinateWith}` : "",
-  ].filter(Boolean);
-  if (follow.length) {
-    section("ข้อเสนอแนะและการติดตาม");
-    list([...new Set(follow)]);
-  }
-
-  // ── ลูกค้า / การรับรอง ─────────────────────────────────────────────────────
-  const c = d.customer || {};
-  if (c.comment || c.signed || c.name) {
-    section("ความเห็นและการรับรองของลูกค้า");
-    if (c.comment) para(`ความเห็นลูกค้า: ${c.comment}`);
-    para([c.signed ? "ลูกค้าลงนามรับรองใน Service Report แล้ว" : "ยังไม่พบลายเซ็นลูกค้าใน Service Report",
-      c.name ? `(${c.name})` : "", c.signDate ? `วันที่ ${thDate(c.signDate)}` : ""].filter(Boolean).join(" "));
-  }
-
-  // ── ท้ายเอกสาร: ที่มาของข้อมูล + ผู้จัดทำ/ผู้ตรวจ ───────────────────────────
+  // ── ท้ายเอกสาร: ที่มาของข้อมูล + ผู้ตรวจ ───────────────────────────────────
   f.y += lh * 0.6;
   f.need(lh * 2.5);
   doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2); doc.line(LM, f.y - lh * 0.6, LM + CW, f.y - lh * 0.6);
   para([
-    `สรุปจาก Service Report ${meta.fileCount || ""} ไฟล์`.replace("  ", " "),
-    meta.confirmedBy ? `ตรวจและยืนยันโดย ${meta.confirmedBy}${meta.confirmedAt ? ` ${moment(meta.confirmedAt).format("D MMM")} ${moment(meta.confirmedAt).year() + 543}` : ""}` : "ฉบับร่าง (ยังไม่ได้ยืนยัน)",
-    `${ISSUER.nameTh}`,
+    meta.fileCount ? `สรุปจาก Service Report ${meta.fileCount} ไฟล์` : "สรุปจาก Service Report",
+    meta.confirmedBy ? `ตรวจและยืนยันโดย ${meta.confirmedBy}${meta.confirmedAt ? ` ${moment(meta.confirmedAt).format("D MMM")} ${beYear(moment(meta.confirmedAt))}` : ""}` : "ฉบับร่าง (ยังไม่ได้ยืนยัน)",
+    ISSUER.nameTh,
   ].join(" · "), { size: fs - 2, sub: true });
 
-  drawFooter(doc, `สรุปรายงานบริการ · ${meta.jobNo || job.project || ""}`);
-  const name = `สรุปรายงานบริการ ${meta.jobNo || ""} ${job.project || meta.site || ""}`.trim();
+  drawFooter(doc, `สรุปรายงานบริการ · ${info.jobNo || info.site || ""}`);
+  const name = `สรุปรายงานบริการ ${info.jobNo || ""} ${info.site || ""}`.trim();
   return outputDocument(doc, name, mode);
 };

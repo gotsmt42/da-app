@@ -43,19 +43,39 @@ const loadPdfjs = () => {
  */
 const DEFAULT_DPI = 200;
 
+const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
+/** คืนจังหวะให้เบราว์เซอร์วาดจอ/รับนิ้ว 1 เฟรม ระหว่างหน้า — ไม่ให้การวาดหลายหน้าติดกันเป็นก้อนเดียวจนจอค้าง */
+const yieldFrame = () => new Promise((r) => {
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(r, 0));
+  else setTimeout(r, 0);
+});
+
 /**
  * @param {Blob} blob  ไฟล์ PDF
- * @returns {Promise<Array<{url: string, blob: Blob, width: number, height: number}>>} ภาพ PNG ทีละหน้า
- *   ⚠️ ผู้เรียกต้อง revokePageImages() เองเมื่อเลิกใช้
+ * @param {object} [opt]
+ * @param {number}   [opt.dpi=200]         ความละเอียด (ดูอย่างเดียวใช้ 150 ก็คมพอ และเร็วกว่าเกือบเท่าตัว)
+ * @param {number}   [opt.startDelay=0]    รอก่อนเริ่ม (ms) — ให้ท่าเปิดกล่องเลื่อนขึ้นจบก่อน ไม่แย่งเครื่องกัน (กระตุก)
+ * @param {Function} [opt.onPage]          (pagesSoFar) เรียกทุกครั้งที่วาดเสร็จ 1 หน้า — แสดงหน้าแรกได้ทันที ไม่ต้องรอทั้งไฟล์
+ * @param {Function} [opt.isCancelled]     () => true เมื่อกล่องถูกปิดแล้ว — หยุดวาดหน้าที่เหลือทันที
+ * @param {string}   [opt.type="image/png"] ชนิดภาพ ("image/jpeg" เล็กและเร็วกว่า เหมาะกับดูอย่างเดียว)
+ * @returns {Promise<Array<{url: string, blob: Blob, width: number, height: number}>>} ภาพทีละหน้า
+ *   ⚠️ ผู้เรียกต้อง revokePageImages() เองเมื่อเลิกใช้ (รวมถึงตอนถูกยกเลิกกลางทาง)
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "แก้ไขอาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf") — เดิมเริ่มวาดทันทีพร้อมท่าเปิดกล่อง
+ *    และวาดครบทุกหน้าก่อนแสดง (ไฟล์หลายหน้าเห็นแต่ตัวหมุนนาน แล้วภาพทุกหน้าโผล่พร้อมกันจนจอสะดุด)
  */
-export async function renderPdfToImages(blob, { dpi = DEFAULT_DPI } = {}) {
+export async function renderPdfToImages(blob, { dpi = DEFAULT_DPI, startDelay = 0, onPage, isCancelled, type = "image/png", quality = 0.9 } = {}) {
+  const stop = () => Boolean(isCancelled?.());
+  if (startDelay) await wait(startDelay);
+  if (stop()) return [];
   const pdfjs = await loadPdfjs();
   const data = new Uint8Array(await blob.arrayBuffer());
+  if (stop()) return [];
   const task = pdfjs.getDocument({ data });
   const pdf = await task.promise;
   const pages = [];
   try {
     for (let n = 1; n <= pdf.numPages; n += 1) {
+      if (stop()) break;
       // eslint-disable-next-line no-await-in-loop -- วาดทีละหน้าโดยตั้งใจ ไม่ให้ canvas หลายหน้ากินแรมพร้อมกัน
       const page = await pdf.getPage(n);
       const viewport = page.getViewport({ scale: dpi / 72 });
@@ -65,14 +85,17 @@ export async function renderPdfToImages(blob, { dpi = DEFAULT_DPI } = {}) {
       // eslint-disable-next-line no-await-in-loop
       await page.render({ canvas, viewport, background: "#ffffff" }).promise;
       // eslint-disable-next-line no-await-in-loop
-      const png = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("แปลงหน้าเอกสารเป็นภาพไม่สำเร็จ"))), "image/png");
+      const img = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("แปลงหน้าเอกสารเป็นภาพไม่สำเร็จ"))), type, quality);
       });
-      pages.push({ url: URL.createObjectURL(png), blob: png, width: canvas.width, height: canvas.height });
+      pages.push({ url: URL.createObjectURL(img), blob: img, width: canvas.width, height: canvas.height });
       page.cleanup();
       // ✅ คืนแรมของ canvas ทันที — Safari ไม่คืนเองจนกว่า GC จะมาเก็บ ซึ่งบนมือถือแรมน้อยอาจไม่ทัน
       canvas.width = 0;
       canvas.height = 0;
+      if (!stop()) onPage?.(pages.slice());
+      // eslint-disable-next-line no-await-in-loop
+      if (n < pdf.numPages) await yieldFrame();
     }
   } catch (err) {
     revokePageImages(pages);

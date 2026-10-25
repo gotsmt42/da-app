@@ -288,6 +288,12 @@ const EventService = {
     return res.data;
   },
 
+  /** สรุป Service Report หลายงาน (jobKey = jobGroupId หรือ _id) — ใช้ส่งออก Excel */
+  async GetServiceReportSummaries(jobKeys) {
+    const res = await API.post(`/events/service-report-summaries`, { jobKeys });
+    return res.data?.summaries || [];
+  },
+
   async BillingScanAvailability() {
     const res = await API.get("/events/billing/scan-availability");
     return res.data;

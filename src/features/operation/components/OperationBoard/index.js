@@ -3393,6 +3393,12 @@ const Operation = () => {
     setExporting(true);
     try {
       const { exportOperationToExcel, buildOperationFileName } = await import("@/features/operation/utils/operationExcelExport");
+      // ✅ (25 ต.ค. 2569) สรุป Service Report ที่ AI อ่าน → ชีต "สรุป Service Report" + "ปัญหาที่พบ" · โหลดไม่ได้ = ส่งออกตามเดิมไม่มีชีตนี้
+      const srKey = (sessions) => String(sessions[0]?.jobGroupId || sessions[0]?._id || "");
+      const srSummaries = new Map(
+        (await EventService.GetServiceReportSummaries(allJobGroups.filter((ss) => ss.some((x) => x.serviceReportAi?.status || (x.reportFiles || []).length)).map(srKey))
+          .catch(() => [])).map((x) => [x.jobKey, x]),
+      );
       const groupLabel = {
         all: "ทั้งหมด", today: "งานวันนี้", pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
       }[effectiveGroup] || "ทั้งหมด";
@@ -3416,8 +3422,9 @@ const Operation = () => {
           return ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน", "เสร็จสิ้น"][Math.min(5, jobStepOf(a, docsOk))] || "";
         },
         roundLabel: (e) => formatRoundLabel(e.time, e.visitCount, e),
+        srOf: (sessions) => srSummaries.get(srKey(sessions)) || null,
       });
-      setSnackbar({ open: true, msg: "ส่งออก Excel เรียบร้อย", severity: "success" });
+      setSnackbar({ open: true, msg: srSummaries.size ? `ส่งออก Excel เรียบร้อย (รวมสรุป Service Report ${srSummaries.size} งาน)` : "ส่งออก Excel เรียบร้อย", severity: "success" });
     } catch (err) {
       setSnackbar({ open: true, msg: err?.response?.data?.message || err.message || "ส่งออกไม่สำเร็จ", severity: "error" });
     } finally {

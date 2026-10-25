@@ -3,44 +3,36 @@
  *
  * ✅ (25 ต.ค. 2569 ผู้ใช้: "ทำระบบให้อ่าน Service Report ของช่าง แล้วให้กดสร้างสรุปออกมาเป็น PDF ทำให้สมบูรณ์ที่สุด")
  *    1) กด "สรุปด้วย AI" — AI อ่านทุกไฟล์ Service Report ของงาน (รูป/PDF · ลายมือ · หลายแผ่น) แล้วบันทึกเป็น "ร่าง"
- *    2) หน้าสรุปแสดงตามหัวข้อฟอร์ม Service Report · จุดที่ AI อ่านไม่ชัดขึ้นกล่องส้มด้านบน ให้ตรวจก่อน
+ *    2) หน้าสรุปแสดง 2 หัวข้อ: รายละเอียดงานที่ทำ · สรุปปัญหาที่พบ · จุดที่ AI อ่านไม่ชัดขึ้นกล่องส้มด้านบน ให้ตรวจก่อน
+ *       🔁 (25 ต.ค. 2569 ผู้ใช้: "เอาแค่เนื้อหารายละเอียดงานที่ทำ ไม่ต้องอ่านหัวกระดาษ และท้ายกระดาษ ... และสรุปปัญหาที่พบ")
+ *       ไม่แสดงข้อมูลงานซ้ำ (ผู้ใช้: "ส่วนตรงนี้ไม่ต้องอ่าน ไม่ต้องสรุปมาให้เปลือง") — Excel ยังมีเลขที่/โครงการ/วันที่ไว้กรอง
  *    3) กด "แก้ไข" แก้ได้ทุกช่อง (รายการแบบ 1 บรรทัด = 1 ข้อ · ตารางเพิ่ม/ลบแถวได้) → บันทึก หรือ "ยืนยันสรุป"
  *    4) "สร้าง PDF" — หัวกระดาษบริษัท พร้อมดาวน์โหลด/แชร์/พิมพ์ (ร่างก็ออกได้ แต่ท้ายเอกสารระบุว่าเป็นฉบับร่าง)
+ *    5) "Excel" — ชีตสรุปงาน + ชีตปัญหาที่พบ (จำนวนเป็นตัวเลขจริง) ไว้ลงรายงานสรุป
+ * ⚠️ jsPDF + ฟอนต์ไทย (~0.5MB) และ ExcelJS โหลดตอนกดปุ่มเท่านั้น — หน้าต่างเปิดเร็ว ไม่กระตุก
  * ⚠️ ข้อมูลอยู่ฝั่งเซิร์ฟเวอร์ (ServiceReportSummary) — งานหลายวันใช้สรุปเดียวกันทั้งงาน
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, IconButton, LinearProgress,
-  MenuItem, Stack, Switch, TextField, Typography, useMediaQuery, FormControlLabel,
+  MenuItem, Stack, TextField, Typography, useMediaQuery,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import {
   AutoAwesome, Close, EditOutlined, PictureAsPdf, Refresh, TaskAlt, AddRounded, DeleteOutline, WarningAmberRounded,
-  Description, CheckCircleRounded,
+  Description, CheckCircleRounded, GridOnRounded,
 } from "@mui/icons-material";
-import { jsPDF } from "jspdf";
-import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
-import { generateServiceReportSummaryPdf, RESULT_META, ISSUE_STATUS, CHECK_RESULT, datesText } from "../utils/serviceReportSummaryPdf";
+import { ISSUE_STATUS, issueStats, jobInfoOf } from "../utils/serviceReportData";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, PRIMARY_BTN_SX, SUCCESS_BTN_SX } from "@/shared/ui/PageKit";
 
-const hex = (rgb) => `#${rgb.map((n) => n.toString(16).padStart(2, "0")).join("")}`;
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", minHeight: 38 };
-const EMPTY = {
-  job: { dates: [], jobType: "", pmRound: "", project: "", system: "", contactName: "", contactPosition: "", contactPhone: "" },
-  systemStatus: [], checks: [], workDone: [], issues: [], result: "unknown",
-  followUp: { revisit: false, revisitDate: "", needQuotation: false, coordinateWith: "" },
-  customer: { comment: "", signed: false, name: "", signDate: "" },
-  technicians: [], summary: "", highlights: [], recommendations: [], reviewNotes: [], confidence: "medium",
+const EMPTY = { found: true, summary: "", workDone: [], issueSummary: "", issues: [], reviewNotes: [], confidence: "medium" };
+const withDefaults = (d) => {
+  const x = { ...EMPTY, ...(d || {}) };
+  return { ...x, workDone: Array.isArray(x.workDone) ? x.workDone : [], issues: Array.isArray(x.issues) ? x.issues : [], reviewNotes: Array.isArray(x.reviewNotes) ? x.reviewNotes : [] };
 };
-const withDefaults = (d) => ({
-  ...EMPTY, ...(d || {}),
-  job: { ...EMPTY.job, ...(d?.job || {}) },
-  followUp: { ...EMPTY.followUp, ...(d?.followUp || {}) },
-  customer: { ...EMPTY.customer, ...(d?.customer || {}) },
-});
 const fmtAt = (d) => (d ? new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
 
 // ─── ชิ้นส่วนแสดงผล ─────────────────────────────────────────────────────────
@@ -73,80 +65,38 @@ const MiniTable = ({ head, rows, aligns = [] }) => (
 const ISSUE_TONE = { fixed: "#15803d", pending: "#b45309", need_quote: "#c2410c", unknown: MUTED };
 
 /** หน้าสรุปแบบอ่าน */
-function SummaryView({ d, meta }) {
-  const rm = RESULT_META[d.result] || RESULT_META.unknown;
-  let n = 0;
-  const next = () => { n += 1; return n; };
-  const fu = d.followUp || {};
-  const info = [
-    ["โครงการ", d.job.project || meta.site], ["ระบบ", d.job.system || meta.system],
-    ["ประเภทงาน", [d.job.jobType, d.job.pmRound ? `ครั้งที่ ${d.job.pmRound}` : ""].filter(Boolean).join(" ")],
-    ["วันที่เข้างาน", datesText(d.job.dates)],
-    ["ผู้ติดต่อ", [d.job.contactName, d.job.contactPosition, d.job.contactPhone].filter(Boolean).join(" · ")],
-    ["ช่าง", d.technicians.join(", ")],
-  ].filter(([, v]) => v);
+function SummaryView({ d }) {
+  const st = issueStats(d.issues);
   return (
     <>
-      <Card sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
-        {info.map(([k, v]) => (
-          <Box key={k} sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: "0.7rem", color: FAINT, fontWeight: 700 }}>{k}</Typography>
-            <Typography sx={{ fontSize: "0.88rem", color: INK, fontWeight: 700, overflowWrap: "anywhere" }}>{v}</Typography>
-          </Box>
-        ))}
-      </Card>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: hex(rm.fill), border: `1px solid ${alpha(hex(rm.rgb), 0.35)}`, flexWrap: "wrap" }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: INK }}>ผลการทำงาน</Typography>
-        <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: hex(rm.rgb) }}>{rm.label}</Typography>
-        <Box sx={{ flex: 1 }} />
-        {fu.revisit && <Chip size="small" label={`ต้องเข้าอีก${fu.revisitDate ? ` ${fu.revisitDate}` : ""}`} sx={{ fontWeight: 700 }} />}
-        {fu.needQuotation && <Chip size="small" label="ต้องเสนอราคา" sx={{ fontWeight: 700, bgcolor: "#fff7ed", color: "#c2410c" }} />}
-      </Stack>
-      {(d.summary || d.highlights.length > 0) && (
-        <Section n={next()} title="บทสรุป">
-          <Card>
-            {d.summary && <Typography sx={{ fontSize: "0.9rem", color: INK_2, lineHeight: 1.7 }}>{d.summary}</Typography>}
-            {d.highlights.length > 0 && <Box sx={{ mt: d.summary ? 1 : 0 }}><Bullets items={d.highlights} /></Box>}
-          </Card>
-        </Section>
-      )}
-      {d.systemStatus.length > 0 && (
-        <Section n={next()} title="สถานะระบบ (ก่อน → หลัง)">
-          <MiniTable head={["รายการ", "ก่อนเข้า", "หลังเสร็จ"]} aligns={["left", "center", "center"]}
-            rows={d.systemStatus.map((r) => [r.item, r.before || "-", <b key="a" style={{ color: INK }}>{r.after || "-"}</b>])} />
-        </Section>
-      )}
-      {d.checks.length > 0 && (
-        <Section n={next()} title="ผลตรวจเช็คพื้นฐาน">
-          <MiniTable head={["รายการ", "ค่าที่วัด / ข้อมูล", "ผล"]} aligns={["left", "left", "center"]}
-            rows={d.checks.map((r) => [r.item, r.value || "-", <span key="r" style={{ fontWeight: 800, color: r.result === "abnormal" ? "#b91c1c" : r.result === "normal" ? "#15803d" : MUTED }}>{CHECK_RESULT[r.result]}</span>])} />
-        </Section>
-      )}
-      {d.workDone.length > 0 && (
-        <Section n={next()} title="รายละเอียดงานที่ทำ"><Card><Bullets items={d.workDone} numbered /></Card></Section>
-      )}
-      {d.issues.length > 0 && (
-        <Section n={next()} title="ปัญหาที่พบ / อุปกรณ์ที่ต้องเปลี่ยน">
-          <MiniTable head={["#", "ตำแหน่ง", "ปัญหา", "อุปกรณ์ / รุ่น", "จำนวน", "สถานะ"]} aligns={["center", "left", "left", "left", "center", "center"]}
-            rows={d.issues.map((r, i) => [i + 1, r.location || "-", r.problem || "-", r.part || "-", r.qty || "-",
-              <span key="s" style={{ fontWeight: 800, color: ISSUE_TONE[r.status], whiteSpace: "nowrap" }}>{ISSUE_STATUS[r.status]}</span>])} />
-        </Section>
-      )}
-      {(d.recommendations.length > 0 || fu.coordinateWith) && (
-        <Section n={next()} title="ข้อเสนอแนะและการติดตาม">
-          <Card><Bullets items={[...d.recommendations, fu.coordinateWith ? `ประสานงานกับ ${fu.coordinateWith}` : ""].filter(Boolean)} /></Card>
-        </Section>
-      )}
-      {(d.customer.comment || d.customer.signed || d.customer.name) && (
-        <Section n={next()} title="ลูกค้า">
-          <Card>
-            {d.customer.comment && <Typography sx={{ fontSize: "0.88rem", color: INK_2 }}>ความเห็น: {d.customer.comment}</Typography>}
-            <Typography sx={{ fontSize: "0.86rem", color: d.customer.signed ? "#15803d" : "#b45309", fontWeight: 700 }}>
-              {d.customer.signed ? "ลูกค้าลงนามแล้ว" : "ยังไม่พบลายเซ็นลูกค้า"}{d.customer.name ? ` · ${d.customer.name}` : ""}{d.customer.signDate ? ` · ${d.customer.signDate}` : ""}
-            </Typography>
-          </Card>
-        </Section>
-      )}
+      <Section n={1} title="รายละเอียดงานที่ทำ">
+        <Card>
+          {d.summary && <Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.7, mb: d.workDone.length ? 1 : 0 }}>{d.summary}</Typography>}
+          {d.workDone.length > 0 && <Bullets items={d.workDone} numbered />}
+          {!d.summary && !d.workDone.length && <Typography sx={{ fontSize: "0.86rem", color: FAINT }}>ไม่มีรายละเอียดในเอกสาร</Typography>}
+        </Card>
+      </Section>
+      <Section n={2} title="สรุปปัญหาที่พบ"
+        right={st.total > 0 && (
+          <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end">
+            {st.pending > 0 && <Chip size="small" label={`ยังค้าง ${st.pending}`} sx={{ fontWeight: 800, bgcolor: "#fffbeb", color: ISSUE_TONE.pending }} />}
+            {st.needQuote > 0 && <Chip size="small" label={`ต้องเสนอราคา ${st.needQuote}`} sx={{ fontWeight: 800, bgcolor: "#fff7ed", color: ISSUE_TONE.need_quote }} />}
+            {st.fixed > 0 && <Chip size="small" label={`แก้แล้ว ${st.fixed}`} sx={{ fontWeight: 800, bgcolor: "#f0fdf4", color: ISSUE_TONE.fixed }} />}
+          </Stack>
+        )}>
+        {!st.total && !d.issueSummary ? (
+          <Card><Typography sx={{ fontSize: "0.88rem", color: ISSUE_TONE.fixed, fontWeight: 700 }}>ไม่พบปัญหา</Typography></Card>
+        ) : (
+          <>
+            {d.issueSummary && <Card sx={{ mb: st.total ? 1 : 0 }}><Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.7 }}>{d.issueSummary}</Typography></Card>}
+            {st.total > 0 && (
+              <MiniTable head={["#", "ตำแหน่ง", "ปัญหา", "อุปกรณ์ / รุ่น", "จำนวน", "สถานะ"]} aligns={["center", "left", "left", "left", "center", "center"]}
+                rows={d.issues.map((r, i) => [i + 1, r.location || "-", r.problem || "-", r.part || "-", r.qty || "-",
+                  <span key="s" style={{ fontWeight: 800, color: ISSUE_TONE[r.status], whiteSpace: "nowrap" }}>{ISSUE_STATUS[r.status]}</span>])} />
+            )}
+          </>
+        )}
+      </Section>
     </>
   );
 }
@@ -177,68 +127,18 @@ function RowEditor({ rows, cols, onChange, blank }) {
 }
 
 function SummaryEditor({ d, setD }) {
-  const job = (k, v) => setD({ ...d, job: { ...d.job, [k]: v } });
-  const [datesTextVal, setDatesTextVal] = useState(() => d.job.dates.map((x) => [x.date, x.timeIn, x.timeOut].join(" ")).join("\n"));
   return (
     <Stack spacing={1.5} sx={{ mt: 1 }}>
-      <Section n={1} title="ข้อมูลงาน">
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-          <TextField {...tf} label="โครงการ / สถานที่" value={d.job.project} onChange={(e) => job("project", e.target.value)} />
-          <TextField {...tf} label="ระบบ" value={d.job.system} onChange={(e) => job("system", e.target.value)} />
-          <TextField {...tf} label="ประเภทงาน" value={d.job.jobType} onChange={(e) => job("jobType", e.target.value)} />
-          <TextField {...tf} label="PM ครั้งที่" value={d.job.pmRound} onChange={(e) => job("pmRound", e.target.value)} />
-          <TextField {...tf} label="ผู้ติดต่อ" value={d.job.contactName} onChange={(e) => job("contactName", e.target.value)} />
-          <TextField {...tf} label="ตำแหน่ง / โทร" value={[d.job.contactPosition, d.job.contactPhone].filter(Boolean).join(" / ")}
-            onChange={(e) => { const [pos, tel] = e.target.value.split("/").map((x) => x.trim()); setD({ ...d, job: { ...d.job, contactPosition: pos || "", contactPhone: tel || "" } }); }} />
-          <TextField {...tf} multiline minRows={2} label="วันที่ เวลาเข้า เวลาออก (บรรทัดละวัน เช่น 2026-10-22 09:00 17:00)" value={datesTextVal}
-            onChange={(e) => {
-              setDatesTextVal(e.target.value);
-              job("dates", linesToArr(e.target.value).map((ln) => { const [date = "", timeIn = "", timeOut = ""] = ln.split(/\s+/); return { date, timeIn, timeOut }; }));
-            }} />
-          <TextField {...tf} multiline minRows={2} label="ช่างผู้ให้บริการ (บรรทัดละคน)" value={d.technicians.join("\n")} onChange={(e) => setD({ ...d, technicians: linesToArr(e.target.value) })} />
-        </Box>
+      <Section n={1} title="รายละเอียดงานที่ทำ">
+        <TextField {...tf} multiline minRows={3} label="สรุปงานที่ทำ (2–4 ประโยค)" value={d.summary} onChange={(e) => setD({ ...d, summary: e.target.value })} />
+        <TextField {...tf} multiline minRows={6} sx={{ mt: 1 }} label="รายละเอียดงานที่ทำ (บรรทัดละ 1 เรื่อง)" value={d.workDone.join("\n")} onChange={(e) => setD({ ...d, workDone: linesToArr(e.target.value) })} />
       </Section>
-      <Section n={2} title="ผลการทำงาน">
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-          <TextField {...tf} select label="ผลการทำงาน" value={d.result} onChange={(e) => setD({ ...d, result: e.target.value })}>
-            {Object.entries(RESULT_META).map(([k, v]) => <MenuItem key={k} value={k}>{v.label}</MenuItem>)}
-          </TextField>
-          <TextField {...tf} label="ประสานงานกับ" value={d.followUp.coordinateWith} onChange={(e) => setD({ ...d, followUp: { ...d.followUp, coordinateWith: e.target.value } })} />
-          <FormControlLabel control={<Switch checked={d.followUp.revisit} onChange={(e) => setD({ ...d, followUp: { ...d.followUp, revisit: e.target.checked } })} />} label="ต้องเข้าอีก" />
-          <TextField {...tf} type="date" label="วันที่นัดเข้าอีก" value={d.followUp.revisitDate} onChange={(e) => setD({ ...d, followUp: { ...d.followUp, revisitDate: e.target.value } })} />
-          <FormControlLabel control={<Switch checked={d.followUp.needQuotation} onChange={(e) => setD({ ...d, followUp: { ...d.followUp, needQuotation: e.target.checked } })} />} label="ต้องทำใบเสนอราคา" />
-        </Box>
-      </Section>
-      <Section n={3} title="บทสรุป">
-        <TextField {...tf} multiline minRows={4} label="บทสรุป" value={d.summary} onChange={(e) => setD({ ...d, summary: e.target.value })} />
-        <TextField {...tf} multiline minRows={2} sx={{ mt: 1 }} label="ประเด็นสำคัญ (บรรทัดละข้อ)" value={d.highlights.join("\n")} onChange={(e) => setD({ ...d, highlights: linesToArr(e.target.value) })} />
-      </Section>
-      <Section n={4} title="สถานะระบบ (ก่อน → หลัง)">
-        <RowEditor rows={d.systemStatus} onChange={(v) => setD({ ...d, systemStatus: v })} blank={{ item: "", before: "", after: "" }}
-          cols={[{ key: "item", label: "รายการ", flex: 2 }, { key: "before", label: "ก่อนเข้า" }, { key: "after", label: "หลังเสร็จ" }]} />
-      </Section>
-      <Section n={5} title="ผลตรวจเช็คพื้นฐาน">
-        <RowEditor rows={d.checks} onChange={(v) => setD({ ...d, checks: v })} blank={{ item: "", value: "", result: "normal" }}
-          cols={[{ key: "item", label: "รายการ", flex: 1.5 }, { key: "value", label: "ค่าที่วัด / ข้อมูล", flex: 2 }, { key: "result", label: "ผล", select: CHECK_RESULT }]} />
-      </Section>
-      <Section n={6} title="รายละเอียดงานที่ทำ">
-        <TextField {...tf} multiline minRows={5} label="บรรทัดละ 1 เรื่อง" value={d.workDone.join("\n")} onChange={(e) => setD({ ...d, workDone: linesToArr(e.target.value) })} />
-      </Section>
-      <Section n={7} title="ปัญหาที่พบ / อุปกรณ์ที่ต้องเปลี่ยน">
+      <Section n={2} title="สรุปปัญหาที่พบ">
+        <TextField {...tf} multiline minRows={3} label="สรุปปัญหาที่พบ (ไม่พบปัญหา = เว้นว่าง)" value={d.issueSummary} onChange={(e) => setD({ ...d, issueSummary: e.target.value })} />
+        <Typography sx={{ fontSize: "0.78rem", color: MUTED, fontWeight: 700, mt: 1.25, mb: 0.75 }}>รายการปัญหา / อุปกรณ์ที่ต้องเปลี่ยน (1 แถว = 1 จุด หรือ 1 รุ่น)</Typography>
         <RowEditor rows={d.issues} onChange={(v) => setD({ ...d, issues: v })} blank={{ location: "", problem: "", part: "", qty: "", status: "pending" }}
           cols={[{ key: "location", label: "ตำแหน่ง" }, { key: "problem", label: "ปัญหา / อาการ", flex: 2, multiline: true }, { key: "part", label: "อุปกรณ์ / รุ่น", flex: 1.4 },
             { key: "qty", label: "จำนวน", flex: 0.7 }, { key: "status", label: "สถานะ", select: ISSUE_STATUS }]} />
-      </Section>
-      <Section n={8} title="ข้อเสนอแนะ">
-        <TextField {...tf} multiline minRows={3} label="บรรทัดละข้อ" value={d.recommendations.join("\n")} onChange={(e) => setD({ ...d, recommendations: linesToArr(e.target.value) })} />
-      </Section>
-      <Section n={9} title="ลูกค้า">
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-          <TextField {...tf} label="ความเห็นลูกค้า" value={d.customer.comment} onChange={(e) => setD({ ...d, customer: { ...d.customer, comment: e.target.value } })} />
-          <TextField {...tf} label="ชื่อผู้ลงนาม" value={d.customer.name} onChange={(e) => setD({ ...d, customer: { ...d.customer, name: e.target.value } })} />
-          <FormControlLabel control={<Switch checked={d.customer.signed} onChange={(e) => setD({ ...d, customer: { ...d.customer, signed: e.target.checked } })} />} label="ลูกค้าลงนามแล้ว" />
-          <TextField {...tf} type="date" label="วันที่ลงนาม" value={d.customer.signDate} onChange={(e) => setD({ ...d, customer: { ...d.customer, signDate: e.target.value } })} />
-        </Box>
       </Section>
     </Stack>
   );
@@ -273,11 +173,11 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
 
   const summary = state.summary;
   const data = useMemo(() => withDefaults(summary?.data), [summary]);
+  const info = useMemo(() => jobInfoOf(event || {}, state.sessions), [event, state.sessions]);
   const meta = useMemo(() => ({
-    jobNo: event?.jobNo || "", company: event?.company || "", site: event?.site || "", system: event?.system || "", title: event?.title || "",
     fileCount: summary?.data?.fileCount || summary?.files?.length || 0,
     confirmedBy: summary?.status === "confirmed" ? summary?.confirmedBy : "", confirmedAt: summary?.confirmedAt,
-  }), [event, summary]);
+  }), [summary]);
 
   const scan = async (force = false) => {
     setScanning(true);
@@ -315,13 +215,31 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
   const makePdf = async () => {
     setPdfBusy(true);
     try {
-      const out = await generateServiceReportSummaryPdf({ jsPDF, thSarabunFont, data: editing ? withDefaults(draft) : data, meta, mode: "blob" });
+      const [{ jsPDF }, { default: thSarabunFont }, { generateServiceReportSummaryPdf }] = await Promise.all([
+        import("jspdf"), import("@/assets/fonts/THSarabunNew_base64"), import("../utils/serviceReportSummaryPdf"),
+      ]);
+      const out = await generateServiceReportSummaryPdf({ jsPDF, thSarabunFont, data: editing ? withDefaults(draft) : data, info, meta, mode: "blob" });
       setPreview(out);
     } catch (err) {
       console.error(err);
       Swal.fire({ icon: "error", title: "สร้าง PDF ไม่สำเร็จ", text: "กรุณาลองใหม่" });
     }
     setPdfBusy(false);
+  };
+
+  const [xlsBusy, setXlsBusy] = useState(false);
+  const makeExcel = async () => {
+    setXlsBusy(true);
+    try {
+      const { exportServiceReportExcel } = await import("../utils/serviceReportExcel");
+      const safe = (v) => String(v || "").replace(/[\\/:*?"<>|]+/g, "-").trim();
+      await exportServiceReportExcel([{ info, summary: { ...summary, data: editing ? withDefaults(draft) : data } }],
+        `สรุป Service Report ${safe(info.jobNo)} ${safe(info.site)}.xlsx`.replace(/\s+/g, " "), [info.jobNo, info.site].filter(Boolean).join(" · "));
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ icon: "error", title: "ส่งออก Excel ไม่สำเร็จ", text: "กรุณาลองใหม่" });
+    }
+    setXlsBusy(false);
   };
 
   const files = state.files || [];
@@ -354,7 +272,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
             <Card sx={{ textAlign: "center", py: 4 }}>
               <AutoAwesome sx={{ fontSize: 34, color: ACCENT, mb: 1 }} />
               <Typography sx={{ fontWeight: 800, color: INK }}>AI กำลังอ่าน Service Report {files.length} ไฟล์…</Typography>
-              <Typography sx={{ fontSize: "0.82rem", color: MUTED, mt: 0.5, mb: 2 }}>อ่านลายมือ แยกหัวข้อ และเขียนบทสรุป — ใช้เวลาประมาณ 30 วินาที ถึง 2 นาที อย่าปิดหน้านี้</Typography>
+              <Typography sx={{ fontSize: "0.82rem", color: MUTED, mt: 0.5, mb: 2 }}>อ่านเนื้อหางานที่ทำและปัญหาที่พบ (ข้ามหัวกระดาษ/ลายเซ็น) — ใช้เวลาประมาณ 30 วินาที ถึง 2 นาที อย่าปิดหน้านี้</Typography>
               <LinearProgress sx={{ maxWidth: 320, mx: "auto", borderRadius: 99 }} />
             </Card>
           ) : !summary ? (
@@ -362,7 +280,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
               <Description sx={{ fontSize: 40, color: FAINT }} />
               <Typography sx={{ fontWeight: 800, color: INK, mt: 1 }}>{files.length ? `มี Service Report ${files.length} ไฟล์ในงานนี้` : "ยังไม่มีไฟล์ Service Report ในงานนี้"}</Typography>
               <Typography sx={{ fontSize: "0.84rem", color: MUTED, mt: 0.5, maxWidth: 460, mx: "auto" }}>
-                AI จะอ่านทุกไฟล์ (รูปถ่าย/สแกน/PDF รวมลายมือ) แล้วสรุปเป็นหัวข้อ: สถานะระบบ ผลตรวจเช็ค งานที่ทำ ปัญหาและอุปกรณ์ที่ต้องเปลี่ยน ข้อเสนอแนะ — ตรวจ/แก้ได้ก่อนออก PDF
+                AI อ่านเฉพาะเนื้อหาในทุกไฟล์ (รูปถ่าย/สแกน/PDF รวมลายมือ) ไม่อ่านหัวกระดาษและท้ายกระดาษ แล้วสรุปเป็น 2 หัวข้อ: รายละเอียดงานที่ทำ · สรุปปัญหาที่พบ — ตรวจ/แก้ได้ก่อนออก PDF / Excel
               </Typography>
               {!state.enabled && <Alert severity="warning" sx={{ mt: 2, textAlign: "left" }}>ยังไม่ได้เปิดใช้งาน AI ที่เซิร์ฟเวอร์ (ต้องตั้งค่า ANTHROPIC_API_KEY)</Alert>}
               <Button variant="contained" startIcon={<AutoAwesome />} disabled={!files.length || !state.enabled} onClick={() => scan(false)} sx={{ ...PRIMARY_BTN_SX, ...BTN, mt: 2.5, px: 3 }}>
@@ -384,7 +302,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                 {summary.editedAt ? ` · แก้ไขล่าสุด ${fmtAt(summary.editedAt)} ${summary.editedBy}` : ""}
                 {confirmed ? ` · ยืนยันโดย ${summary.confirmedBy} ${fmtAt(summary.confirmedAt)}` : ""}
               </Typography>
-              {editing ? <SummaryEditor d={draft} setD={setDraft} /> : <SummaryView d={data} meta={meta} />}
+              {editing ? <SummaryEditor d={draft} setD={setDraft} /> : <SummaryView d={data} />}
             </>
           )}
         </DialogContent>
@@ -402,6 +320,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
               <>
                 {state.canEdit && <Button startIcon={<Refresh />} onClick={() => scan(false)} disabled={!state.enabled} sx={{ ...BTN, color: MUTED }}>อ่านใหม่</Button>}
                 {state.canEdit && <Button startIcon={<EditOutlined />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
+                <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
                 {/* มือถือ: ปุ่มรองแถวบน · ยืนยัน/สร้าง PDF แถวล่างเต็มกว้าง */}
                 <Box sx={isMobile ? { flexBasis: "100%", height: 0 } : { flex: 1 }} />
                 {state.canEdit && !confirmed && <Button variant="outlined" color="success" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving} sx={{ ...BTN, flex: isMobile ? 1 : "none" }}>ยืนยันสรุป</Button>}
