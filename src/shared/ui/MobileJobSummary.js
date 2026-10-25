@@ -107,7 +107,9 @@ export default function MobileJobSummary({ event, statusLabel, statusColor, next
   const kind = classifyJob(event) || "general";
   const meta = event?.noVisit ? { label: "งานส่งของ", color: "#0891b2" } : (getJobClassMeta(kind) || getJobClassMeta("general"));
   const round = event?.time ? formatRoundLabel(event.time, event.visitCount, event) : "";
-  const place = [event.company, event.site].filter((x) => x && x !== "-").filter((x, i, a) => a.indexOf(x) === i).join(" · ");
+  // 🔁 (25 ต.ค. 2569 ผู้ใช้: "การ์ดหน้าแรกเอาชื่อโครงการมาแสดง") ชื่อบริษัทยาวดันชื่อโครงการตกขอบเป็น "…"
+  //    → แสดงชื่อโครงการอย่างเดียว (ไม่มีโครงการ = ชื่อบริษัท) · ชื่อบริษัทยังดูได้ในรายละเอียดงาน
+  const place = [event.site, event.company].find((x) => x && x !== "-") || "";
   // ✅ (20 ต.ค. 2569 ผู้ใช้: "งานหลายช่วงวันทำให้แยกง่าย ไม่สับสนกับงานเดี่ยวๆ กันพลาด")
   //    ช่วงหนึ่งในงานหลายช่วง (inGroup) — ไม่ซ้ำชื่องาน/โครงการ (อยู่หัวกลุ่มแล้ว) · เหลือ ปฏิทิน + คนเข้างาน + สถานะ ในแถวเดียว
   //    หน้าตาจึงต่างจากการ์ดงานเดี่ยวชัดเจน
