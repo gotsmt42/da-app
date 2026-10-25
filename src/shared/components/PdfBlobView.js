@@ -13,9 +13,10 @@
  *    • จอคอม: ฝัง iframe หลังท่าเปิดกล่องจบ (ตัวอ่าน PDF ของเบราว์เซอร์หนัก โหลดพร้อมท่าเปิดแล้วกระตุก)
  */
 import { useEffect, useMemo, useState } from "react";
-import { Box, Stack, Button, Typography } from "@mui/material";
+import { Stack, Button, Typography } from "@mui/material";
 import { OpenInNew } from "@mui/icons-material";
 import PageLoader from "@/shared/ui/PageLoader";
+import PdfPagesView from "@/shared/components/PdfPagesView";
 import { renderPdfToImages, revokePageImages, prefersImagePrint } from "@/shared/utils/pdfRaster";
 
 const OPEN_DELAY = 280; // ≈ ท่าเปิดกล่อง (Dialog/แผ่นเลื่อนขึ้น) ของทั้งแอป
@@ -73,17 +74,10 @@ export default function PdfBlobView({ url, height = 780, title = "PDF" }) {
     );
   }
   if (!pages) return <PageLoader variant="inline" label="กำลังเปิดไฟล์ PDF…" />;
+  // ✅ ซูมในกล่องเอง (PdfPagesView) — ไม่ปล่อยให้ทั้งหน้าเว็บซูม (ภาพซ้อน/ช่องเทาบนมือถือ)
   return (
-    <Stack spacing={1.25} alignItems="center" sx={{ p: { xs: 1, sm: 2 }, bgcolor: "#525659", minHeight: "100%" }}>
-      {pages.map((pg, i) => (
-        <Box key={pg.url} component="img" src={pg.url} alt={`หน้า ${i + 1}`} width={pg.width} height={pg.height}
-          sx={{ display: "block", width: "100%", maxWidth: 900, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)",
-            willChange: pages.length <= 8 ? "transform" : "auto", // ชั้นการ์ดจอ: เลื่อนแล้วไม่ต้องวาดใหม่ (ไม่วาบ)
-            animation: "pdfPageIn .22s ease-out", "@keyframes pdfPageIn": { from: { opacity: 0 }, to: { opacity: 1 } } }} />
-      ))}
-      <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,.75)", pb: 1 }}>
-        {done ? `${pages.length} หน้า · ซูมด้วยสองนิ้วได้` : `กำลังเปิดหน้าถัดไป… (${pages.length} หน้าแล้ว)`}
-      </Typography>
-    </Stack>
+    <PdfPagesView pages={pages} maxWidth={900}
+      footer={done ? `${pages.length} หน้า · ถ่างนิ้ว/แตะสองครั้งเพื่อซูม` : `กำลังเปิดหน้าถัดไป… (${pages.length} หน้าแล้ว)`}
+      sx={{ height: { xs: "calc(100dvh - 72px)", sm: "80vh" } }} />
   );
 }

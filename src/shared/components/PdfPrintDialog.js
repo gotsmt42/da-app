@@ -19,6 +19,7 @@ import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, MailOutline } f
 import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import { renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser } from "@/shared/utils/pdfRaster";
+import PdfPagesView from "@/shared/components/PdfPagesView";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 const TEXT_SUB = "#64748b";
@@ -149,15 +150,8 @@ export default function PdfPrintDialog({ open, onClose, generate, jobKey, title,
         )}
         <Box sx={{ flex: 1, minHeight: 0, position: "relative", overflow: imageMode ? "auto" : "hidden" }}>
           {imageMode && (pages || shown)?.length ? (
-            <Stack spacing={1.5} alignItems="center" sx={{ p: { xs: 1, sm: 2 } }}>
-              {(pages || shown).map((p, i) => (
-                <Box key={p.url} component="img" src={p.url} width={p.width} height={p.height} alt={`หน้า ${i + 1}`}
-                  sx={{ display: "block", width: "100%", maxWidth: 820, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)",
-                    // ✅ (25 ต.ค. 2569 "หน้า pdf กระตุก โดดๆ วาบๆ เวลาเลื่อน") แยกแต่ละหน้าเป็นชั้นของการ์ดจอ — วาดครั้งเดียว
-                    //    เลื่อนแล้วแค่ขยับ ไม่ต้องถอด/วาดภาพใหม่ (ไม่วาบ) · จำกัดไฟล์ไม่เกิน 8 หน้า กันกินหน่วยความจำ
-                    willChange: (pages || shown).length <= 8 ? "transform" : "auto" }} />
-              ))}
-            </Stack>
+            <PdfPagesView pages={pages || shown} footer={pages ? `${pages.length} หน้า · ถ่างนิ้ว/แตะสองครั้งเพื่อซูม` : "กำลังเปิดหน้าถัดไป…"}
+              sx={{ position: "absolute", inset: 0, height: "auto" }} />
           ) : !imageMode && pdf?.url ? (
             <Box component="iframe" title="ตัวอย่างเอกสาร" src={pdf.url} sx={{ width: "100%", height: "100%", border: "none", display: "block" }} />
           ) : !error && !rasterFailed && (
