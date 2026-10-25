@@ -17,13 +17,12 @@
     right: 0;
     bottom: 0;
     z-index: 1040;
-    background: rgba(255, 255, 255, 0.97);
+    /* พื้นทึบ ไม่ใช้ backdrop-filter — เบลอใต้แถบที่ fixed ต้องคำนวณใหม่ทุกเฟรมที่เลื่อน ทำให้มือถือกระตุก (25 ต.ค. 2569) */
+    background: #fff;
     border-top: 1px solid #e2e8f0;
     box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     transition: transform 0.2s ease;
-    -webkit-backdrop-filter: saturate(180%) blur(8px);
-    backdrop-filter: saturate(180%) blur(8px);
   }
   .mbn--hidden {
     transform: translateY(110%);

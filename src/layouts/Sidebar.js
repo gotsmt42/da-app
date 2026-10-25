@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Nav, NavItem, Collapse } from "reactstrap";
 import { Link, useLocation } from "react-router-dom";
-import AuthService from "../shared/services/authService";
 import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
@@ -61,19 +60,6 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
 
   const { badges } = useAppBadges(userData);
 
-  const [, setUser] = useState({});
-
-  useEffect(() => {
-    const getUserData = async () => {
-      try {
-        const getUser = await AuthService.getUserData();
-        setUser(getUser.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-    getUserData();
-  }, []);
 
   /**
    * ── โครงเมนู 4 หมวด ────────────────────────────────────────────────────────

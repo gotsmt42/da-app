@@ -9,6 +9,7 @@
  * 📷 รูปอัปโหลดเข้า "ไฟล์แนบ" ของงานทันทีที่เลือก (ชุดเดียวกับที่แอดมินเห็น) — กดยกเลิก = ลบรูปที่เพิ่งอัปทิ้ง
  * 📍 ไม่อนุญาตตำแหน่ง/หาไม่เจอ ยังเช็คอินได้ — บันทึกว่า "ไม่มีพิกัด" ให้แอดมินเห็น
  */
+import { useLinger } from "@/shared/ui/MobileSheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box, Stack, Typography, Button, ButtonBase, Dialog, DialogContent, DialogActions, IconButton, TextField, Collapse,
@@ -189,6 +190,9 @@ const isImg = (f) => /^image\//.test(f?.fileType || "") || /\.(jpe?g|png|webp|gi
  * @param zIndex  อยู่ในฟอร์ม SweetAlert (EditEvent) — ต้องลอยเหนือ .swal2-container (z-index 20000)
  */
 export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
+  // ✅ (25 ต.ค. 2569 perf) ตอนปิดอยู่ไม่ต้องสร้างเนื้อหาฟอร์มทั้งชุด (การ์ดงาน 1 ใบเคยสร้างฟอร์มนี้ 2–3 ชุดรอไว้)
+  //    คงไว้อีกครู่หลังปิดให้ท่าปิดเล่นจนจบ
+  const shown = useLinger(open, 320);
   const fullScreen = useMediaQuery("(max-width:600px)");
   const [offset, setOffset] = useState(0); // serverNow − Date.now()
   const [now, setNow] = useState(Date.now());
@@ -356,6 +360,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
 
   const jobLabel = [event?.title, event?.site || event?.company].filter(Boolean).join(" · ");
 
+  if (!shown) return null;
   return (
     <Dialog open={open} onClose={cancel} fullScreen={fullScreen} fullWidth maxWidth="sm" sx={zIndex ? { zIndex } : undefined}
       PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: "#fff" } }}>

@@ -44,6 +44,8 @@ const unlockAudio = () => {
 /** เสียง "ติ๊ง-ติ๊ง" สองโน้ตสั้นๆ แบบแอปแชท */
 const playChime = () => {
   try {
+    // Android/Chrome: เคยแตะหน้าจอแล้ว (sticky activation) = สร้างเสียงตอนจะเล่นได้เลย ไม่ต้องจองไว้ตั้งแต่แตะครั้งแรก
+    if (!audioCtx && navigator.userActivation?.hasBeenActive) unlockAudio();
     if (!audioCtx || audioCtx.state !== "running") return;
     const now = audioCtx.currentTime;
     [[880, 0], [1320, 0.13]].forEach(([freq, at]) => {
@@ -84,13 +86,17 @@ export default function InAppPushBanner() {
   }, []);
 
   useEffect(() => {
-    // ปลดล็อกเสียงตอนผู้ใช้แตะ/คลิกครั้งแรก (กฎ autoplay ของเบราว์เซอร์)
-    window.addEventListener("pointerdown", unlockAudio, { passive: true });
-    window.addEventListener("keydown", unlockAudio);
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
+    // 🐛 (25 ต.ค. 2569 ผู้ใช้: "เปิดฟอร์มหน่วง กระตุก") เดิมสร้าง AudioContext (~0.3 วินาที) ตอน "แตะครั้งแรก"
+    //    ซึ่งเป็นจังหวะเดียวกับหน้าต่างแรกที่กดเปิด → ค้างไปครู่หนึ่งทุกครั้งที่เข้าแอป
+    //    ✅ Android/Chrome สร้างตอนจะเล่นเสียงจริง (playChime) · เหลือปลดล็อกตอนแตะเฉพาะ iPhone/iPad
+    //       ที่ต้องทำในจังหวะแตะเท่านั้น (กฎ autoplay ของ Safari) และทำครั้งเดียวแล้วเลิกฟัง
+    if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) return undefined;
+    const onTap = () => {
+      unlockAudio();
+      window.removeEventListener("touchend", onTap);
     };
+    window.addEventListener("touchend", onTap, { passive: true });
+    return () => window.removeEventListener("touchend", onTap);
   }, []);
 
   useEffect(() => {

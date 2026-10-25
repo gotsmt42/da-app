@@ -81,7 +81,7 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
-import MobileSheet, { SHEET_DURATION, SHEET_EASING } from "@/shared/ui/MobileSheet";
+import MobileSheet, { SHEET_DURATION, SHEET_EASING, useLinger, useDeferredOpen, FadeIn } from "@/shared/ui/MobileSheet";
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
@@ -1899,6 +1899,8 @@ const EventRowCard = ({
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ทำไมหน้าดำเนินงานกดแล้วเลื่อนลงอยู่ ไม่เปิดหน้าต่างขึ้นมา") ทุกขนาดจอเปิดหน้าต่างรายละเอียด
   //    (จอคอม = กล่องกลางจอ · มือถือ = แผ่นเลื่อนขึ้น) · ในหน้าการ์ดคงแบบพับไว้ · งานที่เปิดเจาะจง (inlineDetails) กางในหน้าตามเดิม
   const sheet = open && !inlineDetails;
+  // คงเนื้อหาไว้ระหว่างแผ่นกำลังเลื่อนปิด — ไม่ให้แผ่นว่างเปล่าวาบลงไป (25 ต.ค. 2569)
+  const sheetShown = useLinger(sheet);
   const cardBody = renderBody(inlineDetails ? open : false);
 
   return (
@@ -1909,7 +1911,7 @@ const EventRowCard = ({
       <MobileSheet open={sheet} onClose={() => setOpen(false)} maxWidth="lg"
         title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
         subtitle={[event.jobNo, companySite(event.company, event.site)].filter(Boolean).join(" · ")}>
-        <Box sx={{ m: { xs: 1.25, sm: 2 }, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{sheet ? renderBody(true) : null}</Box>
+        <Box sx={{ m: { xs: 1.25, sm: 2 }, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{sheetShown ? renderBody(true) : null}</Box>
       </MobileSheet>
 
       {!inlineDetails && (
@@ -2224,7 +2226,9 @@ export const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
 //    → สถานะ → เอกสารครบหรือยัง (แยกชนิด: รายงาน · ใบเสนอราคา + ผล · ใบส่งมอบ · ใบวางบิล)
 //    หัวตาราง/ระยะ/ตัวอักษรชุดเดียวกับตารางหน้างานเข้า
 
-const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
+// ✅ (25 ต.ค. 2569 ผู้ใช้: "เปิดฟอร์มหน่วง กระตุก") memo — กดแถวเพื่อเปิดรายละเอียดไม่ต้องวาดตารางทั้งตารางใหม่
+//    (เดิมกดแถวแล้วรอ ~0.5 วินาทีก่อนหน้าต่างเริ่มเลื่อนขึ้น เพราะวาดทุกแถวใหม่หมด)
+const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
   const avatarMap = useAvatarMap(employee);
   const [assign, setAssign] = useState(null); // { anchor, job } | null
   const th = { fontWeight: 800, fontSize: "0.74rem", bgcolor: SURFACE, color: MUTED, whiteSpace: "nowrap", borderColor: LINE, py: 1.1 };
@@ -2339,7 +2343,88 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
     )}
   </TableContainer>
   );
-};
+});
+
+// ─── JobDetailDrawer ─────────────────────────────────────────────────────
+/**
+ * แผงรายละเอียดงาน (จากตาราง/บอร์ดวันนี้/คำขอปิดงาน) — ขวามือบนจอใหญ่ · เลื่อนขึ้นเต็มจอบนมือถือ
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "เปิดดูเอกสารกระพริบวาบๆ · เลื่อนลงปิดเร็วๆ แข็งๆ วาบๆ · หน่วง กระตุก")
+ *    • เก็บสถานะ "งานที่เปิด" ไว้ในตัวเอง — เปิด/ปิดไม่ทำให้หน้าการดำเนินงานทั้งหน้าวาดใหม่
+ *    • แผงเลื่อนขึ้นทันที เนื้อหางานวาดตามหลังแบบไม่ขวางจอแล้วจางเข้า
+ *    • ปิดแล้วคงเนื้อหาเดิมไว้จนแผงเลื่อนพ้นจอ — ไม่เป็นแผงว่างวาบลงไป
+ * ผู้เรียกสั่งผ่าน ref: open(jobId) / close()
+ */
+const JobDetailDrawer = React.forwardRef(({ jobGroups, events, isMobile, navigate, renderBlock }, ref) => {
+  const [detailJobId, setDetailJobId] = useState(null);
+  const close = useCallback(() => setDetailJobId(null), []);
+  React.useImperativeHandle(ref, () => ({ open: (id) => setDetailJobId(id), close }), [close]);
+  const detailSessions = useMemo(() => {
+    if (!detailJobId) return null;
+    const inList = jobGroups.find((g) => g.some((x) => x._id === detailJobId));
+    if (inList) return inList;
+    const base = events.find((e) => e._id === detailJobId);
+    if (!base) return null;
+    return base.jobGroupId ? events.filter((e) => e.jobGroupId === base.jobGroupId) : [base];
+  }, [detailJobId, jobGroups, events]);
+  const detailOpen = Boolean(detailSessions);
+  const lastDetailRef = useRef({ sessions: null, id: null });
+  if (detailSessions) lastDetailRef.current = { sessions: detailSessions, id: detailJobId };
+  const shownDetail = detailSessions || lastDetailRef.current.sessions;
+  const shownDetailId = detailSessions ? detailJobId : lastDetailRef.current.id;
+  const detailReady = useDeferredOpen(detailOpen);
+  return (
+    <SwipeableDrawer
+      anchor={isMobile ? "bottom" : "right"}
+      open={detailOpen}
+      onClose={close}
+      onOpen={() => {}}
+      disableSwipeToOpen
+      transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
+      PaperProps={{ className: "tt-swipe-native", sx: {
+        width: isMobile ? "100%" : "min(640px, 92vw)",
+        // เต็มจอบนมือถือ (24 ต.ค. 2569 "เลื่อนขึ้นจนเต็ม")
+        height: isMobile ? "100dvh" : "100%", pt: isMobile ? "env(safe-area-inset-top)" : 0,
+        borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,
+        bgcolor: "#f8fafc", overflow: "hidden",
+      } }}
+    >
+      {shownDetail && (() => {
+        const head = shownDetail[0];
+        return (
+          <>
+            {isMobile && <Box sx={{ bgcolor: "background.paper", pt: 1 }}><Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto" }} /></Box>}
+            <Stack direction="row" alignItems="center" gap={1.25}
+              sx={{ px: 2, py: isMobile ? 1 : 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography noWrap sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>
+                  {head.site || head.company || "รายละเอียดงาน"}
+                </Typography>
+                <Typography noWrap sx={{ fontSize: "0.76rem", color: "text.secondary" }}>
+                  {[head.title, head.system, head.company && head.site ? head.company : ""].filter(Boolean).join(" · ")}
+                </Typography>
+              </Box>
+              <Button
+                size="small" startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
+                onClick={() => {
+                  // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
+                  if (head.unscheduled) { navigate("/jobs/intake"); return; }
+                  navigate(`/event?event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
+                }}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+              >
+                ดูในปฏิทิน
+              </Button>
+              <IconButton size="small" onClick={close} aria-label="ปิด"><Close fontSize="small" /></IconButton>
+            </Stack>
+            <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1, overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
+              {detailReady && <FadeIn>{renderBlock(shownDetail, shownDetailId, close)}</FadeIn>}
+            </Box>
+          </>
+        );
+      })()}
+    </SwipeableDrawer>
+  );
+});
 
 // ─── JobGroupBlock ──────────────────────────────────────────────────────
 // การ์ดรวมสำหรับงานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/signature เดียวกัน)
@@ -2622,6 +2707,7 @@ const Operation = () => {
    * ⚠️ ใช้ /basic-info ตัวเดียวกับหน้าภาพรวมงาน — server ทำให้ทุกวัน/ทุกครั้งของงานเดียวกันได้ค่าเดียวกัน
    *    (ดู services/groupResponsible.js) หน้าภาพรวมงาน/ปฏิทิน/ฟอร์มแก้ไขงาน จึงเห็นชื่อเดียวกันทันที
    */
+  const assignRef = useRef(null);
   const handleAssignResponsible = async (event, name) => {
     if ((event.responsiblePerson || "") === (name || "")) return;
     const person = employee.find((e) => e.fname === name);
@@ -2633,6 +2719,7 @@ const Operation = () => {
       setSnackbar({ open: true, msg: err?.response?.data?.message || "มอบหมายผู้รับผิดชอบไม่สำเร็จ", severity: "error" });
     }
   };
+  assignRef.current = handleAssignResponsible;
 
   const fetchEventsFromDB = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -2976,20 +3063,20 @@ const Operation = () => {
    * ⚠️ เก็บแค่ id — หากลุ่มงานสดจากรายการทุก render: แก้สถานะ/อัปโหลดในแผงแล้วข้อมูลในแผงเปลี่ยนตามทันที
    *    ถ้างานหลุดจากตัวกรองปัจจุบัน (เช่น ปิดงานแล้วย้ายไปกลุ่มเสร็จสิ้น) ยังเปิดค้างได้จากข้อมูลทั้งหมด
    */
-  const [detailJobId, setDetailJobId] = useState(null);
-  const detailSessions = useMemo(() => {
-    if (!detailJobId) return null;
-    const inList = jobGroups.find((g) => g.some((x) => x._id === detailJobId));
-    if (inList) return inList;
-    const base = events.find((e) => e._id === detailJobId);
-    if (!base) return null;
-    return base.jobGroupId ? events.filter((e) => e.jobGroupId === base.jobGroupId) : [base];
-  }, [detailJobId, jobGroups, events]);
+  // ✅ (25 ต.ค. 2569 ผู้ใช้: "เปิดฟอร์มหน่วง กระตุก") สถานะ "เปิดงานไหนอยู่" ย้ายไปอยู่ในแผงรายละเอียดเอง (JobDetailDrawer)
+  //    เดิมอยู่ที่หน้านี้ — กดเปิด/ปิดทีไรวาดทั้งหน้าใหม่ (ตัวกรอง · การ์ดสรุป · ตาราง · ตัวแบ่งหน้า) ก่อนแผงจะเริ่มเลื่อนขึ้น
+  const detailCtl = useRef(null);
+  const setDetailJobId = useCallback((id) => { if (id) detailCtl.current?.open(id); else detailCtl.current?.close(); }, []);
+  const openJobFromRow = useCallback((job) => setDetailJobId(job.sessions[0]._id), [setDetailJobId]);
+  const openJobById = useCallback((jid) => setDetailJobId(jid), [setDetailJobId]);
+  // ฟังก์ชันที่ส่งให้ตารางต้อง "ตัวเดิม" ทุกครั้ง ไม่งั้น memo ไม่ได้ผล (ดู OperationTable)
+  const assignResponsibleStable = useCallback((...args) => assignRef.current?.(...args), []);
 
   const pagedGroups = useMemo(
     () => jobGroups.slice((page - 1) * pageSize, page * pageSize),
     [jobGroups, page, pageSize]
   );
+  const tableJobGroups = useMemo(() => pagedGroups.map((sessions) => ({ sessions })), [pagedGroups]);
 
   // ✅ ?highlight=<id> (จากปุ่ม "ตรวจสอบ" ในพาแนล "งานที่ช่างขอปิด") — งานที่ต้องการอาจไม่ได้อยู่
   // หน้าแรกของรายการ (แบ่งหน้าอยู่) ต้องหาก่อนว่างานนี้อยู่หน้าไหนแล้วกระโดดไปหน้านั้นให้อัตโนมัติ
@@ -3690,7 +3777,7 @@ const Operation = () => {
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
           ) : effectiveGroup === "today" ? (
-            <TodayBoard events={responsibleFiltered} employees={employee} view={isMobile ? "card" : viewMode} onOpenJob={(jid) => setDetailJobId(jid)} />
+            <TodayBoard events={responsibleFiltered} employees={employee} view={isMobile ? "card" : viewMode} onOpenJob={openJobById} />
           ) : sortedEvents.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 10, color: "text.secondary" }}>
               <FolderOpen sx={{ fontSize: 56, opacity: 0.25, mb: 1 }} />
@@ -3704,11 +3791,11 @@ const Operation = () => {
             <OperationTable
               employee={employee}
               canAssign={can(currentUser, "editContracts")}
-              onAssignResponsible={handleAssignResponsible}
-              jobGroups={pagedGroups.map((sessions) => ({ sessions }))}
+              onAssignResponsible={assignResponsibleStable}
+              jobGroups={tableJobGroups}
               daysPastDueMap={daysPastDueMap}
               // ✅ กดแถว = เปิดแผงรายละเอียดทับบนตาราง (ไม่สลับทั้งหน้าไปมุมมองการ์ดเหมือนเดิม)
-              onOpenJob={(job) => setDetailJobId(job.sessions[0]._id)}
+              onOpenJob={openJobFromRow}
             />
             {paginationBar}{closedBar}
             </>
@@ -3842,77 +3929,37 @@ const Operation = () => {
 
       {/* ── แผงรายละเอียดงาน (จากตาราง) — ขวามือบนจอใหญ่ · เต็มจอบนมือถือ ── */}
       {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "เลื่อนขึ้นแบบนี้ แต่สมูท เลื่อนลงปิดได้ง่ายๆ") มือถือ: ลากลงเพื่อปิด (SwipeableDrawer) · มีขีดจับ */}
-      <SwipeableDrawer
-        anchor={isMobile ? "bottom" : "right"}
-        open={Boolean(detailSessions)}
-        onClose={() => setDetailJobId(null)}
-        onOpen={() => {}}
-        disableSwipeToOpen
-        transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
-        PaperProps={{ className: "tt-swipe-native", sx: {
-          width: isMobile ? "100%" : "min(640px, 92vw)",
-          // เต็มจอบนมือถือ (24 ต.ค. 2569 "เลื่อนขึ้นจนเต็ม")
-          height: isMobile ? "100dvh" : "100%", pt: isMobile ? "env(safe-area-inset-top)" : 0,
-          borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,
-          bgcolor: "#f8fafc", overflow: "hidden",
-        } }}
-      >
-        {detailSessions && (() => {
-          const head = detailSessions[0];
-          return (
-            <>
-              {isMobile && <Box sx={{ bgcolor: "background.paper", pt: 1 }}><Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto" }} /></Box>}
-              <Stack direction="row" alignItems="center" gap={1.25}
-                sx={{ px: 2, py: isMobile ? 1 : 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>
-                    {head.site || head.company || "รายละเอียดงาน"}
-                  </Typography>
-                  <Typography noWrap sx={{ fontSize: "0.76rem", color: "text.secondary" }}>
-                    {[head.title, head.system, head.company && head.site ? head.company : ""].filter(Boolean).join(" · ")}
-                  </Typography>
-                </Box>
-                <Button
-                  size="small" startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
-                  onClick={() => {
-                    // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
-                    if (head.unscheduled) { navigate("/jobs/intake"); return; }
-                    navigate(`/event?event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
-                  }}
-                  sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
-                >
-                  ดูในปฏิทิน
-                </Button>
-                <IconButton size="small" onClick={() => setDetailJobId(null)} aria-label="ปิด"><Close fontSize="small" /></IconButton>
-              </Stack>
-              <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1, overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
-                <JobGroupBlock
-                  key={detailJobId}
-                  inlineDetails
-                  sessions={detailSessions}
-                  currentUser={currentUser}
-                  onAssignResponsible={handleAssignResponsible}
-                  employee={employee}
-                  onStatusUpdate={handleStatusUpdate}
-                  onDateUpdate={handleDateUpdate}
-                  onDocNoUpdate={handleDocNoUpdate}
-                  onInputUpdate={handleInputUpdate} onPatched={handlePatched}
-                  onFileUpload={handleFileUpload}
-                  onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
-                  onPreview={handlePreviewFile}
-                  onDelete={(...args) => { setDetailJobId(null); return handleDeleteRow(...args); }}
-                  onApproveClose={handleApproveClose}
-                  onRejectClose={handleRejectClose}
-                  uploadingState={uploadingState}
-                  isUploadingState={isUploadingState}
-                  uploadProgressState={uploadProgressState}
-                  uploadingFileSizeState={uploadingFileSizeState}
-                />
-              </Box>
-            </>
-          );
-        })()}
-      </SwipeableDrawer>
+      <JobDetailDrawer
+        ref={detailCtl}
+        jobGroups={jobGroups}
+        events={events}
+        isMobile={isMobile}
+        navigate={navigate}
+        renderBlock={(sessions, id, close) => (
+          <JobGroupBlock
+            key={id}
+            inlineDetails
+            sessions={sessions}
+            currentUser={currentUser}
+            onAssignResponsible={handleAssignResponsible}
+            employee={employee}
+            onStatusUpdate={handleStatusUpdate}
+            onDateUpdate={handleDateUpdate}
+            onDocNoUpdate={handleDocNoUpdate}
+            onInputUpdate={handleInputUpdate} onPatched={handlePatched}
+            onFileUpload={handleFileUpload}
+            onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
+            onPreview={handlePreviewFile}
+            onDelete={(...args) => { close(); return handleDeleteRow(...args); }}
+            onApproveClose={handleApproveClose}
+            onRejectClose={handleRejectClose}
+            uploadingState={uploadingState}
+            isUploadingState={isUploadingState}
+            uploadProgressState={uploadProgressState}
+            uploadingFileSizeState={uploadingFileSizeState}
+          />
+        )}
+      />
 
       {/* File Preview */}
       <FilePreviewDialog

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
@@ -28,7 +28,9 @@ const FullLayout = () => {
     () => localStorage.getItem("sidebar.collapsed") === "1"
   );
   const [isScrollingUp, setIsScrollingUp] = useState(false);
-  const [lastScrollTop, setLastScrollTop] = useState(0);
+  // ✅ (25 ต.ค. 2569 ผู้ใช้: "เลื่อนปัดหน้าเร็วๆ หน่วง กระตุก ไม่สมูท") ตำแหน่งเลื่อนล่าสุดเก็บใน ref
+  //    เดิมเป็น state — เลื่อนทุกเฟรม = วาดใหม่ทั้งแอป (หัวเว็บ + เมนู + หน้าที่เปิดอยู่) หลายสิบครั้งต่อวินาที
+  const lastScrollTopRef = useRef(0);
 
   const location = useLocation();
   useNewBuildReload(); // มีรุ่นใหม่ → รีโหลดตอนเปลี่ยนหน้า กันหน้า "มีเวอร์ชันใหม่" บนมือถือที่เปิดแอปค้างไว้
@@ -85,16 +87,25 @@ const FullLayout = () => {
     if (isMobile) setIsSidebarOpen(false); // คลิกเมนูแล้วให้หุบซ่อนบนมือถือ
   };
 
-  const handleScroll = useCallback(() => {
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
-    setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
-
-    // 🐛 เดิมมี setIsSidebarOpen(false) ตรงนี้ — เลื่อนหน้าทีเดียวลิ้นชักปิดทันที
-    // ผู้ใช้จึงเลื่อนลงไปกดเมนูท้ายลิ้นชัก (เช่น "ตั้งค่า") ไม่ได้เลย
-    // ✅ ลิ้นชักปิดได้ทางเดียวคือแตะนอกกรอบหรือกดเมนู — ระหว่างเปิดอยู่จะล็อกไม่ให้หน้าหลังเลื่อน
-    //    (ดู useEffect ล็อกการเลื่อนด้านล่าง) เนื้อหาในลิ้นชักเลื่อนเองได้ที่ .sidebar-content
-  }, [lastScrollTop]);
+  // อ่านตำแหน่งครั้งเดียวต่อเฟรม (requestAnimationFrame) · เปลี่ยน state เฉพาะตอน "ขึ้น/ลง" สลับกันจริง
+  // 🐛 เดิมมี setIsSidebarOpen(false) ตรงนี้ — เลื่อนหน้าทีเดียวลิ้นชักปิดทันที
+  //    ผู้ใช้จึงเลื่อนลงไปกดเมนูท้ายลิ้นชัก (เช่น "ตั้งค่า") ไม่ได้เลย
+  // ✅ ลิ้นชักปิดได้ทางเดียวคือแตะนอกกรอบหรือกดเมนู — ระหว่างเปิดอยู่จะล็อกไม่ให้หน้าหลังเลื่อน
+  useEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const top = window.pageYOffset || document.documentElement.scrollTop;
+        const up = top < lastScrollTopRef.current && top > 0;
+        lastScrollTopRef.current = top <= 0 ? 0 : top;
+        setIsScrollingUp((prev) => (prev === up ? prev : up));
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); if (frame) cancelAnimationFrame(frame); };
+  }, []);
 
   /**
    * ล็อกไม่ให้หน้าเบื้องหลังเลื่อนตอนลิ้นชักเปิดอยู่
@@ -107,11 +118,6 @@ const FullLayout = () => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [isMobile, isSidebarOpen]);
-
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
 
   // ✅ ชวนเปิดการแจ้งเตือนแบบ Push ทุกครั้งที่เข้าแอพ ถ้ายังไม่เคยเปิดไว้ — เดิมมีแค่ปุ่ม
   // เปิด/ปิดเงียบๆ ที่ Header ซึ่งผู้ใช้ส่วนใหญ่ไม่รู้ตัวว่ามันมีอยู่เลยไม่เคยกดเปิด ทำให้พลาด

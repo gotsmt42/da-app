@@ -101,6 +101,22 @@ function onStart(e) {
   state = { paper, startY: y, startX: e.touches[0].clientX, dy: 0, t0: Date.now(), active: false, inHead };
 }
 
+/**
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "เลื่อนปัดหน้าเร็วๆ หน่วง กระตุก ไม่สมูท")
+ *    ตัวฟัง touchmove แบบกันเลื่อนได้ (passive: false) ติดที่ document ตลอดเวลา = เบราว์เซอร์ต้องรอ JS ก่อนเลื่อน
+ *    ทุกครั้งที่นิ้วขยับ ทั้งแอป → ติดเฉพาะ "ตอนมีหน้าต่างเปิดอยู่" (หน้าหลังถูกล็อกอยู่แล้ว)
+ *    ⚠️ ต้องติดไว้ก่อนนิ้วแตะ ไม่ใช่ติดตอนแตะ — ไม่งั้นเบราว์เซอร์ไม่ยอมให้กันการเลื่อน (ลากลงอาจกลายเป็นดึงรีเฟรชหน้า)
+ */
+const MODAL_SEL = ".MuiModal-root:not(.MuiModal-hidden), .swal2-container";
+let moveOn = false;
+const syncMoveListener = () => {
+  const on = Boolean(document.querySelector(MODAL_SEL));
+  if (on === moveOn) return;
+  moveOn = on;
+  if (on) document.addEventListener("touchmove", onMove, { passive: false, capture: true });
+  else document.removeEventListener("touchmove", onMove, { capture: true });
+};
+
 /** พื้นหลังมืดของหน้าต่าง (MUI) — จางตามระยะลาก ให้รู้สึกว่าหน้าต่างกำลังจะปิด */
 const backdropOf = (paper) => paper.closest(".MuiModal-root")?.querySelector(":scope > .MuiBackdrop-root") || null;
 
@@ -197,7 +213,9 @@ export function installSwipeToClose() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   document.addEventListener("touchstart", onStart, { passive: true, capture: true });
-  document.addEventListener("touchmove", onMove, { passive: false, capture: true });
+  // หน้าต่างทุกแบบ (MUI/SweetAlert) ถูกวางเป็นลูกตรงของ body — เฝ้าแค่ชั้นนั้น ราคาถูก
+  syncMoveListener();
+  new MutationObserver(() => syncMoveListener()).observe(document.body, { childList: true });
   document.addEventListener("touchend", onEnd, { passive: true, capture: true });
   document.addEventListener("touchcancel", onEnd, { passive: true, capture: true });
   document.addEventListener("click", onClickCapture, true);

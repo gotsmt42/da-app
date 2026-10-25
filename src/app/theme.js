@@ -28,6 +28,22 @@ const theme = createTheme({
     button: { textTransform: "none", fontWeight: 600 },
   },
   components: {
+    // ✅ (25 ต.ค. 2569 ผู้ใช้: "หน่วง กระตุก ไม่สมูท") มือถือ/จอสัมผัส: ปิดคลื่นริปเปิลของ MUI
+    //    ริปเปิลสร้างคอมโพเนนต์ + แอนิเมชันใหม่ทุกครั้งที่แตะ (ตรงจังหวะที่หน้าต่างกำลังเปิด) และทุกปุ่มต้องวาดตัวริปเปิลติดไว้
+    //    → แตะแล้วจางลงเล็กน้อยแบบแอปมือถือแทน (CSS ล้วน ไม่มี JS) · จอคอมยังมีริปเปิลตามเดิม
+    MuiButtonBase: {
+      defaultProps: {
+        disableRipple: typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches,
+      },
+      styleOverrides: {
+        root: {
+          "@media (pointer: coarse)": {
+            transition: "opacity .12s ease",
+            "&:active": { opacity: 0.6 },
+          },
+        },
+      },
+    },
     // ✅ ให้ทุกจุดที่ MUI วาดพื้นหลัง/ตัวอักษรผ่าน CssBaseline ใช้ฟอนต์เดียวกันด้วย
     MuiCssBaseline: {
       styleOverrides: {

@@ -331,6 +331,10 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
   const [openId, setOpenId] = useState(null);
   const toggle = (id) => setOpenId(id);
   const openRow = rows.find((x) => x.j._id === openId);
+  // คงแถวล่าสุดไว้ระหว่างหน้าต่างกำลังปิด — ไม่ให้แผ่นว่างเปล่าวาบตอนเลื่อนลง (25 ต.ค. 2569)
+  const lastOpenRowRef = useRef(null);
+  if (openRow) lastOpenRowRef.current = openRow;
+  const shownRow = openRow || lastOpenRowRef.current;
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
@@ -477,9 +481,9 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
         </tbody>
       </Box>
       <MobileSheet open={Boolean(openRow)} onClose={() => setOpenId(null)} maxWidth="lg"
-        title={openRow ? (openRow.j.intakeNote ? "บันทึกงาน" : `${openRow.j.title || "งาน"}${openRow.j.system ? ` · ${openRow.j.system}` : ""}`) : ""}
-        subtitle={openRow ? [openRow.j.jobNo, openRow.j.site && openRow.j.site !== "-" ? openRow.j.site : "", openRow.j.company && openRow.j.company !== openRow.j.site ? openRow.j.company : ""].filter(Boolean).join(" · ") : ""}>
-        {openRow && <Box sx={{ p: { xs: 1.25, sm: 2 } }}>{renderCard(openRow.j, openRow.oc, () => setOpenId(null))}</Box>}
+        title={shownRow ? (shownRow.j.intakeNote ? "บันทึกงาน" : `${shownRow.j.title || "งาน"}${shownRow.j.system ? ` · ${shownRow.j.system}` : ""}`) : ""}
+        subtitle={shownRow ? [shownRow.j.jobNo, shownRow.j.site && shownRow.j.site !== "-" ? shownRow.j.site : "", shownRow.j.company && shownRow.j.company !== shownRow.j.site ? shownRow.j.company : ""].filter(Boolean).join(" · ") : ""}>
+        {shownRow && <Box sx={{ p: { xs: 1.25, sm: 2 } }}>{renderCard(shownRow.j, shownRow.oc, () => setOpenId(null))}</Box>}
       </MobileSheet>
     </Box>
   );
