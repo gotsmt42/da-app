@@ -48,6 +48,57 @@ export function useDeferredOpen(open, lingerMs = SHEET_DURATION.exit + 60) {
   return ready;
 }
 
+/**
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "เปิดงานขึ้น เลื่อนลง ยังแข็งๆ กระตุกๆ วาบๆ · อยากให้สมูทเหมือนเปิด/ปิดรูปใน Claude")
+ *    "เตรียมก่อน แล้วค่อยเลื่อน" — เดิมเลื่อนแผ่นเปล่าขึ้นก่อนแล้วเนื้อหาโผล่ตามหลัง (เห็นวาบ) หรือวาดเนื้อหาพร้อมเลื่อน (กระตุก)
+ *    1) กดเปิด → วาดเนื้อหาในแผ่นที่ยังซ่อนอยู่ แบบแบ่งเป็นช่วง (หน้าจอไม่ค้าง · มีแถบบางๆ บนสุดบอกว่ากำลังเปิด)
+ *    2) วาดเสร็จ → แผ่นเลื่อนขึ้นพร้อมเนื้อหาครบ ท่าเลื่อนวิ่งบน GPU ล้วน ไม่มีงานอื่นแทรก จึงลื่นตลอดทาง
+ *    3) ปิด → เนื้อหาเดิมอยู่จนแผ่นเลื่อนพ้นจอ แล้วค่อยเก็บ
+ * @returns { mounted: วาดเนื้อหาได้, shown: ส่งให้ Drawer เป็น open }
+ */
+export function useStagedOpen(open) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (open) { startTransition(() => setMounted(true)); return undefined; }
+    setShown(false);
+    const t = setTimeout(() => setMounted(false), SHEET_DURATION.exit + 80);
+    return () => clearTimeout(t);
+  }, [open]);
+  useEffect(() => {
+    if (!open || !mounted || shown) return undefined;
+    // เนื้อหาเพิ่งลงจอ (ยังซ่อน) — รอ 1 เฟรมให้เบราว์เซอร์จัดหน้าเสร็จ แล้วค่อยเริ่มเลื่อน
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, [open, mounted, shown]);
+  return { mounted: mounted || shown, shown, preparing: open && !shown };
+}
+
+/**
+ * วาดส่วนที่อยู่ "ใต้จอแรก" ทีหลัง — แผ่นเตรียมแค่ส่วนบนที่เห็นทันที จึงเลื่อนขึ้นได้เร็ว
+ * ส่วนล่าง (ไฟล์ · เอกสาร · คุยกับช่าง · ประวัติ) ตามมาหลังแผ่นเลื่อนเสร็จ แบบไม่ขวางจอ — อยู่นอกจออยู่แล้วจึงไม่เห็นการเปลี่ยน
+ */
+export function LazyMount({ children, delay = SHEET_DURATION.enter + 40, minHeight = 120 }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => startTransition(() => setReady(true)), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+  return ready ? children : <Box sx={{ minHeight }} />;
+}
+
+/** แถบบางๆ บนสุดของจอระหว่างเตรียมแผ่น — ให้รู้ว่ากดติดแล้ว (CSS ล้วน ไม่กินแรง) */
+export const OpeningBar = ({ on }) => (on ? (
+  <Box aria-hidden sx={{
+    position: "fixed", top: 0, left: 0, right: 0, height: 3, zIndex: 20000, overflow: "hidden", pointerEvents: "none",
+    "&::after": {
+      content: '""', position: "absolute", inset: 0, width: "40%", bgcolor: "#2563eb", borderRadius: 99,
+      animation: "ttOpenBar .9s ease-in-out infinite",
+    },
+    "@keyframes ttOpenBar": { from: { transform: "translateX(-100%)" }, to: { transform: "translateX(260%)" } },
+  }} />
+) : null);
+
 /** คง true ไว้อีกครู่หลังปิด — ใช้กับเนื้อหาที่ผู้เรียกวาดเองตาม open (เช่น `{open ? <Body/> : null}`) */
 export function useLinger(open, ms = SHEET_DURATION.exit + 60) {
   const [on, setOn] = useState(open);
@@ -82,7 +133,7 @@ export const FadeIn = ({ children }) => (
  */
 export default function MobileSheet({ open, onClose, title, subtitle, actions, children, maxWidth = "md", bodySx }) {
   const isMobile = useMediaQuery("(max-width:599.95px)");
-  const ready = useDeferredOpen(open && isMobile);
+  const stage = useStagedOpen(open && isMobile);
   const head = (
     <Box sx={{ position: "sticky", top: 0, zIndex: 2, bgcolor: "#fff", borderBottom: "1px solid #e2e8f0", pt: isMobile ? "env(safe-area-inset-top)" : 0 }}>
       {isMobile && <Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto", mt: 1 }} />}
@@ -98,20 +149,24 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
   );
   const body = (
     <Box sx={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", bgcolor: "#f8fafc", ...bodySx }}>
-      {!isMobile ? children : ready ? <FadeIn>{children}</FadeIn> : null}
+      {!isMobile || stage.mounted ? children : null}
     </Box>
   );
 
   if (isMobile) {
     return (
-      <SwipeableDrawer anchor="bottom" open={open} onClose={onClose} onOpen={() => {}}
-        disableSwipeToOpen disableDiscovery={iOS}
-        transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
-        ModalProps={{ keepMounted: false }}
-        PaperProps={{ className: "tt-swipe-native", sx: SHEET_PAPER_SX }}>
-        {head}
-        {body}
-      </SwipeableDrawer>
+      <>
+        <OpeningBar on={stage.preparing} />
+        {/* keepMounted เฉพาะช่วงที่มีเนื้อหา — แผ่นต้องอยู่ใน DOM (ซ่อน) ระหว่างเตรียม · ปิดสนิทแล้วไม่ค้างไว้ */}
+        <SwipeableDrawer anchor="bottom" open={stage.shown} onClose={onClose} onOpen={() => {}}
+          disableSwipeToOpen disableDiscovery={iOS}
+          transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
+          ModalProps={{ keepMounted: stage.mounted }}
+          PaperProps={{ className: "tt-swipe-native", sx: SHEET_PAPER_SX }}>
+          {head}
+          {body}
+        </SwipeableDrawer>
+      </>
     );
   }
   return (

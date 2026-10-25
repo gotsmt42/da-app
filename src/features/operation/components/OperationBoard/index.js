@@ -81,7 +81,7 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
-import MobileSheet, { SHEET_DURATION, SHEET_EASING, useLinger, useDeferredOpen, FadeIn } from "@/shared/ui/MobileSheet";
+import MobileSheet, { SHEET_DURATION, SHEET_EASING, useLinger, useStagedOpen, OpeningBar, LazyMount } from "@/shared/ui/MobileSheet";
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
@@ -1235,20 +1235,24 @@ const EventRowCard = ({
       </Grid>
       )}
 
-      {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) */}
+      {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) · ✅ (25 ต.ค. 2569 perf) วาดหลังส่วนเอกสาร แบ่งงานเป็นช่วงสั้นๆ ไม่ให้จอค้างทีเดียวนาน */}
+      <LazyMount delay={SHEET_DURATION.enter + 450} minHeight={0}>
       <Grid item xs={12} sx={{ mt: 1 }}>
         {sectionLabel(<Chat sx={{ fontSize: 17, color: MUTED }} />, `คุยกับช่าง${(event.comments || []).length > 0 ? ` (${event.comments.length})` : ""}`)}
         <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
           <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUser} />
         </Box>
       </Grid>
+      </LazyMount>
 
       {event.activityLog?.length > 0 && (
+        <LazyMount delay={SHEET_DURATION.enter + 800} minHeight={0}>
         <Grid item xs={12}>
           <Box sx={{ px: 1.5, py: 0.75, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
             <ActivityLogMini logs={event.activityLog} />
           </Box>
         </Grid>
+        </LazyMount>
       )}
     </Grid>
   );
@@ -1817,11 +1821,12 @@ const EventRowCard = ({
 
 
             {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างานที่ช่างแนบ — แอดมินดู/เพิ่ม/ลบได้ (ย้ายลงมาใต้เอกสาร/คำขอปิดงาน 11 ต.ค. 2569) */}
-            <SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} sx={{ mt: 1.5 }} />
+            {/* ✅ (25 ต.ค. 2569 perf) ส่วนล่าง (รูป/ไฟล์ · เอกสาร · คุยกับช่าง · ประวัติ) วาดหลังแผ่นเลื่อนขึ้นเสร็จ — ดู LazyMount */}
+            <LazyMount minHeight={80}><SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} sx={{ mt: 1.5 }} /></LazyMount>
 
             {/* เอกสาร/คุยกับช่าง/ประวัติ — แผงด้านข้างแสดงต่อท้ายเลย (การ์ดในรายการ: แถบ "สรุปงาน" อยู่ท้ายการ์ดเสมอ ดูด้านล่าง) */}
             {inlineDetails && (
-              <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${LINE}` }}>{expandedContent}</Box>
+              <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${LINE}` }}><LazyMount minHeight={400}>{expandedContent}</LazyMount></Box>
             )}
           </Box>
         </Collapse>
@@ -2371,12 +2376,21 @@ const JobDetailDrawer = React.forwardRef(({ jobGroups, events, isMobile, navigat
   if (detailSessions) lastDetailRef.current = { sessions: detailSessions, id: detailJobId };
   const shownDetail = detailSessions || lastDetailRef.current.sessions;
   const shownDetailId = detailSessions ? detailJobId : lastDetailRef.current.id;
-  const detailReady = useDeferredOpen(detailOpen);
+  const stage = useStagedOpen(detailOpen && isMobile);
+  // จอคอม: เปิดทันทีตามเดิม (เครื่องแรงพอ) · มือถือ: เตรียมเนื้อหาให้เสร็จก่อนแล้วค่อยเลื่อนขึ้น (ดู useStagedOpen)
+  const drawerOpen = isMobile ? stage.shown : detailOpen;
+  const showBody = isMobile ? stage.mounted : true;
+  // เนื้อหาตัวเดิมเมื่อแผงแค่ "เปลี่ยนจากซ่อนเป็นเลื่อนขึ้น" — ไม่วาดการ์ดงานทั้งใบซ้ำอีกรอบตอนเริ่มเลื่อน
+  const body = useMemo(() => (showBody && shownDetail ? renderBlock(shownDetail, shownDetailId, close) : null),
+    [showBody, shownDetail, shownDetailId, renderBlock, close]);
   return (
+    <>
+    {isMobile && <OpeningBar on={stage.preparing} />}
     <SwipeableDrawer
       anchor={isMobile ? "bottom" : "right"}
-      open={detailOpen}
+      open={drawerOpen}
       onClose={close}
+      ModalProps={{ keepMounted: isMobile ? stage.mounted : undefined }}
       onOpen={() => {}}
       disableSwipeToOpen
       transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
@@ -2417,12 +2431,13 @@ const JobDetailDrawer = React.forwardRef(({ jobGroups, events, isMobile, navigat
               <IconButton size="small" onClick={close} aria-label="ปิด"><Close fontSize="small" /></IconButton>
             </Stack>
             <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1, overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
-              {detailReady && <FadeIn>{renderBlock(shownDetail, shownDetailId, close)}</FadeIn>}
+              {body}
             </Box>
           </>
         );
       })()}
     </SwipeableDrawer>
+    </>
   );
 });
 

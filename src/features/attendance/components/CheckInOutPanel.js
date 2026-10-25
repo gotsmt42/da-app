@@ -680,6 +680,14 @@ ${text}`);
             </Box>
           )}
           {line}
+          {/* 🐛 (25 ต.ค. 2569 ผู้ใช้: "ปุ่มบันทึกเห็นมีแต่กดแล้วไม่มีอะไรเกิดขึ้น") การ์ดย่อมีปุ่ม "บันทึก ▾" แต่ไม่ได้วางรายการไว้
+              กดแล้วจึงไม่มีอะไรกางออกมา → กางรายการบันทึกเข้างานรายวันใต้บรรทัดเหมือนการ์ดเต็ม */}
+          <Collapse in={showLog} unmountOnExit>
+            <Box sx={{ pt: 1 }}>
+              <AttendanceList rows={rows || []} me={me} isApprover={isApprover} onPreview={onPreview} embedded={embedded}
+                onChanged={(r) => { setRows((prev) => prev.map((x) => (x._id === r._id ? r : x))); refreshAppBadges(); onChanged?.(); }} />
+            </Box>
+          </Collapse>
           <CheckDialog open={dialog} event={event} onClose={() => setDialog(false)} onDone={onDone} />
           <DeclineDialog open={declineOpen} busy={acking} onClose={() => setDeclineOpen(false)} onSubmit={decline} />
         </Box>
