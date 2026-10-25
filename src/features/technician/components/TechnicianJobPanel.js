@@ -44,6 +44,7 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
+import ServiceReportAiBar from "@/features/documents/components/ServiceReportAiBar";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
@@ -400,12 +401,16 @@ const DocumentChecklistItem = ({
     : <RadioButtonUnchecked sx={{ fontSize: 22, color: "#cbd5e1" }} />;
   const sub = requiredByJobType && !complete ? "งาน PM ต้องแนบทุกครั้ง" : !complete ? desc : "";
   const fileList = (
-    <DocumentFileList
-      type={type} files={files}
-      isUploading={isUploading} uploadProgress={uploadProgress}
-      onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
-      isLocked={isLocked}
-    />
+    <>
+      <DocumentFileList
+        type={type} files={files}
+        isUploading={isUploading} uploadProgress={uploadProgress}
+        onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
+        isLocked={isLocked}
+      />
+      {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ */}
+      {type === "report" && hasFiles && <ServiceReportAiBar event={event} sx={{ mt: 0.5 }} />}
+    </>
   );
   const linkBtn = (text, onClick) => (
     <Button size="small" onClick={onClick}

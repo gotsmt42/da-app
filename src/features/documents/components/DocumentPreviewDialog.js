@@ -51,6 +51,8 @@ const DocumentPreviewDialog = ({
   docNumber,        // เลขที่ที่กำลังแสดง (ตัวอย่าง หรือ เลขจริง)
   busy, error,
   onBack, onConfirm,
+  // ✅ (25 ต.ค. 2569) เอกสารที่ไม่ได้ออกเลขทะเบียน (เช่น สรุปรายงานบริการ) — กำหนดหัวกล่องเอง
+  headerTitle, headerSub,
   // ✅ ส่งทางอีเมล — { docType, refId, defaultTo, recipientName, project, audience, customerMatch } · ไม่ส่ง = ไม่มีปุ่ม
   email,
 }) => {
@@ -162,10 +164,10 @@ const DocumentPreviewDialog = ({
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography noWrap sx={{ fontWeight: 900, fontSize: "1.02rem", lineHeight: 1.3, color: INK }}>
-              {issued ? `${title} · ออกแล้ว` : `ตัวอย่าง${title}`}
+              {headerTitle || (issued ? `${title} · ออกแล้ว` : `ตัวอย่าง${title}`)}
             </Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>
-              {issued ? `เลขที่ ${docNumber || "-"} · บันทึกเข้าทะเบียนแล้ว` : `เลขที่ที่จะได้ ${docNumber || "-"} · ยังไม่ใช้จนกว่าจะยืนยัน`}
+              {headerSub || (issued ? `เลขที่ ${docNumber || "-"} · บันทึกเข้าทะเบียนแล้ว` : `เลขที่ที่จะได้ ${docNumber || "-"} · ยังไม่ใช้จนกว่าจะยืนยัน`)}
             </Typography>
           </Box>
           <IconButton onClick={onClose} disabled={busy} aria-label="ปิด"><Close /></IconButton>

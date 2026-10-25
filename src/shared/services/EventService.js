@@ -270,6 +270,24 @@ const EventService = {
     return res.data;
   },
 
+  /** ✅ (25 ต.ค. 2569) สรุป Service Report ด้วย AI — โหลดสรุปที่บันทึกไว้ + ไฟล์ Service Report ทั้งงาน */
+  async GetServiceReportSummary(id) {
+    const res = await API.get(`/events/${id}/service-report-summary`);
+    return res.data;
+  },
+
+  /** ให้ AI อ่านทุกไฟล์ Service Report ของงาน (ใช้เวลานาน) · force = ทับสรุปที่แก้/ยืนยันแล้ว */
+  async ScanServiceReport(id, force = false) {
+    const res = await API.post(`/events/${id}/service-report-summary/scan`, { force }, { timeout: 240000 });
+    return res.data;
+  },
+
+  /** บันทึกสรุปที่แก้ · confirm = ยืนยันสรุป */
+  async SaveServiceReportSummary(id, data, confirm = false) {
+    const res = await API.put(`/events/${id}/service-report-summary`, { data, confirm });
+    return res.data;
+  },
+
   async BillingScanAvailability() {
     const res = await API.get("/events/billing/scan-availability");
     return res.data;

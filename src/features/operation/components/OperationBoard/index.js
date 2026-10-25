@@ -81,6 +81,7 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
+import ServiceReportAiBar from "@/features/documents/components/ServiceReportAiBar";
 import MobileSheet, { SHEET_DURATION, SHEET_EASING, useLinger, useStagedOpen, OpeningBar, LazyMount } from "@/shared/ui/MobileSheet";
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
@@ -789,6 +790,9 @@ export const FileUploadSection = ({
           ))}
         </Stack>
       )}
+
+      {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ */}
+      {type === "report" && hasFiles && event?._id && <ServiceReportAiBar event={event} sx={{ mb: uploading || (!card && canEdit) ? 1 : 0 }} />}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
       <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
