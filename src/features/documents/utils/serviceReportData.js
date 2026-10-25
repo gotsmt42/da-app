@@ -65,3 +65,26 @@ export const splitQty = (qty) => {
   if (!m) return { n: null, unit: String(qty || "").trim() };
   return { n: Number(m[1].replace(/,/g, "")), unit: m[2].trim() };
 };
+
+/**
+ * ✅ (25 ต.ค. 2569 ผู้ใช้: "ถ้ามีระบุอุปกรณ์ ให้แยกเป็นข้อๆ เช่น - อุปกรณ์... เสีย ... ตัว · ให้ผู้อ่านอ่านง่าย และมืออาชีพ")
+ *    ปัญหาแสดงเป็นข้อ จัดกลุ่มตามสิ่งที่ต้องทำต่อ (แทนตารางที่อ่านยากบนกระดาษ/มือถือ) — ใช้ทั้งหน้าจอและ PDF
+ */
+export const ISSUE_GROUPS = [
+  { key: "need_quote", title: "ต้องเปลี่ยนอุปกรณ์ / เสนอราคา" },
+  { key: "pending", title: "ยังค้าง / ต้องติดตาม" },
+  { key: "fixed", title: "แก้ไขแล้ว" },
+  { key: "unknown", title: "อื่นๆ" },
+];
+
+export const groupIssues = (issues = []) => ISSUE_GROUPS
+  .map((g) => ({ ...g, items: issues.filter((x) => (ISSUE_STATUS[x.status] ? x.status : "unknown") === g.key) }))
+  .filter((g) => g.items.length);
+
+/** 1 ข้อ ขึ้นต้นด้วยอุปกรณ์ เช่น "SIGA-OSD พร้อม Base — Smoke detector เสีย จำนวน 85 ตัว (Tower B)" (ไม่ซ้ำชื่ออุปกรณ์ถ้าอยู่ในอาการแล้ว) */
+export const issueLine = (x = {}) => {
+  const problem = String(x.problem || "").trim();
+  const part = String(x.part || "").trim();
+  const main = part && !problem.toLowerCase().includes(part.toLowerCase()) ? [part, problem].filter(Boolean).join(" — ") : problem || part || "-";
+  return `${main}${x.qty ? ` จำนวน ${x.qty}` : ""}${x.location ? ` (${x.location})` : ""}`;
+};

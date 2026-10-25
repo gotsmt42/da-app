@@ -13,9 +13,9 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   preparePrintAssets, createDocument, drawLetterheadModern, drawDocTitle, drawFooter, outputDocument,
-  createFlow, flowTable, setBold, spaceThaiLatin, wrapText, LM, CW, ISSUER,
+  createFlow, setBold, spaceThaiLatin, wrapText, LM, CW, ISSUER,
 } from "./deliveryNotePdf";
-import { ISSUE_STATUS, issueStats } from "./serviceReportData";
+import { groupIssues, issueLine } from "./serviceReportData";
 
 const beYear = (m) => m.year() + 543;
 const INK = [30, 41, 59];
@@ -81,13 +81,16 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
       lines.forEach((ln) => { f.need(0); doc.text(ln, LM + 8, f.y); f.y += lh; });
     });
   };
-  /** ตาราง (flowTable คาด f.y = ขอบบนของตาราง) */
-  const table = (cols, rows) => {
-    if (!rows.length) return;
-    f.y -= lh * 0.72;
-    flowTable(doc, f, { cols, rows });
-    f.y += lh * 0.95;
+  /** รายการแบบจุด (•) — ปัญหาที่พบแต่ละข้อ */
+  const bullets = (items) => {
+    items.filter(Boolean).forEach((it) => {
+      const lines = wrapText(doc, spaceThaiLatin(it), CW - 9);
+      f.need(lh * Math.min(lines.length, 2) - lh);
+      doc.text("•", LM + 4, f.y);
+      lines.forEach((ln) => { f.need(0); doc.text(ln, LM + 9, f.y); f.y += lh; });
+    });
   };
+
 
   // 🔁 (25 ต.ค. 2569 ผู้ใช้: "ส่วนตรงนี้ไม่ต้องอ่าน ไม่ต้องสรุปมาให้เปลือง") — ไม่มีตารางข้อมูลงาน (เลขที่/โครงการ/วันที่/ช่าง)
   //    เนื้อหาเริ่มที่รายละเอียดงานที่ทำเลย · เลขที่งานยังอยู่ที่ท้ายกระดาษและหัวหน้าต่อ
@@ -105,17 +108,15 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
   if (!issues.length && !d.issueSummary) {
     para("ไม่พบปัญหา");
   } else {
-    if (d.issueSummary) para(d.issueSummary);
-    if (issues.length) {
-      const st = issueStats(issues);
-      para([`รวม ${st.total} รายการ`, st.pending ? `ยังค้าง ${st.pending}` : "", st.needQuote ? `ต้องเสนอราคา ${st.needQuote}` : "", st.fixed ? `แก้แล้ว ${st.fixed}` : ""]
-        .filter(Boolean).join(" · "), { sub: true, size: fs - 1 });
-      f.y += lh * 0.35;
-      table([
-        { title: "ลำดับ", w: 12, align: "center" }, { title: "ตำแหน่ง", w: 30 }, { title: "ปัญหา / อาการ", w: 52 },
-        { title: "อุปกรณ์ / รุ่น", w: 34 }, { title: "จำนวน", w: 18, align: "center" }, { title: "สถานะ", align: "center" },
-      ], issues.map((r, i) => [String(i + 1), r.location || "-", r.problem || "-", r.part || "-", r.qty || "-", ISSUE_STATUS[r.status] || "-"]));
-    }
+    if (d.issueSummary) { para(d.issueSummary); f.y += lh * 0.2; }
+    // 🔁 (25 ต.ค. 2569 ผู้ใช้: "ถ้ามีระบุอุปกรณ์ ให้แยกเป็นข้อๆ ... อ่านง่าย และมืออาชีพ") — ข้อๆ จัดกลุ่มตามสิ่งที่ต้องทำต่อ แทนตาราง
+    groupIssues(issues).forEach((g) => {
+      f.need(lh * 2);
+      setBold(doc, true); doc.text(`${g.title} (${g.items.length} รายการ)`, LM + 1, f.y); setBold(doc, false);
+      f.y += lh;
+      bullets(g.items.map(issueLine));
+      f.y += lh * 0.25;
+    });
   }
 
   // ── ท้ายเอกสาร: ที่มาของข้อมูล + ผู้ตรวจ ───────────────────────────────────

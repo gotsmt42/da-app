@@ -24,14 +24,14 @@ import {
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
-import { ISSUE_STATUS, issueStats, jobInfoOf } from "../utils/serviceReportData";
+import { ISSUE_STATUS, issueStats, jobInfoOf, groupIssues, issueLine } from "../utils/serviceReportData";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, PRIMARY_BTN_SX, SUCCESS_BTN_SX } from "@/shared/ui/PageKit";
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", minHeight: 38 };
-const EMPTY = { found: true, summary: "", workDone: [], issueSummary: "", issues: [], reviewNotes: [], confidence: "medium" };
+const EMPTY = { found: true, fileChecks: [], summary: "", workDone: [], issueSummary: "", issues: [], reviewNotes: [], confidence: "medium" };
 const withDefaults = (d) => {
   const x = { ...EMPTY, ...(d || {}) };
-  return { ...x, workDone: Array.isArray(x.workDone) ? x.workDone : [], issues: Array.isArray(x.issues) ? x.issues : [], reviewNotes: Array.isArray(x.reviewNotes) ? x.reviewNotes : [] };
+  return { ...x, fileChecks: Array.isArray(x.fileChecks) ? x.fileChecks : [], workDone: Array.isArray(x.workDone) ? x.workDone : [], issues: Array.isArray(x.issues) ? x.issues : [], reviewNotes: Array.isArray(x.reviewNotes) ? x.reviewNotes : [] };
 };
 const fmtAt = (d) => (d ? new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -50,16 +50,6 @@ const Card = ({ children, sx }) => <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor
 const Bullets = ({ items, numbered }) => (
   <Box component={numbered ? "ol" : "ul"} sx={{ m: 0, pl: 2.5, "& li": { fontSize: "0.88rem", color: INK_2, lineHeight: 1.6, mb: 0.25 } }}>
     {items.map((t, i) => <li key={i}>{t}</li>)}
-  </Box>
-);
-const MiniTable = ({ head, rows, aligns = [] }) => (
-  <Box sx={{ overflowX: "auto", border: `1px solid ${LINE}`, borderRadius: 2 }}>
-    <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem",
-      "& th": { bgcolor: SURFACE, color: MUTED, fontWeight: 800, fontSize: "0.74rem", textAlign: "left", px: 1, py: 0.75, whiteSpace: "nowrap", borderBottom: `1px solid ${LINE}` },
-      "& td": { px: 1, py: 0.75, color: INK_2, borderTop: `1px solid ${LINE}`, verticalAlign: "top" } }}>
-      <thead><tr>{head.map((h, i) => <th key={i} style={{ textAlign: aligns[i] || "left" }}>{h}</th>)}</tr></thead>
-      <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ textAlign: aligns[j] || "left" }}>{c}</td>)}</tr>)}</tbody>
-    </Box>
   </Box>
 );
 const ISSUE_TONE = { fixed: "#15803d", pending: "#b45309", need_quote: "#c2410c", unknown: MUTED };
@@ -89,11 +79,13 @@ function SummaryView({ d }) {
         ) : (
           <>
             {d.issueSummary && <Card sx={{ mb: st.total ? 1 : 0 }}><Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.7 }}>{d.issueSummary}</Typography></Card>}
-            {st.total > 0 && (
-              <MiniTable head={["#", "ตำแหน่ง", "ปัญหา", "อุปกรณ์ / รุ่น", "จำนวน", "สถานะ"]} aligns={["center", "left", "left", "left", "center", "center"]}
-                rows={d.issues.map((r, i) => [i + 1, r.location || "-", r.problem || "-", r.part || "-", r.qty || "-",
-                  <span key="s" style={{ fontWeight: 800, color: ISSUE_TONE[r.status], whiteSpace: "nowrap" }}>{ISSUE_STATUS[r.status]}</span>])} />
-            )}
+            {/* 🔁 (25 ต.ค. 2569 "ถ้ามีระบุอุปกรณ์ ให้แยกเป็นข้อๆ ... อ่านง่าย และมืออาชีพ") ข้อๆ จัดกลุ่มตามสิ่งที่ต้องทำต่อ — ตรงกับ PDF */}
+            {groupIssues(d.issues).map((g) => (
+              <Card key={g.key} sx={{ mb: 1 }}>
+                <Typography sx={{ fontWeight: 900, fontSize: "0.84rem", color: ISSUE_TONE[g.key], mb: 0.5 }}>{g.title} ({g.items.length})</Typography>
+                <Bullets items={g.items.map(issueLine)} />
+              </Card>
+            ))}
           </>
         )}
       </Section>
@@ -246,6 +238,10 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
   };
 
   const files = state.files || [];
+  // ไฟล์ที่ AI อ่านไม่ได้/ไม่ครบ — ยึดผลจาก AI (aiData) แก้ข้อความเองก็ไม่หาย · เซิร์ฟเวอร์ห้ามยืนยันด้วย
+  const fileChecks = withDefaults(summary?.aiData || summary?.data).fileChecks;
+  const badFiles = fileChecks.filter((x) => x.status === "unreadable" || x.status === "partial");
+  const fileNameOf = (no) => summary?.files?.[no - 1]?.fileName || "";
   // 💰 อ่านใหม่ได้ 3 ครั้ง/วัน/งาน (เซิร์ฟเวอร์บังคับ — หน้าจอบอกให้รู้ก่อนกด)
   const rescanLeft = state.rescanLeft ?? 3;
   const confirmed = summary?.status === "confirmed";
@@ -310,6 +306,24 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                 {summary.editedAt ? ` · แก้ไขล่าสุด ${fmtAt(summary.editedAt)} ${summary.editedBy}` : ""}
                 {confirmed ? ` · ยืนยันโดย ${summary.confirmedBy} ${fmtAt(summary.confirmedAt)}` : ""}
               </Typography>
+              {/* ⛔ (25 ต.ค. 2569 ผู้ใช้: "ไฟล์ไหนที่ AI อ่านไม่ได้ ... บอกมาตรงๆ ไม่เดา · และไม่สามารถออกเอกสารให้ได้") */}
+              {badFiles.length > 0 && (
+                <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2.5, "& .MuiAlert-message": { width: "100%" } }}>
+                  <Typography sx={{ fontWeight: 900, fontSize: "0.88rem", mb: 0.25 }}>
+                    AI อ่านไม่ได้/อ่านไม่ครบ {badFiles.length} ไฟล์ — ยังออกเอกสารไม่ได้
+                  </Typography>
+                  <Bullets items={badFiles.map((x) => `ไฟล์ที่ ${x.no}${fileNameOf(x.no) ? ` (${fileNameOf(x.no)})` : ""}: ${x.status === "unreadable" ? "อ่านไม่ได้" : "อ่านได้ไม่ครบ"} — ${x.note || "ภาพไม่ชัด"}`)} />
+                  <Typography sx={{ fontSize: "0.8rem", mt: 0.5 }}>ถ่ายใหม่ให้ชัด (แสงพอ ถือนิ่ง เห็นทั้งแผ่น) แนบแทนไฟล์เดิม แล้วกด "อ่านใหม่"</Typography>
+                </Alert>
+              )}
+              {!editing && fileChecks.length > 0 && (
+                <Box component="details" sx={{ mb: 1, "& summary": { cursor: "pointer", fontSize: "0.74rem", color: MUTED, fontWeight: 700 } }}>
+                  <summary>AI ตรวจ {fileChecks.length} ไฟล์ · อ่านได้ครบ {fileChecks.filter((x) => x.status === "ok").length} — ดูรายไฟล์</summary>
+                  <Box sx={{ mt: 0.5, "& li": { fontSize: "0.78rem !important" } }}>
+                    <Bullets items={fileChecks.map((x) => `ไฟล์ที่ ${x.no}${fileNameOf(x.no) ? ` (${fileNameOf(x.no)})` : ""} · ${{ ok: "อ่านได้", partial: "อ่านได้ไม่ครบ", unreadable: "อ่านไม่ได้" }[x.status]}${x.note ? ` · ${x.note}` : ""}`)} />
+                  </Box>
+                </Box>
+              )}
               {editing ? <SummaryEditor d={draft} setD={setDraft} /> : <SummaryView d={data} />}
             </>
           )}
@@ -322,7 +336,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                 <Button onClick={() => setEditing(false)} disabled={saving} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
                 <Box sx={{ flex: 1 }} />
                 <Button variant="outlined" onClick={() => save(false)} disabled={saving} sx={{ ...BTN }}>บันทึกร่าง</Button>
-                <Button variant="contained" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving} sx={{ ...SUCCESS_BTN_SX, ...BTN }}>บันทึกและยืนยัน</Button>
+                <Button variant="contained" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving || badFiles.length > 0} sx={{ ...SUCCESS_BTN_SX, ...BTN }}>บันทึกและยืนยัน</Button>
               </>
             ) : (
               <>
@@ -335,11 +349,11 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                   if (ok.isConfirmed) scan(false);
                 }} disabled={!state.enabled || rescanLeft <= 0} sx={{ ...BTN, color: MUTED }}>{rescanLeft <= 0 ? "อ่านใหม่ (ครบวันนี้)" : `อ่านใหม่ (${rescanLeft})`}</Button>}
                 {state.canEdit && <Button startIcon={<EditOutlined />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
-                <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
+                <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy || badFiles.length > 0} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
                 {/* มือถือ: ปุ่มรองแถวบน · ยืนยัน/สร้าง PDF แถวล่างเต็มกว้าง */}
                 <Box sx={isMobile ? { flexBasis: "100%", height: 0 } : { flex: 1 }} />
-                {state.canEdit && !confirmed && <Button variant="outlined" color="success" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving} sx={{ ...BTN, flex: isMobile ? 1 : "none" }}>ยืนยันสรุป</Button>}
-                <Button variant="contained" startIcon={pdfBusy ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : <PictureAsPdf />} onClick={makePdf} disabled={pdfBusy} sx={{ ...PRIMARY_BTN_SX, ...BTN, flex: isMobile ? 1 : "none" }}>
+                {state.canEdit && !confirmed && <Button variant="outlined" color="success" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving || badFiles.length > 0} sx={{ ...BTN, flex: isMobile ? 1 : "none" }}>ยืนยันสรุป</Button>}
+                <Button variant="contained" startIcon={pdfBusy ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : <PictureAsPdf />} onClick={makePdf} disabled={pdfBusy || badFiles.length > 0} sx={{ ...PRIMARY_BTN_SX, ...BTN, flex: isMobile ? 1 : "none" }}>
                   สร้าง PDF
                 </Button>
               </>

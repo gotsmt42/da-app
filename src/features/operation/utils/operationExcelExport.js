@@ -5,6 +5,8 @@ import "@/shared/utils/momentThaiLocale";
 import { addServiceReportSheets } from "@/features/documents/utils/serviceReportExcel";
 import { jobInfoOf, issueStats } from "@/features/documents/utils/serviceReportData";
 
+const srUnreadable = (sr) => (sr?.data?.fileChecks || []).some((x) => x.status === "unreadable" || x.status === "partial");
+
 /**
  * operationExcelExport.js — ส่งออกรายการ "แผนการดำเนินงาน" เป็นไฟล์ Excel (.xlsx) พร้อมรูปแบบ/สี
  *
@@ -169,10 +171,13 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     const approvalState = !a.approvalStatus || a.approvalStatus === "approved" ? "อนุมัติแล้ว"
       : a.approvalStatus === "pending" ? "รออนุมัติ" : "ไม่อนุมัติ";
 
-    const sr = srOf ? srOf(sessions) : null;
+    const srRaw = srOf ? srOf(sessions) : null;
+    // ⛔ AI อ่านบางไฟล์ไม่ได้ (ถ่ายไม่ชัด) — ไม่นำข้อมูลไปออกรายงาน บอกสถานะให้ถ่ายใหม่แทน
+    const srBad = srRaw && srUnreadable(srRaw);
+    const sr = srBad ? null : srRaw;
     const srSt = sr ? issueStats(sr.data?.issues || []) : null;
     const row = ws.addRow({
-      srStatus: sr ? (sr.status === "confirmed" ? "ยืนยันแล้ว" : "ร่าง") : "—",
+      srStatus: srBad ? "อ่านไม่ครบ (ถ่ายใหม่)" : sr ? (sr.status === "confirmed" ? "ยืนยันแล้ว" : "ร่าง") : "—",
       srIssues: srSt ? srSt.total : "",
       srPending: srSt ? srSt.pending + srSt.needQuote : "",
       status: a.status || "-",
@@ -256,7 +261,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   }
 
   // ✅ ชีตสรุป Service Report — เฉพาะงานที่มีสรุปแล้ว เรียงตามลำดับเดียวกับชีตหลัก
-  const srJobs = srOf ? jobs.map((job) => ({ sessions: job.sessions, summary: srOf(job.sessions) })).filter((x) => x.summary?.data) : [];
+  const srJobs = srOf ? jobs.map((job) => ({ sessions: job.sessions, summary: srOf(job.sessions) })).filter((x) => x.summary?.data && !srUnreadable(x.summary)) : [];
   if (srJobs.length) {
     addServiceReportSheets(wb, srJobs.map(({ sessions, summary }) => ({
       info: { ...jobInfoOf(sessions[0], sessions), jobType: [sessions[0].title, sessions[0].time && roundLabel ? `ครั้งที่ ${roundLabel(sessions[0])}` : ""].filter(Boolean).join(" ") },
