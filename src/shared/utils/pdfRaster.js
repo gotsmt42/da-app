@@ -57,13 +57,15 @@ const yieldFrame = () => new Promise((r) => {
  * @param {number}   [opt.startDelay=0]    รอก่อนเริ่ม (ms) — ให้ท่าเปิดกล่องเลื่อนขึ้นจบก่อน ไม่แย่งเครื่องกัน (กระตุก)
  * @param {Function} [opt.onPage]          (pagesSoFar) เรียกทุกครั้งที่วาดเสร็จ 1 หน้า — แสดงหน้าแรกได้ทันที ไม่ต้องรอทั้งไฟล์
  * @param {Function} [opt.isCancelled]     () => true เมื่อกล่องถูกปิดแล้ว — หยุดวาดหน้าที่เหลือทันที
- * @param {string}   [opt.type="image/png"] ชนิดภาพ ("image/jpeg" เล็กและเร็วกว่า เหมาะกับดูอย่างเดียว)
+ * @param {string}   [opt.type="image/jpeg"] ชนิดภาพ — 🔁 (25 ต.ค. 2569 ผู้ใช้: "หน้า pdf ยังกระตุก โดดๆ วาบๆ เวลาเลื่อนดู")
+ *        เดิม PNG: ภาพ A4 200 dpi ถอดช้า (หลายร้อย ms/หน้า) มือถือทิ้งภาพที่เลื่อนพ้นจอแล้วต้องถอดใหม่ตอนเลื่อนกลับ
+ *        = หน้าขาววาบ/สะดุด · JPEG คุณภาพ 0.92 ถอดเร็วกว่าหลายเท่า (มือถือถอดด้วยฮาร์ดแวร์) ตัวหนังสือยังคมพอพิมพ์
  * @returns {Promise<Array<{url: string, blob: Blob, width: number, height: number}>>} ภาพทีละหน้า
  *   ⚠️ ผู้เรียกต้อง revokePageImages() เองเมื่อเลิกใช้ (รวมถึงตอนถูกยกเลิกกลางทาง)
  * ✅ (25 ต.ค. 2569 ผู้ใช้: "แก้ไขอาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf") — เดิมเริ่มวาดทันทีพร้อมท่าเปิดกล่อง
  *    และวาดครบทุกหน้าก่อนแสดง (ไฟล์หลายหน้าเห็นแต่ตัวหมุนนาน แล้วภาพทุกหน้าโผล่พร้อมกันจนจอสะดุด)
  */
-export async function renderPdfToImages(blob, { dpi = DEFAULT_DPI, startDelay = 0, onPage, isCancelled, type = "image/png", quality = 0.9 } = {}) {
+export async function renderPdfToImages(blob, { dpi = DEFAULT_DPI, startDelay = 0, onPage, isCancelled, type = "image/jpeg", quality = 0.92 } = {}) {
   const stop = () => Boolean(isCancelled?.());
   if (startDelay) await wait(startDelay);
   if (stop()) return [];

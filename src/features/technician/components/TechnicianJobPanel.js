@@ -1023,9 +1023,8 @@ const TechnicianJobCard = ({
                 {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
                 {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
                 <InfoLine label="โครงการ">
-                  {event.company && event.site
-                    ? `${event.company} · ${event.site}`
-                    : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
+                  {/* 🔁 (25 ต.ค. 2569 ผู้ใช้: "ให้แสดงชื่อโครงการ ไม่ใช่บริษัท") ชื่อบริษัทยาวดันโครงการตกขอบ */}
+                  {event.site || event.company || "ไม่ระบุโครงการ"}
                 </InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
                 {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
@@ -1271,7 +1270,7 @@ const TechnicianJobCard = ({
       {!inSheet && (
         <MobileSheet open={sheetOpen} onClose={() => setSheetOpen(false)}
           title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
-          subtitle={[event.jobNo, event.company || event.site].filter(Boolean).join(" · ")}>
+          subtitle={[event.jobNo, event.site || event.company].filter(Boolean).join(" · ")}>
           <Box sx={{ m: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
             <TechnicianJobCard event={event} userData={userData} employees={employees} onInputUpdate={onInputUpdate} onStatusUpdate={onStatusUpdate}
               onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview} uploadingState={uploadingState} isUploadingState={isUploadingState}
@@ -1288,7 +1287,7 @@ const TechnicianJobCard = ({
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>รายละเอียดงาน</Typography>
               <Typography noWrap sx={{ fontWeight: 700, fontSize: "1.05rem", color: INK, lineHeight: 1.35 }}>{event.title || "ไม่ระบุประเภทงาน"}</Typography>
               <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.25 }}>
-                {[event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site), event.system,
+                {[event.site || event.company, event.system,
                   formatEventDateRange(event)].filter(Boolean).join(" · ")}
               </Typography>
             </Box>
@@ -1317,7 +1316,7 @@ const TechnicianJobCard = ({
                   {event.title || "ไม่ระบุประเภทงาน"}
                 </Typography>
                 {(() => {
-                  const place = [event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site),
+                  const place = [event.site || event.company,
                     event.system, event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : ""].filter(Boolean).join(" · ");
                   return place ? <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.25 }}>{place}</Typography> : null;
                 })()}

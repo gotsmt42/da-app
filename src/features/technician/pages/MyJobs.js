@@ -228,7 +228,7 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
   return (
     <Box sx={multiDayCardSx(STATUS_DOT[head.status] || "#94a3b8")}>
       <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)} att={groupAtt}
-        title={`${head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site || "")}${head.title ? ` — ${head.title}` : ""}${head.system ? ` · ${head.system}` : ""}`} />
+        title={`${head.site || head.company || ""}${head.title ? ` — ${head.title}` : ""}${head.system ? ` · ${head.system}` : ""}`} />
       {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แยกให้ละเอียดและชัดเจน งานไม่ต่อเนื่อง หลายช่วงวัน") — แต่ละช่วงมีกรอบ + "ช่วงที่ k/N · สถานะ"
           ช่วงวันนี้/ถัดไปขึ้นก่อน · ช่วงที่ผ่านมาพับไว้ (ชุดเดียวกับหน้าการดำเนินงาน) */}
       <Collapse in={expanded}>

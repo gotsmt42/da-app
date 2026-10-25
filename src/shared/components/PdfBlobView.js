@@ -76,8 +76,9 @@ export default function PdfBlobView({ url, height = 780, title = "PDF" }) {
   return (
     <Stack spacing={1.25} alignItems="center" sx={{ p: { xs: 1, sm: 2 }, bgcolor: "#525659", minHeight: "100%" }}>
       {pages.map((pg, i) => (
-        <Box key={pg.url} component="img" src={pg.url} alt={`หน้า ${i + 1}`} decoding="async" width={pg.width} height={pg.height}
+        <Box key={pg.url} component="img" src={pg.url} alt={`หน้า ${i + 1}`} width={pg.width} height={pg.height}
           sx={{ display: "block", width: "100%", maxWidth: 900, height: "auto", bgcolor: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,.35)",
+            willChange: pages.length <= 8 ? "transform" : "auto", // ชั้นการ์ดจอ: เลื่อนแล้วไม่ต้องวาดใหม่ (ไม่วาบ)
             animation: "pdfPageIn .22s ease-out", "@keyframes pdfPageIn": { from: { opacity: 0 }, to: { opacity: 1 } } }} />
       ))}
       <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,.75)", pb: 1 }}>
