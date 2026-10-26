@@ -11,21 +11,27 @@
  */
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// 🔁 (26 ต.ค. 2569 ผู้ใช้: "สีดูรกเกินไป ไม่มืออาชีพ") — รายการขาวเส้นคั่นบางชุดเดียว ไม่มีพื้นสี/ขอบหนา
+//    สีเหลือแค่ไอคอนเล็กกับคำสถานะท้ายแถว · ปัญหาขึ้นก่อน ไฟล์ที่ถูกต้องอยู่ท้าย
 const TONE = {
-  ok: { c: "#15803d", bg: "#f0fdf4", line: "#bbf7d0", mark: "✓" },
-  bad: { c: "#b91c1c", bg: "#fef2f2", line: "#fecaca", mark: "✕" },
-  warn: { c: "#b45309", bg: "#fffbeb", line: "#fde68a", mark: "?" },
+  ok: { c: "#16a34a", label: "ถูกต้อง", icon: '<path d="M5 10.5l3 3 7-7"/>' },
+  bad: { c: "#dc2626", label: "ต้องแก้", icon: '<path d="M6 6l8 8M14 6l-8 8"/>' },
+  warn: { c: "#d97706", label: "ไม่ชัด", icon: '<path d="M10 5.5v5.5"/><path d="M10 14.2v.3"/>' },
 };
+const ORDER = { bad: 0, warn: 1, ok: 2 };
+const icon = (t) => `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="${t.c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="10" cy="10" r="8.5" stroke-width="1.5"/>${t.icon}</svg>`;
 
-const row = (tone, title, sub, fix) => {
+const row = ({ tone, title, sub, fix, extra = "" }) => {
   const t = TONE[tone];
-  return `<div style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;margin-top:6px;border-radius:10px;background:${t.bg};border:1px solid ${t.line};border-left:4px solid ${t.c}">
-    <span style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:${t.c};color:#fff;font-size:12px;font-weight:900;display:grid;place-items:center;margin-top:1px">${t.mark}</span>
+  return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-top:1px solid #eef2f6">
+    ${icon(t)}
     <div style="min-width:0;flex:1">
-      <div style="font-size:13px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</div>
-      ${sub ? `<div style="font-size:12.5px;color:${t.c};font-weight:700;margin-top:1px">${sub}</div>` : ""}
-      ${fix ? `<div style="font-size:12px;color:#475569;margin-top:2px">→ ${fix}</div>` : ""}
+      <div style="font-size:13px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${title}</div>
+      ${sub ? `<div style="font-size:12px;color:#64748b;margin-top:1px">${sub}</div>` : ""}
+      ${fix ? `<div style="font-size:12px;color:#334155;margin-top:3px">${fix}</div>` : ""}
+      ${extra}
     </div>
+    <span style="flex-shrink:0;font-size:11.5px;font-weight:700;color:${t.c};margin-top:1px">${t.label}</span>
   </div>`;
 };
 
@@ -35,46 +41,35 @@ export function closeCheckHtml(check) {
   const okCount = files.filter((f) => f.matches === "yes").length;
   // ปัญหาที่ไม่ใช่ "ไฟล์ผิดช่อง" (เนื้อหา Service Report · ต้องมีใบเสนอราคา) — ไฟล์ผิดช่องแสดงในรายไฟล์อยู่แล้ว
   const extra = problems.filter((p) => !["wrong_type", "unsure_type"].includes(p.code));
-  const fileBad = files.filter((f) => f.matches !== "yes").length;
-  const badCount = fileBad + extra.length;
+  const badCount = files.filter((f) => f.matches !== "yes").length + extra.length;
 
-  const pill = (tone, text) => `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:${TONE[tone].bg};color:${TONE[tone].c};font-size:12.5px;font-weight:800;border:1px solid ${TONE[tone].line}">${text}</span>`;
-  const head = `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:6px">
-    ${pill("ok", `✓ ถูกต้อง ${okCount} ไฟล์`)}
-    ${badCount ? pill("bad", `✕ ต้องแก้ ${badCount} ข้อ`) : ""}
-  </div>`;
-
-  // จัดกลุ่มตามช่องเอกสาร (ลำดับตามที่เซิร์ฟเวอร์ส่งมา)
-  const slots = [];
-  files.forEach((f) => {
-    let g = slots.find((s) => s.label === f.slotLabel);
-    if (!g) { g = { label: f.slotLabel, rows: [] }; slots.push(g); }
+  const rows = files.map((f) => {
     const name = esc(f.fileName || "ไม่มีชื่อไฟล์");
+    const slot = esc(f.slotLabel || "");
     const seen = esc(f.detected || "");
-    if (f.matches === "yes") g.rows.push(row("ok", name, seen ? `ถูกต้อง · ${seen}` : "ถูกต้อง"));
-    else if (f.matches === "no") g.rows.push(row("bad", name, `ไม่ใช่${esc(f.slotLabel)} · AI เห็นเป็น ${seen || "เอกสารอื่น"}`, "ลบไฟล์นี้ แล้วแนบไฟล์ที่ถูกต้อง"));
-    else g.rows.push(row("warn", name, `AI ดูไม่ออก${seen ? ` · ${seen}` : ""}`, "ถ่ายให้ชัด หรือตรวจว่าแนบถูกช่อง"));
+    if (f.matches === "yes") return { tone: "ok", title: name, sub: `${slot}${seen ? ` · ${seen}` : ""}` };
+    if (f.matches === "no") return { tone: "bad", title: name, sub: `ช่อง ${slot} · AI เห็นเป็น ${seen || "เอกสารอื่น"}`, fix: "ลบไฟล์นี้ แล้วแนบไฟล์ที่ถูกต้อง" };
+    return { tone: "warn", title: name, sub: `ช่อง ${slot}${seen ? ` · ${seen}` : ""}`, fix: "ถ่ายใหม่ให้ชัด หรือตรวจว่าแนบถูกช่อง" };
   });
-  const slotHtml = slots.map((g) => `<div style="margin-top:10px">
-    <div style="font-size:12px;font-weight:800;color:#64748b;letter-spacing:.2px">${esc(g.label)}</div>${g.rows.join("")}</div>`).join("");
-
-  const extraHtml = extra.map((p) => {
+  extra.forEach((p) => {
     if (p.code === "need_quote") {
-      const items = (p.items || []).slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join("");
-      const more = (p.items || []).length > 6 ? `<li>และอีก ${(p.items || []).length - 6} รายการ</li>` : "";
-      return row("bad", "ต้องแนบใบเสนอราคาเพิ่มเติม", `Service Report พบรายการต้องเสนอราคา ${(p.items || []).length} รายการ`, "แนบใบเสนอราคาในช่อง “ใบเสนอราคาเพิ่มเติม”")
-        + (items ? `<ul style="margin:4px 0 0;padding-left:30px;font-size:12px;color:#475569;line-height:1.5">${items}${more}</ul>` : "");
-    }
-    if (p.code === "sr_not_found") return row("bad", "Service Report", "ไม่ใช่ใบ Service Report", "แนบใบ Service Report ที่ช่างเขียนจริง");
-    if (p.code === "sr_unreadable") return row("warn", "Service Report", esc(String(p.text || "").split(" — ")[0]), "ถ่ายใหม่ให้ชัด แล้วแนบแทน");
-    return row("bad", esc(p.slotLabel || "เอกสาร"), esc(p.text));
-  }).join("");
+      const list = p.items || [];
+      const items = list.slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join("") + (list.length > 6 ? `<li>และอีก ${list.length - 6} รายการ</li>` : "");
+      rows.push({ tone: "bad", title: "ต้องแนบใบเสนอราคาเพิ่มเติม", sub: `Service Report พบรายการต้องเสนอราคา ${list.length} รายการ`,
+        extra: items ? `<ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#475569;line-height:1.55">${items}</ul>` : "" });
+    } else if (p.code === "sr_not_found") rows.push({ tone: "bad", title: "Service Report", sub: "AI อ่านแล้วไม่ใช่ใบ Service Report", fix: "แนบใบ Service Report ที่ช่างเขียนจริง" });
+    else if (p.code === "sr_unreadable") rows.push({ tone: "warn", title: "Service Report", sub: esc(String(p.text || "").split(" — ")[0]), fix: "ถ่ายใหม่ให้ชัด แล้วแนบแทน" });
+    else rows.push({ tone: "bad", title: esc(p.slotLabel || "เอกสาร"), sub: esc(p.text) });
+  });
+  rows.sort((x, y) => ORDER[x.tone] - ORDER[y.tone]);
 
-  const tip = badCount ? `<div style="margin-top:12px;padding:8px 10px;border-radius:10px;background:#f8fafc;color:#475569;font-size:12px;line-height:1.5">
-      เอกสารไม่มีจริง (เช่น ลูกค้าไม่ออกให้)? กด <b style="white-space:nowrap">ขอแอดมินพิจารณา</b> แล้วใส่เหตุผล</div>`
-    : `<div style="margin-top:12px;color:#475569;font-size:12.5px;text-align:center">งานจะเข้าสถานะ “รอแอดมินอนุมัติ” ทันที</div>`;
-
-  return `<div style="text-align:left">${head}${slotHtml}${extraHtml ? `<div style="margin-top:10px"><div style="font-size:12px;font-weight:800;color:#64748b">เนื้อหาเอกสาร</div>${extraHtml}</div>` : ""}${tip}</div>`;
+  const head = `<div style="font-size:12.5px;color:#64748b;text-align:center;margin-bottom:10px">
+    ตรวจ ${files.length} ไฟล์ · ถูกต้อง <b style="color:#16a34a">${okCount}</b>${badCount ? ` · ต้องแก้ <b style="color:#dc2626">${badCount}</b>` : ""}</div>`;
+  const list = `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff"><div style="margin-top:-1px">${rows.map(row).join("")}</div></div>`;
+  const tip = badCount
+    ? `<div style="margin-top:10px;color:#64748b;font-size:12px;line-height:1.5">เอกสารไม่มีจริง (เช่น ลูกค้าไม่ออกให้) — กด <b style="white-space:nowrap;color:#334155">ขอแอดมินพิจารณา</b> แล้วใส่เหตุผล</div>`
+    : `<div style="margin-top:10px;color:#64748b;font-size:12px;text-align:center">งานจะเข้าสถานะ “รอแอดมินอนุมัติ” ทันที</div>`;
+  return `<div style="text-align:left">${head}${list}${tip}</div>`;
 }
 
 export default closeCheckHtml;
