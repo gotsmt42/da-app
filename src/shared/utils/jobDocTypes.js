@@ -15,7 +15,8 @@ import { Description, RequestQuote, ReceiptLong, AssignmentTurnedIn } from "@mui
 export const JOB_DOC_TYPES = [
   { key: "report", field: "reportFiles", label: "Service Report", color: "#2563eb", Icon: Description,
     desc: "ใบรายงานผลการเข้าปฏิบัติงานครั้งนี้ — ทุกงานต้องมีก่อนปิดงาน" },
-  { key: "quotation", field: "quotationFiles", label: "ใบเสนอราคา", color: "#d97706", Icon: RequestQuote,
+  // 🔁 (26 ต.ค. 2569 ผู้ใช้: "อยากให้ระบุชัดเจนว่าคือใบเสนอราคาเพิ่มเติม แบบนี้อาจจะสับสน")
+  { key: "quotation", field: "quotationFiles", label: "ใบเสนอราคาเพิ่มเติม", color: "#d97706", Icon: RequestQuote,
     desc: "เสนอราคางานเพิ่มเติม/อะไหล่ที่พบหน้างาน — ไฟล์ที่แนบจะไปอยู่ในหน้า “ติดตามใบเสนอราคา”" },
   { key: "invoice", field: "invoiceFiles", label: "ใบวางบิล", color: "#0891b2", Icon: ReceiptLong,
     desc: "ใบวางบิล/ใบแจ้งหนี้ที่วางให้ลูกค้าสำหรับงานครั้งนี้" },

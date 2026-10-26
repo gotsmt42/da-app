@@ -53,7 +53,7 @@ const DOC_TYPE_ICON = {
 const DOC_TYPES = [
   { value: "all", label: "ทั้งหมด" },
   { value: "report", label: "Service Report" },
-  { value: "quotation", label: "ใบเสนอราคา" },
+  { value: "quotation", label: "ใบเสนอราคาเพิ่มเติม" },
   { value: "invoice", label: "ใบวางบิล" },
   { value: "completion", label: "ใบส่งมอบงาน" },
 ];
