@@ -520,7 +520,9 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const returningToCompany = expense?.kind === "claim" && !reimburse && !ctr && money(expense?.difference) < 0;
 
   return (
-    <Dialog open onClose={() => !busy && onCancel()} fullWidth maxWidth="xs">
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "แก้ไขขนาดหน้าอนุมัติด้วย มันเล็กไป ขยายออกให้พอดี สวยงาม")
+    //    กล่องจ่ายเงิน (มียอด · บัญชี · วันที่ · วิธีจ่าย · หลักฐาน) กว้างขึ้น (sm) และจัดช่องเป็น 2 คอลัมน์ · กล่องอื่นคงขนาดเดิม
+    <Dialog open onClose={() => !busy && onCancel()} fullWidth maxWidth={payLike ? "sm" : "xs"}>
       <DialogTitle sx={{ fontWeight: 800, pb: 0.5 }}>{cfg.title}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: TEXT_SUB, mb: 2 }}>{cfg.body}</Typography>
@@ -557,14 +559,16 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                 </Box>
               )}
               {/* ป้ายช่องเปลี่ยนตามทิศทางเงิน — "วันที่รับเงินคืน" กับ "วันที่จ่ายเงิน" คนละความหมาย */}
-              <ThaiDatePicker
-                label={returningToCompany ? "วันที่รับเงินคืน" : action === "pay" ? "วันที่จ่ายเงิน" : "วันที่จ่ายเงิน"}
-                value={form.paidAt}
-                onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))}
-              />
-              <TextField select size="small" label={returningToCompany ? "รับคืนเป็น" : "จ่ายเป็น"} value={form.method || "transfer"} onChange={set("method")}>
-                {PAYMENT_METHODS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
-              </TextField>
+              <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+                <ThaiDatePicker
+                  label={returningToCompany ? "วันที่รับเงินคืน" : action === "pay" ? "วันที่จ่ายเงิน" : "วันที่จ่ายเงิน"}
+                  value={form.paidAt}
+                  onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))}
+                />
+                <TextField select size="small" label={returningToCompany ? "รับคืนเป็น" : "จ่ายเป็น"} value={form.method || "transfer"} onChange={set("method")}>
+                  {PAYMENT_METHODS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
+                </TextField>
+              </Box>
               <TextField size="small" label="เลขอ้างอิง (ไม่บังคับ)"
                 placeholder={returningToCompany ? "เช่น เลขที่ใบเสร็จรับเงิน / เลขที่รายการโอนเข้า" : "เช่น ธนาคาร / เลขที่รายการ"}
                 value={form.ref || ""} onChange={set("ref")} />
@@ -618,7 +622,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2, pt: payLike ? 1.5 : 1 }}>
         <Button onClick={onCancel} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ปิด</Button>
         <Button
           variant="contained" disabled={busy || (needReason && !String(form.reason || "").trim())}
