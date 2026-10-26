@@ -90,27 +90,52 @@ const Kpi = ({ label, value, sub, color, highlight, followup = false, active }) 
  * แผงหนึ่งหัวข้อของรายงาน — ✅ ผู้ใช้: "หัวข้อการสรุปทำให้ชัดเจน เด่น สวยงาม แต่ไม่รกตา"
  * หัวแผง = ไอคอนในกรอบสีอ่อนตามความหมายของหัวข้อ · ชื่อหัวข้อตัวใหญ่ขึ้น · คำอธิบายจาง · เส้นคั่นบางใต้หัวแผง
  */
-const Panel = ({ title, hint, children, action, icon, color = "#475569" }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, minWidth: 0, overflow: "hidden" }}>
-    <Stack direction="row" alignItems="center" useFlexGap flexWrap={{ xs: "wrap", sm: "nowrap" }} sx={{ columnGap: 1.25, rowGap: 1, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.4 }, borderBottom: `1px solid #f1f5f9` }}>
-      {icon && (
-        <Box sx={{
-          width: 34, height: 34, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(color, 0.1), color, "& svg": { fontSize: 19 },
-        }}>
-          {icon}
+/**
+ * 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้ารายงานเบิกให้กดพับปิดได้ทุกหัวข้อด้วย ให้สวยงาม ดูง่าย")
+ *    กดหัวแผง (หรือลูกศรขวา) = พับ/กาง · จำสถานะไว้ในเครื่อง (เปิดหน้าใหม่ยังพับเหมือนเดิม) · ปุ่มด้านขวาของหัวแผงกดได้ตามปกติ ไม่พับ
+ */
+const PANEL_KEY = (title) => `expReport.fold.${String(title || "").replace(/\s*\(.*\)\s*$/, "").trim()}`;
+const readFold = (title) => { try { return localStorage.getItem(PANEL_KEY(title)) === "1"; } catch { return false; } };
+const Panel = ({ title, hint, children, action, icon, color = "#475569" }) => {
+  const [folded, setFolded] = useState(() => readFold(title));
+  const toggle = () => setFolded((f) => {
+    try { localStorage.setItem(PANEL_KEY(title), f ? "0" : "1"); } catch { /* ไม่มีที่เก็บ = ไม่จำ */ }
+    return !f;
+  });
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, minWidth: 0, overflow: "hidden", alignSelf: folded ? "start" : "stretch" }}>
+      <Stack direction="row" alignItems="center" useFlexGap flexWrap={{ xs: "wrap", sm: "nowrap" }} onClick={toggle} role="button" aria-expanded={!folded}
+        sx={{ columnGap: 1.25, rowGap: 1, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.4 }, borderBottom: folded ? "none" : `1px solid #f1f5f9`,
+          cursor: "pointer", userSelect: "none", transition: "background-color .15s", "&:hover": { bgcolor: "#f8fafc" } }}>
+        {icon && (
+          <Box sx={{
+            width: 34, height: 34, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+            bgcolor: alpha(color, 0.1), color, "& svg": { fontSize: 19 },
+          }}>
+            {icon}
+          </Box>
+        )}
+        <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: { xs: "0.98rem", sm: "1.05rem" }, color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
+          {hint && <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, lineHeight: 1.45 }}>{hint}</Typography>}
         </Box>
-      )}
-      <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: { xs: "0.98rem", sm: "1.05rem" }, color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
-        {hint && <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, lineHeight: 1.45 }}>{hint}</Typography>}
-      </Box>
-      {/* ⚠️ มือถือ: ปุ่มด้านขวาลงบรรทัดใหม่เต็มความกว้าง — ไม่งั้นชื่อหัวข้อถูกบีบจนตัดทีละคำ */}
-      {action && <Box sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" }, "& .MuiToggleButtonGroup-root": { width: { xs: "100%", sm: "auto" } }, "& .MuiToggleButton-root": { flex: { xs: 1, sm: "none" } } }}>{action}</Box>}
-    </Stack>
-    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>{children}</Box>
-  </Box>
-);
+        {/* ⚠️ มือถือ: ปุ่มด้านขวาลงบรรทัดใหม่เต็มความกว้าง — ไม่งั้นชื่อหัวข้อถูกบีบจนตัดทีละคำ · ซ่อนตอนพับ */}
+        {action && !folded && (
+          <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" }, order: { xs: 3, sm: 0 }, "& .MuiToggleButtonGroup-root": { width: { xs: "100%", sm: "auto" } }, "& .MuiToggleButton-root": { flex: { xs: 1, sm: "none" } } }}>{action}</Box>
+        )}
+        <Tooltip title={folded ? "กางหัวข้อนี้" : "พับหัวข้อนี้"}>
+          <IconButton size="small" aria-label={folded ? "กาง" : "พับ"} onClick={(e) => { e.stopPropagation(); toggle(); }}
+            sx={{ flexShrink: 0, color: TEXT_SUB, bgcolor: folded ? "#f1f5f9" : "transparent", "& svg": { transition: "transform .2s", transform: folded ? "rotate(-90deg)" : "none" } }}>
+            <ExpandMore />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+      <Collapse in={!folded} timeout={220} unmountOnExit>
+        <Box sx={{ p: { xs: 1.5, sm: 2 } }}>{children}</Box>
+      </Collapse>
+    </Box>
+  );
+};
 
 /**
  * ใบที่ค้างอยู่ในสายอนุมัติ 3 ส่วน — ✅ ผู้ใช้สั่งให้หน้ารายงานตรงกับลำดับการเบิกใหม่
