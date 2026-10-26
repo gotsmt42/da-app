@@ -40,7 +40,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Search, FolderOpen, Add, Close,
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
-  AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess, Groups,
+  AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess, 
   CalendarMonth, Category, Assignment, Description, HourglassEmpty, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
   AddCircleOutline, Check, Autorenew, History, Apartment, Timelapse, Tune,
@@ -64,7 +64,6 @@ import BillingDialog from "@/features/finance/components/BillingDialog";
 import BillingChip from "@/features/finance/components/BillingChip";
 import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
-import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
 import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
 import ColumnSettings from "@/features/contracts/components/ColumnSettings";
@@ -1521,8 +1520,6 @@ export default function ContractOverview() {
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   // ✅ แผง "งานตามผู้รับผิดชอบ" (จอคอม) — พับไว้เป็นค่าเริ่มต้น จำค่าที่ผู้ใช้เลือกไว้
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
-  const [peopleOpen, setPeopleOpen] = useState(() => { try { return localStorage.getItem("tt-co-people") === "1"; } catch { return false; } });
-  const togglePeople = () => setPeopleOpen((o) => { try { localStorage.setItem("tt-co-people", o ? "0" : "1"); } catch { /* ignore */ } return !o; });
   // ✅ งานส่วนใหญ่ในระบบยังเป็นงานเก่าที่ยังไม่ได้จัดกลุ่มเป็นสัญญา (สร้างก่อนมีฟีเจอร์นี้) เดิม fallback
   // ให้ทุกงานเก่าขึ้นเป็น "สัญญา" 1 แถวของตัวเอง ทำให้ตารางท่วมไปด้วยแถวที่ไม่มีข้อมูลสัญญาจริงเลย
   // (ขึ้น "-" เกือบทุกช่อง) ดูรก/ไม่มีประโยชน์ — ใช้แท็บสลับมุมมองแทน switch เดียว (เทียบ pattern
@@ -2281,13 +2278,12 @@ export default function ContractOverview() {
   }, [regionalContracts]);
 
   // ✅ แถวสำหรับแผง "งานตามผู้รับผิดชอบ" — กรองเหมือนตารางทุกอย่าง ยกเว้นตัวกรองผู้รับผิดชอบเอง
-  //    (เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน) ดู ResponsibleSummary.js
+  //    (เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน) — ใช้นับจำนวนในช่องเลือกผู้รับผิดชอบ
   const responsibleRows = useMemo(
     () => applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "responsible" }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [viewBase, search, viewFilter, yearFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
   );
-  const isRowOverdue = useCallback((c) => c.isRealContract && isRoundOverdue(c), []);
 
   // ✅ จำนวนต่อตัวเลือกของตัวกรอง "แผนก" และ "สถานะสัญญา" — โชว์ในตัวเลือกเลย ให้รู้ตั้งแต่ยังไม่กด
   // 🐛 BUG ที่แก้ (ตัวเลขไม่ตรงกับที่เห็นในตาราง): เดิมนับจาก contracts ทั้งชุดของทั้งระบบ ไม่สนใจว่า
@@ -5999,18 +5995,6 @@ pagedRows.map((c, idx) => {
         />
       )}
 
-      {/* ✅ สรุปว่าผู้รับผิดชอบแต่ละคนถืองานกี่ชิ้น — กดเพื่อกรองตาราง (ตัวกรองเดียวกับ dropdown ผู้รับผิดชอบ) */}
-      {!loading && isAdminOrManager && !isMobile && peopleOpen && (
-        <ResponsibleSummary
-          rows={responsibleRows}
-          unit={unitLabel}
-          value={responsibleFilter}
-          onChange={setResponsibleFilter}
-          employees={lookups.employees}
-          isOverdue={isRowOverdue}
-          isMobile={isMobile}
-        />
-      )}
 
       {/* ✅ ช่วยหางานเก่าที่น่าจะเป็นสัญญาเดียวกันให้ (company/site/system/title ตรงกันเป๊ะ) — เดิม
           ต้องไล่ดูเองทีละแถวจากงานเก่าเป็นร้อยรายการ กดปุ่มเดียวเลือกทั้งกลุ่มแล้วไปกรอกข้อมูลสัญญาต่อได้เลย
@@ -6155,20 +6139,20 @@ pagedRows.map((c, idx) => {
               ตัวกรองเพิ่มเติม{moreFilterCount ? ` (${moreFilterCount})` : ""}
             </Button>
           )}
-          {/* ✅ แผง "งานตามผู้รับผิดชอบ" พับไว้เป็นค่าเริ่มต้น (ลดความรก) — กดปุ่มนี้เพื่อกาง · จำค่าไว้ */}
-          {!isMobile && isAdminOrManager && (
-            <Button
-              onClick={togglePeople} startIcon={<Groups sx={{ fontSize: 18 }} />}
-              endIcon={<ExpandMore sx={{ fontSize: 18, transform: peopleOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
-              sx={{
-                order: 2, flexShrink: 0, alignSelf: "center", height: 40, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 1.5,
-                border: `1px solid ${peopleOpen || responsibleFilter !== "all" ? alpha("#2563eb", 0.45) : BORDER_MAIN}`,
-                color: peopleOpen || responsibleFilter !== "all" ? "#2563eb" : "text.primary",
-                bgcolor: peopleOpen ? alpha("#2563eb", 0.06) : "background.paper",
-              }}
-            >
-              {responsibleFilter !== "all" ? `ผู้รับผิดชอบ: ${responsibleFilter === "unassigned" ? "ยังไม่มอบหมาย" : responsibleFilter}` : "ผู้รับผิดชอบ"}
-            </Button>
+          {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เลือกผู้รับผิดชอบ ให้ทำเป็น Select แทน มีรูปผู้รับผิดชอบ และจำนวนสัญญา")
+              แทนปุ่มกางแผงการ์ดผู้รับผิดชอบ — ช่องเลือกแบบเดียวกับมือถือ: รูป/อักษรย่อ · จำนวนสัญญาของแต่ละคน · ยังไม่มอบหมาย */}
+          {!isMobile && isAdminOrManager && responsibleOptions.total > 0 && (
+            <Box sx={{ order: 2, flexShrink: 0, alignSelf: "center", width: 230 }}>
+              <PersonSelectField
+                label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={responsibleFilter} onChange={setResponsibleFilter}
+                allLabel="ทุกคน" allCount={responsibleOptions.total} unit={unitLabel}
+                options={[
+                  ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
+                  ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: lookups.employees.find((e) => e.fname === name)?.imageUrl })),
+                ]}
+                sx={{ width: "100%" }}
+              />
+            </Box>
           )}
           {!isMobile && hasActiveFilters && (
             <Button
