@@ -76,7 +76,7 @@ export default function WebsiteArticles() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, sm: 3 } }}>
+    <Box sx={{ mx: "auto", px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 3 } }}>
       <WebPageHeader title="บทความบนเว็บไซต์" subtitle="ความรู้งานระบบสำหรับเจ้าของอาคาร — ช่วยให้ลูกค้าค้นเจอบริษัทผ่าน Google" sitePath="/articles"
         actions={<Button variant="contained" startIcon={<Add />} onClick={() => setEditing({ ...EMPTY })}
           sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: UI.accent, "&:hover": { bgcolor: "#b91c1c" } }}>เขียนบทความ</Button>} />

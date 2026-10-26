@@ -54,7 +54,7 @@ export default function WebsiteLeads() {
   const total = Object.values(summary.byStatus || {}).reduce((a, b) => a + b, 0);
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, sm: 3 } }}>
+    <Box sx={{ mx: "auto", px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 3 } }}>
       <WebPageHeader title="คำขอจากเว็บไซต์" subtitle="ข้อความติดต่อและคำขอใบเสนอราคาที่ลูกค้าส่งผ่านเว็บไซต์บริษัท" sitePath="/quotation" />
       {fb.node}
 

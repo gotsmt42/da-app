@@ -91,7 +91,7 @@ export default function WebsiteProducts() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, sm: 3 } }}>
+    <Box sx={{ mx: "auto", px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 3 } }}>
       <WebPageHeader
         title="สินค้าบนเว็บไซต์"
         subtitle="เพิ่ม แก้ไข รูปภาพ และข้อมูลจำเพาะของสินค้าที่แสดงบนหน้า “สินค้า” ของเว็บไซต์บริษัท"

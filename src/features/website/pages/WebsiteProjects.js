@@ -70,7 +70,7 @@ export default function WebsiteProjects() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, sm: 3 } }}>
+    <Box sx={{ mx: "auto", px: { xs: 1.5, sm: 2.5 }, py: { xs: 2, sm: 3 } }}>
       <WebPageHeader
         title="ผลงานบนเว็บไซต์"
         subtitle="โครงการที่ส่งมอบแล้ว — โจทย์หน้างาน แนวทางแก้ และผลลัพธ์ พร้อมรูปหน้างาน"

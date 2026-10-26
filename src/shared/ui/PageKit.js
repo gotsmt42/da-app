@@ -37,7 +37,10 @@ export const SELECTED_SX = { bgcolor: `${ACCENT_SOFT} !important`, color: `${ACC
  *    • หน้าข้อมูล/รายการ = กว้าง 1500 · หน้าฟอร์ม/ตั้งค่า = narrow 960
  *    • มือถือไม่เว้นขอบซ้อน (ขอบมาจาก .app-page-container ชั้นเดียว)
  */
-export const PAGE_SX = { px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" };
+// 🔁 (26 ต.ค. 2569 ผู้ใช้: "ขยายหน้างานของฉันด้วย ให้เท่ากัน · หน้าอื่นๆทั้งหมดด้วย") ทุกหน้าเต็มความกว้างจอ
+//    ระยะขอบเท่ากันทุกหน้า (เดิมจำกัด 1500px — จอกว้างเห็นขอบว่างสองข้างไม่เท่ากับหน้างานใหม่)
+//    หน้าฟอร์มตั้งค่า/บัญชี (PAGE_NARROW_SX) ยังแคบไว้ตามเดิม — ช่องกรอกยืดเต็มจอกว้างจะอ่าน/กรอกยาก
+export const PAGE_SX = { px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: "none", mx: "auto" };
 export const PAGE_NARROW_SX = { ...PAGE_SX, maxWidth: 960 };
 export function PageShell({ narrow, sx, children }) {
   return <Box sx={{ ...(narrow ? PAGE_NARROW_SX : PAGE_SX), ...sx }}>{children}</Box>;

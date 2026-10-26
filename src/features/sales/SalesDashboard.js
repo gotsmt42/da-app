@@ -136,7 +136,7 @@ export default function SalesDashboard() {
     : weekCount ? `วันนี้ไม่มีนัด · 7 วันนี้ ${weekCount} นัด` : "ยังไม่มีนัดหมายใน 7 วันนี้";
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2 }, maxWidth: 1480, mx: "auto", bgcolor: SURFACE, minHeight: "100vh" }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2 }, mx: "auto", bgcolor: SURFACE, minHeight: "100vh" }}>
       <Box sx={{ display: "grid", gap: { xs: 0, lg: 2.5 }, gridTemplateColumns: { xs: "1fr", lg: "minmax(0,1fr) 380px" }, alignItems: "start" }}>
         {/* ── ซ้าย ── */}
         <Box sx={{ minWidth: 0 }}>

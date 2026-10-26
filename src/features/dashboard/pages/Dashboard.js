@@ -948,7 +948,7 @@ const baseStyles = {
     padding: "12px 14px 30px 14px",
     backgroundColor: "#f8fafc",
     width: "100%",
-    maxWidth: "1480px",
+    maxWidth: "none", // 🔁 (26 ต.ค. 2569) เต็มความกว้างเท่าทุกหน้า
     margin: "0 auto",
     minHeight: "100vh",
   },
