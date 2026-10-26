@@ -569,10 +569,15 @@ export default function ExpenseList({
         <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
       ) : mode === "inbox" ? (
         (() => {
+          // 🔁 (26 ต.ค. 2569 ผู้ใช้: "รายการรอดำเนินการ อยากให้อิงตัวล่าสุดขึ้นก่อน")
+          //    เรียงตาม "เวลาที่ใบเข้ามารอขั้นนี้" ล่าสุดก่อน (ส่ง → ตรวจสอบ → อนุมัติ) ทั้งในกลุ่ม และลำดับกลุ่ม
+          //    (กลุ่มที่มีใบเข้ามาล่าสุดขึ้นบนสุด) · "Advance เลยกำหนดเคลียร์" เป็นการเตือน ไว้ล่างสุดเสมอ
+          const stepAt = (e) => new Date((e.status === "approved" ? e.approvedAt : e.status === "reviewed" ? e.reviewedAt : e.submittedAt) || e.updatedAt || e.createdAt || 0).getTime();
           const groups = INBOX_GROUPS
             .filter((g) => can(g.cap))
-            .map((g) => ({ ...g, rows: base.filter(g.match) }))
-            .filter((g) => g.rows.length);
+            .map((g) => ({ ...g, rows: base.filter(g.match).sort((x, y) => stepAt(y) - stepAt(x)) }))
+            .filter((g) => g.rows.length)
+            .sort((x, y) => (x.key === "overdue") - (y.key === "overdue") || stepAt(y.rows[0]) - stepAt(x.rows[0]));
           if (!groups.length) return empty("ไม่มีรายการที่รอดำเนินการ 🎉");
           return (
             <Stack spacing={2.5}>
