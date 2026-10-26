@@ -1643,6 +1643,8 @@ export default function JobIntake() {
    *    กับ ยังไม่ถึงวัน (นัดเข้างานวันข้างหน้า) · เรียงตามวันเข้างาน ใหม่→เก่า เป็นค่าเริ่มต้น กดหัว "กำหนดการ" สลับได้
    */
   const [activeSub, setActiveSub] = useState("due");
+  // ✅ (26 ต.ค. 2569 ผู้ใช้: "เลือกผู้รับผิดชอบ ให้ทำเป็น Select มีรูปและจำนวน ... หน้าอื่นๆด้วยทำเหมือนกัน")
+  const [owner, setOwner] = useState("all");
   const [dateDir, setDateDir] = useState("desc");
   const toggleDateDir = () => setDateDir((d) => (d === "asc" ? "desc" : "asc"));
   const isUpcoming = useCallback((j) => {
@@ -1664,7 +1666,8 @@ export default function JobIntake() {
     const sub = (x) => tab !== "active" || (activeSub === "upcoming" ? isUpcoming(x.j) : !isUpcoming(x.j));
     const dateOf = (j) => new Date(j.start || j.scheduledAt || j.intakeAt || j.createdAt || 0).getTime();
     const dir = dateDir === "asc" ? 1 : -1;
-    return withStage.filter((x) => t.test(x.s, x.oc) && sub(x) && hit(x.j))
+    const ownerOk = (j) => owner === "all" || (owner === "unassigned" ? !j.responsiblePerson : j.responsiblePerson === owner);
+    return withStage.filter((x) => t.test(x.s, x.oc) && sub(x) && hit(x.j) && ownerOk(x.j))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
       .sort(({ j: a }, { j: b }) => (tab === "waiting"
@@ -1673,11 +1676,25 @@ export default function JobIntake() {
           ? dir * (new Date(a.closeApprovedAt || a.updatedAt || 0) - new Date(b.closeApprovedAt || b.updatedAt || 0))
           // กำลังดำเนินการ/ยกเลิก: ตามวันเข้างาน (กดหัวตารางสลับ ใหม่→เก่า / เก่า→ใหม่)
           : dir * (dateOf(a) - dateOf(b))));
-  }, [withStage, tab, q, activeSub, dateDir, isUpcoming]);
+  }, [withStage, tab, q, activeSub, dateDir, isUpcoming, owner]);
+  // จำนวนงานของผู้รับผิดชอบแต่ละคน — ในแท็บ/กลุ่มที่เปิดอยู่ (ก่อนกรองผู้รับผิดชอบ)
+  const ownerOptions = useMemo(() => {
+    const t = TABS.find((x) => x.key === tab) || TABS[0];
+    const rows = withStage.filter((x) => t.test(x.s, x.oc) && (tab !== "active" || (activeSub === "upcoming" ? isUpcoming(x.j) : !isUpcoming(x.j))));
+    const m = new Map(); let un = 0;
+    rows.forEach(({ j }) => { if (!j.responsiblePerson) un += 1; else m.set(j.responsiblePerson, (m.get(j.responsiblePerson) || 0) + 1); });
+    return {
+      total: rows.length,
+      list: [
+        ...(un ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: un, unassigned: true }] : []),
+        ...[...m].sort((a, b) => b[1] - a[1]).map(([name, n]) => ({ id: name, name, count: n, avatar: employees.find((e) => e.fname === name)?.imageUrl })),
+      ],
+    };
+  }, [withStage, tab, activeSub, isUpcoming, employees]);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าด้วยให้สมบูรณ์") การ์ด 10 / ตาราง 20 ต่อหน้า · เปลี่ยนแท็บ/ค้นหา/มุมมอง = กลับหน้า 1
   const pg = usePaged(list, view === "table" ? 20 : 10);
   const { setPage } = pg;
-  useEffect(() => { setPage(1); }, [tab, q, view, activeSub, dateDir, setPage]);
+  useEffect(() => { setPage(1); }, [tab, q, view, activeSub, dateDir, owner, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ต้องการปุ่ม Excel หน้ารับงาน") ส่งออกงานตามแท็บ + คำค้นที่เห็นอยู่
@@ -1766,6 +1783,12 @@ export default function JobIntake() {
             sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
           {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
         </Box>
+        {tab !== "requests" && ownerOptions.total > 0 && (
+          <Box sx={{ width: { xs: 150, sm: 220 }, flexShrink: 0 }}>
+            <PersonSelectField label="" title="เลือกผู้รับผิดชอบ" value={owner} onChange={setOwner}
+              allLabel="ผู้รับผิดชอบทุกคน" allCount={ownerOptions.total} unit="งาน" options={ownerOptions.list} sx={{ width: "100%" }} />
+          </Box>
+        )}
         <Tooltip title={canExport ? `ส่งออก Excel (${list.length} งาน)` : "ไม่มีงานให้ส่งออก"}>
           <span>
             <ButtonBase onClick={exportExcel} disabled={!canExport || exporting} aria-label="ส่งออก Excel"
