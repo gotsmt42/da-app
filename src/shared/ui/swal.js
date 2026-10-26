@@ -54,6 +54,18 @@ if (typeof document !== "undefined" && !document.getElementById("tt-swal-css")) 
   document.head.appendChild(el);
 }
 
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "หน้านี้กดพิมพ์ไม่ได้") กล่อง Swal ที่มีช่องกรอก เปิดซ้อนบนหน้าต่าง MUI (Dialog/แผ่นเลื่อนขึ้น)
+ *    MUI ดึงโฟกัสกลับเข้าหน้าต่างของตัวเองทุกครั้งที่โฟกัสออกไปข้างนอก (focus trap ฟัง focusin ที่ document)
+ *    → ช่องพิมพ์ของ Swal ได้โฟกัสไม่ได้ · กันไว้ที่เดียว: โฟกัสที่อยู่ในกล่อง Swal ไม่ส่งต่อไปถึงตัวดักของ MUI
+ */
+if (typeof window !== "undefined" && !window.__ttSwalFocusGuard) {
+  window.__ttSwalFocusGuard = true;
+  window.addEventListener("focusin", (e) => {
+    if (e.target?.closest?.(".swal2-container")) e.stopImmediatePropagation();
+  }, true);
+}
+
 const Swal = BaseSwal.mixin({
   customClass: { popup: "tt-swal" },
   confirmButtonColor: "#2563eb",
