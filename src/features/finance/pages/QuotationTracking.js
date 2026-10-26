@@ -37,7 +37,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import { FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
 import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
-import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
+import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup, QUOTE_STATUS, quoteRevOf, revLabel, currentFollowUps } from "@/shared/utils/quotationTracking";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
@@ -181,7 +181,7 @@ const Field = ({ label, children, warn, danger, sub, big, ai }) => {
 const ACTION = {
   follow_up: { label: "บันทึกติดตาม", primary: true, color: "#dc2626" },
   sent: { label: "อัปเดตผล", primary: true },
-  revising: { label: "อัปเดตผล", primary: true },
+  revising: { label: "แนบฉบับแก้ไข", primary: true },
   not_sent: { label: "เปิด" },
   waiting_file: { label: "แนบไฟล์", primary: true },
   approved: { label: "ดู" },
@@ -228,6 +228,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                     </Typography>
                   )) : <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#94a3b8" }}>ไม่มีเลขที่</Typography>}
                   {quoteNos(a).length > 1 && <Typography sx={{ ...sub, color: "#7c3aed", fontWeight: 800 }}>{quoteNos(a).length} ใบ</Typography>}
+                  {quoteRevOf(a) > 0 && <Typography sx={{ ...sub, color: "#7c3aed", fontWeight: 800 }}>ฉบับแก้ไข {revLabel(quoteRevOf(a))}</Typography>}
                   {a.quotationDate && <Typography sx={sub}>ลงวันที่ {thaiDate(a.quotationDate)}</Typography>}
                   {files.length > 0 && (
                     <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
@@ -325,7 +326,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
         <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1, px: 1, py: 0.75, borderRadius: 2, bgcolor: "#f8fafc" }}>
           <Description sx={{ fontSize: 16, color: TEXT_SUB }} />
           <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: a.quotationNo ? TEXT_MAIN : "#94a3b8", overflowWrap: "anywhere" }}>
-            {quoteNos(a).length ? `เลขที่ ${quoteNos(a).join(", ")}${quoteNos(a).length > 1 ? ` (${quoteNos(a).length} ใบ)` : ""}` : "ไม่มีเลขที่"}{a.quotationDate ? ` · ${thaiDate(a.quotationDate)}` : ""}
+            {quoteNos(a).length ? `เลขที่ ${quoteNos(a).join(", ")}${quoteNos(a).length > 1 ? ` (${quoteNos(a).length} ใบ)` : ""}` : "ไม่มีเลขที่"}{quoteRevOf(a) > 0 ? ` · ฉบับแก้ไข ${revLabel(quoteRevOf(a))}` : ""}{a.quotationDate ? ` · ${thaiDate(a.quotationDate)}` : ""}
           </Typography>
           {files.length > 0 && (
             <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview?.(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
@@ -448,6 +449,111 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
         </Button>
       </DialogActions>
     </Dialog>
+  );
+};
+
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "ให้สามารถกดแก้ไขใบเสนอราคาแล้วเริ่มติดตามใหม่ บางทีเสนอราคาไปแล้วลูกค้ามีให้แก้ไขรายละเอียด
+ *    เลยจำเป็นต้องออกใบเสนอราคาใบใหม่ ที่นี้จะงงว่าเอกสารเดิมที่ส่งไปแล้วมันไม่สามารถแก้ไขได้")
+ *    ออกฉบับแก้ไข: ระบุสิ่งที่ลูกค้าขอแก้ + แนบไฟล์ฉบับใหม่ → ฉบับเดิมถูกเก็บเป็นประวัติ (🔒 ดูได้ ลบไม่ได้)
+ *    → เริ่มนับติดตามใหม่ทันที · AI อ่านเลขที่/มูลค่าจากฉบับใหม่ · แจ้งผู้เกี่ยวข้อง
+ */
+const ReviseDialog = ({ a, open, onClose, onConfirm }) => {
+  const [reason, setReason] = useState("");
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef();
+  useEffect(() => { if (open) { setReason(""); setFiles([]); setBusy(false); } }, [open]);
+  if (!open) return null;
+  const rev = quoteRevOf(a);
+  const ok = reason.trim() && files.length > 0 && !busy;
+  const submit = async () => {
+    if (!ok) return;
+    setBusy(true);
+    const done = await onConfirm({ reason: reason.trim(), files });
+    setBusy(false);
+    if (done) onClose();
+  };
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 900, fontSize: "1.05rem", color: "#7c3aed", pb: 0.5 }}>
+        ออกใบเสนอราคาฉบับแก้ไข {revLabel(rev + 1)}
+      </DialogTitle>
+      <DialogContent>
+        <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+          <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f5f3ff", border: "1px solid #ddd6fe" }}>
+            <Typography component="ul" sx={{ m: 0, pl: 2.25, fontSize: "0.8rem", color: "#4c1d95", lineHeight: 1.65 }}>
+              <li>ฉบับเดิม <b>{revLabel(rev)}{a.quotationNo ? ` · ${a.quotationNo}` : ""}</b> ที่ส่งลูกค้าไปแล้ว เก็บเป็นประวัติ — ดู/ดาวน์โหลดได้ <b>แก้/ลบไม่ได้</b></li>
+              <li>แนบไฟล์ฉบับใหม่แล้ว ระบบ<b>เริ่มนับติดตามใหม่</b>ทันที (นับครั้งที่ติดตามใหม่ของฉบับนี้)</li>
+              <li>AI อ่านเลขที่ · วันที่ · มูลค่า จากฉบับใหม่ให้เอง (ตรวจ/แก้ได้ภายหลัง) · แจ้งผู้เกี่ยวข้องอัตโนมัติ</li>
+            </Typography>
+          </Box>
+          <TextField size="small" multiline minRows={3} label="ลูกค้าขอแก้อะไร *" value={reason} onChange={(e) => setReason(e.target.value)}
+            inputProps={{ maxLength: 300 }} placeholder="เช่น ขอส่วนลดเพิ่ม 5% / ตัดรายการปั๊มสำรองออก / เปลี่ยนรุ่นอุปกรณ์" />
+          <Box>
+            <input ref={inputRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+              onChange={(e) => { const list = Array.from(e.target.files || []); if (list.length) setFiles(list); e.target.value = ""; }} />
+            <Button variant="outlined" startIcon={<AttachFile />} onClick={() => inputRef.current?.click()} disabled={busy}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, borderStyle: files.length ? "solid" : "dashed", color: "#7c3aed", borderColor: "#c4b5fd" }}>
+              {files.length ? "เปลี่ยนไฟล์ฉบับใหม่" : "แนบไฟล์ใบเสนอราคาฉบับใหม่ *"}
+            </Button>
+            {files.map((f) => (
+              <Typography key={f.name} noWrap sx={{ mt: 0.5, fontSize: "0.8rem", fontWeight: 700, color: "#334155" }}>📄 {f.name}</Typography>
+            ))}
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
+        <Button variant="contained" disabled={!ok} onClick={submit} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <Autorenew />}
+          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
+          {busy ? "กำลังบันทึก..." : `ออกฉบับ ${revLabel(rev + 1)} · เริ่มนับใหม่`}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+/** ประวัติฉบับเดิมของใบเสนอราคา (ใหม่ → เก่า) */
+const RevisionHistory = ({ a, onPreview }) => {
+  const list = (a.quotationRevisions || []).slice().reverse();
+  if (!list.length) return null;
+  const ST = { sent: "ส่งแล้ว รอลูกค้าตอบ", approved: "ได้งาน", rejected: "ไม่ได้งาน" };
+  return (
+    <Section title={`ฉบับเดิมที่ส่งลูกค้าแล้ว · ${list.length} ฉบับ`} icon={<History />}>
+      <Stack spacing={1}>
+        {list.map((r) => (
+          <Box key={r.rev} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: "#fcfdfe" }}>
+            <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
+              <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: "#f1f5f9", color: "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
+                🔒 {revLabel(r.rev)}
+              </Box>
+              <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: TEXT_MAIN }}>
+                {[r.quotationNo, r.amount ? baht(r.amount) : ""].filter(Boolean).join(" · ") || "ไม่มีเลขที่"}
+              </Typography>
+              <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>
+                {[r.sentAt ? `ส่ง ${thaiDate(r.sentAt)}` : "", ST[r.status] || "", r.followUps ? `ติดตาม ${r.followUps} ครั้ง` : ""].filter(Boolean).join(" · ")}
+              </Typography>
+            </Stack>
+            <Typography sx={{ fontSize: "0.8rem", color: "#475569", mt: 0.5 }}>
+              ลูกค้าขอแก้: {r.reason || "-"} <Box component="span" sx={{ color: TEXT_SUB }}>— {r.by || "-"}{r.at ? ` · ${formatThai(moment(r.at).locale("th"), "D MMM YY HH:mm")}` : ""}</Box>
+            </Typography>
+            {(r.files || []).length > 0 && (
+              <Stack direction="row" gap={0.5} sx={{ mt: 0.75, flexWrap: "wrap" }}>
+                {r.files.map((f) => (
+                  <Box key={f.fileUrl} component="button" type="button" onClick={() => onPreview(f.fileUrl, f.fileName)}
+                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 0.9, maxWidth: 260, border: 0, borderRadius: 99, cursor: "pointer", font: "inherit",
+                      bgcolor: "#f1f5f9", color: "#334155", fontSize: "0.72rem", fontWeight: 700 }}>
+                    <AttachFile sx={{ fontSize: 14 }} />
+                    <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</Box>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Box>
+        ))}
+      </Stack>
+    </Section>
   );
 };
 
@@ -579,6 +685,8 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
 //    ปุ่มบอกว่าบันทึกครั้งที่เท่าไร · ประวัติเป็นการ์ดเรียงใหม่→เก่า (ครั้งที่ · ช่องทาง · วันเวลา · ผู้บันทึก · ข้อความ · หลักฐาน)
 const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
   const followUps = a.quotationFollowUps || [];
+  const rev = quoteRevOf(a);
+  const curCount = currentFollowUps(a).length;
   const [note, setNote] = useState("");
   const [channel, setChannel] = useState("phone");
   const [next, setNext] = useState("");
@@ -593,9 +701,9 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
     if (ok) { setNote(""); setFile(null); setNext(""); }
   };
   const canWrite = canFollow && ["sent", "revising"].includes(a.quotationStatus);
-  const nextNo = followUps.length + 1;
+  const nextNo = curCount + 1;
   return (
-    <Section title={`การติดตามลูกค้า${followUps.length ? ` · ติดตามแล้ว ${followUps.length} ครั้ง` : ""}`} icon={<EventRepeat />}>
+    <Section title={`การติดตามลูกค้า${curCount ? ` · ติดตามแล้ว ${curCount} ครั้ง` : ""}${rev ? ` (${revLabel(rev)})` : ""}`} icon={<EventRepeat />}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ดูแล้วไม่สวย ดูรก และตรงแนบไฟล์สังเกตยาก")
           กล่องเขียนแบบเดียว (composer): หัว = ครั้งที่ + ช่องทาง · กลาง = ข้อความ · ล่าง = แนบหลักฐาน (ปุ่มชัด) · นัดครั้งถัดไป · บันทึก */}
       {canWrite && (
@@ -603,7 +711,7 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
           "&:focus-within": { borderColor: "#93c5fd", boxShadow: "0 0 0 3px rgba(37,99,235,.10)" } }}>
           <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1} sx={{ px: 1.5, pt: 1.25, pb: 0.75 }}>
             <Typography sx={{ flex: 1, fontSize: "0.88rem", fontWeight: 800, color: TEXT_MAIN }}>
-              ติดตามครั้งที่ {nextNo} <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB, fontSize: "0.78rem" }}>· ติดต่อทาง</Box>
+              ติดตามครั้งที่ {nextNo}{rev ? ` · ${revLabel(rev)}` : ""} <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB, fontSize: "0.78rem" }}>· ติดต่อทาง</Box>
             </Typography>
             <Stack direction="row" sx={{ p: 0.4, borderRadius: 2, bgcolor: "#f1f5f9", gap: 0.4, flexWrap: "wrap" }}>
               {CHANNELS.map((c) => {
@@ -656,6 +764,12 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
                   <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#2563eb" : "#e2e8f0", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
                     ครั้งที่ {x.attemptNumber}
                   </Box>
+                  {rev > 0 && (
+                    <Box component="span" sx={{ px: 0.75, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800,
+                      color: (Number(x.revision) || 0) === rev ? "#7c3aed" : TEXT_SUB, bgcolor: (Number(x.revision) || 0) === rev ? "#f5f3ff" : "#f1f5f9" }}>
+                      {(Number(x.revision) || 0) === rev ? "" : "ฉบับเดิม "}{revLabel(x.revision)}
+                    </Box>
+                  )}
                   {x.channel && <Chip size="small" label={channelLabel(x.channel)} sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, bgcolor: "#f1f5f9" }} />}
                   <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{formatThai(moment(x.contactedAt).locale("th"), "D MMM YY · HH:mm")} น. · {x.userName}</Typography>
                 </Stack>
@@ -890,7 +1004,7 @@ const MiniStat = ({ label, value, color }) => (
 );
 
 const DetailDialog = ({
-  job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload,
+  job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload, onRevise,
 }) => {
   const fullScreen = useMediaQuery("(max-width:600px)");
   const navigate = useNavigate();
@@ -899,7 +1013,9 @@ const DetailDialog = ({
   const [showLog, setShowLog] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [editResult, setEditResult] = useState(false);
+  const [revising, setRevising] = useState(false);
   const followRef = useRef(null);
+  const filesRef = useRef(null);
   if (!job) return null;
   const a = job.anchor;
   const k = job.groupKey;
@@ -940,9 +1056,18 @@ const DetailDialog = ({
       // 🔁 (19 ต.ค. 2569 ผู้ใช้: "นับตั้งแต่ช่างอัปไฟล์ · ไม่ต้องมากดเอง") เซิร์ฟเวอร์เริ่มนับทันทีที่อัปไฟล์ — สถานะนี้เห็นแค่ชั่วครู่
       return { title: "แนบแล้ว · ระบบกำลังเริ่มนับติดตามให้", text: "ไม่ต้องกดอะไร — ระบบเริ่มนับวันติดตามให้อัตโนมัติจากวันที่แนบไฟล์" };
     }
+    if (k === "revising") {
+      // ✅ (26 ต.ค. 2569) ออกฉบับแก้ไขแล้ว แต่ยังไม่ได้แนบไฟล์ฉบับใหม่ (เช่นอัปโหลดไม่สำเร็จ)
+      return {
+        title: `แนบใบเสนอราคาฉบับแก้ไข ${revLabel(quoteRevOf(a))}`,
+        tone: "#7c3aed",
+        text: "แนบไฟล์ฉบับใหม่ในกล่องใบเสนอราคาด้านล่าง — แนบแล้วระบบเริ่มนับติดตามใหม่ให้ทันที (ฉบับเดิมเก็บเป็นประวัติแล้ว)",
+        primary: { label: "ไปที่กล่องใบเสนอราคา", icon: <AttachFile />, onClick: () => filesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }) },
+      };
+    }
     if (open) {
       return {
-        title: k === "revising" ? `ลูกค้าขอแก้ไข · ${due}` : due,
+        title: due,
         tone: k === "follow_up" ? "#dc2626" : null,
         text: k === "follow_up"
           ? "ถึงเวลาโทร/ทักลูกค้าแล้ว — บันทึกผลทุกครั้งที่ติดต่อ ระบบจะนับรอบถัดไปให้"
@@ -967,7 +1092,7 @@ const DetailDialog = ({
             <RequestQuote />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.2 }}>ใบเสนอราคา{a.quotationNo ? ` · ${a.quotationNo}` : ""}</Typography>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.2 }}>ใบเสนอราคา{a.quotationNo ? ` · ${a.quotationNo}` : ""}{quoteRevOf(a) ? ` · ${revLabel(quoteRevOf(a))}` : ""}</Typography>
             <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
               {siteText(a)}
             </Typography>
@@ -1128,7 +1253,8 @@ const DetailDialog = ({
           )}
 
           {/* ── ③ ใบเสนอราคา: ไฟล์ + ข้อมูล (เห็นเสมอ) ── */}
-          <Section title="ใบเสนอราคา" icon={<Description />}>
+          <Section title={`ใบเสนอราคา${quoteRevOf(a) ? ` · ฉบับปัจจุบัน ${revLabel(quoteRevOf(a))}` : ""}`} icon={<Description />}>
+            <Box ref={filesRef} />
             <FileUploadSection
               eventId={a._id} type="quotation" label="ไฟล์ใบเสนอราคา"
               files={a.quotationFiles} applicable={a.quotationApplicable}
@@ -1136,14 +1262,24 @@ const DetailDialog = ({
               uploading={upload.busy && upload.eventId === a._id && upload.type === "quotation"} progress={upload.progress} currentUser={currentUser}
             />
             <QuoteScanBox a={a} />
-            {open && (
-              <Button size="small" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setDecision("resend")}
-                sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขให้ลูกค้าแล้ว (เริ่มนับใหม่)</Button>
+            {/* ✅ (26 ต.ค. 2569) ลูกค้าให้แก้ → ออกฉบับใหม่ (ฉบับเดิมที่ส่งไปแล้วล็อกไว้เป็นประวัติ) */}
+            {onRevise && !req && (["sent", "follow_up", "rejected"].includes(k) || (k === "approved" && isFinance)) && (
+              <Box sx={{ mt: 1, p: 1.25, borderRadius: 2, bgcolor: "#faf5ff", border: "1px dashed #c4b5fd", display: "flex", alignItems: { sm: "center" }, flexDirection: { xs: "column", sm: "row" }, gap: 1 }}>
+                <Typography sx={{ flex: 1, fontSize: "0.8rem", color: "#5b21b6" }}>
+                  ลูกค้าขอแก้รายละเอียด? ไฟล์ที่ส่งไปแล้วแก้ไม่ได้ — ออกฉบับใหม่ ({revLabel(quoteRevOf(a) + 1)}) แล้วระบบเริ่มนับติดตามใหม่
+                </Typography>
+                <Button size="small" variant="contained" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setRevising(true)}
+                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
+                  แก้ไขใบเสนอราคา · ออกฉบับใหม่
+                </Button>
+              </Box>
             )}
             <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px dashed ${BORDER}` }}>
               <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} inline />
             </Box>
           </Section>
+
+          <RevisionHistory a={a} onPreview={onPreview} />
 
           {/* ── ④ การติดตามลูกค้า ── */}
           {(open || (a.quotationFollowUps || []).length > 0) && (
@@ -1183,6 +1319,7 @@ const DetailDialog = ({
           </Button>
         </Stack>
       </DialogContent>
+      <ReviseDialog a={a} open={revising} onClose={() => setRevising(false)} onConfirm={(p) => onRevise(job, p)} />
       <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision}
         asRequest={!isFinance} req={req}
         resetInfo={{ label: m.label, detail: [a.quotationDecisionAt ? `ลูกค้าตอบ ${thaiDate(a.quotationDecisionAt)}` : "", a.quotationPoNo ? `PO ${a.quotationPoNo}` : "", a.quotationDecisionNote ? `เหตุผล: ${a.quotationDecisionNote}` : ""].filter(Boolean).join(" · ") }} />
@@ -1210,7 +1347,7 @@ function useQuotationActions(fetchJobs, toast, userData) {
       toast(body.action === "approve" ? (fin ? "บันทึกแล้ว: ได้งาน" : "ส่งคำขอ “ได้งาน” แล้ว — รอแอดมินอนุมัติ")
         : body.action === "reject" ? (fin ? "บันทึกแล้ว: ไม่ได้งาน" : "ส่งคำขอ “ไม่ได้งาน” แล้ว — รอแอดมินอนุมัติ")
         : body.action === "approveRequest" ? "อนุมัติผลแล้ว" : body.action === "rejectRequest" ? "ไม่อนุมัติ — ส่งกลับผู้ขอแล้ว" : body.action === "cancelRequest" ? "ยกเลิกคำขอแล้ว"
-        : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "แก้ผลแล้ว — กลับไปรอลูกค้าตอบ" : "บันทึกข้อมูลแล้ว");
+        : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "แก้ผลแล้ว — กลับไปรอลูกค้าตอบ" : "บันทึกข้อมูลใบเสนอราคาแล้ว");
       return true;
     } catch (err) {
       toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
@@ -1219,9 +1356,12 @@ function useQuotationActions(fetchJobs, toast, userData) {
   }, [fetchJobs, toast, userData]);
   const onFollowUp = useCallback(async (job, payload) => {
     try {
-      await EventService.AddQuotationFollowUp(job.anchor._id, payload);
+      const res = await EventService.AddQuotationFollowUp(job.anchor._id, payload);
       await fetchJobs(true);
-      toast("บันทึกการติดตามแล้ว");
+      // ✅ (26 ต.ค. 2569 ผู้ใช้: "มีแจ้งเตือนตอนกดบันทึกติดตาม") บอกครั้งที่ · นัดครั้งถัดไป · ว่าแจ้งผู้เกี่ยวข้องแล้ว
+      const no = res?.attemptNumber;
+      const nextTxt = payload.nextFollowUpAt ? `นัดติดตามครั้งถัดไป ${thaiDate(payload.nextFollowUpAt)}` : `ระบบเตือนติดตามอีกครั้งใน ${WARNING_DAYS_AFTER_SENT} วัน`;
+      toast(`✓ บันทึกการติดตาม${no ? `ครั้งที่ ${no}` : ""}แล้ว · ${nextTxt} · แจ้งผู้รับผิดชอบแล้ว`);
       return true;
     } catch (err) {
       toast(errMsg(err, "บันทึกการติดตามไม่สำเร็จ"), "error");
@@ -1262,10 +1402,39 @@ function useQuotationActions(fetchJobs, toast, userData) {
     }
   }, [fetchJobs, toast]);
   const onDeleteFile = useCallback(async (eventId, type, fileId) => {
-    try { await EventService.DeleteFile(eventId, type, fileId); toast("ลบไฟล์เรียบร้อย"); await fetchJobs(true); } catch { toast("ลบไฟล์ไม่สำเร็จ", "error"); }
+    try { await EventService.DeleteFile(eventId, type, fileId); toast("ลบไฟล์เรียบร้อย"); await fetchJobs(true); } catch (err) { toast(errMsg(err, "ลบไฟล์ไม่สำเร็จ"), "error"); }
+  }, [fetchJobs, toast]);
+  // ✅ (26 ต.ค. 2569) ออกใบเสนอราคาฉบับแก้ไข: บันทึกฉบับใหม่ → แนบไฟล์ฉบับใหม่ (เซิร์ฟเวอร์เริ่มนับติดตามใหม่เมื่อแนบ)
+  const onRevise = useCallback(async (job, { reason, files }) => {
+    const id = job.anchor._id;
+    const rev = (Number(job.anchor.quotationRevision) || 0) + 1;
+    try {
+      await EventService.UpdateQuotation(id, { action: "revise", reason });
+    } catch (err) {
+      toast(errMsg(err, "ออกฉบับแก้ไขไม่สำเร็จ"), "error");
+      return false;
+    }
+    setUpload({ busy: true, eventId: id, type: "quotation", progress: 0 });
+    let ok = 0;
+    try {
+      for (const file of files) {
+        // eslint-disable-next-line no-await-in-loop -- อัปโหลดทีละไฟล์ให้แถบความคืบหน้าถูกต้อง
+        await EventService.Upload(id, file, "quotation", {
+          onUploadProgress: (pe) => setUpload((u) => ({ ...u, progress: Math.min(99, Math.round((pe.loaded * 100) / pe.total)) })),
+        });
+        ok += 1;
+      }
+      toast(`✓ ออกใบเสนอราคาฉบับแก้ไข ${revLabel(rev)} แล้ว · เริ่มนับติดตามใหม่ · แจ้งผู้เกี่ยวข้องแล้ว`);
+    } catch (err) {
+      toast(ok ? `แนบฉบับใหม่ได้ ${ok}/${files.length} ไฟล์ — แนบที่เหลือในกล่องใบเสนอราคา` : "บันทึกฉบับแก้ไขแล้ว แต่แนบไฟล์ไม่สำเร็จ — แนบไฟล์ฉบับใหม่ในกล่องใบเสนอราคาอีกครั้ง", "error");
+    } finally {
+      await fetchJobs(true);
+      setUpload({ busy: false, eventId: null, type: null, progress: 0 });
+    }
+    return true;
   }, [fetchJobs, toast]);
 
-  return { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, upload };
+  return { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onRevise, upload };
 }
 
 /**
@@ -1468,7 +1637,7 @@ export default function QuotationTracking() {
   const cur = Math.min(page, pageCount);
   const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
 
-  const { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, upload } = useQuotationActions(fetchJobs, toast, userData);
+  const { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onRevise, upload } = useQuotationActions(fetchJobs, toast, userData);
 
   const doExport = async () => {
     if (exporting || !visible.length) return;
@@ -1671,7 +1840,7 @@ export default function QuotationTracking() {
         <DetailDialog
           job={detailJob} currentUser={userData} onClose={() => setDetailId("")}
           onQuotation={onQuotation} onFollowUp={onFollowUp} onComment={onComment}
-          onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={(url, name) => setPreview({ url, name })} upload={upload}
+          onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onRevise={onRevise} onPreview={(url, name) => setPreview({ url, name })} upload={upload}
         />
       )}
       <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} onClose={() => setPreview({ url: null, name: "" })} />

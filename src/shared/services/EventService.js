@@ -385,6 +385,12 @@ const EventService = {
     }
   },
 
+  /** ✅ (26 ต.ค. 2569) งานรับเข้าที่มีงานเดียวกันลงตารางแล้ว → อิงงานในตาราง (รวมข้อมูล/ไฟล์ แล้วลบใบรับงานซ้ำ) */
+  async LinkIntake(id, targetId) {
+    const response = await API.post(`/events/${id}/link-intake`, { targetId });
+    return response.data.event;
+  },
+
   async ScheduleDraftEvent(id, scheduleData) {
     try {
       const response = await API.put(`/events/${id}/schedule`, scheduleData);

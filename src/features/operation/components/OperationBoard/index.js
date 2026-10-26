@@ -28,6 +28,7 @@ import {
 } from "@/shared/utils/overdueJobs";
 import { getApprovalState, isPendingApproval, isRejected } from "@/shared/utils/approvalStatus";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
+import { sortQuoteFiles, quoteFileTag, isOldQuoteFile } from "@/shared/utils/quotationTracking";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 // ✅ ไอคอนไฟล์ Excel — ชุดเดียวกับปุ่มส่งออกในหน้าปฏิทิน/ติดตามใบเสนอราคา (MUI ไม่มีไอคอนนี้)
@@ -259,7 +260,7 @@ const ACTION_META = {
   quotation_sent:     { label: "ส่งใบเสนอราคาให้ลูกค้า",   icon: <RequestQuote sx={{ fontSize: 13 }} />, color: "#3b82f6" },
   quotation_approved: { label: "ลูกค้าอนุมัติใบเสนอราคา",  icon: <CheckCircle sx={{ fontSize: 13 }} />,  color: "#10b981" },
   quotation_rejected: { label: "ลูกค้าปฏิเสธใบเสนอราคา",   icon: <Cancel sx={{ fontSize: 13 }} />,       color: "#ef4444" },
-  quotation_revising: { label: "แก้ไขใบเสนอราคาใหม่",      icon: <Edit sx={{ fontSize: 13 }} />,         color: "#f59e0b" },
+  quotation_revising: { label: "ออกใบเสนอราคาฉบับแก้ไข",   icon: <Edit sx={{ fontSize: 13 }} />,         color: "#7c3aed" },
   quotation_followup: { label: "บันทึกการติดตามลูกค้า",    icon: <History sx={{ fontSize: 13 }} />,      color: "#3b82f6" },
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "ทุกๆ ขั้นตอนให้มีบันทึกประวัติของผู้ดำเนินการด้วย")
   intake_created:       { label: "รับงานใหม่",          icon: <NoteAdd sx={{ fontSize: 13 }} />,       color: "#2563eb" },
@@ -676,9 +677,9 @@ const DOC_TYPE_META = Object.fromEntries(
 // แม้เนื้อหาเดิม) — ต้องรับ onPreview/onOpenMenu แบบ stable reference (useCallback ที่ต้นทาง) ไม่งั้น
 // memo จะไม่มีผลอะไรเลยเพราะ props เปลี่ยนทุกครั้งอยู่ดี
 const FileRow = React.memo(
-  ({ file: f, onPreview, onOpenMenu }) => (
+  ({ file: f, onPreview, onOpenMenu, tag }) => (
     <Stack direction="row" alignItems="center" gap={1} sx={{
-      pl: 1.25, pr: 0.5, py: 0.35, borderRadius: "10px", bgcolor: SURFACE,
+      pl: 1.25, pr: 0.5, py: 0.35, borderRadius: "10px", bgcolor: SURFACE, opacity: tag?.old ? 0.78 : 1,
     }}>
       {fileTypeIcon(f.fileName)}
       <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
@@ -687,6 +688,11 @@ const FileRow = React.memo(
           <Typography noWrap sx={{ fontSize: "0.68rem", color: FAINT }}>
             {[f.uploadedBy, f.uploadedAt ? moment(f.uploadedAt).locale("th").format("D MMM HH:mm") : ""].filter(Boolean).join(" · ")}
           </Typography>
+        )}
+        {tag && (
+          <Box component="span" sx={{ display: "inline-block", mt: 0.25, px: 0.75, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, color: tag.color, bgcolor: tag.bg, lineHeight: 1.6 }}>
+            {tag.old ? "🔒 " : ""}{tag.text}
+          </Box>
         )}
       </Box>
       <Tooltip title="ดูไฟล์">
@@ -703,6 +709,7 @@ const FileRow = React.memo(
     prev.file._id === next.file._id &&
     prev.file.fileUrl === next.file.fileUrl &&
     prev.file.fileName === next.file.fileName &&
+    prev.tag?.text === next.tag?.text &&
     prev.onPreview === next.onPreview &&
     prev.onOpenMenu === next.onOpenMenu,
 );
@@ -731,7 +738,9 @@ export const FileUploadSection = ({
   // เป็น stable อยู่แล้ว ห่อด้วย useCallback deps [] เฉยๆ เพื่อความชัดเจน)
   const handleOpenFileMenu = useCallback((el, file) => setFileMenu({ el, file }), []);
 
-  const fileList = files || [];
+  // ✅ (26 ต.ค. 2569) ใบเสนอราคา: ฉบับปัจจุบันขึ้นก่อน · ฉบับเดิมที่ส่งลูกค้าแล้วติดป้าย 🔒 (ลบไม่ได้)
+  const isQuote = type === "quotation";
+  const fileList = isQuote ? sortQuoteFiles(files) : files || [];
   const hasFiles = fileList.length > 0;
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "เลื่อนดูรูปอื่นในช่องเดียวกันได้เลย") ส่งไฟล์ทั้งช่องไปให้กล่องดูไฟล์ — reference คงที่ (FileRow memo)
   const listRef = useRef(fileList);
@@ -823,7 +832,7 @@ export const FileUploadSection = ({
       {hasFiles && (
         <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} />
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={isQuote ? quoteFileTag(f, fileList) : null} />
           ))}
         </Stack>
       )}
@@ -860,7 +869,7 @@ export const FileUploadSection = ({
             </MenuItem>
           </>
         )}
-        {canEdit && [
+        {canEdit && !isOldQuoteFile(fileMenu?.file) && [
           <Divider key="file-menu-divider" />,
           <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await confirmDelete({ name: f.fileName })) onDelete(eventId, type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>

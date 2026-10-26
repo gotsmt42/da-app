@@ -51,7 +51,8 @@ export const isQuotationNeedsFollowUp = (days) =>
  */
 export const getFollowUpInfo = (event) => {
   if (event?.quotationStatus !== "sent" || !event?.quotationSentAt) return null;
-  const followUps = event.quotationFollowUps || [];
+  // 🔁 (26 ต.ค. 2569) ออกฉบับแก้ไขแล้ว = นับครั้งที่ติดตามใหม่ของฉบับปัจจุบัน (ประวัติฉบับเดิมยังเก็บไว้)
+  const followUps = currentFollowUps(event);
   const lastContactAt = getLastContactAt(event);
   const daysSinceLastContact = getDaysSinceLastContact(event);
   // ✅ นัดติดตามครั้งถัดไป (ตั้งไว้ตอนบันทึกการติดตาม/ในข้อมูลใบเสนอราคา) — ถ้ามีและอยู่หลังการติดต่อล่าสุด
@@ -102,7 +103,32 @@ export const QUOTE_STATUS = {
   not_sent: { label: "กำลังเริ่มนับติดตาม", short: "เริ่มนับ", color: "#d97706" },
   sent: { label: "รอลูกค้าตอบ", short: "รอลูกค้าตอบ", color: "#2563eb" },
   follow_up: { label: "ถึงเวลาติดตาม", short: "ถึงเวลาติดตาม", color: "#dc2626" },
-  revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed" },
+  revising: { label: "รอแนบใบเสนอราคาฉบับแก้ไข", short: "รอฉบับแก้ไข", color: "#7c3aed" },
   approved: { label: "ได้งาน", short: "ได้งาน", color: "#16a34a" },
   rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#dc2626" }, // ผู้ใช้: ไม่ได้งาน = แดง · ได้งาน = เขียว
+};
+
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "ให้สามารถกดแก้ไขใบเสนอราคาแล้วเริ่มติดตามใหม่ ... เอกสารเดิมที่ส่งไปแล้วมันไม่สามารถแก้ไขได้")
+ *    ฉบับของใบเสนอราคา — quotationRevision = ฉบับปัจจุบัน (0 = ฉบับแรก)
+ *    ไฟล์ฉบับเดิม (supersededAt) = เอกสารที่ส่งลูกค้าไปแล้ว ล็อก ดู/ดาวน์โหลดได้ ลบไม่ได้ · ใช้ร่วมทุกหน้าที่แสดงไฟล์ใบเสนอราคา
+ */
+export const quoteRevOf = (event) => Number(event?.quotationRevision) || 0;
+export const revLabel = (n) => `Rev.${Number(n) || 0}`;
+export const isOldQuoteFile = (f) => Boolean(f?.supersededAt);
+export const currentQuoteFiles = (files) => (files || []).filter((f) => !f?.supersededAt);
+export const currentFollowUps = (event) => {
+  const rev = quoteRevOf(event);
+  return (event?.quotationFollowUps || []).filter((f) => (Number(f?.revision) || 0) === rev);
+};
+/** ฉบับปัจจุบันขึ้นก่อน แล้วตามด้วยฉบับเดิม (ใหม่ → เก่า) */
+export const sortQuoteFiles = (files) => (files || []).slice().sort((a, b) =>
+  (isOldQuoteFile(a) - isOldQuoteFile(b)) || ((Number(b?.revision) || 0) - (Number(a?.revision) || 0)));
+/** ป้ายฉบับของไฟล์ — null ถ้างานนี้ยังไม่เคยออกฉบับแก้ไข (ไม่ต้องรก) */
+export const quoteFileTag = (f, files) => {
+  if (!(files || []).some((x) => x?.supersededAt || Number(x?.revision) > 0)) return null;
+  const r = revLabel(f?.revision);
+  return isOldQuoteFile(f)
+    ? { text: `ฉบับเดิม ${r} · ส่งแล้ว`, color: "#64748b", bg: "#f1f5f9", old: true }
+    : { text: `ฉบับปัจจุบัน ${r}`, color: "#7c3aed", bg: "#f5f3ff", old: false };
 };

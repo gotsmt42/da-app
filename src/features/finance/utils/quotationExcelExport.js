@@ -46,7 +46,7 @@ const STATUS_LABEL = {
   not_sent: "รอช่างส่งงาน",
   sent: "รอลูกค้าตอบ",
   follow_up: "ต้องติดตามด่วน",
-  revising: "ลูกค้าขอแก้ไข",
+  revising: "รอแนบใบเสนอราคาฉบับแก้ไข",
   approved: "อนุมัติแล้ว",
   rejected: "ปฏิเสธแล้ว",
 };

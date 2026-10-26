@@ -20,7 +20,7 @@ import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
 
 // [ชื่อสั้น, สี, ปุ่ม] — ชื่อ/สีจาก QUOTE_STATUS ชุดเดียวทั้งแอป
-const BTN_LABEL = { waiting_file: "แนบ", not_sent: "เปิด", sent: "ติดตาม", follow_up: "ติดตาม", revising: "ติดตาม", approved: "เปิด", rejected: "เปิด" };
+const BTN_LABEL = { waiting_file: "แนบ", not_sent: "เปิด", sent: "ติดตาม", follow_up: "ติดตาม", revising: "แนบ", approved: "เปิด", rejected: "เปิด" };
 const QUOTE = Object.fromEntries(Object.entries(QUOTE_STATUS).map(([k, v]) => [k, [v.short, v.color, BTN_LABEL[k]]]));
 
 export default function JobDocsCell({ event }) {

@@ -24,7 +24,8 @@ export const ACTIVITY_LOG_META = {
   quotation_sent:     { label: "ส่งใบเสนอราคาให้ลูกค้า",  emoji: "📤", color: "#3b82f6" },
   quotation_approved: { label: "ลูกค้าอนุมัติใบเสนอราคา", emoji: "✅", color: "#10b981" },
   quotation_rejected: { label: "ลูกค้าปฏิเสธใบเสนอราคา",  emoji: "❌", color: "#ef4444" },
-  quotation_revising: { label: "แก้ไขใบเสนอราคาใหม่",     emoji: "✏️", color: "#f59e0b" },
+  quotation_revising: { label: "ออกใบเสนอราคาฉบับแก้ไข",  emoji: "✏️", color: "#7c3aed" },
+  intake_linked:      { label: "อิงงานรับเข้า",            emoji: "🔗", color: "#0891b2" },
   quotation_followup: { label: "บันทึกการติดตามลูกค้า",   emoji: "📞", color: "#3b82f6" },
 
   // ✅ เพิ่มสำหรับหน้า /event (EditEvent.js) — เดิมหน้านี้ไม่เคยบันทึกประวัติอะไรเลยแม้จะเป็นจุดที่

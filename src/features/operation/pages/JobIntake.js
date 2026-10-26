@@ -15,14 +15,14 @@
  *   • งานไม่ต้องเข้างาน: รับงาน → ส่งมอบ → วางบิล (อัปโหลดใบวางบิล) → เสร็จ · ไม่ขึ้นปฏิทิน/งานช่าง
  *     แต่ขึ้นหน้าติดตามวางบิลให้ตามรับเงินต่อ
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
 import RefDoc, { refFilesOf } from "@/shared/ui/RefDoc";
 import { billingStatus, BILLING_STATE_META } from "@/shared/utils/billing";
 import JobKindTag from "@/shared/ui/JobKindTag";
-import { resolveQuotationGroup, getFollowUpInfo, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
+import { resolveQuotationGroup, getFollowUpInfo, QUOTE_STATUS, quoteRevOf, revLabel } from "@/shared/utils/quotationTracking";
 import { Link, useLocation } from "react-router-dom";
 import moment from "moment";
 import Swal from "@/shared/ui/swal";
@@ -41,6 +41,7 @@ import {
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
   ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined, ExpandMoreRounded,
   VerifiedOutlined, SendOutlined, NotificationsActiveOutlined, EditNoteOutlined, CheckCircleRounded, CancelRounded, DoNotDisturbOnOutlined,
+  LinkRounded,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -143,7 +144,7 @@ const OUTCOME = {
   not_sent: { ...QUOTE_STATUS.not_sent, act: "ดูใบเสนอราคา", to: "qt", group: "todo" },
   sent: { ...QUOTE_STATUS.sent, act: "อัปเดตผล", to: "qt", group: "wait" },
   follow_up: { ...QUOTE_STATUS.follow_up, act: "บันทึกการติดตาม", to: "qt", group: "wait" },
-  revising: { ...QUOTE_STATUS.revising, act: "อัปเดตผล", to: "qt", group: "wait" },
+  revising: { ...QUOTE_STATUS.revising, act: "แนบฉบับแก้ไข", to: "qt", group: "wait" },
   approved: { ...QUOTE_STATUS.approved, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
   rejected: { ...QUOTE_STATUS.rejected, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "จะรู้ได้ไงว่างานพวกนี้มีใบเสนอราคาแนบแล้ว โดยไม่ต้องเปิดหน้าอื่น") — สถานะที่รู้ได้จากตอนรับงาน
@@ -172,6 +173,7 @@ const outcomeOf = (job, st, sessions) => {
   const fu = getFollowUpInfo(anchor);
   const facts = [];
   if (anchor.quotationNo) facts.push(anchor.quotationNo);
+  if (quoteRevOf(anchor)) facts.push(`ฉบับแก้ไข ${revLabel(quoteRevOf(anchor))}`); // ✅ (26 ต.ค. 2569) ฉบับเดียวกับหน้าติดตามใบเสนอราคา
   if (anchor.quotationAmount) facts.push(baht(anchor.quotationAmount));
   if ((key === "sent" || key === "follow_up") && anchor.quotationSentAt) {
     facts.push(`ส่ง ${formatThai(moment(anchor.quotationSentAt), "D MMM YY")}`);
@@ -389,7 +391,12 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                         ? <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>
                         : <Button component={Link} to={`/finance?tab=billing&jobId=${j._id}`} size="small" sx={ghost}>ติดตามวางบิล</Button>)
                   : s.i === 0
-                    ? <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
+                    ? (
+                      <Stack direction="row" gap={0.75} justifyContent="flex-end">
+                        <LinkButton job={j} />
+                        <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
+                      </Stack>
+                    )
                     : !j.unscheduled
                       ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button>
                       : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>;
@@ -502,6 +509,161 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
 // ✅ (19 ต.ค. 2569 ผู้ใช้: "ปุ่มดูไม่สวย เยื้องๆ") ปุ่มทุกแบบสูงเท่ากัน 36px · ไอคอน/ระยะเท่ากัน (เดิมปุ่มขอบกับปุ่มทึบสูงไม่เท่ากัน)
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem", height: 36, px: 1.5, lineHeight: 1, "& .MuiButton-startIcon": { mr: 0.6, ml: 0 }, "& .MuiButton-endIcon": { ml: 0.4, mr: 0 } };
 const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "แก้ไขหน้ารับงาน ให้มีบันทึกลงตารางแล้ว โดยให้ดูงานที่ช่างลงตารางไปอิงงานนั้น
+ *    ... ลงงานในหน้างานเข้า แต่ช่างขอลงงานมาใหม่ โดยที่เนื้องานมาซ้ำ ... ทำยังไงให้ไม่สับสน และเชื่อมต่อข้อมูลกันได้สมบูรณ์")
+ *    งานรอลงตารางที่มีงานเดียวกันอยู่ในตารางแล้ว (ช่างลงเอง/ขอลงงานมา) → ปุ่ม "ลงตารางแล้ว" → เลือกงานในตาราง
+ *    เซิร์ฟเวอร์รวมข้อมูลรับงาน/ไฟล์/คอมเมนต์ไปไว้ที่งานในตาราง แล้วลบใบรับงานซ้ำ (POST /:id/link-intake)
+ *    ระบบหางานที่น่าจะซ้ำให้เอง (สถานที่/ลูกค้า/ชื่องาน/ระบบ/ช่วงวัน) → ปุ่มเปลี่ยนเป็นสีเตือนพร้อมจำนวน
+ */
+const LinkCtx = createContext(null);
+const normTxt = (v) => String(v || "").toLowerCase().replace(/[\s\-_.(),/]+/g, "");
+const sameTxt = (a, b) => {
+  const x = normTxt(a); const y = normTxt(b);
+  if (!x || !y || x === "-" || y === "-") return false;
+  return x === y || (Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x)));
+};
+const isLinkable = (j) => j?.unscheduled && j.intakeAt && !j.intakeNote && !j.noVisit && !j.cancelledAt;
+/** งานในตาราง (1 แถวต่องาน) ที่อิงได้ เรียงตามความน่าจะเป็นงานเดียวกัน — score ≥ 5 = น่าจะซ้ำ */
+function linkCandidates(job, events) {
+  const groups = new Map();
+  (events || []).forEach((e) => {
+    if (e.unscheduled || e.cancelledAt || e.isHoliday || e.department === "sales" || e.approvalStatus === "rejected") return;
+    const k = String(e.jobGroupId || e._id);
+    const g = groups.get(k);
+    if (!g) groups.set(k, { e, days: 1 });
+    else { g.days += 1; if (new Date(e.start) < new Date(g.e.start)) g.e = e; }
+  });
+  const at = moment(job.intakeAt || job.createdAt);
+  return [...groups.values()].map(({ e, days }) => {
+    let score = 0;
+    if (sameTxt(job.site, e.site)) score += 4;
+    if (job.customerId && String(job.customerId) === String(e.customerId || "")) score += 3;
+    else if (sameTxt(job.company, e.company)) score += 2;
+    if (sameTxt(job.title, e.title)) score += 2;
+    if (job.system && sameTxt(job.system, e.system)) score += 1;
+    const st = moment(e.start);
+    if (st.isValid() && st.isAfter(at.clone().subtract(7, "days")) && st.isBefore(at.clone().add(120, "days"))) score += 1;
+    if (e.createdAt && moment(e.createdAt).isAfter(at.clone().subtract(1, "day"))) score += 1;
+    return { e, days, score };
+  }).sort((a, b) => (b.score - a.score) || (new Date(b.e.start) - new Date(a.e.start)));
+}
+
+function LinkButton({ job, card = false }) {
+  const ctx = useContext(LinkCtx);
+  if (!ctx || !isLinkable(job)) return null;
+  const n = ctx.dupesOf(job).length;
+  const tone = n ? AMBER : MUTED;
+  return (
+    <Tooltip title={n ? `พบงานในตารางที่น่าจะเป็นงานเดียวกัน ${n} งาน — กดเพื่อเลือกอิงงาน (ไม่ต้องลงตารางซ้ำ)` : "งานนี้ลงตารางไว้แล้ว (เช่น ช่างขอลงงานมาเอง) — เลือกอิงงานในตาราง"}>
+      <Button variant="outlined" size={card ? "medium" : "small"} onClick={() => ctx.open(job)} startIcon={<LinkRounded sx={{ fontSize: "17px !important" }} />}
+        sx={{ ...BTN, ...(card ? { flex: { xs: 1, sm: "0 0 auto" } } : { height: 30, px: 1.1 }), color: tone, borderColor: alpha(tone, 0.45), bgcolor: n ? alpha(AMBER, 0.06) : "transparent",
+          "&:hover": { borderColor: tone, bgcolor: alpha(tone, 0.08) } }}>
+        {n ? `ลงตารางแล้ว? (${n})` : "ลงตารางแล้ว"}
+      </Button>
+    </Tooltip>
+  );
+}
+
+function LinkIntakeDialog({ job, events, onClose, onDone }) {
+  const [q, setQ] = useState("");
+  const [pick, setPick] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const all = useMemo(() => linkCandidates(job, events), [job, events]);
+  const shown = useMemo(() => {
+    const t = normTxt(q);
+    const list = t
+      ? all.filter(({ e }) => normTxt([e.title, e.system, e.site, e.company, e.jobNo, e.dispatchNo, e.team, e.responsiblePerson].join(" ")).includes(t))
+      : all.filter((c) => c.score >= 3);
+    return list.slice(0, 60);
+  }, [all, q]);
+  const save = async () => {
+    if (!pick) return;
+    setSaving(true);
+    try {
+      await EventService.LinkIntake(job._id, pick._id);
+      onDone();
+      Swal.fire({ icon: "success", title: "อิงงานในตารางแล้ว", html: '<div style="font-size:14px;color:#475569;line-height:1.6">ข้อมูลรับงาน · ไฟล์ · คอมเมนต์ รวมไว้ที่งานในตารางแล้ว<br/>ลบใบรับงานซ้ำแล้ว — ติดตามต่อได้ที่แท็บ “กำลังดำเนินการ”</div>', confirmButtonColor: ACCENT });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "อิงงานไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+      setSaving(false);
+    }
+  };
+  const when = (e) => {
+    const s = moment(e.start); const en = moment(e.end).subtract(e.allDay === false ? 0 : 1, "day");
+    if (!s.isValid()) return "-";
+    return en.isValid() && en.isAfter(s, "day") ? `${formatThai(s, "D MMM")} – ${formatThai(en, "D MMM YY")}` : formatThai(s, "D MMM YY");
+  };
+  return (
+    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
+          <LinkRounded sx={{ fontSize: 20 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ลงตารางแล้ว · เลือกงานในตารางที่จะอิง</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>ใบรับงาน: {[job.jobNo, job.title, job.site || job.company].filter(Boolean).join(" · ")}</Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose} disabled={saving}><Close fontSize="small" /></IconButton>
+      </Stack>
+      <DialogContent sx={{ px: 2.5, pt: "16px !important", pb: 1.5 }}>
+        <Box sx={{ mb: 1.5, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, fontSize: "0.78rem", color: "#475569", lineHeight: 1.65 }}>
+          ใช้เมื่อ<b>งานนี้มีคนลงตารางไว้แล้ว</b> (เช่น ช่างขอลงงานมาเอง) — ไม่ต้องส่งลงตารางซ้ำ<br />
+          ระบบจะ<b>รวมข้อมูลรับงาน</b> (ที่มา · เอกสาร · ผู้ติดต่อ · รายละเอียด · ผู้รับผิดชอบ · ใบเสนอราคา) <b>+ ไฟล์ + คอมเมนต์</b> ไปไว้ที่งานในตาราง
+          (เติมเฉพาะช่องที่ยังว่าง ไม่ทับของเดิม) แล้ว<b>ลบใบรับงานซ้ำ</b>ทิ้ง · แจ้งช่างและคนรับงานให้อัตโนมัติ
+        </Box>
+        <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหางานในตาราง: ชื่องาน · โครงการ · ลูกค้า · เลข Job · ช่าง"
+          sx={{ width: "100%", height: 40, px: 1.5, mb: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, font: "inherit", fontSize: "0.86rem", outline: "none", "&:focus": { borderColor: ACCENT } }} />
+        {!q && <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: MUTED, mb: 0.75 }}>งานที่น่าจะเป็นงานเดียวกัน (ค้นหาเพื่อดูงานอื่น)</Typography>}
+        <Stack spacing={0.75} sx={{ maxHeight: 420, overflowY: "auto" }}>
+          {shown.length === 0 && (
+            <Typography sx={{ py: 3, textAlign: "center", fontSize: "0.84rem", color: MUTED }}>
+              {q ? "ไม่พบงานที่ค้นหา" : "ไม่พบงานที่คล้ายกันในตาราง — ลองค้นหาด้วยชื่องาน/โครงการ"}
+            </Typography>
+          )}
+          {shown.map(({ e, days, score }) => {
+            const on = pick?._id === e._id;
+            return (
+              <ButtonBase key={e._id} onClick={() => setPick(e)} sx={{ display: "flex", alignItems: "center", gap: 1.25, textAlign: "left", px: 1.25, py: 1, borderRadius: 2,
+                border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.05) : "#fff", "&:hover": { borderColor: on ? ACCENT : "#cbd5e1" } }}>
+                <Box sx={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? ACCENT : "#cbd5e1"}`, display: "grid", placeItems: "center" }}>
+                  {on && <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: ACCENT }} />}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>
+                    {[e.title, e.system].filter(Boolean).join(" · ") || "งาน"}
+                  </Typography>
+                  <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>
+                    {[e.site && e.site !== "-" ? e.site : "", e.company].filter(Boolean).join(" · ") || "-"}
+                  </Typography>
+                  <Stack direction="row" gap={0.5} sx={{ mt: 0.4, flexWrap: "wrap" }}>
+                    {score >= 5 && <Box component="span" sx={{ px: 0.75, borderRadius: 99, fontSize: "0.68rem", fontWeight: 800, color: AMBER, bgcolor: alpha(AMBER, 0.1) }}>น่าจะงานเดียวกัน</Box>}
+                    {e.approvalStatus === "pending" && <Box component="span" sx={{ px: 0.75, borderRadius: 99, fontSize: "0.68rem", fontWeight: 800, color: "#c2410c", bgcolor: "#fff7ed" }}>ช่างขอลงงาน · รออนุมัติ</Box>}
+                    {e.intakeAt && <Box component="span" sx={{ px: 0.75, borderRadius: 99, fontSize: "0.68rem", fontWeight: 800, color: MUTED, bgcolor: SURFACE }}>อยู่ในหน้ารับงานแล้ว</Box>}
+                    {[e.jobNo, e.team ? `ทีม ${e.team}` : "", e.status].filter(Boolean).map((t) => (
+                      <Box key={t} component="span" sx={{ px: 0.75, borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, color: "#475569", bgcolor: SURFACE }}>{t}</Box>
+                    ))}
+                  </Stack>
+                </Box>
+                <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, whiteSpace: "nowrap" }}>{when(e)}</Typography>
+                  {days > 1 && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{days} วัน</Typography>}
+                </Box>
+              </ButtonBase>
+            );
+          })}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
+        <Button onClick={onClose} disabled={saving} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
+        <Button variant="contained" disabled={!pick || saving} onClick={save} startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <LinkRounded />} sx={{ ...PRIMARY, px: 2.5 }}>
+          {saving ? "กำลังอิงงาน..." : "อิงงานนี้ · ลบใบรับงานซ้ำ"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ✅ (15 ต.ค. 2569 ผู้ใช้: "ใช้สีให้ถูกต้องตามปุ่มต่างๆ หรือการดำเนินการ") — ปุ่มจบขั้น (ทำเสร็จ/ส่งมอบแล้ว) = เขียว · ไปขั้นถัดไป = น้ำเงิน · ยกเลิก = แดง
 const SUCCESS = { ...BTN, bgcolor: GREEN, color: "#fff", "&:hover": { bgcolor: "#15803d", boxShadow: "none" } };
 
@@ -961,6 +1123,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
+      <LinkButton job={job} card />
       <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
     </>
@@ -1472,6 +1635,7 @@ export default function JobIntake() {
   const fromDispatch = useLocation().pathname.startsWith("/dispatch");
   const [tab, setTab] = useState(fromDispatch ? "requests" : "waiting");
   const [scheduling, setScheduling] = useState(null);
+  const [linking, setLinking] = useState(null);
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
@@ -1715,9 +1879,17 @@ export default function JobIntake() {
     }
   };
   const canExport = tab !== "requests" && list.length > 0;
+  // ✅ (26 ต.ค. 2569) ปุ่ม "ลงตารางแล้ว" — งานรอลงตารางที่น่าจะซ้ำกับงานในตาราง (เฉพาะคนจัดคิว ซึ่งโหลดงานทั้งระบบอยู่แล้ว)
+  const linkCtx = useMemo(() => {
+    if (!canManage) return null;
+    const dupes = new Map();
+    (jobs || []).forEach((j) => { if (isLinkable(j)) dupes.set(String(j._id), linkCandidates(j, rawEvents).filter((c) => c.score >= 5)); });
+    return { dupesOf: (j) => dupes.get(String(j._id)) || [], open: setLinking };
+  }, [canManage, jobs, rawEvents]);
 
   return (
-    // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500)
+    <LinkCtx.Provider value={linkCtx}>
+    {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500) */}
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
         subtitle="รับงาน → ลงตารางเข้าหน้างาน หรือ ส่งของ → วางบิล · กดช่องใบเสนอราคาเพื่ออัปเดตได้ทันที"
@@ -1880,7 +2052,12 @@ export default function JobIntake() {
         <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} requestMode={!canManage} onClose={() => setScheduling(null)}
           onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
       )}
+      {linking && (
+        <LinkIntakeDialog job={linking} events={rawEvents} onClose={() => setLinking(null)}
+          onDone={async () => { setLinking(null); await load(); refreshAppBadges(); }} />
+      )}
     </Box>
+    </LinkCtx.Provider>
   );
 }
 

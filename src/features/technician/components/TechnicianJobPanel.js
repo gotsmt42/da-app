@@ -17,6 +17,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import Swal from "@/shared/ui/swal";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
+import { sortQuoteFiles, quoteFileTag, isOldQuoteFile } from "@/shared/utils/quotationTracking";
 import { isApproved } from "@/shared/utils/approvalStatus";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
@@ -236,16 +237,22 @@ const fileTypeIcon = (fileName) => {
 // นี่คือส่วนที่หนักที่สุด เทียบด้วยค่าจริง (_id/fileUrl/fileName) ไม่ใช่ reference ของ object ไฟล์
 // (เปลี่ยนทุก poll อยู่แล้วแม้เนื้อหาเดิม) — onPreview/onOpenMenu ต้องเป็น stable reference จากต้นทาง
 const FileRow = React.memo(
-  ({ file: f, onPreview, onOpenMenu }) => (
+  ({ file: f, onPreview, onOpenMenu, tag }) => (
     <Stack direction="row" alignItems="center" gap={1} sx={{
-      pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`,
+      pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, opacity: tag?.old ? 0.78 : 1,
     }}>
       {fileTypeIcon(f.fileName)}
-      <Typography noWrap flex={1} title={f.fileName}
-        sx={{ fontSize: "0.82rem", fontWeight: 600, color: INK_2, cursor: "pointer", minWidth: 0 }}
-        onClick={() => onPreview(f.fileUrl, f.fileName)}>
-        {f.fileName}
-      </Typography>
+      <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
+        <Typography noWrap title={f.fileName} sx={{ fontSize: "0.82rem", fontWeight: 600, color: INK_2 }}>
+          {f.fileName}
+        </Typography>
+        {/* ✅ (26 ต.ค. 2569) ฉบับของใบเสนอราคา — ฉบับเดิมที่ส่งลูกค้าแล้ว 🔒 ลบไม่ได้ */}
+        {tag && (
+          <Box component="span" sx={{ display: "inline-block", mt: 0.25, px: 0.75, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, color: tag.color, bgcolor: tag.bg, lineHeight: 1.6 }}>
+            {tag.old ? "🔒 " : ""}{tag.text}
+          </Box>
+        )}
+      </Box>
       <Tooltip title="ดูไฟล์">
         <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 0.9, color: MUTED }}>
           <Visibility sx={{ fontSize: 18 }} />
@@ -262,6 +269,7 @@ const FileRow = React.memo(
     prev.file._id === next.file._id &&
     prev.file.fileUrl === next.file.fileUrl &&
     prev.file.fileName === next.file.fileName &&
+    prev.tag?.text === next.tag?.text &&
     prev.onPreview === next.onPreview &&
     prev.onOpenMenu === next.onOpenMenu,
 );
@@ -270,7 +278,8 @@ const FileRow = React.memo(
 // รายการไฟล์ที่แนบ (แนบได้หลายไฟล์) + ปุ่มเพิ่มไฟล์อีก (ใช้ร่วมกันทั้ง required เสมอ และ "มี")
 const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked }) => {
   const fileRef = useRef();
-  const fileList = files || [];
+  const isQuote = type === "quotation";
+  const fileList = isQuote ? sortQuoteFiles(files) : files || [];
   // 🔁 (21 ต.ค. 2569) ส่งไฟล์ทั้งช่องให้กล่องดูไฟล์ เลื่อนดูไฟล์อื่นได้เลย (reference คงที่ — FileRow memo)
   const listRef = useRef(fileList);
   listRef.current = fileList;
@@ -294,7 +303,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
       {fileList.length > 0 && (
         <Stack spacing={0.75} sx={{ mb: 1, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} />
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={isQuote ? quoteFileTag(f, fileList) : null} />
           ))}
         </Stack>
       )}
@@ -328,7 +337,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
             </MenuItem>
           </>
         )}
-        {!isLocked && [
+        {!isLocked && !isOldQuoteFile(fileMenu?.file) && [
           <Divider key="file-menu-divider" />,
           <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await confirmDelete({ name: f.fileName })) onDeleteFile(type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
