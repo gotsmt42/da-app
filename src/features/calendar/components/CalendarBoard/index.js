@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
 import SelectField from "@/shared/ui/SelectField";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -1382,6 +1383,30 @@ function EventCalendar() {
     setSelectedApproval("");
   };
 
+  /**
+   * ✅ (26 ต.ค. 2569 ผู้ใช้: "เลือกผู้รับผิดชอบ ให้ทำเป็น Select มีรูป และจำนวน ... หน้าอื่นๆด้วยทำเหมือนกัน")
+   *    จำนวนงานของแต่ละคนในช่วงที่โหลดอยู่ (เกณฑ์เดียวกับตัวกรอง: หัวหน้าทีม/ลูกทีม · เซล = ผู้สร้างนัด)
+   */
+  const personCounts = useMemo(() => {
+    const m = new Map();
+    const opts = isSalesView ? salespersonOptions : technicianOptions;
+    events.forEach((event) => {
+      const members = [...(event.teamMembers || []), ...(event.extendedProps?.teamMembers || [])];
+      opts.forEach((t) => {
+        const id = String(t._id);
+        const hit = isSalesView
+          ? String(event.userId || "") === id
+          : event.resPerson === t._id || (!event.resPerson && t.fname && event.team === t.fname)
+            || members.some((mm) => String(mm?.userId || "") === id || (t.fname && mm?.name === t.fname));
+        if (hit) m.set(id, (m.get(id) || 0) + 1);
+      });
+    });
+    return m;
+  }, [events, technicianOptions, salespersonOptions, isSalesView]);
+  const personOptionsFor = (list) => list
+    .map((t) => ({ id: t._id, name: t.fname ? `${t.fname} ${t.lname || ""}`.trim() : t.username, avatar: t.imageUrl, count: personCounts.get(String(t._id)) || 0 }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "th"));
+
   const filteredCalendarEvents = useMemo(() => {
     const keyword = searchTerm.toLowerCase();
     // เผื่องานเก่าที่ยังไม่มี resPerson (ผูกด้วยชื่อ team แทน) ให้ยังกรองเจอได้เหมือนกัน
@@ -2495,18 +2520,11 @@ function EventCalendar() {
               {/* คนเดียวเห็นนัดตัวเองอยู่แล้วจากขอบเขตฝั่ง server — ตัวกรองนี้มีความหมายเฉพาะตอน
                   แอดมิน/ผู้จัดการเปิดดูรวมของทุกเซล */}
               {viewingSalesCalendar && (
-                <SelectField
-                  className="event-filter-msel" fullWidth
-                  value={selectedTechnician}
-                  onChange={(e) => setSelectedTechnician(e.target.value)}
-                >
-                  <option value="">ฝ่ายขายทุกคน</option>
-                  {salespersonOptions.map((sp) => (
-                    <option key={sp._id} value={sp._id}>
-                      {sp.fname ? `${sp.fname} ${sp.lname || ""}`.trim() : sp.username}
-                    </option>
-                  ))}
-                </SelectField>
+                <div className="event-filter-msel" style={{ minWidth: 0, flex: "1 1 190px" }}>
+                  <PersonSelectField label="" title="เลือกพนักงานฝ่ายขาย" value={selectedTechnician || "all"}
+                    onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
+                    allLabel="ฝ่ายขายทุกคน" allCount={events.length} unit="นัด" options={personOptionsFor(salespersonOptions)} sx={{ width: "100%" }} />
+                </div>
               )}
 
               <SelectField
@@ -2533,18 +2551,11 @@ function EventCalendar() {
             </>
           ) : (
             <>
-              <SelectField
-                className="event-filter-msel" fullWidth
-                value={selectedTechnician}
-                onChange={(e) => setSelectedTechnician(e.target.value)}
-              >
-                <option value="">ช่างทุกคน</option>
-                {technicianOptions.map((tech) => (
-                  <option key={tech._id} value={tech._id}>
-                    {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
-                  </option>
-                ))}
-              </SelectField>
+              <div className="event-filter-msel" style={{ minWidth: 0, flex: "1 1 190px" }}>
+                <PersonSelectField label="" title="เลือกช่างที่เข้างาน" value={selectedTechnician || "all"}
+                  onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
+                  allLabel="ช่างทุกคน" allCount={events.length} unit="งาน" options={personOptionsFor(technicianOptions)} sx={{ width: "100%" }} />
+              </div>
 
               {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
                   2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก

@@ -2164,3 +2164,5 @@
   .event-toolbar-row > .toolbar-icon-btn { width: 40px; height: 40px; border-radius: 12px; }
   .event-toolbar-row .tb-label { display: none; }
 }
+/* ✅ (26 ต.ค. 2569) ช่องเลือกช่าง/เซล (มีรูป + จำนวนงาน) กว้างกว่าช่องอื่น 1.5 เท่า — ชื่อไม่ถูกตัดเหลือ "ช่..." */
+.ec-wide-toolbar .event-toolbar-row > .event-filter-inline { grid-template-columns: minmax(0, 1.6fr); }
