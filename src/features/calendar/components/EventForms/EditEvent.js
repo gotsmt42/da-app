@@ -872,7 +872,19 @@ function injectStyles() {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #ee-head-mini svg { flex-shrink: 0; }
-    .ee-head--compact #ee-head-meta, .ee-head--compact #ee-head-status { display: none !important; }
+    /* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เลื่อนขึ้นบนสุดมันวาบๆ เด้งไปรูปแบบหนึ่ง ไม่สมูท") เดิม display:none สลับทันที
+       → พับ/กางแบบนุ่ม (ความสูง + ความจาง) ไม่กระตุกทั้งกล่อง */
+    .swal-edit-event #ee-head-meta, .swal-edit-event #ee-head-status {
+      max-height: 640px; opacity: 1;
+      transition: max-height .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease, margin .28s ease, padding .28s ease;
+    }
+    .swal-edit-event .ee-head--compact #ee-head-meta, .swal-edit-event .ee-head--compact #ee-head-status {
+      max-height: 0 !important; opacity: 0; margin-top: 0 !important; margin-bottom: 0 !important;
+      padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; pointer-events: none;
+    }
+    /* ตัดส่วนเกินเฉพาะตอนพับ/กำลังกาง — กางเสร็จแล้วต้องไม่ตัด (เมนูเลือกผู้รับผิดชอบ/สถานะยื่นออกนอกกล่องได้) */
+    .swal-edit-event .ee-head--compact #ee-head-meta, .swal-edit-event .ee-head--compact #ee-head-status,
+    .swal-edit-event .ee-head--anim #ee-head-meta, .swal-edit-event .ee-head--anim #ee-head-status { overflow: hidden; }
     .ee-head--compact #ee-head-mini { display: inline-flex; }
     .swal-edit-event .ee-head--compact#ee-status-header { padding-top: 8px; padding-bottom: 8px; }
     .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; font-size: 14.5px; line-height: 1.6; }
@@ -3032,14 +3044,32 @@ export const getEditEvent = async ({
         const bodyEl = document.getElementById("ee-body");
         const toggleEl = document.getElementById("ee-head-toggle");
         let pinned = null; // null = อัตโนมัติ · true/false = ผู้ใช้กดเลือกเอง (จนกว่าจะเลื่อนกลับบนสุด)
+        let animTimer = 0;
         const setCompact = (on) => {
-          headerEl?.classList.toggle("ee-head--compact", on);
+          if (!headerEl || headerEl.classList.contains("ee-head--compact") === on) return;
+          headerEl.classList.add("ee-head--anim");
+          clearTimeout(animTimer);
+          animTimer = setTimeout(() => headerEl.classList.remove("ee-head--anim"), 320);
+          headerEl.classList.toggle("ee-head--compact", on);
           toggleEl?.setAttribute("aria-expanded", on ? "false" : "true");
         };
+        // 🔁 (26 ต.ค. 2569) กางกลับเมื่อ "หยุดนิ่งที่บนสุด" เท่านั้น — มือถือเลื่อนแรงๆ จะเด้ง (overscroll) ผ่านจุดบนสุด
+        //    ชั่วขณะ เดิมกางทันทีแล้วย่อกลับ = วาบ · อ่านค่าครั้งเดียวต่อเฟรม (rAF)
+        let raf = 0;
+        let expandTimer = 0;
         bodyEl?.addEventListener("scroll", () => {
-          const y = bodyEl.scrollTop;
-          if (y < 4) { pinned = null; setCompact(false); return; }
-          if (pinned === null && y > 48) setCompact(true);
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            raf = 0;
+            const y = bodyEl.scrollTop;
+            if (y <= 2) {
+              clearTimeout(expandTimer);
+              expandTimer = setTimeout(() => { if (bodyEl.scrollTop <= 2) { pinned = null; setCompact(false); } }, 160);
+              return;
+            }
+            clearTimeout(expandTimer);
+            if (pinned === null && y > 56) setCompact(true);
+          });
         }, { passive: true });
         toggleEl?.addEventListener("click", () => {
           const next = !headerEl.classList.contains("ee-head--compact");
