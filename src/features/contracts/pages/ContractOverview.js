@@ -5573,14 +5573,51 @@ pagedRows.map((c, idx) => {
   // ✅ (8 ต.ค. 2569 ผู้ใช้: "การ select ดูข้อมูลต่างๆ ดูเยอะและรก ใช้ยาก") แบ่ง 2 ชั้น
   //    primary = ช่องที่ใช้บ่อย (ประเภทงาน · ระบบ · ช่วงเวลา) โชว์ตลอด
   //    more    = แผนก · สถานะสัญญา · อายุสัญญา — พับไว้ใต้ปุ่ม "ตัวกรองเพิ่มเติม" (2 ช่องหลังมีเฉพาะงานสัญญา)
+  const renderStatusField = () => (
+      <SelectField
+        size="small" label="สถานะสัญญา" value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Autorenew sx={{ fontSize: 18, color: statusFilter !== "all" ? ACCENT : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 190 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: statusFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+            "& fieldset": statusFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+            "&:hover fieldset": statusFilter !== "all" ? { borderColor: ACCENT } : {},
+          },
+          "& .MuiInputLabel-root": statusFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกสถานะ</option>
+        {STATUS_FILTER_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label} ({statusCounts[o.value] || 0})
+          </option>
+        ))}
+      </SelectField>
+  );
   const renderFilterFields = (part = "all") => {
     const P = part !== "more";
     const M = part !== "primary";
     const contractish = category === "contracts" || category === "all";
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "เอาตัวเลือกสถานะไว้หน้าแรก ไม่เอาไว้ตัวกรองเพิ่มเติม เอาสลับกับประเภทงาน")
+    //    หมวดที่มีสัญญา: สถานะสัญญา อยู่แถวหลัก · ประเภทงาน ย้ายไปตัวกรองเพิ่มเติม
+    //    งานทั่วไป/โปรเจค (ไม่มีสถานะสัญญา): ประเภทงาน ยังอยู่แถวหลักตามเดิม
+    const statusPrimary = contractish || statusFilter !== "all";
+    const showTitle = statusPrimary ? M : P;
     return (
     <>
+      {/* ✅ กรองตามสถานะสัญญา — แถวหลัก (ดูรายละเอียดที่ตัวเลือกด้านล่าง) */}
+      {P && statusPrimary && renderStatusField()}
       {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ */}
-{P && (<>
+{showTitle && (<>
       <SelectField
         size="small" label="ประเภทงาน" value={titleFilter}
         onChange={(e) => setTitleFilter(e.target.value)}
@@ -5688,36 +5725,7 @@ pagedRows.map((c, idx) => {
           ⚠️ กรองด้วย kind (คีย์คงที่) ไม่ใช่ข้อความบนจอ — ดูเหตุผลที่ STATUS_FILTER_OPTIONS
           ✅ "ข้อมูลไม่ครบ" เป็นตัวเลือกหนึ่งในนี้ด้วย จึงไล่เก็บสัญญาที่ยังกรอกไม่ครบทั้งหมดได้ในคลิกเดียว
           ซึ่งเป็นงานที่เดิมทำไม่ได้เลยนอกจากกวาดตาดูทีละแถว */}
-{M && (contractish || statusFilter !== "all") && (<>
-      <SelectField
-        size="small" label="สถานะสัญญา" value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Autorenew sx={{ fontSize: 18, color: statusFilter !== "all" ? ACCENT : "text.disabled" }} />
-            </InputAdornment>
-          ),
-        }}
-        sx={{
-          width: { xs: "100%", sm: 190 }, flexShrink: 0,
-          "& .MuiOutlinedInput-root": {
-            borderRadius: 2.5,
-            bgcolor: statusFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-            "& fieldset": statusFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-            "&:hover fieldset": statusFilter !== "all" ? { borderColor: ACCENT } : {},
-          },
-          "& .MuiInputLabel-root": statusFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-        }}
-      >
-        <option value="all">ทุกสถานะ</option>
-        {STATUS_FILTER_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label} ({statusCounts[o.value] || 0})
-          </option>
-        ))}
-      </SelectField>
-      </>)}
+
       {/* 🧹 ตัวกรอง "ผู้รับผิดชอบงาน" เอาออก (ผู้ใช้ขอ) — ใช้แผง "งานตามผู้รับผิดชอบ" ด้านบนแทน (ตัวกรองเดียวกัน) */}
       {/* ✅ กรองตามอายุสัญญา (1 ปี / 2 ปี / 3 ปี ...) — ตามที่ผู้ใช้ขอให้ "แยกค้นหางานต่อปี" เพราะสัญญา
           หลายปีมีเงื่อนไขการดูแล/วางบิลต่างจากสัญญาปีต่อปีชัดเจน แต่เดิมปนกันอยู่ในตารางเดียวโดยไม่มี
