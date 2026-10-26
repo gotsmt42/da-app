@@ -155,7 +155,8 @@ export default function JobReport() {
   }
 
   return (
-    <Box sx={PAGE_SX}>
+    // 🔁 (26 ต.ค. 2569) กว้างเท่าหน้าการดำเนินงาน/งานใหม่ — สลับแท็บแล้วขอบไม่กระโดด
+    <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader
         icon={<AssessmentOutlined />}

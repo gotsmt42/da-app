@@ -3528,7 +3528,8 @@ const Operation = () => {
   );
 
   return (
-    <Box sx={PAGE_SX}>
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "ขยาย ระยะขอบย่นให้เท่ากันกับหน้างานใหม่") เต็มความกว้างเหมือนหน้างานใหม่ (JobIntake)
+    <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
 
       {/* Header
