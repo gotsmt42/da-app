@@ -24,8 +24,6 @@ import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@for
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
-// ✅ (26 ต.ค. 2569) ดู/ตรวจ/แนบเอกสารในฟอร์มนี้เลย — โหลดเมื่อเปิดงานที่ถึงขั้นเอกสาร (ไม่ถ่วงหน้าปฏิทิน)
-const EditEventDocs = lazy(() => import("./EditEventDocs"));
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import {
   colorPickerHtml,
@@ -33,6 +31,8 @@ import {
   rememberEventColors,
 } from "./eventColorPicker";
 // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
+// ✅ (26 ต.ค. 2569) ดู/ตรวจ/แนบเอกสารในฟอร์มนี้เลย — โหลดเมื่อเปิดงานที่ถึงขั้นเอกสาร (ไม่ถ่วงหน้าปฏิทิน)
+const EditEventDocs = lazy(() => import("./EditEventDocs"));
 let formDraftCtl = null;
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
