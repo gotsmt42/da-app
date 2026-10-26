@@ -96,6 +96,7 @@ import CheckInOutPanel, { MiniSteps, jobStepOf } from "@/features/attendance/com
 import TodayBoard, { isTodayJob } from "@/features/operation/components/TodayBoard";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
+import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
 import Add from "@mui/icons-material/Add";
 import InfoLine from "@/shared/ui/InfoLine";
@@ -1740,52 +1741,9 @@ const EventRowCard = ({
               เดิมเป็นแถบบางๆ ท้ายการ์ด — ตอนนี้เป็นกล่องเด่นต่อจากขั้นตอนงาน (ชุดเดียวกับฝั่งช่าง):
               จำนวนที่ครบ · รายการ 4 ชนิดพร้อมเครื่องหมายถูก · ปุ่มหลัก "ดู / ตรวจเอกสาร" (ครบแล้วกล่องเป็นสีเขียว) */}
           {!hideDocuments && !docsUnlocked(event) && <DocsLockedRow event={event} />}
-          {!hideDocuments && docsUnlocked(event) && (() => {
-            const allDone = docDone === JOB_DOC_TYPES.length;
-            const tone = allDone ? "#16a34a" : ACCENT;
-            return (
-              <Box sx={{ ...CARD, mt: 1.5, p: { xs: 1.75, sm: 2 }, borderColor: alpha(tone, 0.3), boxShadow: `0 1px 2px rgba(15,23,42,.04), 0 8px 20px -12px ${alpha(tone, 0.45)}` }}>
-                <Stack direction="row" alignItems="center" gap={1.25}>
-                  <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.12), color: tone }}>
-                    {allDone ? <TaskAlt sx={{ fontSize: 22 }} /> : <Description sx={{ fontSize: 22 }} />}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: INK }}>เอกสารประจำงาน</Typography>
-                    <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
-                      {allDone ? "ครบแล้ว — พร้อมปิดงาน" : `ช่างแนบ/ระบุแล้ว ${docDone} จาก ${JOB_DOC_TYPES.length} รายการ`}
-                    </Typography>
-                  </Box>
-                  <Typography sx={{ flexShrink: 0, fontSize: "1.35rem", fontWeight: 900, color: tone, fontVariantNumeric: "tabular-nums" }}>
-                    {docDone}/{JOB_DOC_TYPES.length}
-                  </Typography>
-                </Stack>
-                <LinearProgress variant="determinate" value={(docDone / JOB_DOC_TYPES.length) * 100}
-                  sx={{ mt: 1.25, height: 6, borderRadius: 5, bgcolor: alpha(MUTED, 0.12), "& .MuiLinearProgress-bar": { bgcolor: tone, borderRadius: 5 } }} />
-                <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-                  {JOB_DOC_TYPES.map((t) => {
-                    const ok = isDocComplete(event, t.key);
-                    const files = (event[t.field] || []).length;
-                    return (
-                      <Stack key={t.key} direction="row" alignItems="center" gap={0.6} sx={{ minWidth: 0 }}>
-                        {ok
-                          ? <CheckCircle sx={{ fontSize: 17, color: "#16a34a", flexShrink: 0 }} />
-                          : <RadioButtonUnchecked sx={{ fontSize: 17, color: "#cbd5e1", flexShrink: 0 }} />}
-                        <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: ok ? 600 : 800, color: ok ? MUTED : INK }}>
-                          {t.label}{files > 1 ? ` · ${files}` : ""}{!ok && isDocRequired(event, t.key) ? " *" : ""}
-                        </Typography>
-                      </Stack>
-                    );
-                  })}
-                </Box>
-                {!inlineDetails && (
-                  <Button fullWidth variant="outlined" disableElevation onClick={() => setExpanded(true)}
-                    startIcon={<Description />} sx={{ ...MBTN.outline(tone), mt: 1.5 }}>
-                    ดู / ตรวจเอกสาร
-                  </Button>
-                )}
-              </Box>
-            );
-          })()}
+          {!hideDocuments && docsUnlocked(event) && (
+            <JobDocsSummaryCard event={event} onOpen={inlineDetails ? undefined : () => setExpanded(true)} />
+          )}
 
 
           {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot

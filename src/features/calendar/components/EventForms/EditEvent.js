@@ -23,6 +23,8 @@ import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMap
 import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
+import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
+import { docsUnlocked } from "@/shared/utils/jobFlow";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -1973,6 +1975,8 @@ export const getEditEvent = async ({
          บนสุดของเนื้อหา — กล่อง "ขั้นตอนของฉัน" ตัวเดียวกับการ์ดงาน (รับทราบ → เช็คอิน → เช็คเอาต์ → ขอปิดงาน)
          แสดงเฉพาะช่างที่อยู่ในงาน / งานที่มีบันทึกเข้า-ออกแล้ว (คอมโพเนนต์ตัดสินเอง ไม่มีอะไร = ไม่กินที่) */""}
     ${ev.extendedProps?.department === "sales" ? "" : `<div id="ee-checkinMount" data-no-draft></div>`}
+    ${/* ✅ (26 ต.ค. 2569 ผู้ใช้: "อยากให้การแสดงแบบนี้ไปอยู่ใน editEvent ด้วย") กล่องสรุปเอกสารประจำงาน ตัวเดียวกับการ์ดหน้าการดำเนินงาน */""}
+    ${ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled ? "" : `<div id="ee-docsMount" data-no-draft></div>`}
 
     <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
          (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
@@ -2640,6 +2644,8 @@ export const getEditEvent = async ({
       if (photosRoot) setTimeout(() => photosRoot.unmount(), 0);
       const checkinRoot = popup.__checkinRoot;
       if (checkinRoot) setTimeout(() => checkinRoot.unmount(), 0);
+      const docsRoot = popup.__docsRoot;
+      if (docsRoot) setTimeout(() => docsRoot.unmount(), 0);
       if (popup.__sitePhotosChanged || popup.__checkinChanged) fetchEventsFromDB?.();
     },
 
@@ -2712,6 +2718,19 @@ export const getEditEvent = async ({
             },
           }));
           render(baseEvent);
+        }
+      }
+      // ✅ (26 ต.ค. 2569) สรุปเอกสารประจำงาน (React) — ยังไม่ถึงขั้นเอกสาร (docsUnlocked) = ไม่แสดง
+      //    ปุ่ม "ดู / ตรวจเอกสาร" = ไปหน้าการดำเนินงาน/งานของฉัน (ปุ่มเดียวกับ #btnGoOperation) · ไม่มีสิทธิ์ดู = ไม่มีปุ่ม
+      {
+        const host = document.getElementById("ee-docsMount");
+        const evt = { ...(ev.extendedProps || {}), _id: eventId, title: eventTitle, start: ev.start, end: ev.end, allDay: ev.allDay };
+        if (host && docsUnlocked(evt)) {
+          const popup = Swal.getPopup();
+          const root = createRoot(host);
+          popup.__docsRoot = root;
+          const go = document.getElementById("btnGoOperation");
+          root.render(createElement(JobDocsSummaryCard, { event: evt, onOpen: go ? () => go.click() : undefined, sx: { mt: 0, mb: 1.5 } }));
         }
       }
       /**
