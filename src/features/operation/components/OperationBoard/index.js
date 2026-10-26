@@ -306,6 +306,44 @@ const getFileType = (fileName = "") => {
 // 🔁 (25 ต.ค. 2569 ผู้ใช้: "หน้าแรกให้แสดงชื่อโครงการ ไม่ใช่บริษัท" · "ชื่อโครงการหายไปเป็น ....")
 //    ชื่อบริษัทยาวจนดันชื่อโครงการตกขอบเป็น "…" — แสดงชื่อโครงการอย่างเดียว (ไม่มีโครงการ = ชื่อบริษัท)
 //    ชื่อบริษัทยังดูได้ในรายละเอียดงาน/ฟอร์มแก้ไข และยังค้นหาด้วยชื่อบริษัทได้ตามเดิม
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "เท่าที่ทดสอบ AI ยังไม่ตรวจให้เลย · อัพใบมั่วๆ ยังขอปิดมาได้")
+ *    กล่องผลตรวจเอกสารด้วย AI ในคำขอปิดงาน — ผ่าน (เขียว) / ไม่ผ่าน (แดง พร้อมรายการ) / ยังไม่ตรวจ (ปุ่มให้ AI ตรวจ)
+ *    💰 ไฟล์ไม่เปลี่ยน = เซิร์ฟเวอร์ส่งผลเดิมทันที ไม่เรียก AI ซ้ำ
+ */
+function AiCloseCheckBox({ event }) {
+  const [chk, setChk] = useState(event.closeCheck || null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setChk(event.closeCheck || null); }, [event.closeCheck]);
+  const run = async () => {
+    setBusy(true);
+    try { setChk(await EventService.CloseCheck(event._id)); } catch (err) { setChk({ error: err?.response?.data?.message || "ตรวจเอกสารไม่สำเร็จ" }); }
+    setBusy(false);
+  };
+  const neutral = !chk || chk.error || chk.skipped;
+  const tone = neutral ? "#64748b" : chk.ok ? "#15803d" : "#b91c1c";
+  return (
+    <Box sx={{ mb: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: neutral ? "#f8fafc" : chk.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${neutral ? "#e2e8f0" : chk.ok ? "#bbf7d0" : "#fecaca"}` }}>
+      <Stack direction="row" alignItems="center" gap={1}>
+        <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 900, color: tone }}>
+          {busy ? "AI กำลังตรวจเอกสาร…" : !chk ? "ยังไม่ได้ให้ AI ตรวจเอกสาร" : chk.error ? chk.error : chk.skipped ? "ไม่ได้ตรวจด้วย AI (ยังไม่เปิดใช้งาน AI)" : chk.ok ? "AI ตรวจเอกสารแล้ว · ผ่าน" : `AI ตรวจเอกสารแล้ว · ไม่ผ่าน ${chk.problems?.length || 0} ข้อ`}
+        </Typography>
+        {(!chk || chk.error || !chk.ok) && !chk?.skipped && (
+          <Button size="small" onClick={run} disabled={busy} startIcon={busy ? <CircularProgress size={14} /> : null}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, flexShrink: 0 }}>
+            {chk ? "ตรวจอีกครั้ง" : "ให้ AI ตรวจเอกสาร"}
+          </Button>
+        )}
+      </Stack>
+      {chk && !chk.ok && (chk.problems || []).length > 0 && (
+        <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.25, "& li": { fontSize: "0.78rem", color: "#7f1d1d", mb: 0.25 } }}>
+          {chk.problems.map((p, i) => <li key={i}>{p.slotLabel ? `${p.slotLabel}: ` : ""}{p.text}</li>)}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 const companySite = (company, site) => site || company || "ไม่ระบุโครงการ";
 
 const fileTypeIcon = (fileName) => {
@@ -1765,6 +1803,8 @@ const EventRowCard = ({
                 </Box>
               </Stack>
               <Box sx={{ px: 1.75, py: 1.25 }}>
+                {/* ✅ (26 ต.ค. 2569) ผลตรวจเอกสารด้วย AI — แอดมินเห็นก่อนอนุมัติ · คำขอเก่าที่ยังไม่เคยตรวจ กดให้ AI ตรวจได้เลย */}
+                {!event.closeOverride?.reason && <AiCloseCheckBox event={event} />}
                 {/* ⚠️ (26 ต.ค. 2569) ขอปิดแม้เอกสารไม่ผ่านการตรวจด้วย AI — แอดมินต้องเห็นเหตุผลและปัญหาก่อนอนุมัติ */}
                 {event.closeOverride?.reason && (
                   <Box sx={{ mb: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>

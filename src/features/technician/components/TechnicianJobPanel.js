@@ -41,9 +41,8 @@ import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LI
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { ROLES, can } from "@/shared/utils/roles";
+import { ROLES } from "@/shared/utils/roles";
 import EventService from "@/shared/services/EventService";
-import { useAuth } from "@/features/auth/AuthContext";
 import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import ServiceReportAiBar from "@/features/documents/components/ServiceReportAiBar";
@@ -690,9 +689,6 @@ const TechnicianJobCard = ({
   // ดึง userName จาก localStorage
   const payload  = JSON.parse(localStorage.getItem("payload") || "{}");
   const userName = payload?.name || payload?.username || "ช่าง";
-  // แอดมิน/ผู้จัดการ (editAnyJob) ขอปิดงานได้โดยไม่ต้องผ่านการตรวจเอกสารด้วย AI (เซิร์ฟเวอร์ใช้เกณฑ์เดียวกัน)
-  const { userData: authUser } = useAuth();
-  const isAdminOrManager = can(authUser, "editAnyJob");
 
   // ── push activityLog ─────────────────────────────────────────────
   const pushLog = useCallback(async (action, detail = "") => {
@@ -791,16 +787,15 @@ const TechnicianJobCard = ({
      *    ขั้นแรก: AI ตรวจเอกสารทุกช่อง (ครั้งเดียวต่อชุดไฟล์ — ไฟล์ไม่เปลี่ยน = ผลเดิมทันที ไม่เสีย AI)
      *    ไม่ผ่าน → บอกทีละข้อว่าผิดอะไร แก้ยังไง · ทางเลือก: แก้เอกสาร หรือ ขอให้แอดมินพิจารณาปิดงาน (ต้องใส่เหตุผล)
      */
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "อัพใบมั่วๆ ยังขอปิดมาได้") ตรวจทุกคน — เซิร์ฟเวอร์บังคับเหมือนกัน
     let check = null;
-    if (!isAdminOrManager) {
-      Swal.fire({ title: "AI กำลังตรวจเอกสาร…", text: "ตรวจประเภทเอกสารทุกช่อง และอ่าน Service Report — อาจใช้เวลาสักครู่", allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
-      try {
-        check = await EventService.CloseCheck(event._id);
-        Swal.close();
-      } catch (err) {
-        Swal.fire({ icon: "error", title: "ตรวจเอกสารไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่อีกครั้ง" });
-        return;
-      }
+    Swal.fire({ title: "AI กำลังตรวจเอกสาร…", text: "ตรวจประเภทเอกสารทุกช่อง และอ่าน Service Report — อาจใช้เวลาสักครู่", allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+    try {
+      check = await EventService.CloseCheck(event._id);
+      Swal.close();
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "ตรวจเอกสารไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่อีกครั้ง" });
+      return;
     }
     let overrideReason = "";
     if (check && !check.ok) {
