@@ -36,6 +36,8 @@ const CSS = `
 .tt-swal .swal2-validation-message { margin: 10px 0 0 !important; border-radius: 10px; background: #fef2f2 !important; color: #b91c1c !important; font-size: .82rem !important; }
 .tt-swal:not(.swal2-toast) .swal2-actions { width: 100%; margin: 20px 0 0 !important; gap: 8px; flex-wrap: nowrap; }
 .tt-swal:not(.swal2-toast) .swal2-actions button { flex: 1 1 0; margin: 0 !important; }
+.tt-swal:not(.swal2-toast) .swal2-actions.tt-swal-stack { flex-direction: column; } /* ปุ่มยาว → เรียงแนวตั้งเต็มความกว้าง */
+.tt-swal:not(.swal2-toast) .swal2-actions.tt-swal-stack button { width: 100%; flex: 0 0 auto; }
 .tt-swal .swal2-styled { height: 42px; padding: 0 18px !important; border-radius: 10px !important; font-family: inherit !important; font-size: .9rem !important; font-weight: 800 !important; box-shadow: none !important; }
 .tt-swal .swal2-styled:focus-visible { box-shadow: 0 0 0 3px rgba(37,99,235,.25) !important; }
 .tt-swal .swal2-styled.swal2-cancel { color: #334155 !important; border: 1px solid #e2e8f0 !important; background: #fff !important; }

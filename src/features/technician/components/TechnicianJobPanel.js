@@ -54,6 +54,7 @@ import CheckInOutPanel, { jobStepOf } from "@/features/attendance/components/Che
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { confirmDelete } from "@/shared/ui/swal";
+import { closeCheckHtml } from "@/shared/utils/closeCheckHtml";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -808,15 +809,11 @@ const TechnicianJobCard = ({
     }
     let overrideReason = "";
     if (check && !check.ok) {
-      const esc = (t) => String(t || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-      const html = `<div style="text-align:left;font-size:14px;line-height:1.55">
-        <div style="margin-bottom:8px;color:#475569">แก้ตามรายการด้านล่างแล้วกด “ขอปิดงาน” อีกครั้ง</div>
-        <ol style="margin:0;padding-left:20px">${(check.problems || []).map((p) => `<li style="margin-bottom:8px"><b style="color:#b91c1c">${esc(p.slotLabel)}</b> — ${esc(p.text)}${(p.items || []).length ? `<ul style="margin:4px 0 0;padding-left:18px;color:#475569;font-size:13px">${p.items.slice(0, 8).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>
-        <div style="margin-top:10px;padding:8px 10px;border-radius:8px;background:#f8fafc;color:#475569;font-size:13px">ถ้าเอกสารนั้น “ไม่มีจริง” (เช่น ลูกค้าไม่ออกเอกสาร) กด <b>ขอแอดมินพิจารณาปิดงาน</b> แล้วระบุเหตุผล — แอดมินจะเห็นปัญหาทั้งหมดก่อนอนุมัติ</div>
-      </div>`;
       const r = await Swal.fire({
-        icon: "warning", title: "เอกสารยังไม่ผ่าน — ยังขอปิดงานไม่ได้", html, width: 640,
-        showCancelButton: true, confirmButtonText: "แก้ไขเอกสาร", cancelButtonText: "ขอแอดมินพิจารณาปิดงาน",
+        // 🔁 (26 ต.ค. 2569) แยกสีรายไฟล์: เขียว = ถูก · แดง = ผิดประเภท · ส้ม = AI ดูไม่ออก (shared/utils/closeCheckHtml.js)
+        title: "เอกสารยังไม่ผ่าน", html: closeCheckHtml(check), width: 520,
+        customClass: { popup: "tt-swal", actions: "tt-swal-stack" },
+        showCancelButton: true, confirmButtonText: "แก้ไขเอกสาร", cancelButtonText: "ขอแอดมินพิจารณา",
         confirmButtonColor: "#2563eb", cancelButtonColor: "#64748b", reverseButtons: false,
       });
       if (r.isConfirmed || r.dismiss !== Swal.DismissReason.cancel) return;
@@ -832,9 +829,9 @@ const TechnicianJobCard = ({
         title: "ยืนยันขอปิดงาน?",
         // ✅ ผ่านแล้วก็แสดงว่า AI เห็นอะไรในแต่ละไฟล์ — รู้ว่าตรวจจริง (ผู้ใช้: "กดขอปิดงานแล้วไม่มีการตรวจเลย")
         ...(check?.skipped ? { text: "งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที" } : {
-          html: `<div style="text-align:left;font-size:13.5px;line-height:1.55"><div style="color:#15803d;font-weight:800;margin-bottom:6px">✓ AI ตรวจเอกสารแล้ว · ผ่าน</div>${(check?.files || []).map((f) => `<div>✓ <b>${String(f.slotLabel || "").replace(/</g, "&lt;")}</b> — ${String(f.fileName || "").replace(/</g, "&lt;")}${f.detected ? ` <span style="color:#64748b">(${String(f.detected).replace(/</g, "&lt;")})</span>` : ""}</div>`).join("")}<div style="margin-top:8px;color:#475569">งานนี้จะเข้าสถานะ "รอแอดมินอนุมัติ" ทันที</div></div>`,
+          title: "AI ตรวจเอกสารแล้ว · ผ่าน", html: closeCheckHtml(check), width: 520,
         }),
-        icon: "question",
+        icon: check?.skipped ? "question" : "success",
         showCancelButton: true,
         confirmButtonText: "ขอปิดงาน",
         cancelButtonText: "ยกเลิก",
