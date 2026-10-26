@@ -821,7 +821,10 @@ const TechnicianJobCard = ({
     } else {
       const confirm = await Swal.fire({
         title: "ยืนยันขอปิดงาน?",
-        text: check?.skipped ? "งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที" : "เอกสารผ่านการตรวจแล้ว · งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที",
+        // ✅ ผ่านแล้วก็แสดงว่า AI เห็นอะไรในแต่ละไฟล์ — รู้ว่าตรวจจริง (ผู้ใช้: "กดขอปิดงานแล้วไม่มีการตรวจเลย")
+        ...(check?.skipped ? { text: "งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที" } : {
+          html: `<div style="text-align:left;font-size:13.5px;line-height:1.55"><div style="color:#15803d;font-weight:800;margin-bottom:6px">✓ AI ตรวจเอกสารแล้ว · ผ่าน</div>${(check?.files || []).map((f) => `<div>✓ <b>${String(f.slotLabel || "").replace(/</g, "&lt;")}</b> — ${String(f.fileName || "").replace(/</g, "&lt;")}${f.detected ? ` <span style="color:#64748b">(${String(f.detected).replace(/</g, "&lt;")})</span>` : ""}</div>`).join("")}<div style="margin-top:8px;color:#475569">งานนี้จะเข้าสถานะ "รอแอดมินอนุมัติ" ทันที</div></div>`,
+        }),
         icon: "question",
         showCancelButton: true,
         confirmButtonText: "ขอปิดงาน",
