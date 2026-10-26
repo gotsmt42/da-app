@@ -10,7 +10,7 @@
  * งวดงาน และยอดหักที่ใบอื่นไม่มี ถ้ายัดรวมกันฟอร์มเดิม (1,100+ บรรทัด) จะมีเงื่อนไขซ้อนกันจนแก้ไม่ได้
  * ⚠️ ตัวเลขบนหน้าจอเป็นพรีวิว — server คำนวณใหม่ทั้งหมดเสมอ (contractorMoney ใน routes/expenses.js)
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
@@ -715,12 +715,25 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                     onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
                 </Stack>
                 {/* เวลา · คน · ค่าแรงรวม */}
+                {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "แก้ไขให้ เวลา สามารถแก้ไข หรือไม่ใส่ก็ได้") — แก้ได้ · กด ✕ ล้างได้ (ไม่ระบุเวลา)
+                    เดิมช่องเวลาแบบเลือกนาฬิกาลบค่าไม่ได้ในหลายเครื่อง ติดค่าเริ่มต้น 08:30–17:30 ตลอด */}
                 <Stack direction="row" alignItems="center" gap={0.5} sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}>
-                  <TextField size="small" label="เวลาเริ่ม" type="time" value={row.timeFrom || ""} onChange={(e) => setItem(row.key, { timeFrom: e.target.value, auto: false })}
-                    InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
-                  <Typography sx={{ color: TEXT_SUB }}>–</Typography>
-                  <TextField size="small" label="ถึง" type="time" value={row.timeTo || ""} onChange={(e) => setItem(row.key, { timeTo: e.target.value, auto: false })}
-                    InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
+                  {[["timeFrom", "เวลาเริ่ม"], ["timeTo", "ถึง"]].map(([k, label], i) => (
+                    <Fragment key={k}>
+                      {i === 1 && <Typography sx={{ color: TEXT_SUB }}>–</Typography>}
+                      <TextField size="small" label={label} type="time" value={row[k] || ""} placeholder="ไม่ระบุ"
+                        onChange={(e) => setItem(row.key, { [k]: e.target.value, auto: false })}
+                        InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1, minWidth: 0, "& input": { pr: 0 } }}
+                        InputProps={{ endAdornment: row[k] ? (
+                          <InputAdornment position="end" sx={{ ml: 0 }}>
+                            <IconButton size="small" aria-label={`ล้าง${label}`} title="ไม่ระบุเวลา" edge="end"
+                              onClick={() => setItem(row.key, { [k]: "", auto: false })} sx={{ p: 0.25 }}>
+                              <Close sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </InputAdornment>
+                        ) : null }} />
+                    </Fragment>
+                  ))}
                 </Stack>
                 <TextField size="small" label="คน" type="number" value={row.people ?? ""} onChange={(e) => setItem(row.key, { people: e.target.value, auto: false })}
                   inputProps={{ min: 0, step: 1, ...numberField }} />
