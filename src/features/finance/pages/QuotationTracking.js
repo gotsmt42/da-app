@@ -94,6 +94,20 @@ const ownerOf = (a) => a.responsiblePerson || a.team || "";
 const refDateOf = (a) => a.quotationDate || a.quotationSentAt || a.start;
 const isExpired = (a) => a.quotationValidUntil && ["sent", "revising"].includes(a.quotationStatus) && moment(a.quotationValidUntil).isBefore(moment(), "day");
 const missingInfo = (a) => !a.quotationAmount || !a.quotationNo;
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "การอัพเดตว่าได้งาน และ ไม่ได้งาน ให้ช่างส่งคำขอมา และต้องให้แอดมินอนุมัติก่อนเท่านั้น")
+ *    คำขอบันทึกผลที่รอแอดมิน (ผู้มีสิทธิ์ editFinance) อนุมัติ — null = ไม่มี
+ */
+const reqOf = (a) => (a?.quotationDecisionRequest?.action ? a.quotationDecisionRequest : null);
+const REQ_COLOR = "#c2410c";
+const reqLabel = (r) => (r?.action === "approve" ? "ได้งาน" : "ไม่ได้งาน");
+const ReqPill = ({ r, sx }) => (
+  <Box component="span" title={`${r.by || "-"} ขอบันทึกผล “${reqLabel(r)}” — รอแอดมินอนุมัติ`}
+    sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 22, px: 0.9, borderRadius: 99, whiteSpace: "nowrap",
+      bgcolor: "#fff7ed", color: REQ_COLOR, border: `1px solid ${alpha(REQ_COLOR, 0.35)}`, fontSize: "0.7rem", fontWeight: 800, ...sx }}>
+    <HourglassTop sx={{ fontSize: 13 }} />รออนุมัติผล: {reqLabel(r)}
+  </Box>
+);
 
 /** ป้ายกำหนดติดตาม — เลยกำหนด (แดง) / วันนี้ (ส้ม) / อีก N วัน (เทา) */
 const DueChip = ({ info }) => {
@@ -115,12 +129,13 @@ const Owner = ({ name, size = 30 }) => (
 const Kpi = ({ label, value, sub, color = TEXT_MAIN, onClick, active, alert }) => (
   <Box component={onClick ? "button" : "div"} type={onClick ? "button" : undefined} onClick={onClick} sx={{
     textAlign: "left", font: "inherit", cursor: onClick ? "pointer" : "default", minWidth: 0,
-    p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5, bgcolor: "#fff",
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "ส่วนเมนูด้านบนมันใหญ่ไป ลดขนาดให้กระทัดรัด พอดี") ตัวเลขสรุปเตี้ยลง
+    px: { xs: 1.25, sm: 1.4 }, py: { xs: 0.9, sm: 0.85 }, borderRadius: 2.5, bgcolor: "#fff",
     border: `1px solid ${active ? "#334155" : BORDER}`, boxShadow: active ? "inset 0 -3px 0 #334155" : "0 1px 2px rgba(15,23,42,.04)",
     transition: "border-color .15s", "&:hover": onClick ? { borderColor: "#94a3b8" } : {},
   }}>
     <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
-    <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.3rem" }, color: alert ? color : TEXT_MAIN, lineHeight: 1.3 }}>{value}</Typography>
+    <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.05rem", sm: "1.12rem" }, color: alert ? color : TEXT_MAIN, lineHeight: 1.3 }}>{value}</Typography>
     {sub && <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{sub}</Typography>}
   </Box>
 );
@@ -190,7 +205,8 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
             const info = job.info;
             const files = a.quotationFiles || [];
             const m = STATUS[job.groupKey] || STATUS.not_sent;
-            const act = ACTION[job.groupKey] || { label: "เปิด" };
+            const req = reqOf(a);
+            const act = req ? { label: "ตรวจคำขอ", primary: true, color: REQ_COLOR } : ACTION[job.groupKey] || { label: "เปิด" };
             const actColor = act.color || "#2563eb";
             return (
               <Box component="tr" key={a._id} onClick={() => onOpen(job)}
@@ -249,6 +265,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                     bgcolor: alpha(m.color, 0.12), color: m.color, border: `1px solid ${alpha(m.color, 0.35)}`, fontSize: "0.76rem", fontWeight: 800 }}>
                     <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color }} />{m.label}
                   </Box>
+                  {req && <ReqPill r={req} sx={{ mt: 0.5 }} />}
                 </Box>
                 <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                   <Stack direction="row" alignItems="center" gap={0.5} justifyContent="flex-end">
@@ -275,7 +292,8 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
 const MobileCard = ({ job, onOpen, onPreview }) => {
   const a = job.anchor;
   const m = STATUS[job.groupKey] || STATUS.not_sent;
-  const act = ACTION[job.groupKey] || { label: "เปิด" };
+  const req = reqOf(a);
+  const act = req ? { label: "ตรวจคำขอ", primary: true, color: REQ_COLOR } : ACTION[job.groupKey] || { label: "เปิด" };
   const actColor = act.color || "#2563eb";
   const files = a.quotationFiles || [];
   const info = job.info;
@@ -289,6 +307,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
           <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color }} />{m.label}
         </Box>
       </Stack>
+      {req && <Box sx={{ px: 1.5, pt: 0.9 }}><ReqPill r={req} /></Box>}
       <Box sx={{ px: 1.5, pt: 1.1, pb: 1.25 }}>
         <Stack direction="row" gap={1} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -339,12 +358,20 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
 };
 
 // ─── กล่องยืนยันการตัดสินใจของลูกค้า (อนุมัติ = เลข PO · ปฏิเสธ = เหตุผลบังคับ · ส่ง = วันที่ส่ง) ─────
-const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo }) => {
+const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest = false, req = null }) => {
   const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
   const [po, setPo] = useState("");
   const [note, setNote] = useState("");
-  useEffect(() => { if (mode) { setDate(moment().format("YYYY-MM-DD")); setPo(""); setNote(""); } }, [mode]);
+  useEffect(() => {
+    if (!mode) return;
+    // อนุมัติคำขอ = เติมค่าตามที่ช่างขอมา (แก้ได้ก่อนอนุมัติ)
+    const fromReq = mode === "approveRequest" && req;
+    setDate(fromReq && req.decidedAt ? moment(req.decidedAt).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD"));
+    setPo(fromReq ? req.poNo || "" : "");
+    setNote(fromReq ? req.note || "" : "");
+  }, [mode, req]);
   if (!mode) return null;
+  const reqIsApprove = req?.action === "approve";
   const meta = {
     send: { title: "ส่งใบเสนอราคาให้ลูกค้าแล้ว · เริ่มนับติดตาม", color: "#2563eb", btn: "เริ่มนับติดตาม", dateLabel: "วันที่ส่งให้ลูกค้า" },
     resend: { title: "ส่งใบเสนอราคาฉบับแก้ไขให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึก · เริ่มนับใหม่", dateLabel: "วันที่ส่งฉบับแก้ไข" },
@@ -352,13 +379,43 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo }) => {
     reject: { title: "ไม่ได้งาน — ลูกค้าไม่รับใบเสนอราคา", color: "#b91c1c", btn: "บันทึก · ไม่ได้งาน", dateLabel: "วันที่ลูกค้าแจ้ง" },
     // ✅ (19 ต.ค. 2569 ผู้ใช้: "ปุ่มแก้ผลให้มีคอนเฟิร์มก่อน กันกดพลาด และมีคำอธิบายชัดเจน")
     reset: { title: "แก้ผลใบเสนอราคา?", color: "#b45309", btn: "ยืนยัน · แก้ผล", noDate: true },
+    approveRequest: {
+      title: `อนุมัติผล “${reqLabel(req)}” ตามคำขอ`, color: reqIsApprove ? "#15803d" : "#b91c1c", btn: `อนุมัติ · ${reqLabel(req)}`,
+      dateLabel: reqIsApprove ? "วันที่ลูกค้าตอบรับ" : "วันที่ลูกค้าแจ้ง",
+    },
+    rejectRequest: { title: "ไม่อนุมัติคำขอบันทึกผล", color: REQ_COLOR, btn: "ไม่อนุมัติ · ส่งกลับ", noDate: true },
   }[mode];
-  const invalid = mode === "reject" && !note.trim();
+  // ✅ คนที่ไม่ใช่แอดมิน: ได้งาน/ไม่ได้งาน = ส่งคำขอ (สถานะยังไม่เปลี่ยนจนกว่าแอดมินอนุมัติ)
+  const requesting = asRequest && (mode === "approve" || mode === "reject");
+  const title = requesting ? `ส่งคำขอ: ${meta.title}` : meta.title;
+  const btn = requesting ? "ส่งคำขอ · รอแอดมินอนุมัติ" : meta.btn;
+  const poMode = mode === "approve" || (mode === "approveRequest" && reqIsApprove);
+  const noteMode = mode === "approve" || mode === "reject" || mode === "approveRequest" || mode === "rejectRequest";
+  const noteRequired = mode === "reject" || mode === "rejectRequest" || (mode === "approveRequest" && !reqIsApprove);
+  const invalid = noteRequired && !note.trim();
+  const noteLabel = mode === "rejectRequest" ? "เหตุผลที่ไม่อนุมัติ * (ส่งกลับให้ผู้ขอ)"
+    : (mode === "reject" || (mode === "approveRequest" && !reqIsApprove)) ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)";
   return (
-    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
-      <DialogTitle sx={{ fontWeight: 900, fontSize: "1rem", color: meta.color }}>{meta.title}</DialogTitle>
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้าอื่นๆด้วยที่มีขนาดเล็กไป") กว้างขึ้น (sm) — วันที่กับเลข PO อยู่แถวเดียวกัน
+    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 900, fontSize: "1.05rem", color: meta.color, pb: 1 }}>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+          {requesting && (
+            <Alert severity="info" icon={<HourglassTop />} sx={{ borderRadius: 2, "& .MuiAlert-message": { fontSize: "0.82rem" } }}>
+              ผลจะยังไม่เปลี่ยนจนกว่าแอดมิน (ฝ่ายบริหาร/การเงิน) อนุมัติ — ระบบแจ้งเตือนแอดมินให้ทันที
+            </Alert>
+          )}
+          {(mode === "approveRequest" || mode === "rejectRequest") && req && (
+            <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#fff7ed", border: `1px solid ${alpha(REQ_COLOR, 0.3)}` }}>
+              <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: REQ_COLOR }}>
+                {req.by || "-"} ขอบันทึกผล “{reqLabel(req)}”{req.at ? ` · ${formatThai(req.at, "D MMM HH:mm")}` : ""}
+              </Typography>
+              <Typography sx={{ fontSize: "0.8rem", color: "#475569", mt: 0.25 }}>
+                {[req.decidedAt ? `ลูกค้าตอบ ${thaiDate(req.decidedAt)}` : "", req.poNo ? `PO ${req.poNo}` : "", req.note].filter(Boolean).join(" · ") || "ไม่มีรายละเอียดเพิ่ม"}
+              </Typography>
+            </Box>
+          )}
           {mode === "reset" && (
             <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
               <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#92400e" }}>ผลเดิม: {resetInfo?.label || "-"}</Typography>
@@ -370,12 +427,16 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo }) => {
               </Typography>
             </Box>
           )}
-          {!meta.noDate && <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />}
-          {mode === "approve" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
-          {(mode === "approve" || mode === "reject") && (
-            <TextField size="small" multiline minRows={2} label={mode === "reject" ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)"} value={note}
+          {(!meta.noDate || poMode) && (
+            <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: poMode && !meta.noDate ? "1fr 1fr" : "1fr" } }}>
+              {!meta.noDate && <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />}
+              {poMode && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
+            </Box>
+          )}
+          {noteMode && (
+            <TextField size="small" multiline minRows={3} label={noteLabel} value={note}
               onChange={(e) => setNote(e.target.value)} error={invalid && note !== ""} inputProps={{ maxLength: 500 }}
-              placeholder={mode === "reject" ? "เช่น ราคาสูงกว่าเจ้าอื่น / เลื่อนโครงการ / ใช้ผู้รับเหมาเดิม" : ""} />
+              placeholder={mode === "rejectRequest" ? "เช่น ยังไม่มี PO ยืนยัน / ลูกค้ายังไม่ได้ตอบจริง" : noteRequired ? "เช่น ราคาสูงกว่าเจ้าอื่น / เลื่อนโครงการ / ใช้ผู้รับเหมาเดิม" : ""} />
           )}
         </Stack>
       </DialogContent>
@@ -383,7 +444,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo }) => {
         <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
         <Button variant="contained" disabled={busy || invalid} onClick={() => onConfirm({ date, po: po.trim(), note: note.trim() })}
           sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.color, filter: "brightness(.92)" } }}>
-          {busy ? "กำลังบันทึก..." : meta.btn}
+          {busy ? "กำลังบันทึก..." : btn}
         </Button>
       </DialogActions>
     </Dialog>
@@ -851,10 +912,14 @@ const DetailDialog = ({
   const comments = a.comments || [];
   const chatOpen = showChat || comments.length > 0;
 
+  const req = reqOf(a);
+  const isRequester = req && String(req.byId) === String(currentUser?.userId || currentUser?._id || "");
   const confirmDecision = async ({ date, po, note }) => {
     setBusy(true);
     const action = decision === "resend" || decision === "send" ? "send" : decision;
-    const body = action === "reset" ? { action } : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
+    const body = action === "reset" ? { action }
+      : action === "rejectRequest" ? { action, reason: note }
+      : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
     const ok = await onQuotation(job, body);
     setBusy(false);
     if (ok) setDecision(null);
@@ -881,9 +946,11 @@ const DetailDialog = ({
         tone: k === "follow_up" ? "#dc2626" : null,
         text: k === "follow_up"
           ? "ถึงเวลาโทร/ทักลูกค้าแล้ว — บันทึกผลทุกครั้งที่ติดต่อ ระบบจะนับรอบถัดไปให้"
-          : "รอลูกค้าตัดสินใจ — ติดต่อแล้วบันทึกผลไว้ เมื่อลูกค้าตอบ กด “ได้งาน” หรือ “ไม่ได้งาน”",
+          : isFinance
+            ? "รอลูกค้าตัดสินใจ — ติดต่อแล้วบันทึกผลไว้ เมื่อลูกค้าตอบ กด “ได้งาน” หรือ “ไม่ได้งาน”"
+            : "รอลูกค้าตัดสินใจ — ติดต่อแล้วบันทึกผลไว้ เมื่อลูกค้าตอบ กดส่งคำขอ “ได้งาน/ไม่ได้งาน” ให้แอดมินอนุมัติ",
         stats: true,
-        decide: true,
+        decide: !req,
         primary: { label: "บันทึกการติดตาม", icon: <EventRepeat />, onClick: goFollow },
       };
     }
@@ -970,13 +1037,56 @@ const DetailDialog = ({
                   {next.decide && (
                     <>
                       <Button variant="outlined" startIcon={<CheckCircle />} onClick={() => setDecision("approve")}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>ได้งาน</Button>
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>{isFinance ? "ได้งาน" : "ขอบันทึก ได้งาน"}</Button>
                       <Button variant="outlined" startIcon={<Cancel />} onClick={() => setDecision("reject")}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ไม่ได้งาน</Button>
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>{isFinance ? "ไม่ได้งาน" : "ขอบันทึก ไม่ได้งาน"}</Button>
                     </>
                   )}
                 </Box>
               )}
+            </Box>
+          )}
+
+          {/* ── คำขอบันทึกผลที่รอแอดมินอนุมัติ ── */}
+          {req && (
+            <Box sx={{ p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${alpha(REQ_COLOR, 0.4)}`, boxShadow: `inset 4px 0 0 ${REQ_COLOR}` }}>
+              <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                <HourglassTop sx={{ color: REQ_COLOR, fontSize: 26, mt: 0.25 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>รอแอดมินอนุมัติผล</Typography>
+                  <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: REQ_COLOR }}>
+                    {req.by || "-"} ขอบันทึกผล “{reqLabel(req)}”
+                  </Typography>
+                  <Box sx={{ display: "grid", gap: 0.75, mt: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, minmax(0, 1fr))" } }}>
+                    <MiniStat label="ส่งคำขอเมื่อ" value={req.at ? formatThai(req.at, "D MMM YY HH:mm") : ""} />
+                    <MiniStat label="วันที่ลูกค้าตอบ" value={req.decidedAt ? thaiDate(req.decidedAt) : ""} />
+                    {req.action === "approve" && <MiniStat label="เลขที่ PO ลูกค้า" value={req.poNo} />}
+                  </Box>
+                  {req.note && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{req.action === "reject" ? "เหตุผล: " : "หมายเหตุ: "}{req.note}</Typography>}
+                  {!isFinance && (
+                    <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, mt: 1 }}>ผลจะเปลี่ยนเมื่อแอดมิน (ฝ่ายบริหาร/การเงิน) อนุมัติ — ระหว่างนี้ยังติดตามลูกค้าต่อได้ตามปกติ</Typography>
+                  )}
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1.5 }}>
+                    {isFinance && (
+                      <>
+                        <Button variant="contained" startIcon={<Check />} onClick={() => setDecision("approveRequest")} disabled={busy}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", height: 40, px: 2,
+                            bgcolor: req.action === "approve" ? "#15803d" : "#b91c1c", "&:hover": { bgcolor: req.action === "approve" ? "#166534" : "#991b1b", boxShadow: "none" } }}>
+                          อนุมัติ · {reqLabel(req)}
+                        </Button>
+                        <Button variant="outlined" startIcon={<Undo />} onClick={() => setDecision("rejectRequest")} disabled={busy}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 40, color: REQ_COLOR, borderColor: alpha(REQ_COLOR, 0.45) }}>
+                          ไม่อนุมัติ
+                        </Button>
+                      </>
+                    )}
+                    {(isRequester || isFinance) && (
+                      <Button onClick={async () => { setBusy(true); await onQuotation(job, { action: "cancelRequest" }); setBusy(false); }} disabled={busy}
+                        sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ยกเลิกคำขอ</Button>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
             </Box>
           )}
 
@@ -1074,6 +1184,7 @@ const DetailDialog = ({
         </Stack>
       </DialogContent>
       <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision}
+        asRequest={!isFinance} req={req}
         resetInfo={{ label: m.label, detail: [a.quotationDecisionAt ? `ลูกค้าตอบ ${thaiDate(a.quotationDecisionAt)}` : "", a.quotationPoNo ? `PO ${a.quotationPoNo}` : "", a.quotationDecisionNote ? `เหตุผล: ${a.quotationDecisionNote}` : ""].filter(Boolean).join(" · ") }} />
     </Dialog>
   );
@@ -1095,13 +1206,17 @@ function useQuotationActions(fetchJobs, toast, userData) {
     try {
       await EventService.UpdateQuotation(job.anchor._id, body);
       await fetchJobs(true);
-      toast(body.action === "approve" ? "บันทึกแล้ว: ได้งาน" : body.action === "reject" ? "บันทึกแล้ว: ไม่ได้งาน" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "แก้ผลแล้ว — กลับไปรอลูกค้าตอบ" : "บันทึกข้อมูลแล้ว");
+      const fin = can(userData, "editFinance");
+      toast(body.action === "approve" ? (fin ? "บันทึกแล้ว: ได้งาน" : "ส่งคำขอ “ได้งาน” แล้ว — รอแอดมินอนุมัติ")
+        : body.action === "reject" ? (fin ? "บันทึกแล้ว: ไม่ได้งาน" : "ส่งคำขอ “ไม่ได้งาน” แล้ว — รอแอดมินอนุมัติ")
+        : body.action === "approveRequest" ? "อนุมัติผลแล้ว" : body.action === "rejectRequest" ? "ไม่อนุมัติ — ส่งกลับผู้ขอแล้ว" : body.action === "cancelRequest" ? "ยกเลิกคำขอแล้ว"
+        : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "แก้ผลแล้ว — กลับไปรอลูกค้าตอบ" : "บันทึกข้อมูลแล้ว");
       return true;
     } catch (err) {
       toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
       return false;
     }
-  }, [fetchJobs, toast]);
+  }, [fetchJobs, toast, userData]);
   const onFollowUp = useCallback(async (job, payload) => {
     try {
       await EventService.AddQuotationFollowUp(job.anchor._id, payload);
@@ -1316,8 +1431,11 @@ export default function QuotationTracking() {
   const base = useMemo(() => scoped.filter((j) => owner === "all" || (ownerOf(j.anchor) || "ไม่ระบุ") === owner), [scoped, owner]);
 
   const counts = useMemo(() => {
-    const c = { all: base.length, open: 0, incomplete: 0 };
-    base.forEach((j) => { c[j.groupKey] = (c[j.groupKey] || 0) + 1; if (OPEN.includes(j.groupKey)) c.open += 1; if (missingInfo(j.anchor)) c.incomplete += 1; });
+    const c = { all: base.length, open: 0, incomplete: 0, decision_req: 0 };
+    base.forEach((j) => {
+      c[j.groupKey] = (c[j.groupKey] || 0) + 1; if (OPEN.includes(j.groupKey)) c.open += 1; if (missingInfo(j.anchor)) c.incomplete += 1;
+      if (reqOf(j.anchor)) c.decision_req += 1;
+    });
     return c;
   }, [base]);
   const stats = useMemo(() => {
@@ -1338,6 +1456,7 @@ export default function QuotationTracking() {
     let list = base;
     if (status === "open") list = base.filter((j) => OPEN.includes(j.groupKey));
     else if (status === "incomplete") list = base.filter((j) => missingInfo(j.anchor));
+    else if (status === "decision_req") list = base.filter((j) => reqOf(j.anchor));
     else if (status !== "all") list = base.filter((j) => j.groupKey === status);
     // เรียง: ขั้นที่ต้องจัดการก่อน → ครบกำหนดติดตามใกล้สุด → ใหม่สุด
     return list.slice().sort((x, y) => (STATUS_ORDER.indexOf(x.groupKey) - STATUS_ORDER.indexOf(y.groupKey))
@@ -1382,6 +1501,10 @@ export default function QuotationTracking() {
 
   const tiles = [
     { value: "open", label: "กำลังดำเนินการ", shortLabel: "ดำเนินการ", count: counts.open, unit: "ใบ", icon: <Apps />, color: "#475569" },
+    // ✅ คำขอ ได้งาน/ไม่ได้งาน ที่รอแอดมินอนุมัติ — แสดงเมื่อมี
+    ...(counts.decision_req > 0 || status === "decision_req" ? [{
+      value: "decision_req", label: "รออนุมัติผล", shortLabel: "รออนุมัติ", count: counts.decision_req, unit: "ใบ", icon: <HourglassTop />, color: REQ_COLOR, alert: counts.decision_req > 0,
+    }] : []),
     // ✅ โชว์เฉพาะสถานะที่มีใบอยู่จริง (หรือกำลังเลือกอยู่) — การ์ดเลข 0 เรียงเต็มแถวทำให้รกตา
     ...STATUS_ORDER.filter((s) => (counts[s] || 0) > 0 || status === s).map((s) => {
       const m = STATUS[s];
@@ -1419,8 +1542,8 @@ export default function QuotationTracking() {
         </Stack>
       </Stack>
   );
-  const tilesEl = <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: tiles }]} />;
-  const statusLabel = status === "open" ? "กำลังดำเนินการ" : status === "all" ? "ทั้งหมด" : status === "incomplete" ? "ข้อมูลไม่ครบ" : STATUS[status]?.label || "";
+  const tilesEl = <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} compact groups={[{ title: "", items: tiles }]} />;
+  const statusLabel = status === "open" ? "กำลังดำเนินการ" : status === "all" ? "ทั้งหมด" : status === "incomplete" ? "ข้อมูลไม่ครบ" : status === "decision_req" ? "รออนุมัติผล" : STATUS[status]?.label || "";
 
   return (
     <Box sx={PAGE_SX}>
