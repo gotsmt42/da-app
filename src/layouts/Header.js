@@ -30,7 +30,7 @@ import { appLogoFor } from "@/shared/services/OrgSettingService";
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
   FaBars, FaUserCircle, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
-  FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt,
+  FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaClipboardCheck, FaChartBar, FaWallet,
 } from "react-icons/fa";
 import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
 
@@ -103,6 +103,29 @@ const HeaderCount = ({ n }) => {
   return <span className="header-nav-count">{count > 99 ? "99+" : count}</span>;
 };
 
+/**
+ * ✅ (26 ต.ค. 2569 ผู้ใช้: "แก้ไข header ให้สอดคล้องกับตอนนี้ หน้าใบเบิก เคลมต่างๆ ให้ทำเป็น select ให้สมบูรณ์ สวยงาม")
+ *    รวมเมนูเบิกค่าใช้จ่ายเป็นปุ่มเลือกเดียว (เหมือนปุ่มตารางงาน) — รายการชุดเดียวกับหมวด "เบิกค่าใช้จ่าย" ในเมนูข้าง
+ *    ป้ายบนปุ่ม = หน้าที่เปิดอยู่ (ไม่อยู่หน้าเบิก = "เบิกค่าใช้จ่าย") · ตัวเลขรวมของทุกรายการ · แต่ละรายการมีตัวเลขของตัวเอง
+ */
+const ExpenseDropdownMenu = ({ items, activeHref }) => (
+  <DropdownMenu end className="modern-dropdown-menu">
+    {items.map((it) => {
+      const Icon = it.icon;
+      return (
+        <Link key={it.href} to={it.href} style={{ textDecoration: "none" }}>
+          <DropdownItem className="dropdown-item-icon">
+            <Icon size={14} />
+            <span>{it.label}</span>
+            {Number(it.badge) > 0 && <span className="header-nav-count" style={{ marginLeft: 6 }}>{it.badge > 99 ? "99+" : it.badge}</span>}
+            {activeHref === it.href && <FaCheck size={11} style={{ marginLeft: "auto", color: "#16a34a" }} />}
+          </DropdownItem>
+        </Link>
+      );
+    })}
+  </DropdownMenu>
+);
+
 const Header = ({ toggleMobileSidebar }) => {
   const location = useLocation();
   const [user, setUser] = useState({});
@@ -112,6 +135,7 @@ const Header = ({ toggleMobileSidebar }) => {
   // เปิดตามไปด้วยเวลาจอเปลี่ยนขนาดผ่าน breakpoint พอดี
   const [scheduleMenuOpenDesktop, setScheduleMenuOpenDesktop] = useState(false);
   const [scheduleMenuOpenMobile, setScheduleMenuOpenMobile] = useState(false);
+  const [expenseMenuOpen, setExpenseMenuOpen] = useState(false);
 
   // ✅ events/แผนงานล่วงหน้า มาจาก store กลาง (shared/hooks/useAppBadges.js) ซึ่ง poll ให้ทุก 30 วิ
   // 🐛 ที่แก้: เดิม Header ดึง /event-op เองอีกชุดหนึ่ง (~150 kB ทุก 30 วิ) พอเมนูอื่นเริ่มมีป้ายตัวเลข
@@ -140,6 +164,17 @@ const Header = ({ toggleMobileSidebar }) => {
   // ✅ ป้ายบนปุ่มสลับตามตัวเลือกปัจจุบันเหมือน <select> จริง — อยู่หน้าอื่นที่ไม่ใช่ปฏิทินเลยก็ยัง
   // ต้องมีค่าเริ่มต้นให้แสดง จึงเผื่อตัวเลือกหลัก (primary) ไว้เป็นค่าตั้งต้นเสมอ
   const scheduleLabel = isSecondaryScheduleActive ? scheduleOptions.secondary.label : scheduleOptions.primary.label;
+  // ✅ เมนูเบิกค่าใช้จ่าย (ปุ่มเลือกเดียว) — สิทธิ์ตรงกับเมนูข้าง (Sidebar.js expenseMenu)
+  const canExpenseInbox = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
+  const expenseItems = [
+    { href: "/expenses/advances", label: "ใบ Advance", icon: FaMoneyCheckAlt, badge: badges.advance },
+    { href: "/expenses/claims", label: "ใบเคลม (Claim)", icon: FaReceipt, badge: badges.claim },
+    { href: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", icon: FaHardHat, badge: badges.contractorPay },
+    ...(canExpenseInbox ? [{ href: "/expenses/approvals", label: "รออนุมัติเบิก", icon: FaClipboardCheck, badge: badges.expenseInbox }] : []),
+    { href: "/expenses/report", label: "รายงานการเบิก", icon: FaChartBar, badge: 0 },
+  ];
+  const activeExpense = expenseItems.find((it) => location.pathname.startsWith(it.href));
+  const expenseBadge = expenseItems.reduce((n, it) => n + (Number(it.badge) || 0), 0);
 
   /**
    * กลางแถบบนของ "จอมือถือ" เหลือได้แค่ทางลัดตารางงานของเซลเท่านั้น
@@ -257,27 +292,22 @@ const Header = ({ toggleMobileSidebar }) => {
             </Link>
           </NavItem>
           )}
-          {/* ✅ ทางลัดใบเบิก — ใช้บ่อยทุกวัน (ผู้ใช้ขอให้มีบนแถบบน) · โชว์เฉพาะคนที่มีสิทธิ์เบิก/ดูใบเบิก */}
+          {/* ✅ เบิกค่าใช้จ่าย — ปุ่มเลือกเดียว (ใบ Advance · ใบเคลม · ค่าจ้างผู้รับเหมา · รออนุมัติเบิก · รายงาน) */}
           {canUseExpenses && (
             <NavItem>
-              <Link
-                to="/expenses/advances"
-                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/expenses/advances") ? "active" : ""}`}
-              >
-                <FaMoneyCheckAlt size={13} /> ใบ Advance
-                <HeaderCount n={badges.advance} />
-              </Link>
-            </NavItem>
-          )}
-          {canUseExpenses && (
-            <NavItem>
-              <Link
-                to="/expenses/claims"
-                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/expenses/claims") ? "active" : ""}`}
-              >
-                <FaReceipt size={13} /> ใบเคลม
-                <HeaderCount n={badges.claim} />
-              </Link>
+              <Dropdown isOpen={expenseMenuOpen} toggle={() => setExpenseMenuOpen((o) => !o)}>
+                <DropdownToggle
+                  tag="button" type="button"
+                  className={`nav-link d-flex align-items-center gap-2 ${activeExpense ? "active" : ""}`}
+                  style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
+                >
+                  {activeExpense ? <activeExpense.icon size={13} /> : <FaWallet size={13} />}
+                  <span>{activeExpense ? activeExpense.label : "เบิกค่าใช้จ่าย"}</span>
+                  <HeaderCount n={expenseBadge} />
+                  <FaChevronDown size={9} className={`schedule-toggle-caret ${expenseMenuOpen ? "schedule-toggle-caret--open" : ""}`} />
+                </DropdownToggle>
+                <ExpenseDropdownMenu items={expenseItems} activeHref={activeExpense?.href} />
+              </Dropdown>
             </NavItem>
           )}
         </Nav>
