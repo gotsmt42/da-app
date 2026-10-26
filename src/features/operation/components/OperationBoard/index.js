@@ -725,6 +725,9 @@ export const FileUploadSection = ({
   onUpload, onDelete, onPreview,
   uploading, progress, uploading_size, currentUser,
   card = false, event = null,
+  // ✅ (26 ต.ค. 2569) embedded = อยู่ในฟอร์ม Swal (editEvent บนปฏิทิน) — ห้ามเปิด Swal ซ้อน (จะปิดฟอร์มทิ้ง)
+  //    → ยืนยันลบด้วย window.confirm · ไม่แสดงแถบสรุป Service Report ด้วย AI (กล่องนั้นใช้ Swal)
+  embedded = false,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
@@ -839,7 +842,7 @@ export const FileUploadSection = ({
       )}
 
       {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ */}
-      {type === "report" && hasFiles && event?._id && <ServiceReportAiBar event={event} sx={{ mb: uploading || (!card && canEdit) ? 1 : 0 }} />}
+      {type === "report" && hasFiles && event?._id && !embedded && <ServiceReportAiBar event={event} sx={{ mb: uploading || (!card && canEdit) ? 1 : 0 }} />}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
       <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
@@ -872,7 +875,7 @@ export const FileUploadSection = ({
         )}
         {canEdit && !isOldQuoteFile(fileMenu?.file) && [
           <Divider key="file-menu-divider" />,
-          <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await confirmDelete({ name: f.fileName })) onDelete(eventId, type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+          <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await (embedded ? Promise.resolve(window.confirm(`ลบไฟล์ "${f.fileName}"?`)) : confirmDelete({ name: f.fileName }))) onDelete(eventId, type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
             <ListItemText>ลบไฟล์</ListItemText>
           </MenuItem>,

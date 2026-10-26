@@ -12,7 +12,7 @@ import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
-import { createElement } from "react";
+import { createElement, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
@@ -24,6 +24,8 @@ import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@for
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
+// ✅ (26 ต.ค. 2569) ดู/ตรวจ/แนบเอกสารในฟอร์มนี้เลย — โหลดเมื่อเปิดงานที่ถึงขั้นเอกสาร (ไม่ถ่วงหน้าปฏิทิน)
+const EditEventDocs = lazy(() => import("./EditEventDocs"));
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import {
   colorPickerHtml,
@@ -2646,7 +2648,7 @@ export const getEditEvent = async ({
       if (checkinRoot) setTimeout(() => checkinRoot.unmount(), 0);
       const docsRoot = popup.__docsRoot;
       if (docsRoot) setTimeout(() => docsRoot.unmount(), 0);
-      if (popup.__sitePhotosChanged || popup.__checkinChanged) fetchEventsFromDB?.();
+      if (popup.__sitePhotosChanged || popup.__checkinChanged || popup.__docsChanged) fetchEventsFromDB?.();
     },
 
     didOpen: () => {
@@ -2729,8 +2731,9 @@ export const getEditEvent = async ({
           const popup = Swal.getPopup();
           const root = createRoot(host);
           popup.__docsRoot = root;
-          const go = document.getElementById("btnGoOperation");
-          root.render(createElement(JobDocsSummaryCard, { event: evt, onOpen: go ? () => go.click() : undefined, sx: { mt: 0, mb: 1.5 } }));
+          // 🔁 (26 ต.ค. 2569 ผู้ใช้: "เปิดดู และตรวจเอกสารหน้านี้ได้เลย ไม่ต้องเด้งไปหน้าการดำเนินงาน") กางช่องเอกสารในฟอร์มนี้
+          root.render(createElement(Suspense, { fallback: createElement(JobDocsSummaryCard, { event: evt, sx: { mt: 0, mb: 1.5 } }) },
+            createElement(EditEventDocs, { event: evt, currentUser: userData, onChanged: () => { popup.__docsChanged = true; } })));
         }
       }
       /**
