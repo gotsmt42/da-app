@@ -305,6 +305,12 @@ const EventService = {
   },
 
   /** ข้อมูล/สถานะใบเสนอราคา — PUT /events/:id/quotation (บันทึกทุกวันของงานเดียวกันพร้อมกัน) */
+  /** ✅ (26 ต.ค. 2569) ตรวจเอกสารประจำงานด้วย AI ก่อนขอปิดงาน — ไฟล์ไม่เปลี่ยน = ได้ผลเดิมทันที (ไม่เสีย AI) */
+  async CloseCheck(id, force = false) {
+    const res = await API.post(`/events/${id}/close-check`, { force }, { timeout: 240000 });
+    return res.data?.check;
+  },
+
   async UpdateQuotation(id, body) {
     const response = await API.put(`/events/${id}/quotation`, body);
     return response.data;

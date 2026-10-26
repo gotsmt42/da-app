@@ -41,7 +41,9 @@ import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LI
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { ROLES } from "@/shared/utils/roles";
+import { ROLES, can } from "@/shared/utils/roles";
+import EventService from "@/shared/services/EventService";
+import { useAuth } from "@/features/auth/AuthContext";
 import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import ServiceReportAiBar from "@/features/documents/components/ServiceReportAiBar";
@@ -687,6 +689,9 @@ const TechnicianJobCard = ({
   // ดึง userName จาก localStorage
   const payload  = JSON.parse(localStorage.getItem("payload") || "{}");
   const userName = payload?.name || payload?.username || "ช่าง";
+  // แอดมิน/ผู้จัดการ (editAnyJob) ขอปิดงานได้โดยไม่ต้องผ่านการตรวจเอกสารด้วย AI (เซิร์ฟเวอร์ใช้เกณฑ์เดียวกัน)
+  const { userData: authUser } = useAuth();
+  const isAdminOrManager = can(authUser, "editAnyJob");
 
   // ── push activityLog ─────────────────────────────────────────────
   const pushLog = useCallback(async (action, detail = "") => {
@@ -779,16 +784,56 @@ const TechnicianJobCard = ({
     if (event.closeRequested || !canRequestClose) return;
     // ✅ ป้องกันกดผิด/กดพลาด — งานนี้จะเข้าสถานะ "รอแอดมินอนุมัติ" ทันทีที่กด (และถ้าเป็นงานกลุ่ม
     // เข้าหลายวัน จะมีผลกับทุกวันในกลุ่มพร้อมกัน ดูคอมเมนต์ด้านบน) ควรให้ยืนยันก่อนอีกชั้น
-    const confirm = await Swal.fire({
-      title: "ยืนยันขอปิดงาน?",
-      text: "งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "ขอปิดงาน",
-      cancelButtonText: "ยกเลิก",
-      confirmButtonColor: "#f59e0b",
-    });
-    if (!confirm.isConfirmed) return;
+    /**
+     * ✅ (26 ต.ค. 2569 ผู้ใช้: "ให้ AI อ่าน Service Report อัตโนมัติ ถ้าพบอุปกรณ์เสีย/ต้องเสนอราคา ต้องอัพใบเสนอราคาก่อนจึงปิดงานได้"
+     *    · "ตรวจเอกสารที่อัพผิดประเภทของแต่ละช่อง บังคับไม่ให้ปิดงาน อธิบายให้ชัดเจน แต่ยังขอปิดกับแอดมินได้ถ้าเอกสารไม่มีจริงๆ")
+     *    ขั้นแรก: AI ตรวจเอกสารทุกช่อง (ครั้งเดียวต่อชุดไฟล์ — ไฟล์ไม่เปลี่ยน = ผลเดิมทันที ไม่เสีย AI)
+     *    ไม่ผ่าน → บอกทีละข้อว่าผิดอะไร แก้ยังไง · ทางเลือก: แก้เอกสาร หรือ ขอให้แอดมินพิจารณาปิดงาน (ต้องใส่เหตุผล)
+     */
+    let check = null;
+    if (!isAdminOrManager) {
+      Swal.fire({ title: "AI กำลังตรวจเอกสาร…", text: "ตรวจประเภทเอกสารทุกช่อง และอ่าน Service Report — อาจใช้เวลาสักครู่", allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+      try {
+        check = await EventService.CloseCheck(event._id);
+        Swal.close();
+      } catch (err) {
+        Swal.fire({ icon: "error", title: "ตรวจเอกสารไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่อีกครั้ง" });
+        return;
+      }
+    }
+    let overrideReason = "";
+    if (check && !check.ok) {
+      const esc = (t) => String(t || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      const html = `<div style="text-align:left;font-size:14px;line-height:1.55">
+        <div style="margin-bottom:8px;color:#475569">แก้ตามรายการด้านล่างแล้วกด “ขอปิดงาน” อีกครั้ง</div>
+        <ol style="margin:0;padding-left:20px">${(check.problems || []).map((p) => `<li style="margin-bottom:8px"><b style="color:#b91c1c">${esc(p.slotLabel)}</b> — ${esc(p.text)}${(p.items || []).length ? `<ul style="margin:4px 0 0;padding-left:18px;color:#475569;font-size:13px">${p.items.slice(0, 8).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ol>
+        <div style="margin-top:10px;padding:8px 10px;border-radius:8px;background:#f8fafc;color:#475569;font-size:13px">ถ้าเอกสารนั้น “ไม่มีจริง” (เช่น ลูกค้าไม่ออกเอกสาร) กด <b>ขอแอดมินพิจารณาปิดงาน</b> แล้วระบุเหตุผล — แอดมินจะเห็นปัญหาทั้งหมดก่อนอนุมัติ</div>
+      </div>`;
+      const r = await Swal.fire({
+        icon: "warning", title: "เอกสารยังไม่ผ่าน — ยังขอปิดงานไม่ได้", html, width: 640,
+        showCancelButton: true, confirmButtonText: "แก้ไขเอกสาร", cancelButtonText: "ขอแอดมินพิจารณาปิดงาน",
+        confirmButtonColor: "#2563eb", cancelButtonColor: "#64748b", reverseButtons: false,
+      });
+      if (r.isConfirmed || r.dismiss !== Swal.DismissReason.cancel) return;
+      const reason = await Swal.fire({
+        title: "เหตุผลที่ขอให้แอดมินปิดงาน", input: "textarea", inputPlaceholder: "เช่น ลูกค้าไม่ออกใบส่งมอบงาน / งานนี้ไม่มีใบวางบิล",
+        inputValidator: (v) => (!String(v || "").trim() ? "กรุณาระบุเหตุผล" : undefined),
+        showCancelButton: true, confirmButtonText: "ส่งคำขอปิดงาน", cancelButtonText: "ยกเลิก", confirmButtonColor: "#f59e0b",
+      });
+      if (!reason.isConfirmed) return;
+      overrideReason = String(reason.value || "").trim();
+    } else {
+      const confirm = await Swal.fire({
+        title: "ยืนยันขอปิดงาน?",
+        text: check?.skipped ? "งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที" : "เอกสารผ่านการตรวจแล้ว · งานนี้จะเข้าสถานะ \"รอแอดมินอนุมัติ\" ทันที",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "ขอปิดงาน",
+        cancelButtonText: "ยกเลิก",
+        confirmButtonColor: "#f59e0b",
+      });
+      if (!confirm.isConfirmed) return;
+    }
 
     setRequestingClose(true);
     const now = new Date().toISOString();
@@ -799,8 +844,9 @@ const TechnicianJobCard = ({
       // ✅ เก็บ userId จริงของคนกดขอปิดงานไว้ด้วย เพื่อให้แจ้งเตือน push ตอนอนุมัติ/ไม่อนุมัติ
       // ส่งถึงคนที่กดขอจริงๆ ได้ (resPerson ของงานอาจไม่ตรงกับคนกดขอ เช่น งานมอบหมายผ่านชื่อทีมแบบเก่า)
       closeRequestedByUserId: payload?.userId || "",
+      ...(overrideReason ? { closeOverrideReason: overrideReason } : {}),
     });
-    await pushLog("close_requested", "ขอปิดงาน รอแอดมินอนุมัติ");
+    await pushLog("close_requested", overrideReason ? `ขอปิดงาน (เอกสารไม่ผ่านการตรวจ — ขอแอดมินพิจารณา: ${overrideReason})` : "ขอปิดงาน รอแอดมินอนุมัติ");
     setRequestingClose(false);
   };
 

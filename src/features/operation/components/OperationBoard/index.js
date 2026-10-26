@@ -1765,6 +1765,18 @@ const EventRowCard = ({
                 </Box>
               </Stack>
               <Box sx={{ px: 1.75, py: 1.25 }}>
+                {/* ⚠️ (26 ต.ค. 2569) ขอปิดแม้เอกสารไม่ผ่านการตรวจด้วย AI — แอดมินต้องเห็นเหตุผลและปัญหาก่อนอนุมัติ */}
+                {event.closeOverride?.reason && (
+                  <Box sx={{ mb: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: "#b91c1c" }}>เอกสารไม่ผ่านการตรวจ — ช่างขอให้พิจารณาปิดงาน</Typography>
+                    <Typography sx={{ fontSize: "0.82rem", color: INK, mt: 0.25 }}>เหตุผล: {event.closeOverride.reason}</Typography>
+                    {(event.closeOverride.problems || []).length > 0 && (
+                      <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.25, "& li": { fontSize: "0.78rem", color: "#7f1d1d", mb: 0.25 } }}>
+                        {event.closeOverride.problems.map((p, i) => <li key={i}>{p.slotLabel ? `${p.slotLabel}: ` : ""}{p.text}</li>)}
+                      </Box>
+                    )}
+                  </Box>
+                )}
                 {event.workNote && (
                   <Typography sx={{ fontSize: "0.84rem", color: INK, bgcolor: SURFACE, borderRadius: 2, px: 1.25, py: 0.9, mb: 1, whiteSpace: "pre-line", wordBreak: "break-word" }}>
                     <Box component="span" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 800, color: MUTED, mb: 0.25 }}>บันทึกจากช่าง</Box>
