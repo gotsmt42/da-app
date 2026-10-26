@@ -819,7 +819,7 @@ const ResultDocs = ({ a, k, onUpload, onDelete, onPreview, uploading, progress }
         ))}
         <input ref={ref} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { const fl = e.target.files; if (fl?.length) onUpload(fl, a._id, "quotationResult"); e.target.value = ""; }} />
         <Button size="small" startIcon={<AttachFile sx={{ fontSize: 15 }} />} onClick={() => ref.current?.click()} disabled={uploading}
-          sx={{ height: 30, px: 1.25, textTransform: "none", fontWeight: 800, borderRadius: 99, border: "1px dashed #94a3b8", color: "#334155" }}>
+          sx={{ height: 30, px: 1.25, textTransform: "none", fontWeight: 800, borderRadius: 99, border: "1px dashed #94a3b8", color: "#334155", whiteSpace: "nowrap", flexShrink: 0 }}>
           {uploading ? `กำลังอัปโหลด ${progress || 0}%` : files.length ? "แนบเพิ่ม" : "แนบเอกสาร"}
         </Button>
       </Stack>
@@ -1221,7 +1221,20 @@ const DetailDialog = ({
               <Stack direction="row" spacing={1.25} alignItems="flex-start">
                 {k === "approved" ? <CheckCircle sx={{ color: "#16a34a", fontSize: 28 }} /> : <Cancel sx={{ color: "#dc2626", fontSize: 28 }} />}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>ผลลัพธ์</Typography>
+                  {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้ามันเพี้ยนๆ") ปุ่มแก้อยู่บรรทัดหัวข้อ — เดิมอยู่คอลัมน์ขวา บีบเนื้อหาบนมือถือจนตัวหนังสือแตกเป็นคำๆ */}
+                  <Stack direction="row" alignItems="center" gap={0.25}>
+                    <Typography sx={{ flex: 1, fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>ผลลัพธ์</Typography>
+                    {!editResult && (
+                      <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={() => setEditResult(true)}
+                        sx={{ textTransform: "none", fontWeight: 800, py: 0.25, minHeight: 0, color: k === "approved" && !a.quotationPoNo ? "#b45309" : "#2563eb" }}>
+                        {k === "approved" && !a.quotationPoNo ? "เติมเลข PO" : "แก้รายละเอียด"}
+                      </Button>
+                    )}
+                    {isFinance && (
+                      <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
+                        sx={{ textTransform: "none", fontWeight: 700, py: 0.25, minHeight: 0, color: TEXT_SUB }}>แก้ผล</Button>
+                    )}
+                  </Stack>
                   <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: k === "approved" ? "#15803d" : "#b91c1c" }}>
                     {k === "approved" ? "ได้งาน — ลูกค้าตอบรับใบเสนอราคา" : "ไม่ได้งาน — ลูกค้าไม่รับใบเสนอราคา"}
                   </Typography>
@@ -1236,18 +1249,6 @@ const DetailDialog = ({
                     uploading={upload.busy && upload.eventId === a._id && upload.type === "quotationResult"} progress={upload.progress} />
                   <ResultDetails a={a} k={k} onSave={(body) => onQuotation(job, body)} open={editResult} onClose={() => setEditResult(false)} />
                 </Box>
-                <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
-                  {!editResult && (
-                    <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={() => setEditResult(true)}
-                      sx={{ textTransform: "none", fontWeight: 800, color: k === "approved" && !a.quotationPoNo ? "#b45309" : "#2563eb" }}>
-                      {k === "approved" && !a.quotationPoNo ? "เติมเลข PO" : "แก้รายละเอียด"}
-                    </Button>
-                  )}
-                  {isFinance && (
-                    <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
-                      sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>แก้ผล</Button>
-                  )}
-                </Stack>
               </Stack>
             </Box>
           )}
