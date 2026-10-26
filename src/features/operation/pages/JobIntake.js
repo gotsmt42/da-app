@@ -324,7 +324,7 @@ const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(mo
  * 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดให้ครบแบบหน้าการ์ดด้วย") — เพิ่มคอลัมน์รายละเอียดงาน · ทีม/ผู้ติดต่อ · ขั้นถัดไป · กำหนดเสร็จ
  *    และกดแถวเพื่อกางการ์ดเต็มใต้แถว (ไฟล์แนบ · ผลเสนอราคา · แถบขั้นตอน · ปุ่มแก้ไข/ยกเลิก ครบเหมือนมุมมองการ์ด)
  */
-function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, renderCard, employees = [], refMode = false }) {
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, renderCard, employees = [], refMode = false, dateDir = null, onDateSort }) {
   const personOf = (name) => employees.find((u) => u.fname === name || [u.fname, u.lname].filter(Boolean).join(" ") === name);
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าจอคอมให้เปิดเป็นหน้าต่างขึ้นมาแทนการเลื่อนลง ดูใช้ยาก ไม่สมูท")
   //    กดแถว = เปิดหน้าต่างรายละเอียด (จอคอม = กล่องกลางจอ · มือถือ = แผ่นเลื่อนขึ้น) แทนการกางใต้แถว
@@ -344,7 +344,17 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1560, borderCollapse: "collapse" }}>
         <thead>
-          <tr>{COLS.map((h, i) => <Box component="th" key={i} sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}) }}>{h}</Box>)}</tr>
+          <tr>{COLS.map((h, i) => (
+            // ✅ (26 ต.ค. 2569 ผู้ใช้: "ให้สามารถกดหัวตารางเพื่อเรียงวันที่มากไปน้อย หรือน้อยไปมากได้") หัว "กำหนดการ" กดสลับ ใหม่→เก่า / เก่า→ใหม่
+            <Box component="th" key={i} onClick={i === 1 && onDateSort ? onDateSort : undefined}
+              sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}), ...(i === 1 && onDateSort ? { cursor: "pointer", userSelect: "none", color: dateDir ? ACCENT : MUTED, "&:hover": { color: ACCENT } } : {}) }}>
+              {i === 1 && onDateSort ? (
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4 }} title={dateDir === "asc" ? "เรียง: เก่า → ใหม่ (กดเพื่อสลับ)" : "เรียง: ใหม่ → เก่า (กดเพื่อสลับ)"}>
+                  {h}<Box component="span" sx={{ fontSize: "0.8rem", lineHeight: 1 }}>{dateDir === "asc" ? "↑" : "↓"}</Box>
+                </Box>
+              ) : h}
+            </Box>
+          ))}</tr>
         </thead>
         <tbody>
           {rows.map(({ j, s, oc }) => {
@@ -1627,25 +1637,47 @@ export default function JobIntake() {
     ...TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key),
   ];
   const tabCount = (k) => (k === "requests" ? reqTotal : counts[k] || 0);
+  /**
+   * ✅ (26 ต.ค. 2569 ผู้ใช้: "หน้ารับงาน อยากให้แยกงานที่ยังไม่ถึงวัน และงานที่ถึงและดำเนินการออกจากกัน และเอาล่าสุดขึ้นก่อน")
+   *    แท็บกำลังดำเนินการ แยก 2 กลุ่ม: ถึงวันแล้ว/กำลังทำ (วันเข้างานถึงแล้ว · กำลังดำเนินการ · ไม่มีวันนัด เช่นส่งของ/รอวางบิล)
+   *    กับ ยังไม่ถึงวัน (นัดเข้างานวันข้างหน้า) · เรียงตามวันเข้างาน ใหม่→เก่า เป็นค่าเริ่มต้น กดหัว "กำหนดการ" สลับได้
+   */
+  const [activeSub, setActiveSub] = useState("due");
+  const [dateDir, setDateDir] = useState("desc");
+  const toggleDateDir = () => setDateDir((d) => (d === "asc" ? "desc" : "asc"));
+  const isUpcoming = useCallback((j) => {
+    if (!j?.start || j.unscheduled || j.status === "กำลังดำเนินการ") return false;
+    return moment(j.start).isAfter(moment(), "day");
+  }, []);
+  const activeSplit = useMemo(() => {
+    const t = TABS.find((x) => x.key === "active");
+    const rows = withStage.filter((x) => t.test(x.s, x.oc));
+    const up = rows.filter((x) => isUpcoming(x.j)).length;
+    return { due: rows.length - up, upcoming: up };
+  }, [withStage, isUpcoming]);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
     // ✅ ค้นหา: ชื่องาน · โครงการ · บริษัท · เลข Job · เลขเอกสาร · ผู้รับผิดชอบ
     const kw = q.trim().toLowerCase();
     const hit = (j) => !kw || [j.title, j.system, j.site, j.company, j.jobNo, j.intakeDocNo, j.responsiblePerson, j.description]
       .some((v) => String(v || "").toLowerCase().includes(kw));
-    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j))
+    const sub = (x) => tab !== "active" || (activeSub === "upcoming" ? isUpcoming(x.j) : !isUpcoming(x.j));
+    const dateOf = (j) => new Date(j.start || j.scheduledAt || j.intakeAt || j.createdAt || 0).getTime();
+    const dir = dateDir === "asc" ? 1 : -1;
+    return withStage.filter((x) => t.test(x.s, x.oc) && sub(x) && hit(x.j))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
-      .sort(({ j: a }, { j: b }) => (tab === "done"
-        ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
-        : tab === "active"
-          ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
-          : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
-  }, [withStage, tab, q]);
+      .sort(({ j: a }, { j: b }) => (tab === "waiting"
+        ? (isUrgent(b) - isUrgent(a)) || dir * (new Date(a.intakeAt || 0) - new Date(b.intakeAt || 0))
+        : tab === "done"
+          ? dir * (new Date(a.closeApprovedAt || a.updatedAt || 0) - new Date(b.closeApprovedAt || b.updatedAt || 0))
+          // กำลังดำเนินการ/ยกเลิก: ตามวันเข้างาน (กดหัวตารางสลับ ใหม่→เก่า / เก่า→ใหม่)
+          : dir * (dateOf(a) - dateOf(b))));
+  }, [withStage, tab, q, activeSub, dateDir, isUpcoming]);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าด้วยให้สมบูรณ์") การ์ด 10 / ตาราง 20 ต่อหน้า · เปลี่ยนแท็บ/ค้นหา/มุมมอง = กลับหน้า 1
   const pg = usePaged(list, view === "table" ? 20 : 10);
   const { setPage } = pg;
-  useEffect(() => { setPage(1); }, [tab, q, view, setPage]);
+  useEffect(() => { setPage(1); }, [tab, q, view, activeSub, dateDir, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ต้องการปุ่ม Excel หน้ารับงาน") ส่งออกงานตามแท็บ + คำค้นที่เห็นอยู่
@@ -1701,6 +1733,30 @@ export default function JobIntake() {
           );
         })}
       </Stack>
+
+      {/* แท็บย่อยของ "กำลังดำเนินการ": ถึงวันแล้ว/กำลังทำ · ยังไม่ถึงวัน */}
+      {tab === "active" && (
+        <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 1.25, flexWrap: "wrap" }}>
+          {[["due", "ถึงวันแล้ว · กำลังทำ", activeSplit.due, "#7c3aed"], ["upcoming", "ยังไม่ถึงวัน", activeSplit.upcoming, "#2563eb"]].map(([k, label, n, c]) => {
+            const on = activeSub === k;
+            return (
+              <ButtonBase key={k} onClick={() => setActiveSub(k)} aria-pressed={on}
+                sx={{ height: 32, px: 1.25, gap: 0.6, borderRadius: 99, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 800, whiteSpace: "nowrap",
+                  border: `1px solid ${on ? alpha(c, 0.5) : LINE}`, bgcolor: on ? alpha(c, 0.08) : "#fff", color: on ? c : "#475569" }}>
+                <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: c }} />
+                {label}
+                <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem",
+                  bgcolor: on ? c : SURFACE, color: on ? "#fff" : MUTED }}>{n}</Box>
+              </ButtonBase>
+            );
+          })}
+          <Box sx={{ flex: 1 }} />
+          {/* การ์ด (มือถือ/มุมมองการ์ด) ไม่มีหัวตาราง — ปุ่มสลับลำดับวันที่ */}
+          <ButtonBase onClick={toggleDateDir} sx={{ height: 32, px: 1.1, gap: 0.5, borderRadius: 99, border: `1px solid ${LINE}`, bgcolor: "#fff", fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 800, color: "#475569" }}>
+            {dateDir === "asc" ? "วันที่ เก่า → ใหม่ ↑" : "วันที่ ใหม่ → เก่า ↓"}
+          </ButtonBase>
+        </Stack>
+      )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
       <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
@@ -1761,7 +1817,7 @@ export default function JobIntake() {
         view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
-          <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
+          <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} dateDir={dateDir} onDateSort={toggleDateDir} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
             renderCard={(j, oc, close) => <JobCard inRow inSheet employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage}
               onSchedule={(x) => { close?.(); setScheduling(x); }} onDeliver={(x) => { close?.(); setDelivering(x); }} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onNoteChanged={load}
               onEdit={(x) => { close?.(); openForm(x); }} onCancel={(x) => { close?.(); cancelJob(x); }} onRestore={restoreJob} />} />

@@ -1500,16 +1500,18 @@ export default function QuotationTracking() {
   if (!loading && !canAccess) return <Navigate to="/dashboard" replace />;
 
   const tiles = [
-    { value: "open", label: "กำลังดำเนินการ", shortLabel: "ดำเนินการ", count: counts.open, unit: "ใบ", icon: <Apps />, color: "#475569" },
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "สถานะหน้าติดตามใบเสนอราคาให้สอดคล้องกับปัจจุบันด้วย") ชื่อบนแถบ = ชื่อป้ายสถานะในตาราง/การ์ดเป๊ะ
+    //    (เดิมแถบใช้ชื่อย่อ "ตามด่วน/รอตอบ/รอไฟล์" แต่แถวใช้ "ถึงเวลาติดตาม/รอลูกค้าตอบ/..." อ่านแล้วไม่ตรงกัน)
+    { value: "open", label: "กำลังดำเนินการ", count: counts.open, unit: "ใบ", icon: <Apps />, color: "#475569" },
     // ✅ คำขอ ได้งาน/ไม่ได้งาน ที่รอแอดมินอนุมัติ — แสดงเมื่อมี
     ...(counts.decision_req > 0 || status === "decision_req" ? [{
-      value: "decision_req", label: "รออนุมัติผล", shortLabel: "รออนุมัติ", count: counts.decision_req, unit: "ใบ", icon: <HourglassTop />, color: REQ_COLOR, alert: counts.decision_req > 0,
+      value: "decision_req", label: "รออนุมัติผล", count: counts.decision_req, unit: "ใบ", icon: <HourglassTop />, color: REQ_COLOR, alert: counts.decision_req > 0,
     }] : []),
     // ✅ โชว์เฉพาะสถานะที่มีใบอยู่จริง (หรือกำลังเลือกอยู่) — การ์ดเลข 0 เรียงเต็มแถวทำให้รกตา
     ...STATUS_ORDER.filter((s) => (counts[s] || 0) > 0 || status === s).map((s) => {
       const m = STATUS[s];
       const Icon = m.icon;
-      return { value: s, label: m.label, shortLabel: m.short, count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: s === "follow_up" ? m.color : "#475569", alert: s === "follow_up" };
+      return { value: s, label: m.label, count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: s === "follow_up" ? m.color : "#475569", alert: s === "follow_up" };
     }),
     { value: "all", label: "ทั้งหมด", count: counts.all, unit: "ใบ", icon: <Insights />, color: "#475569" },
   ];
