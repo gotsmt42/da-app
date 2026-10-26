@@ -107,7 +107,6 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES, TECHNICIAN_ROLES, isRole, normalizeRole } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
 import ViewTiles from "@/shared/ui/ViewTiles";
-import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import AppsIcon from "@mui/icons-material/Apps";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
@@ -2008,7 +2007,7 @@ const FilterPanel = ({
   filterStatus, onFilterStatus, filterOP, onFilterOP, filterTeam, onFilterTeam,
   showAll, onToggleShowAll, selectedDate, onDateChange, onClearAll, activeCount,
   typeOptions, systemOptions, inSheet = false,
-  peopleToggle = null, // ✅ (15 ต.ค. 2569) { open, onToggle, label } — ปุ่มพับ/กางแผงงานตามผู้รับผิดชอบ (จอคอม · แอดมิน)
+  peopleSelect = null, // 🔁 (26 ต.ค. 2569) ช่องเลือกผู้รับผิดชอบ (รูป + จำนวนงาน) แทนปุ่มกางแผง — จอคอม · แอดมิน
 }) => {
   const [open, setOpen] = useState(false);
   // ✅ จอคอม/จอใหญ่ แสดงช่องเลือกตัวกรองตลอด (ผู้ใช้ขอ) — พื้นที่พอ ไม่ต้องกดเปิดก่อน · มือถือยังพับเก็บได้เหมือนเดิม
@@ -2143,19 +2142,8 @@ const FilterPanel = ({
                 เลือกเดือน
               </Button>
             )}
-            {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ทำให้กดพับผู้รับผิดชอบได้เหมือนภาพรวม") — ปุ่มเดียวกับหน้าภาพรวมงาน */}
-            {peopleToggle && (
-              <Button onClick={peopleToggle.onToggle} startIcon={<Groups sx={{ fontSize: 18 }} />}
-                endIcon={<ExpandMore sx={{ fontSize: 18, transform: peopleToggle.open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
-                sx={{
-                  flexShrink: 0, height: 40, textTransform: "none", fontWeight: 700, fontSize: "0.82rem", borderRadius: 2.5, px: 1.5,
-                  border: `1px solid ${peopleToggle.open || peopleToggle.active ? alpha("#2563eb", 0.45) : "#e2e8f0"}`,
-                  color: peopleToggle.open || peopleToggle.active ? "#2563eb" : "text.primary",
-                  bgcolor: peopleToggle.open ? alpha("#2563eb", 0.06) : "background.paper",
-                }}>
-                {peopleToggle.label}
-              </Button>
-            )}
+            {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เลือกผู้รับผิดชอบ ให้ทำเป็น Select ... หน้าการดำเนินงาน และหน้าอื่นๆด้วยทำเหมือนกัน") */}
+            {peopleSelect && <Box sx={{ flexShrink: 0, width: 220 }}>{peopleSelect}</Box>}
           </Stack>
           {!isWide && (
           <Badge badgeContent={activeCount} color="error" invisible={activeCount === 0}>
@@ -2803,9 +2791,6 @@ const Operation = () => {
   // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
   // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
   const [filterResponsible, setFilterResponsible] = useState("all");
-  // ✅ (15 ต.ค. 2569) แผง "งานตามผู้รับผิดชอบ" พับไว้เป็นค่าเริ่มต้น (เหมือนหน้าภาพรวมงาน) · จำค่าที่ผู้ใช้เลือกไว้
-  const [peopleOpen, setPeopleOpen] = useState(() => { try { return localStorage.getItem("tt-op-people") === "1"; } catch { return false; } });
-  const togglePeople = () => setPeopleOpen((o) => { try { localStorage.setItem("tt-op-people", o ? "0" : "1"); } catch { /* ignore */ } return !o; });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState(null);
   /**
@@ -3069,7 +3054,6 @@ const Operation = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredEvents]);
-  const isRowOverdue = useCallback((r) => isFlaggedDays(daysPastDueMap.get(r._id)?.days), [daysPastDueMap]);
 
   // กันหน้าเกินขอบเขตเมื่อผลลัพธ์หลังกรองน้อยกว่าหน้าปัจจุบัน
   useEffect(() => {
@@ -3470,6 +3454,18 @@ const Operation = () => {
     });
     return { list: [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th")), unassigned, total: responsibleRows.length };
   })();
+  // ✅ ช่องเลือกผู้รับผิดชอบ (รูป/อักษรย่อ + จำนวนงาน) — ชุดเดียวทั้งจอคอม (แถบตัวกรอง) และมือถือ (บนหน้า ไม่ซ่อน)
+  const personSelect = (
+    <PersonSelectField
+      label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={filterResponsible} onChange={(v) => { setFilterResponsible(v); setPage(1); }}
+      allLabel="ทุกคน" allCount={responsibleOptions.total} unit="งาน"
+      options={[
+        ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
+        ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: (employee || []).find((e) => e.fname === name)?.imageUrl })),
+      ]}
+      sx={{ width: "100%" }}
+    />
+  );
   const clearAllOpFilters = () => {
     setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all");
   };
@@ -3485,10 +3481,7 @@ const Operation = () => {
     selectedDate, onDateChange: (d) => { setSelectedDate(d); setShowAll(false); },
     onClearAll: clearAllOpFilters,
     activeCount: activeFilterCount,
-    peopleToggle: isAdminOrManager && activeTab !== 1 && !id ? {
-      open: peopleOpen, onToggle: togglePeople, active: filterResponsible !== "all",
-      label: filterResponsible !== "all" ? `ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}` : "ผู้รับผิดชอบ",
-    } : null,
+    peopleSelect: isAdminOrManager && activeTab !== 1 && !id && responsibleOptions.total > 0 ? personSelect : null,
   };
 
   // ✅ แถบแบ่งหน้าแบบเดียวกับทั้งแอป (สไตล์ปุ่มมาจากธีม — app/theme.js) — ซ้าย: แสดงกี่รายการ + ต่อหน้า · ขวา: เลขหน้า
@@ -3699,21 +3692,6 @@ const Operation = () => {
           )}
 
           {!isMobile && <FilterPanel {...filterPanelProps} />}
-          {/* 🔁 (17 ต.ค. 2569) แผงผู้รับผิดชอบเปิดจากปุ่มในแถบค้นหา → กางใต้แถบค้นหา (เดิมกางเหนือปุ่ม ดูไม่สัมพันธ์กัน) */}
-          {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
-      {isAdminOrManager && activeTab !== 1 && !id && !isMobile && (
-        <Collapse in={peopleOpen} unmountOnExit>
-        <ResponsibleSummary
-          rows={responsibleRows}
-          unit="งาน"
-          value={filterResponsible}
-          onChange={(v) => { setFilterResponsible(v); setPage(1); }}
-          employees={employee}
-          isOverdue={isRowOverdue}
-          isMobile={isMobile}
-        />
-        </Collapse>
-      )}
 
 
           {isMobile && (
@@ -3747,11 +3725,12 @@ const Operation = () => {
                   })}
                 </Box>
               )}
+              {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้ามือถือให้เลือกดูผู้รับผิดชอบง่ายๆด้วย ไม่ซ่อนไว้") */}
+              {isAdminOrManager && !id && activeTab !== 1 && responsibleOptions.total > 0 && (
+                <Box sx={{ mb: 1, display: "flex", "& > *": { flex: 1 } }}>{personSelect}</Box>
+              )}
               <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
                 <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e2e8f0", color: "#334155" }} />
-                {filterResponsible !== "all" && (
-                  <Chip size="small" label={`ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}`} onDelete={() => setFilterResponsible("all")} sx={{ fontWeight: 700 }} />
-                )}
                 {search.trim() && <Chip size="small" label={`ค้นหา: ${search.trim()}`} onDelete={() => setSearch("")} sx={{ fontWeight: 700 }} />}
                 {filterOP && <Chip size="small" label={`สถานะ: ${filterOP}`} onDelete={() => setFilterOP("")} sx={{ fontWeight: 700 }} />}
                 {filterType && <Chip size="small" label={`ประเภท: ${filterType}`} onDelete={() => setFilterType("")} sx={{ fontWeight: 700 }} />}
@@ -3777,18 +3756,6 @@ const Operation = () => {
                   <Box sx={{ "& > div": { mb: 1.75 } }}>
                     <ViewTiles value={effectiveGroup} onChange={setStatusGroup} isMobile groups={statusTileGroups} />
                   </Box>
-                  {isAdminOrManager && !id && responsibleOptions.total > 0 && (
-                    <Box sx={{ mb: 1.5, display: "flex", "& > *": { flex: 1 } }}>
-                      <PersonSelectField
-                        label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={filterResponsible} onChange={(v) => { setFilterResponsible(v); setPage(1); }}
-                        allLabel="ทุกคน" allCount={responsibleOptions.total} unit="งาน"
-                        options={[
-                          ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
-                          ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: (employee || []).find((e) => e.fname === name)?.imageUrl })),
-                        ]}
-                      />
-                    </Box>
-                  )}
                   <FilterPanel {...filterPanelProps} inSheet />
                 </Box>
                 <Button

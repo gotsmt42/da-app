@@ -6171,8 +6171,9 @@ pagedRows.map((c, idx) => {
           {!isMobile && hasActiveFilters && (
             <Button
               onClick={clearAllFilters} startIcon={<Close sx={{ fontSize: 16 }} />}
-              sx={{ order: 3, flexShrink: 0, alignSelf: "center", height: 40, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 1.75, color: ACCENT, bgcolor: alpha(ACCENT, 0.06), "&:hover": { bgcolor: alpha(ACCENT, 0.12) } }}
+              sx={{ order: 3, flexShrink: 0, alignSelf: "center", height: 40, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 1.75, color: "#dc2626", bgcolor: "#fef2f2", border: "1px solid #fecaca", "&:hover": { bgcolor: "#fee2e2", borderColor: "#fca5a5" } }}
             >
+              {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "ล้างตัวกรองให้เป็นสีแดงด้วย ให้ชัดเจน") */}
               ล้างตัวกรอง ({activeFilterLabels.length})
             </Button>
           )}
@@ -6187,7 +6188,7 @@ pagedRows.map((c, idx) => {
                 {hasActiveFilters && (
                   <Button
                     size="small" onClick={clearAllFilters} startIcon={<Close sx={{ fontSize: 15 }} />}
-                    sx={{ alignSelf: "flex-start", textTransform: "none", color: "text.secondary" }}
+                    sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 700, color: "#dc2626" }}
                   >
                     ล้างตัวกรองทั้งหมด
                   </Button>
@@ -6433,7 +6434,7 @@ pagedRows.map((c, idx) => {
             <Button
               size="small" variant="outlined" onClick={clearAllFilters}
               startIcon={<Close sx={{ fontSize: 16 }} />}
-              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(ACCENT, 0.5), color: ACCENT }}
+              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#fca5a5", color: "#dc2626", bgcolor: "#fef2f2", "&:hover": { borderColor: "#dc2626", bgcolor: "#fee2e2" } }}
             >
               ล้างตัวกรองทั้งหมด
             </Button>
