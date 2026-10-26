@@ -22,7 +22,7 @@
  * (GET /events/event-op, /events/drafts เช็ค resPerson/team/userId ให้อยู่แล้ว) จึงไม่ต้องกรองซ้ำที่นี่
  */
 
-import { Children, Fragment, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Children, Fragment, cloneElement, createContext, isValidElement, memo, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
@@ -424,6 +424,9 @@ const contractEditHistory = (c) => {
   }
   return out.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
+
+/** 1 แถวของตาราง = 1 คอมโพเนนต์ (memo) — วาดซ้ำเฉพาะแถวที่ข้อมูล/ตัววาดเปลี่ยน · React แบ่งงานเป็นช่วงได้ */
+const TableRowShell = memo(({ render, c, idx }) => render(c, idx));
 
 const VIEW_FILTER_VALUES = ["contracts", "overdue", "expired", "completed", "closed", "general", "project", "ungrouped", "all"];
 // ✅ (8 ต.ค. 2569) มุมมอง = "หมวดงาน" × "สถานะ" — 2 มิติแยกกัน ไม่ปนเป็นแท็บเดียวอีกต่อไป (ดู ContractNav.js)
@@ -2417,10 +2420,16 @@ export default function ContractOverview() {
   // พอ page ค้างเกินจำนวนหน้าจริง slice จะได้ [] → ตารางว่างเปล่าสนิทโดยไม่มีอะไรอธิบาย ต้องกดเปลี่ยน
   // ตัวกรองไปมาเองถึงจะกลับมา — clamp ไว้เสมอ (เทียบ pattern เดียวกับ draftsSafePage ใน Dashboard.js)
   const safePage = Math.min(page, totalPages);
-  const pagedRows = useMemo(
+  const pagedRowsLive = useMemo(
     () => sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
     [sortedFiltered, safePage, PAGE_SIZE]
   );
+  // ✅ (26 ต.ค. 2569 ผู้ใช้: "ข้อมูลหน่วงโหลดช้า เวลา select ดูข้อมูล ... ทำให้ประสิทธิภาพสูงสุด")
+  //    ตัวที่หนักคือ "วาดตาราง" (แถวละหลายสิบช่อง) ไม่ใช่การกรอง — เลื่อนการวาดตารางไปทำเบื้องหลัง (useDeferredValue)
+  //    เลือกตัวกรอง/แท็บแล้วช่อง/ตัวเลขเปลี่ยนทันที ตารางตามมาโดยไม่ค้างจอ (ระหว่างนั้นตารางจางลงเล็กน้อย)
+  //    กดเปลี่ยนรัวๆ ระบบข้ามรอบที่ไม่ทันใช้ไปเอง ไม่ต้องวาดทุกรอบ
+  const pagedRows = useDeferredValue(pagedRowsLive);
+  const tableStaleRows = pagedRows !== pagedRowsLive;
 
   // ✅ นับจากแถวที่แสดงอยู่จริง (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
   // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
@@ -2574,9 +2583,11 @@ export default function ContractOverview() {
   // ตัวนี้คือส่วนที่ 4: ติดตามว่ายังเลื่อนไปทางไหนได้อีกบ้าง เพื่อซ่อน/แสดงปุ่มลูกศรให้ตรงความจริง
   const tableScrollRef = useRef(null);
   const [tableScroll, setTableScroll] = useState({ canLeft: false, canRight: false });
+  const tableScrolledRef = useRef(false);
   const syncTableScroll = useCallback(() => {
     const el = tableScrollRef.current;
     if (!el) return;
+    tableScrolledRef.current = el.scrollLeft > 0;
     // ⚠️ เผื่อ 2px — ค่า scrollLeft ของเบราว์เซอร์เป็นทศนิยมได้ (จอ retina/ซูม) ถ้าเทียบเท่ากันเป๊ะๆ
     // ปุ่มจะกะพริบค้างอยู่ทั้งที่เลื่อนสุดทางแล้ว
     const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
@@ -2585,20 +2596,30 @@ export default function ContractOverview() {
   }, []);
   // ✅ ต้องคำนวณใหม่เมื่อ "สิ่งที่ทำให้ตารางกว้างขึ้น/แคบลง" เปลี่ยน ไม่ใช่แค่ตอนเลื่อน — สลับแท็บ
   // (คอลัมน์ไม่เท่ากัน) / สลับมุมมอง / เปลี่ยนหน้า / ปรับความกว้างคอลัมน์ ล้วนเปลี่ยนความกว้างรวมทั้งนั้น
+  // ⚡ (26 ต.ค. 2569 "select ดูข้อมูลหน่วง") เดิมเรียกวัดทันทีหลังวาดทุกครั้ง = บังคับเบราว์เซอร์จัดหน้าใหม่ทั้งหน้ากลางคัน
+  //    (โปรไฟล์: กินเวลามากที่สุดของการสลับแท็บ) → ให้ ResizeObserver เป็นคนเรียก (ทำงานหลังเบราว์เซอร์จัดหน้าเสร็จเอง ไม่ต้องบังคับ)
+  //    เฝ้าทั้งกล่องเลื่อนและตัวตาราง — ตารางกว้าง/แคบลงเพราะคอลัมน์เปลี่ยนก็รู้ · observe() ครั้งแรกเรียกให้หนึ่งครั้งเสมอ
   useEffect(() => {
-    syncTableScroll();
     const el = tableScrollRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    if (!el) return undefined;
+    if (typeof ResizeObserver === "undefined") { syncTableScroll(); return undefined; }
     const ro = new ResizeObserver(syncTableScroll);
     ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, [syncTableScroll, useMobileTable, viewFilter, totalTableWidth, loading, filtered.length]);
   // ✅ เปลี่ยนหน้า/สลับแท็บแล้วให้ตารางเลื่อนกลับมาคอลัมน์แรกเสมอ — จำเป็นมากขึ้นตั้งแต่จำนวนคอลัมน์
   // "ครั้งที่ N" คิดจากแถวในหน้านั้นๆ (ดู visitColumns) เพราะหน้าถัดไปอาจมีคอลัมน์น้อยกว่าหน้าที่เพิ่งดู
   // อยู่ ถ้าปล่อยให้ค้างอยู่กลางตาราง ผู้ใช้จะเจอหน้าใหม่ที่เปิดมาแล้วเห็นแต่ช่องท้ายๆ หรือช่องว่าง
+  // ⚡ ตั้ง scrollLeft = บังคับเบราว์เซอร์คำนวณหน้าใหม่ทันที (โปรไฟล์: ตัวที่หนักที่สุดตอนสลับแท็บ) — เลื่อนไปทำในเฟรมถัดไป
+  //    และตั้งเฉพาะตอนที่ไม่ได้อยู่ที่ 0 อยู่แล้ว (จำค่าไว้จาก onScroll ไม่ต้องอ่านจาก DOM)
   useEffect(() => {
-    const el = tableScrollRef.current;
-    if (el) el.scrollLeft = 0;
+    if (!tableScrolledRef.current) return undefined;
+    const id = requestAnimationFrame(() => {
+      const el = tableScrollRef.current;
+      if (el) { el.scrollLeft = 0; tableScrolledRef.current = false; }
+    });
+    return () => cancelAnimationFrame(id);
   }, [safePage, viewFilter]);
   const scrollTableBy = (dir) => {
     const el = tableScrollRef.current;
@@ -3947,8 +3968,9 @@ export default function ContractOverview() {
   const [rowEditorKey, setRowEditorKey] = useState(null);
   const tableEditingCell = rowEditorKey ? null : editingCell;
 
-  const tableRows = useMemo(() => (
-pagedRows.map((c, idx) => {
+  // ✅ (26 ต.ค. 2569 "select ดูข้อมูลหน่วง") วาดแถวในคอมโพเนนต์ย่อยของแต่ละแถว (TableRowShell) แทนการสร้าง JSX
+  //    ทุกแถวรวดเดียวในตัวหน้า — React แบ่งงานวาดเป็นช่วงสั้นๆ ได้ (หน้าไม่ค้าง) และแถวที่ไม่เปลี่ยนไม่ต้องวาดซ้ำ
+  const renderTableRow = useCallback((c, idx) => {
                 // ✅ "ครั้งถัดไปที่ว่าง" — ใช้ตัดสินว่าจะโชว์ปุ่ม "+ เพิ่มครั้งถัดไป" ในช่องครั้งที่ไหน
                 // (ย้ายมาจากคอลัมน์ actions แยกต่างหาก มาไว้ในช่องครั้งที่ของมันเองเลย พอเพิ่มสำเร็จแล้ว
                 // ปุ่มจะขยับไปโผล่ที่ช่องครั้งถัดไปเองอัตโนมัติ เพราะคำนวณจากจำนวนครั้งที่ใช้ไปแล้วสดๆ ทุกครั้ง)
@@ -4785,14 +4807,22 @@ pagedRows.map((c, idx) => {
                   </TableCell>
                 </TableRow>
                 );
-              })
   // 🐛 BUG ที่แก้ (จอขาวทันทีที่เปิดหน้า): dependency array ถูก "ประเมินทุก render" ไม่ใช่ตอน callback
   // ทำงาน — เดิมมี roundTeamEdit.value อยู่ในนี้ ซึ่ง eslint แนะนำมาตามที่โค้ดเขียนไว้ใน JSX (ตรงนั้น
   // อยู่ในเงื่อนไข roundTeamEdit?.visitId === ... จึงปลอดภัย) แต่พอย้ายมาอยู่ใน dep array มันไม่มี
   // เงื่อนไขคุมแล้ว และ roundTeamEdit เริ่มต้นเป็น null → TypeError ตั้งแต่ render แรก
   // ⚠️ ทุก dep ที่เป็นการเข้าถึงสมาชิกของ state ที่มีโอกาสเป็น null ต้องใช้ ?. เสมอ
   // eslint-disable-next-line react-hooks/exhaustive-deps -- renewWidget สร้างใหม่ทุก render · ผูกกับ renewalOf แทน
-  ), [renewalOf, rowEditorKey, renderColumns, responsibleDisplay, beginEdit, beginRoundTeamEdit, canEditBasicField, canEditField, canEditRoundTeam, colWidth, commitEdit, commitRoundTeamEdit, editSaving, editValue, tableEditingCell?.field, tableEditingCell?.key, expandedVisitCells, handleDetachRound, handleOpenBilling, handleOpenDocs, hideContractOnlyColumns, isAdminOrManager, pagedRows, pendingDraftChip, roundTeamEdit?.value, roundTeamEdit?.visitId, roundTeamSaving, selectedIds, showCheckboxes, systemOptions, teamOptions, titleOptions, useMobileTable, visitColumns]);
+  }, [renewalOf, rowEditorKey, renderColumns, responsibleDisplay, beginEdit, beginRoundTeamEdit, canEditBasicField, canEditField, canEditRoundTeam, colWidth, commitEdit, commitRoundTeamEdit, editSaving, editValue, tableEditingCell?.field, tableEditingCell?.key, expandedVisitCells, handleDetachRound, handleOpenBilling, handleOpenDocs, hideContractOnlyColumns, isAdminOrManager, pendingDraftChip, roundTeamEdit?.value, roundTeamEdit?.visitId, roundTeamSaving, selectedIds, showCheckboxes, systemOptions, teamOptions, titleOptions, useMobileTable, visitColumns]);
+  // ✅ ตัววาดแถวก็เลื่อนไปเบื้องหลังด้วย (สลับแท็บ/หมวดทำให้คอลัมน์เปลี่ยน = ตัววาดใหม่) — รอบด่วนใช้แถวเดิมที่วาดไว้แล้ว
+  //    ⚠️ ยกเว้นตอนกำลังแก้ไขช่องในตาราง: ต้องใช้ตัววาดล่าสุดทันที ไม่งั้นค่าที่พิมพ์จะตามไม่ทัน
+  const deferredRenderRow = useDeferredValue(renderTableRow);
+  const rowRenderer = tableEditingCell || roundTeamEdit ? renderTableRow : deferredRenderRow;
+  const tableStale = tableStaleRows || rowRenderer !== renderTableRow;
+  const tableRows = useMemo(
+    () => pagedRows.map((c, idx) => <TableRowShell key={c.key} render={rowRenderer} c={c} idx={idx} />),
+    [pagedRows, rowRenderer],
+  );
 
   // ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่นได้อย่างอิสระ ──────────────────────────
   // ✅ ย้ายยกทั้งครั้ง (วันที่/สถานะ/ทีม/ประวัติงานทุก document ของครั้งนั้นติดไปด้วยครบ ไม่ใช่แค่เลข) —
@@ -6453,7 +6483,7 @@ pagedRows.map((c, idx) => {
           )}
         </Paper>
       ) : isMobile && mobileView === "card" ? (
-        <Stack spacing={1.5}>
+        <Stack spacing={1.5} sx={{ opacity: tableStale ? 0.55 : 1, transition: tableStale ? "opacity .15s .12s" : "opacity .1s" }}>
           {/* ✅ ยอดรวมย้ายไปเป็นแถบตรึงท้ายจอแล้ว (ดู renderMobileSummaryBar) — เห็นตลอดเวลาไม่ว่า
               จะเลื่อนอยู่ตรงไหน ดีกว่าวางไว้บนสุดแล้วหายไปทันทีที่เลื่อนดูรายการ */}
           {pagedRows.map((c) => renderMobileCard(c))}
@@ -6584,6 +6614,8 @@ pagedRows.map((c, idx) => {
           component={Paper} variant="outlined"
           sx={{
             borderRadius: 3, overflowX: "auto", overflowY: "hidden",
+            // ✅ ระหว่างตารางกำลังตามตัวกรองใหม่ (วาดเบื้องหลัง) จางลงเล็กน้อย ให้รู้ว่ากำลังอัปเดต
+            opacity: tableStale ? 0.55 : 1, transition: tableStale ? "opacity .15s .12s" : "opacity .1s",
             // ✅ ให้เลื่อนแนวนอนด้วยนิ้วลื่นแบบมือถือ (momentum scroll) บน iOS Safari — เดิมไม่มี ทำให้
             // เลื่อนดูคอลัมน์ที่เกินจอกระตุกๆ ต้องปาดหลายทีกว่าจะเลื่อนได้จริง
             WebkitOverflowScrolling: "touch",

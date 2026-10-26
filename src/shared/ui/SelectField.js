@@ -47,6 +47,13 @@ const toItems = (children) => {
 export default function SelectField({ children, SelectProps = {}, InputLabelProps, autoOpen = false, onMenuClose, onChange, value, size = "small", sx, ...props }) {
   const [open, setOpen] = useState(Boolean(autoOpen));
   const pickedRef = useRef(false);
+  /**
+   * ⚡ (26 ต.ค. 2569 "select ดูข้อมูลหน่วง") Select ของ MUI ที่คุม open เอง อ่าน anchor.clientWidth "ทุกครั้งที่วาด" (แม้เมนูปิด)
+   *    = บังคับเบราว์เซอร์จัดหน้าใหม่กลางการวาด ทุกช่องเลือกบนหน้า (โปรไฟล์หน้าภาพรวมงาน: ตัวที่หนักที่สุดตอนสลับแท็บ)
+   *    → ใช้ autoWidth (ไม่อ่าน) แล้ววัดความกว้างช่องเองครั้งเดียวตอนกดเปิด ให้เมนูกว้างเท่าช่องเหมือนเดิม
+   */
+  const rootRef = useRef(null);
+  const [menuW, setMenuW] = useState(0);
   // native ถูกทิ้งโดยตั้งใจ — คอมโพเนนต์นี้มีไว้เลิกใช้ native
   // eslint-disable-next-line no-unused-vars
   const { native, MenuProps, ...restSelect } = SelectProps;
@@ -70,7 +77,8 @@ export default function SelectField({ children, SelectProps = {}, InputLabelProp
         ...restSelect,
         displayEmpty: true,
         open,
-        onOpen: () => { pickedRef.current = false; setOpen(true); },
+        autoWidth: true,
+        onOpen: () => { pickedRef.current = false; setMenuW(rootRef.current?.offsetWidth || 0); setOpen(true); },
         onClose: () => {
           setOpen(false);
           if (!pickedRef.current) onMenuClose?.();
@@ -80,7 +88,7 @@ export default function SelectField({ children, SelectProps = {}, InputLabelProp
           PaperProps: {
             ...(MenuProps?.PaperProps || {}),
             sx: {
-              mt: 0.5, borderRadius: 2.5, maxHeight: 360, minWidth: 180,
+              mt: 0.5, borderRadius: 2.5, maxHeight: 360, minWidth: Math.max(180, menuW),
               border: "1px solid #e2e8f0", boxShadow: "0 12px 32px rgba(15,23,42,.14)",
               "& .MuiMenu-list": { py: 0.5 },
               "& .MuiMenuItem-root": {
@@ -97,6 +105,7 @@ export default function SelectField({ children, SelectProps = {}, InputLabelProp
         },
       }}
       {...props}
+      ref={rootRef}
     >
       {toItems(children)}
     </TextField>
