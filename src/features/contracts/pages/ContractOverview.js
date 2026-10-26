@@ -5994,6 +5994,20 @@ pagedRows.map((c, idx) => {
           yearText={exportLabels.yearLabel === "ทุกช่วงเวลา" ? "ทุกปี" : /^\d+$/.test(exportLabels.yearLabel) ? `ปี ${exportLabels.yearLabel}` : exportLabels.yearLabel}
         />
       )}
+      {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้ามือถือให้เลือกดูผู้รับผิดชอบง่ายๆด้วย ไม่ซ่อนไว้") — มือถือ: ช่องเลือกผู้รับผิดชอบอยู่บนหน้าเลย
+          (เดิมซ่อนในแผ่นตัวกรอง) · มีรูป/อักษรย่อ + จำนวนของแต่ละคน */}
+      {isMobile && isAdminOrManager && responsibleOptions.total > 0 && (
+        <Box sx={{ mb: 1.5, display: "flex", "& > *": { flex: 1 } }}>
+          <PersonSelectField
+            label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={responsibleFilter} onChange={setResponsibleFilter}
+            allLabel="ทุกคน" allCount={responsibleOptions.total} unit={unitLabel}
+            options={[
+              ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
+              ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: lookups.employees.find((e) => e.fname === name)?.imageUrl })),
+            ]}
+          />
+        </Box>
+      )}
 
 
       {/* ✅ ช่วยหางานเก่าที่น่าจะเป็นสัญญาเดียวกันให้ (company/site/system/title ตรงกันเป๊ะ) — เดิม
@@ -6340,18 +6354,6 @@ pagedRows.map((c, idx) => {
                 ) : undefined,
               }}
             />
-            {isAdminOrManager && responsibleOptions.total > 0 && (
-              <Box sx={{ mb: 1.5, display: "flex", "& > *": { flex: 1 } }}>
-                <PersonSelectField
-                  label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={responsibleFilter} onChange={setResponsibleFilter}
-                  allLabel="ทุกคน" allCount={responsibleOptions.total}
-                  options={[
-                    ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
-                    ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: lookups.employees.find((e) => e.fname === name)?.imageUrl })),
-                  ]}
-                />
-              </Box>
-            )}
             <Stack gap={1.5}>{renderFilterFields()}</Stack>
           </Box>
           <Button
