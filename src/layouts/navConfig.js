@@ -59,7 +59,7 @@ export const DEST = {
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaUserCheck, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },
   // ✅ หน้าเดียวกับ "ภาพรวมงาน" แต่เปิดที่ "ปิดแล้ว · ประวัติ" — สัญญาหมดอายุ (รอต่อสัญญา) + งานที่เข้างานครบแล้ว
-  contractsClosed: { title: "งานปิดแล้ว · ประวัติ", short: "งานปิดแล้ว", sub: "สัญญาหมดอายุ · เข้างานครบ", href: "/contracts?view=closed", icon: FaArchive },
+  contractsClosed: { title: "งานปิดแล้ว · ประวัติ", short: "งานปิดแล้ว", sub: "รอต่อสัญญา · เข้าครบ", href: "/contracts?view=closed", icon: FaArchive },
   // ✅ (11 ต.ค. 2569) ถาดรับเข้า = คำขอที่ส่งเข้ามารอจัดคิว (เดิมใช้รูปคลิปบอร์ดติ๊กถูก ซึ่งสื่อว่า "อนุมัติแล้ว")
   dispatch: { title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaInbox, badgeKey: "dispatchQueue" },
   sales: { title: "แจ้งงานให้ช่าง", bar: "แจ้งงาน", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, badgeKey: "dispatchMine" },

@@ -2174,9 +2174,16 @@ export default function ContractOverview() {
       byStage: Object.fromEntries(Object.keys(f).map((k) => [k, inCat(category, f[k])])),
       // ⚠️ นับตามหมวดที่เลือก — ตรงกับรายการที่จะเห็นเมื่อกดปุ่มนั้น
       scope: { active: inCat(category, f.open), closed: f.expired.length + f.completed.length, expired: inCat(category, f.expired), completed: inCat(category, f.completed) },
+      // ✅ (26 ต.ค. 2569 ผู้ใช้: "แถบจบแล้ว อธิบายให้ชัดเจน ... มันคืองานปีไหน และอะไรจบ") แยกว่า "เสร็จครบ" เพราะอะไร
+      done: (() => {
+        const rows = f.completed.filter(CATEGORY_PRED[category] || CATEGORY_PRED.all);
+        const renewed = rows.filter((c) => c.isRealContract && renewalOf.has(c.key)).length;
+        const rounds = rows.filter((c) => c.isRealContract && !renewalOf.has(c.key)).length;
+        return { renewed, rounds, jobs: rows.length - renewed - rounds };
+      })(),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageRows, stage, category, search, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+  }, [stageRows, stage, category, renewalOf, search, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
 
   const filtered = useMemo(() => {
     // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
@@ -2998,6 +3005,23 @@ export default function ContractOverview() {
     setFormError("");
     setInlineAddOpen(false);
     setAddOpen(true);
+  };
+  /**
+   * ✅ (26 ต.ค. 2569 ผู้ใช้: "แถบจบแล้ว ... มันคืองานปีไหน และอะไรจบ") ป้ายบอกเหตุผลที่ "เข้าครบ" + ปีของสัญญา/งาน
+   *    แสดงเฉพาะแถบ "เข้าครบ · ประวัติ" · ต่อสัญญาแล้ว ใช้ป้าย "ต่อแล้ว" ของ renewWidget อยู่แล้ว
+   */
+  const doneChip = (c) => {
+    if (stage !== "completed" || (c.isRealContract && renewalOf.has(c.key))) return null;
+    const p = contractPeriod(c);
+    const yrs = p ? [p.start.year() + 543, p.end.year() + 543] : null;
+    const yearTxt = yrs ? (yrs[1] > yrs[0] ? `ปี ${yrs[0]}–${String(yrs[1]).slice(-2)}` : `ปี ${yrs[0]}`) : "";
+    const total = c.isRealContract ? (totalRoundsOf(c) || countUsedRounds(c.visits)) : 0;
+    const label = c.isRealContract ? `เข้างานครบ ${total}/${total} ครั้ง` : "ปิดงานครบทุกวันแล้ว";
+    return (
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 20, px: 0.8, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, whiteSpace: "nowrap", color: "#15803d", bgcolor: "#f0fdf4" }}>
+        <Check sx={{ fontSize: 12 }} />{label}{yearTxt ? ` · ${yearTxt}` : ""}
+      </Box>
+    );
   };
   /** ป้าย/ปุ่มต่อสัญญา ใต้สถานะสัญญา — ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่ม "ต่อสัญญาปีถัดไป" */
   const renewWidget = (c, { block = false } = {}) => {
@@ -4327,6 +4351,7 @@ pagedRows.map((c, idx) => {
                               )}
                               {/* ✅ ต่อสัญญา — อยู่ใต้วันสิ้นสุดสัญญาเลย (ช่องที่ทำให้รู้ว่าต้องต่อ) */}
                               {renewWidget(c) && <Box sx={{ pt: 0.6 }}>{renewWidget(c)}</Box>}
+                              {doneChip(c) && <Box sx={{ pt: 0.6 }}>{doneChip(c)}</Box>}
                             </Stack>
                           </TableCell>
                         )}
@@ -5148,6 +5173,7 @@ pagedRows.map((c, idx) => {
           )}
           {/* ✅ ต่อสัญญา — แถวของตัวเองใต้ป้าย (ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่มเต็มความกว้าง) */}
           {renewWidget(c, { block: true }) && <Box sx={{ mt: 1.1 }}>{renewWidget(c, { block: true })}</Box>}
+          {doneChip(c) && <Box sx={{ mt: 1.1 }}>{doneChip(c)}</Box>}
         </Box>
 
         {/* แถบล่าง: ความคืบหน้า · ล่าสุด · แผนที่ · รายละเอียด */}
@@ -5877,7 +5903,7 @@ pagedRows.map((c, idx) => {
             <Assignment sx={{ fontSize: 22 }} />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={800}>{isClosedScope ? (stage === "expired" ? "สัญญาหมดอายุ · รอต่อสัญญา" : "งานจบแล้ว · ประวัติ") : isAdminOrManager ? "ภาพรวมงาน" : "ภาพรวมงานของฉัน"}</Typography>
+            <Typography variant="h6" fontWeight={800}>{isClosedScope ? (stage === "expired" ? "สัญญาหมดอายุ · รอต่อสัญญา" : "งานเข้าครบ · ประวัติ") : isAdminOrManager ? "ภาพรวมงาน" : "ภาพรวมงานของฉัน"}</Typography>
             {/* ✅ แท็บ "เลยกำหนด/คงค้าง" กรองเฉพาะ isRealContract เหมือนแท็บ "งานสัญญา" ทุกประการ (ดู
                 filtered) แถวทั้งหมดจึงเป็นสัญญา ไม่ใช่ "งาน" — เดิมเช็คแค่ viewFilter==="contracts"
                 ทำให้แท็บนี้ขึ้นหน่วยผิดเป็น "งาน" */}
@@ -5961,6 +5987,7 @@ pagedRows.map((c, idx) => {
           scope={isClosedScope ? "closed" : "active"} category={category} stage={stage}
           onScope={changeScope} onCategory={changeCategory} onStage={setStage}
           counts={navCounts} showUngrouped={isAdminOrManager} isMobile={isMobile}
+          yearText={exportLabels.yearLabel === "ทุกช่วงเวลา" ? "ทุกปี" : /^\d+$/.test(exportLabels.yearLabel) ? `ปี ${exportLabels.yearLabel}` : exportLabels.yearLabel}
         />
       )}
 

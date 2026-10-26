@@ -30,7 +30,7 @@ export const STAGE_META = {
   open: { label: "ทั้งหมด", color: BLUE },
   overdue: { label: "เลยกำหนดเข้ารอบ", short: "เลยกำหนด", color: "#dc2626" },
   expired: { label: "หมดอายุ · รอต่อสัญญา", short: "หมดอายุ", color: "#ea580c" },
-  completed: { label: "จบแล้ว · ประวัติ", short: "จบแล้ว", color: "#16a34a" },
+  completed: { label: "เข้าครบ · ประวัติ", short: "เข้าครบ", color: "#16a34a" },
 };
 export const isContractish = (category) => category === "contracts" || category === "all";
 
@@ -39,7 +39,7 @@ export const stagesFor = (scope, category) => (scope === "closed"
   ? [...(isContractish(category) ? ["expired"] : []), "completed"]
   : ["open", ...(isContractish(category) ? ["overdue"] : [])]);
 
-export default function ContractNav({ scope, category, stage, onScope, onCategory, onStage, counts, showUngrouped = true, isMobile = false }) {
+export default function ContractNav({ scope, category, stage, onScope, onCategory, onStage, counts, showUngrouped = true, isMobile = false, yearText = "" }) {
   const cats = ["contracts", "general", "project", ...(showUngrouped ? ["ungrouped"] : []), "all"];
   const stages = stagesFor(scope, category);
   const closed = scope === "closed";
@@ -55,7 +55,9 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
       k: "expired", label: "หมดอายุ · รอต่อสัญญา", short: "รอต่อสัญญา", icon: <EventBusy />, n: counts.scope.expired ?? 0, on: closed && stage === "expired", color: "#ea580c",
       go: () => { onScope("closed"); onStage("expired"); },
     }] : []),
-    { k: "done", label: "จบแล้ว · ประวัติ", short: "จบแล้ว", icon: <Inventory2 />, n: counts.scope.completed ?? counts.scope.closed, on: closed && stage !== "expired", color: "#16a34a",
+    // 🔁 (26 ต.ค. 2569 ผู้ใช้: "แถบจบแล้ว อธิบายให้ชัดเจน และทำให้ไม่สับสน มันคืองานปีไหน และอะไรจบ")
+    //    "จบแล้ว · ประวัติ" → "เข้าครบ · ประวัติ" (ผู้ใช้เลือกชื่อ) + แถบล่างบอกปีที่แสดง และแยกจำนวนตามเหตุที่เสร็จ (ทุกจอ รวมมือถือ)
+    { k: "done", label: "เข้าครบ · ประวัติ", short: "เข้าครบ", icon: <Inventory2 />, n: counts.scope.completed ?? counts.scope.closed, on: closed && stage !== "expired", color: "#16a34a",
       go: () => { onScope("closed"); onStage("completed"); } },
   ];
 
@@ -139,13 +141,36 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
               </ButtonBase>
             );
           })}
-          {closed && !isMobile && (
+          {closed && stage === "expired" && !isMobile && (
             <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
-              {stage === "expired"
-                ? "สัญญาที่เลยวันสิ้นสุดแล้วแต่ยังไม่ได้ต่อ — ต้องติดตามลูกค้า · กด “ต่อสัญญาปีถัดไป” เพื่อสร้างสัญญาใหม่จากข้อมูลเดิม"
-                : "งานที่จบแล้ว: เข้างานครบทุกครั้ง หรือต่อสัญญาฉบับใหม่แล้ว — ไว้ดูย้อนหลัง ไม่ต้องทำอะไรเพิ่ม"}
+              สัญญาที่เลยวันสิ้นสุดแล้วแต่ยังไม่ได้ต่อ — ต้องติดตามลูกค้า · กด “ต่อสัญญาปีถัดไป” เพื่อสร้างสัญญาใหม่จากข้อมูลเดิม
             </Typography>
           )}
+          {closed && stage !== "expired" && (() => {
+            const d = counts.done || {};
+            const parts = [
+              d.rounds ? { n: d.rounds, t: "สัญญาที่เข้างานครบทุกครั้งตามสัญญา" } : null,
+              d.renewed ? { n: d.renewed, t: "สัญญาที่หมดอายุและต่อฉบับใหม่แล้ว" } : null,
+              d.jobs ? { n: d.jobs, t: "งานทั่วไป/โปรเจคที่ปิดงานครบทุกวัน" } : null,
+            ].filter(Boolean);
+            return (
+              <Box sx={{ width: "100%" }}>
+                <Typography sx={{ fontSize: "0.78rem", color: INK, fontWeight: 800 }}>
+                  งานที่ไม่ต้องทำอะไรต่อแล้ว · แสดง{yearText ? ` ${yearText}` : "ทุกปี"}
+                  <Box component="span" sx={{ fontWeight: 600, color: MUTED }}> (เปลี่ยนปีได้ที่ตัวกรอง)</Box>
+                </Typography>
+                {parts.length > 0 && (
+                  <Stack direction="row" useFlexGap flexWrap="wrap" columnGap={1.5} rowGap={0.25} sx={{ mt: 0.25 }}>
+                    {parts.map((x) => (
+                      <Typography key={x.t} sx={{ fontSize: "0.76rem", color: MUTED }}>
+                        <Box component="span" sx={{ color: "#16a34a", fontWeight: 800 }}>✓ {x.n.toLocaleString()}</Box> {x.t}
+                      </Typography>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            );
+          })()}
         </Stack>
       )}
     </Box>
