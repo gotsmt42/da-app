@@ -3647,8 +3647,21 @@ function EventCalendar() {
           )
         ) : listMode ? null : (
         <div className="ec-legend-panel">
+          {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "คำอธิบายด้านล่างให้สอดคล้องและชัดเจนกับปัจจุบัน") อ่านการ์ดงานแบบใหม่ทีละส่วน */}
           <div className="ec-legend-group">
-            <div className="ec-legend-group-title">สถานะงาน</div>
+            <div className="ec-legend-group-title">อ่านการ์ดงาน</div>
+            <div className="ec-legend-item"><span className="ec-legend-icon"><span className="ec-legend-chip">PM</span></span><span>ป้ายประเภทงาน (PM · PO · Service ฯลฯ)</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon">🏢</span><span>โครงการ / สถานที่</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon">💻</span><span>ระบบ</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon">🔄</span><span>ครั้งที่ของงานสัญญา</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon">👷</span><span>ทีมเข้างาน — ชื่อแรกคือหัวหน้าทีม ตามด้วยลูกทีม</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon">▲▼</span><span>ติ่งมุมขวาบน = ไอคอนสถานะ · กดเพื่อย่อ/ขยายรายละเอียด</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon"><span className="ec-legend-swatch" style={{ width: 14, height: 14, background: "linear-gradient(135deg,#6366f1 50%,#facc15 50%)" }} /></span><span>สีการ์ด = สีพื้น/สีตัวอักษรที่ตั้งไว้ในงาน (หัวข้อ “การแสดงผลบนปฏิทิน”)</span></div>
+            <div className="ec-legend-item"><span className="ec-legend-icon"><span className="ec-legend-today">26</span></span><span>วงกลมแดง = วันนี้</span></div>
+          </div>
+
+          <div className="ec-legend-group">
+            <div className="ec-legend-group-title">สถานะงาน (ไอคอนในติ่ง)</div>
             {statusLegend.map((status) => (
               <div key={status.label} className="ec-legend-item">
                 <span className="ec-legend-icon">
@@ -3669,7 +3682,7 @@ function EventCalendar() {
 
           {/* ✅ อธิบายแถบสีขอบซ้าย (ประเภทงาน) — คู่กับ eventClassNames/fc-event-type-* ด้านบน */}
           <div className="ec-legend-group">
-            <div className="ec-legend-group-title">ประเภทงาน</div>
+            <div className="ec-legend-group-title">แถบสีขอบซ้าย (กลุ่มงาน)</div>
             {Object.entries(JOB_CLASS_META).map(([key, meta]) => (
               <div key={key} className="ec-legend-item">
                 <span className="ec-legend-icon">
@@ -3678,6 +3691,12 @@ function EventCalendar() {
                 <span>{meta.emoji} {meta.label}</span>
               </div>
             ))}
+            <div className="ec-legend-item">
+              <span className="ec-legend-icon">
+                <span className="ec-legend-swatch" style={{ width: 4, height: 14, background: "repeating-linear-gradient(180deg,#94a3b8 0 3px,transparent 3px 5px)" }} />
+              </span>
+              <span>แถบเส้นประ + มุมเหลี่ยม = งานต่อเนื่องจากวัน/สัปดาห์ก่อน (ยังไม่จบ)</span>
+            </div>
           </div>
 
           <div className="ec-legend-group">
@@ -3692,8 +3711,12 @@ function EventCalendar() {
                 ไว้ตรงนี้ไม่มีทางรู้ได้เองว่าใช้งานได้ — ใช้ Alt ไม่ใช่ Ctrl เพราะ @fullcalendar/interaction
                 ตัดการลากทิ้งทันทีถ้ากด Ctrl ค้างไว้ตอนกดเมาส์ลง (ดูคอมเมนต์ละเอียดใน EventDrop.js) */}
             <div className="ec-legend-item">
+              <span className="ec-legend-icon">👆</span>
+              <span>ลากการ์ด = ย้ายวัน · ลากขีดขวาของการ์ด = ขยาย/ย่อวัน · มือถือ: กดค้างแล้วลากเพื่อจัดลำดับในวัน</span>
+            </div>
+            <div className="ec-legend-item">
               <span className="ec-legend-icon">💡</span>
-              <span>กด Alt (หรือ Cmd บน Mac) ค้างไว้แล้วลากงาน เพื่อก๊อปปี้ไปวันอื่น</span>
+              <span>จอคอม: กด Alt (หรือ Cmd บน Mac) ค้างไว้แล้วลากงาน เพื่อก๊อปปี้ไปวันอื่น</span>
             </div>
           </div>
         </div>
