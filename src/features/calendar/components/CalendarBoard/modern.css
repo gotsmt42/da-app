@@ -310,3 +310,18 @@
 }
 .modern-calendar-container.ec-modern .ec-timed-resize-handle:hover::after,
 .modern-calendar-container.ec-modern .ec-timed-resize-handle.is-resizing::after { opacity: .6; }
+
+/* ติ่งไอคอน: ต่อเส้นขอบบน/ขวาของการ์ดให้เป็นเส้นเดียวกัน (ไม่ลอย) — ไม่มีเส้นซ้าย/ล่าง (ไม่ทะลุลงในการ์ด) */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-badges {
+  right: -1px !important;
+  border-top: 1px solid rgba(15, 23, 42, .16) !important;
+  border-right: 1px solid rgba(15, 23, 42, .16) !important;
+  border-left: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 6px 6px 0 0 !important;
+}
+/* แถบสีขอบซ้าย (กลุ่มงาน) บางลง */
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event[class*="fc-event-type-"] { border-left-width: 3px !important; }
+@media (max-width: 768px) {
+  .modern-calendar-container.ec-modern .fc-daygrid .fc-event[class*="fc-event-type-"] { border-left-width: 2px !important; }
+}
