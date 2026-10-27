@@ -75,7 +75,10 @@ const BADGE_TONE = {
 };
 
 /** โทนสีของป้ายตัวเลขหนึ่งใบ — "act" หรือ "soon" */
-export const badgeTone = (badgeKey, badges) => {
+// 🔁 (27 ต.ค. 2569 ผู้ใช้: "เลขจำนวนแจ้งเตือนจากสีส้มเป็นสีแดงทั้งหมด") ทุกป้ายตัวเลขใช้สีแดงสีเดียว
+//    (เมนูหลัก · เมนูข้าง · แถบล่างมือถือ) — ตรรกะแยกโทนเดิมเก็บไว้ใน badgeToneDetail เผื่อกลับมาใช้
+export const badgeTone = () => "act";
+export const badgeToneDetail = (badgeKey, badges) => {
   // ✅ ภาพรวมงาน: แดง = มีสัญญาถึง/เลยกำหนดรอบ · อำพัน = มีแค่ที่ใกล้ถึงรอบเดือนหน้า (ดู contractsTone)
   if (badgeKey === "contracts" && badges?.contractsTone) return badges.contractsTone;
   // งานเข้า: มีคำขอลงงานรอตัดสินใจ = แดง · มีแค่งานรอส่งลงตาราง = อำพัน
