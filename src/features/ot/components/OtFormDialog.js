@@ -69,6 +69,25 @@ const daysOfJob = (job) => {
   const n = rawEnd && rawEnd > start ? Math.max(1, Math.round((rawEnd - start) / 86400000)) : 1;
   return Array.from({ length: Math.min(n, 62) }, (_, i) => moment(start).add(i, "day").format("YYYY-MM-DD"));
 };
+/**
+ * "รายการ OT รอส่ง" (ตะกร้า) — ✅ (27 ต.ค. 2569 ผู้ใช้: "กดขอโอทีต้องเพิ่มเข้ารายการก่อน เพราะจะลงหลายวัน ไม่ใช่บันทึกใบนั้นเลย")
+ *   กด "ขอ OT งานนี้" จากหน้างาน = เพิ่มวันนั้นเข้ารายการ (เก็บในเครื่อง) · ปิดได้ แล้วไปเพิ่มวัน/งานอื่นต่อ
+ *   เปิดฟอร์มใบใหม่ครั้งถัดไป (จากหน้างานหรือเมนู OT) รายการเดิมยังอยู่ · ส่งใบสำเร็จแล้วล้างรายการ
+ *   ⚠️ เก็บแยกต่อผู้ใช้ · เก็บเฉพาะข้อมูลงานที่ฟอร์มใช้ ไม่เก็บไฟล์แนบ
+ */
+const basketKey = (uid) => `ot:basket:${uid || "me"}`;
+const slimJob = (j) => (j ? (({ _id, title, system, company, site, docNo, start, end, round, visitCount, time, backgroundColor, __label }) =>
+  ({ _id, title, system, company, site, docNo, start, end, round, visitCount, time, backgroundColor, __label }))(j) : null);
+export const loadOtBasket = (uid) => {
+  try { const v = JSON.parse(localStorage.getItem(basketKey(uid)) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+};
+const saveOtBasket = (uid, list) => {
+  try {
+    if (list.length) localStorage.setItem(basketKey(uid), JSON.stringify(list.map((it) => ({ ...it, job: slimJob(it.job) }))));
+    else localStorage.removeItem(basketKey(uid));
+  } catch { /* เครื่องไม่ให้เก็บ — ฟอร์มยังใช้ได้ แค่ไม่จำรายการ */ }
+};
+
 const DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 
 const TimeField = ({ label, value, onChange, error }) => (
@@ -96,10 +115,13 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
+  const uid = String(userData?.userId || "");
+  // โหมดรายการรอส่ง: เปิดจากหน้างาน หรือมีรายการค้างอยู่ — ไม่ใช้ร่างอัตโนมัติ (รายการรอส่งคือร่างอยู่แล้ว)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ตัดสินครั้งเดียวตอนเปิดกล่อง
+  const basketMode = useMemo(() => Boolean(open) && !editing && (Boolean(presetJob) || loadOtBasket(uid).length > 0), [open, presetJob]);
   const draft = useFormDraft({
     key: editing ? `ot:edit:${request._id}` : "ot:new:v3",
-    // เปิดจากหน้างาน (presetJob) ไม่กู้ร่างเก่า — ร่างอาจเป็นของงานอื่น
-    enabled: Boolean(open) && !presetJob,
+    enabled: Boolean(open) && !basketMode,
     data: { items, note },
     restore: (d) => {
       if (Array.isArray(d.items) && d.items.length) setItems(d.items);
@@ -137,14 +159,19 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
       setNote(request.note || "");
     } else {
       setOwners([]);
+      const basket = loadOtBasket(uid);
       if (presetJob) {
         const days = daysOfJob(presetJob);
         const today = moment().format("YYYY-MM-DD");
         // ลำดับ: วันที่ของช่องที่กดในปฏิทิน → วันนี้ (ถ้าอยู่ในช่วงงาน) → วันแรกของงาน · ยังกดเลือกวันอื่นของงานได้
         const prefer = presetJob.preferDate;
         const date = prefer && (!days.length || days.includes(prefer)) ? prefer : !days.length || days.includes(today) ? today : days[0];
-        const it = blankItem(null, { date });
-        setItems([{ ...it, ...defaultTime(date, null), job: { ...presetJob, __label: "" } }]);
+        const it = { ...blankItem(null, { date }), ...defaultTime(date, null), job: { ...presetJob, __label: "" } };
+        // งานเดียวกันวันเดียวกันมีในรายการแล้ว = ไม่เพิ่มซ้ำ
+        const dup = basket.some((b) => b.job?._id === presetJob._id && b.date === date);
+        setItems(dup ? basket : [...basket, it]);
+      } else if (basket.length) {
+        setItems(basket);
       } else {
         setItems([blankItem(null)]);
       }
@@ -175,6 +202,13 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ดึงเฉพาะวันที่ยังไม่มีในแคช
   }, [open, dates]);
+
+  // โหมดรายการรอส่ง → บันทึกรายการลงเครื่องทุกครั้งที่แก้ (ปิดกล่องแล้วยังอยู่)
+  useEffect(() => {
+    if (open && basketMode && items.length) saveOtBasket(uid, items);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- บันทึกตามรายการ
+  }, [items, basketMode, open]);
+  const clearBasket = () => { saveOtBasket(uid, []); setItems([blankItem(cfg)]); };
 
   const holidays = useHolidays(cfg);
   const who = owners.length ? owners : [me];
@@ -232,6 +266,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
     try {
       let saved = editing ? await OtService.update(request._id, payload) : await OtService.create(payload);
       draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
+      if (!editing) saveOtBasket(uid, []); // ส่งแล้ว → ล้างรายการรอส่ง
       // หลักฐาน (ไม่บังคับ) — อัปไม่สำเร็จไม่ทำให้ใบหาย แนบเพิ่มได้ภายหลังในหน้ารายละเอียด
       let fileWarn = "";
       if (evidence.length) {
@@ -248,7 +283,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
   const resubmit = editing && request.status === "rejected";
 
   return (
-    <Dialog open={open} onClose={(_, r) => { if (saving || r === "backdropClick") return; onClose?.(); }}
+    <Dialog open={open} onClose={(_, r) => { if (saving || r === "backdropClick") return; onClose?.({ kept: basketMode, count: items.length }); }}
       fullWidth maxWidth="md" fullScreen={isMobile} PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: "#f8fafc" } }}>
       <DialogTitle sx={{ p: 0, bgcolor: "#fff" }}>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${BORDER_MAIN}` }}>
@@ -263,7 +298,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
               กรอกรายการ OT ของคุณ → แอดมินตรวจสอบ → อนุมัติ
             </Typography>
           </Box>
-          <IconButton onClick={onClose} disabled={saving}><Close /></IconButton>
+          <IconButton onClick={() => onClose?.({ kept: basketMode, count: items.length })} disabled={saving}><Close /></IconButton>
         </Stack>
         {/* ผู้ทำ OT (ตัวเอง) — แสดงเพื่อยืนยัน ไม่ต้องเลือก */}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ px: { xs: 2, sm: 2.5 }, py: 1, borderBottom: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
@@ -282,6 +317,16 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
 
       <DialogContent sx={{ px: { xs: 1.25, sm: 2.5 }, pt: "14px !important", pb: 1 }}>
         <DraftBanner draft={draft} />
+        {basketMode && (
+          <Alert severity="info" icon={false} sx={{ mb: 1.5, borderRadius: 2.5, bgcolor: "#ecfeff", color: OT_DARK, border: "1px solid #a5f3fc", "& .MuiAlert-message": { width: "100%" } }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+              <Box sx={{ flex: 1, fontSize: "0.84rem" }}>
+                <b>รายการ OT รอส่ง {items.length} รายการ</b> — กด “เก็บไว้ก่อน” แล้วไปกด “ขอ OT งานนี้” ที่งาน/วันอื่นเพิ่มได้ ครบแล้วค่อยส่งทีเดียว
+              </Box>
+              <Button size="small" onClick={clearBasket} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>ล้างรายการ</Button>
+            </Stack>
+          </Alert>
+        )}
         {resubmit && request.rejectReason && (
           <Alert severity="warning" sx={{ mb: 1.5, borderRadius: 2 }}><b>ถูกตีกลับ:</b> {request.rejectReason} — แก้แล้วกด “ส่งใหม่”</Alert>
         )}
@@ -424,7 +469,10 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
             <Typography sx={{ fontWeight: 900, lineHeight: 1.1 }}>{hoursText(totalHours)}</Typography>
           </Box>
         )}
-        <Button onClick={onClose} disabled={saving} sx={{ textTransform: "none", color: TEXT_SUB, display: { xs: error ? "none" : "inline-flex", sm: "inline-flex" } }}>ยกเลิก</Button>
+        <Button onClick={() => onClose?.({ kept: basketMode, count: items.length })} disabled={saving}
+          sx={{ textTransform: "none", color: basketMode ? OT_DARK : TEXT_SUB, fontWeight: basketMode ? 800 : 500, display: { xs: error ? "none" : "inline-flex", sm: "inline-flex" } }}>
+          {basketMode ? "เก็บไว้ก่อน" : "ยกเลิก"}
+        </Button>
         <Button variant="contained" onClick={submit} disabled={saving}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : editing && !resubmit ? <Save /> : <Send />}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5, boxShadow: "none", whiteSpace: "nowrap", bgcolor: OT_ACCENT, "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>

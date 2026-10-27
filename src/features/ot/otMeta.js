@@ -53,13 +53,20 @@ const toMin = (t) => {
 };
 
 /** ชั่วโมงของบรรทัด — สูตรเดียวกับ server (hoursOf) · null = เวลายังไม่ครบ/ผิด */
+/**
+ * พักเที่ยง 12:00–13:00 ไม่นับเป็นชั่วโมง OT — ✅ (27 ต.ค. 2569 ผู้ใช้: "เวลาทำงานไม่ต้องนับเที่ยง 12.00 ด้วย")
+ * หักเฉพาะส่วนที่ช่วง OT คร่อมจริง (เช่น 08:30–17:30 = 9 ชม. − 1 = 8 ชม. · 11:30–12:30 หัก 30 นาที)
+ * ⚠️ ต้องตรงกับ server (routes/ot.js · lunchOverlap) — server คำนวณซ้ำเองไม่เชื่อค่าจากหน้าจอ
+ */
+const LUNCH = [12 * 60, 13 * 60];
+const lunchOverlap = (a, dur) => [0, 1440].reduce((t, off) => t + Math.max(0, Math.min(a + dur, LUNCH[1] + off) - Math.max(a, LUNCH[0] + off)), 0);
 export const lineHours = (start, end, breakMin) => {
   const a = toMin(start);
   const b = toMin(end);
   if (a === null || b === null || a === b) return null;
   const dur = b > a ? b - a : b + 1440 - a;
   if (dur > 16 * 60) return null;
-  const brk = Math.min(Math.max(Math.round(Number(breakMin) || 0), 0), dur - 1);
+  const brk = Math.min(Math.max(Math.round(Number(breakMin) || 0), 0) + lunchOverlap(a, dur), dur - 1);
   return Math.round(((dur - brk) / 60) * 100) / 100;
 };
 

@@ -3794,7 +3794,13 @@ function EventCalendar() {
           <OtFormDialog
             open
             presetJob={otJob}
-            onClose={() => setOtJob(null)}
+            onClose={(info) => {
+              setOtJob(null);
+              if (info?.kept) {
+                Swal.fire({ toast: true, position: "bottom", icon: "info", timer: 3500, showConfirmButton: false,
+                  title: `เก็บไว้ในรายการ OT แล้ว (${info.count} รายการ)`, text: "กด “ขอ OT งานนี้” ที่งานอื่นเพื่อเพิ่ม · ส่งทีเดียวเมื่อครบ" });
+              }
+            }}
             onSaved={async (req, { fileWarn } = {}) => {
               setOtJob(null);
               const r = await Swal.fire({

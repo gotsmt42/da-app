@@ -28,7 +28,8 @@ import { thaiDate } from "@/shared/utils/thaiDate";
 import OtService, { errorText } from "../services/OtService";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
-import OtFormDialog from "../components/OtFormDialog";
+import OtFormDialog, { loadOtBasket } from "../components/OtFormDialog";
+import { useAuth } from "@/features/auth/AuthContext";
 import OtDetailDialog from "../components/OtDetailDialog";
 import OtStatusBadge from "../components/OtStatusBadge";
 import { useHolidays } from "../components/OtDayInfo";
@@ -297,6 +298,10 @@ export default function OtPage({ view = "mine" }) {
   const [detailId, setDetailId] = useState(routeId || "");
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
+  // รายการ OT รอส่ง (เพิ่มจากหน้างาน) — ปุ่มบอกจำนวน · อ่านใหม่ทุกครั้งที่ปิดฟอร์ม
+  const { userData } = useAuth();
+  const [basketN, setBasketN] = useState(0);
+  useEffect(() => { if (!form.open) setBasketN(loadOtBasket(String(userData?.userId || "")).length); }, [form.open, userData?.userId]);
   const holidays = useHolidays(null);
 
   useEffect(() => { if (routeId) setDetailId(routeId); }, [routeId]);
@@ -405,7 +410,7 @@ export default function OtPage({ view = "mine" }) {
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
             sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
-            ยื่นขอ OT
+            {basketN ? `ส่งรายการ OT (${basketN})` : "ยื่นขอ OT"}
           </Button>
         </Stack>
         <Box component="nav" aria-label="เมนู OT"
