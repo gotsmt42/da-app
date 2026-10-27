@@ -198,6 +198,7 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
   };
   section("หมายเหตุ", [
     r.note && ["", r.note],
+    r.attachments?.length && ["หลักฐานการทำ OT", `${r.attachments.length} ไฟล์ (ดูในระบบ)`],
     r.status === "rejected" && ["เหตุผลที่ตีกลับ", `${r.rejectReason || "-"}${r.rejectedBy?.name ? ` · โดย ${r.rejectedBy.name}` : ""}`],
     r.status === "cancelled" && ["ยกเลิกใบ", `${r.cancelReason || ""}${r.cancelledBy?.name ? ` · โดย ${r.cancelledBy.name}` : ""}`],
   ]);

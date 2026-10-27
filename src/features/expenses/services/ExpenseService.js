@@ -67,8 +67,9 @@ const ExpenseService = {
     return res.data.users || [];
   },
 
-  async jobs(q = "") {
-    const res = await API.get("/expenses/jobs", { params: q ? { q } : {} });
+  /** @param {string} [on] YYYY-MM-DD — เฉพาะงานที่มีในวันนั้น (ฟอร์ม OT เลือกงานเป็นรายวัน) */
+  async jobs(q = "", on = "") {
+    const res = await API.get("/expenses/jobs", { params: { ...(q ? { q } : {}), ...(on ? { on } : {}) } });
     return res.data.jobs || [];
   },
 

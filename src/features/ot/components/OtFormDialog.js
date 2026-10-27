@@ -13,12 +13,13 @@ import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
-  useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, Avatar,
+  useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, Avatar, ButtonBase,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Close, DeleteOutline, Send, Save, AccessTime, ContentCopy, Add } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { thaiDate } from "@/shared/utils/thaiDate";
 import { useAuth } from "@/features/auth/AuthContext";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
@@ -26,28 +27,29 @@ import { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import OtService, { errorText } from "../services/OtService";
 import {
-  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, typeMeta, lineHours, hoursText, guessType, crossesMidnight,
+  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, typeMeta, lineHours, hoursText, guessType, timeForType, crossesMidnight,
 } from "../otMeta";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 import OtDayInfo, { useHolidays } from "./OtDayInfo";
+import { EvidencePicker } from "./OtEvidence";
 
 let seq = 0;
 const key = () => `i${Date.now()}_${(seq += 1)}`;
 const today = () => moment().format("YYYY-MM-DD");
 /**
  * 🔁 (27 ต.ค. 2569 ผู้ใช้: "ตัดพักออก และเวลางาน 8.30 - 17.30")
- *   ไม่มีช่องพักแล้ว (ส่ง breakMin = 0 เสมอ) · เวลาตั้งต้นตามวัน:
- *   วันทำงาน = OT หลังเลิกงาน 17:30–20:30 · วันหยุด = ทำงานเต็มวัน 08:30–17:30
- *   ผู้ใช้แก้เวลาเองแล้ว (timeTouched) = ไม่เปลี่ยนให้อีกตอนเปลี่ยนวันที่
+ *   ไม่มีช่องพักแล้ว (ส่ง breakMin = 0 เสมอ)
+ * 🔁 (27 ต.ค. 2569 ผู้ใช้: "คำนวณอัตโนมัติ — เสาร์ อาทิตย์ = ทำงานวันหยุด 8.30-17.30 · จ-ศ = OT วันทำงานเริ่ม 17.30
+ *    · OT วันหยุดเริ่ม 17.30") ประเภทเดาจากวันที่ → เวลาตั้งต้นตามประเภท (TYPE_TIME ใน otMeta)
+ *   เปลี่ยนวัน/ประเภทแล้วเวลาเปลี่ยนตาม — เว้นแต่ผู้ใช้แก้เวลาเองแล้ว (timeTouched)
  */
-const WORKDAY_TIME = { start: "17:30", end: "20:30" };
-const HOLIDAY_TIME = { start: "08:30", end: "17:30" };
-const defaultTime = (date, cfg) => (guessType(date, "08:30", cfg) === "workdayOT" ? WORKDAY_TIME : HOLIDAY_TIME);
+const defaultTime = (date, cfg) => timeForType(guessType(date, "08:30", cfg));
 
 /** รายการใหม่ — ต่อจากรายการก่อนหน้า (วัน/เวลา/งานเดิม) ให้กรอกเร็ว */
 const blankItem = (cfg, from) => {
   const date = from?.date || today();
-  const t = from?.timeTouched ? from : defaultTime(date, cfg);
+  // เวลาที่แก้เองแล้ว → ใช้ต่อ · ประเภทที่เลือกเอง → เวลาตามประเภทนั้น · ไม่งั้นตามวัน
+  const t = from?.timeTouched ? from : from?.typeTouched ? timeForType(from.type) : defaultTime(date, cfg);
   return {
     key: key(), date, start: t.start, end: t.end, breakMin: 0, timeTouched: Boolean(from?.timeTouched),
     type: from?.typeTouched ? from.type : guessType(date, t.start, cfg), typeTouched: Boolean(from?.typeTouched),
@@ -55,12 +57,30 @@ const blankItem = (cfg, from) => {
   };
 };
 
+/**
+ * วันของงาน (ช่วงงานหลายวัน → รายวัน) — ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้เลือกงานได้เป็นวัน ไม่ใช่ผูกงานรวม เพราะเบิกโอทีบางวัน")
+ * ⚠️ end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" (เที่ยงคืนของวันถัดไป) → ถอยกลับ 1 วัน
+ */
+const daysOfJob = (job) => {
+  if (!job?.start) return [];
+  // นับจำนวนวันแบบเดียวกับ jobRangeText (expenseMeta) — เวลาที่เก็บไม่ใช่เที่ยงคืนเสมอ จึงนับเป็นวันเต็มแล้วปัดเศษ
+  const start = new Date(job.start);
+  const rawEnd = job.end ? new Date(job.end) : null;
+  const n = rawEnd && rawEnd > start ? Math.max(1, Math.round((rawEnd - start) / 86400000)) : 1;
+  return Array.from({ length: Math.min(n, 62) }, (_, i) => moment(start).add(i, "day").format("YYYY-MM-DD"));
+};
+const DAY_SHORT = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+
 const TimeField = ({ label, value, onChange, error }) => (
   <TextField size="small" type="time" label={label} value={value} onChange={(e) => onChange(e.target.value)}
     InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} error={error} fullWidth />
 );
 
-export default function OtFormDialog({ open, request, onClose, onSaved }) {
+/**
+ * @param {object} [presetJob] ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้มีเมนูกดลงโอทีในหน้า editEvent ได้เลย")
+ *   เปิดจากหน้างาน — รายการแรกผูกงานนี้ให้ · วันที่ = วันนี้ถ้าอยู่ในช่วงงาน ไม่งั้นวันแรกของงาน
+ */
+export default function OtFormDialog({ open, request, presetJob = null, onClose, onSaved }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const { userData } = useAuth();
   const editing = Boolean(request?._id);
@@ -72,12 +92,14 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
   const [owners, setOwners] = useState([]); // ผู้ทำ OT — ใบใหม่ = ตัวเอง · แก้ใบเดิม = ตามใบ
   const [items, setItems] = useState([]);
   const [note, setNote] = useState("");
+  const [evidence, setEvidence] = useState([]); // หลักฐาน (ไม่บังคับ) — อัปโหลดหลังบันทึกใบ
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
   const draft = useFormDraft({
     key: editing ? `ot:edit:${request._id}` : "ot:new:v3",
-    enabled: Boolean(open),
+    // เปิดจากหน้างาน (presetJob) ไม่กู้ร่างเก่า — ร่างอาจเป็นของงานอื่น
+    enabled: Boolean(open) && !presetJob,
     data: { items, note },
     restore: (d) => {
       if (Array.isArray(d.items) && d.items.length) setItems(d.items);
@@ -115,7 +137,19 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
       setNote(request.note || "");
     } else {
       setOwners([]);
-      setItems([blankItem(null)]); setNote("");
+      if (presetJob) {
+        const days = daysOfJob(presetJob);
+        const today = moment().format("YYYY-MM-DD");
+        // ลำดับ: วันที่ของช่องที่กดในปฏิทิน → วันนี้ (ถ้าอยู่ในช่วงงาน) → วันแรกของงาน · ยังกดเลือกวันอื่นของงานได้
+        const prefer = presetJob.preferDate;
+        const date = prefer && (!days.length || days.includes(prefer)) ? prefer : !days.length || days.includes(today) ? today : days[0];
+        const it = blankItem(null, { date });
+        setItems([{ ...it, ...defaultTime(date, null), job: { ...presetJob, __label: "" } }]);
+      } else {
+        setItems([blankItem(null)]);
+      }
+      setNote("");
+      setEvidence([]);
     }
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- รีเซ็ตเฉพาะตอนเปิดกล่อง/เปลี่ยนใบ
@@ -130,6 +164,18 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
     return () => clearTimeout(t);
   }, [open, jobQuery]);
 
+  // งานที่มี "ในวันนั้น" ของทุกวันที่ในฟอร์ม (ดึงครั้งเดียวต่อวัน)
+  const [dayJobs, setDayJobs] = useState({});
+  const dates = [...new Set(items.map((it) => it.date).filter(Boolean))].join(",");
+  useEffect(() => {
+    if (!open) return;
+    dates.split(",").filter((d) => d && !(d in dayJobs)).forEach((d) => {
+      setDayJobs((cur) => ({ ...cur, [d]: null }));
+      ExpenseService.jobs("", d).then((list) => setDayJobs((cur) => ({ ...cur, [d]: list }))).catch(() => setDayJobs((cur) => ({ ...cur, [d]: [] })));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ดึงเฉพาะวันที่ยังไม่มีในแคช
+  }, [open, dates]);
+
   const holidays = useHolidays(cfg);
   const who = owners.length ? owners : [me];
   const jobLabel = (j) => (j ? (j.__label || jobText(j) || j.title || "") : "");
@@ -138,12 +184,23 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
     if (it.key !== k) return it;
     const next = { ...it, ...patch };
     if ("start" in patch || "end" in patch) next.timeTouched = true;
-    // เปลี่ยนวัน → ตั้งเวลาตามชนิดวัน (ถ้ายังไม่เคยแก้เวลาเอง)
-    if ("date" in patch && !next.timeTouched) Object.assign(next, defaultTime(next.date, cfg));
-    // เปลี่ยนวัน/เวลาเริ่มแล้วเดาประเภทใหม่ — เว้นแต่ผู้ใช้เลือกประเภทเองไว้แล้ว
-    if (!next.typeTouched && ("date" in patch || "start" in patch)) next.type = guessType(next.date, next.start, cfg);
+    if ("date" in patch && !next.timeTouched) {
+      // เปลี่ยนวัน (ยังไม่เคยแก้เวลาเอง) → ประเภทตามวัน แล้วเวลาตามประเภท
+      if (!next.typeTouched) next.type = guessType(next.date, "08:30", cfg);
+      Object.assign(next, timeForType(next.type));
+    } else if ("type" in patch && !next.timeTouched) {
+      // เลือกประเภทเอง → เวลาตั้งต้นของประเภทนั้น (ทำงานวันหยุด 08:30 · OT วันทำงาน/วันหยุด 17:30)
+      Object.assign(next, timeForType(next.type));
+    } else if (!next.typeTouched && ("date" in patch || "start" in patch)) {
+      // แก้เวลาเริ่มเอง → เดาประเภทใหม่ (วันหยุด: ก่อน 17:30 = ทำงานวันหยุด · ตั้งแต่ 17:30 = OT วันหยุด)
+      next.type = guessType(next.date, next.start, cfg);
+    }
     return next;
   }));
+  const pickJob = (it, job) => {
+    const days = daysOfJob(job);
+    setItem(it.key, days.length && !days.includes(it.date) ? { job, date: days[0] } : { job });
+  };
   const addItem = () => setItems((cur) => [...cur, blankItem(cfg, cur[cur.length - 1])]);
   const copyNextDay = (it) => setItems((cur) => {
     const d = moment(it.date).add(1, "day").format("YYYY-MM-DD");
@@ -173,9 +230,14 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
       }))),
     };
     try {
-      const saved = editing ? await OtService.update(request._id, payload) : await OtService.create(payload);
+      let saved = editing ? await OtService.update(request._id, payload) : await OtService.create(payload);
       draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
-      onSaved?.(saved, { created: !editing });
+      // หลักฐาน (ไม่บังคับ) — อัปไม่สำเร็จไม่ทำให้ใบหาย แนบเพิ่มได้ภายหลังในหน้ารายละเอียด
+      let fileWarn = "";
+      if (evidence.length) {
+        try { saved = await OtService.addFiles(saved._id, evidence.map((f) => f.file)); } catch (e) { fileWarn = `บันทึกใบแล้ว แต่แนบหลักฐานไม่สำเร็จ (${errorText(e)}) — แนบเพิ่มได้ในหน้ารายละเอียด`; }
+      }
+      onSaved?.(saved, { created: !editing, fileWarn });
     } catch (err) {
       setError(errorText(err, "บันทึกไม่สำเร็จ"));
     } finally {
@@ -230,7 +292,15 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
             const h = lineHours(it.start, it.end, it.breakMin);
             const tm = typeMeta(it.type);
             const bad = h === null || (touched && !it.job);
-            const opts = it.job && !jobOptions.some((j) => j._id === it.job._id) ? [it.job, ...jobOptions] : jobOptions;
+            // ✅ กลุ่ม "งานในวันที่เลือก" ขึ้นก่อน (กรองตามคำค้นในเครื่อง) · ตามด้วยงานอื่นจากการค้นหา
+            const needle = jobQuery.trim().toLowerCase();
+            const onDay = (dayJobs[it.date] || []).filter((j) => !needle || jobLabel(j).toLowerCase().includes(needle) || String(j.docNo || "").toLowerCase().includes(needle));
+            const dayIds = new Set(onDay.map((j) => j._id));
+            const others = jobOptions.filter((j) => !dayIds.has(j._id));
+            let opts = [...onDay.map((j) => ({ ...j, __grp: "day" })), ...others.map((j) => ({ ...j, __grp: "other" }))];
+            if (it.job && !opts.some((j) => j._id === it.job._id)) opts = [{ ...it.job, __grp: "other" }, ...opts];
+            const jobDays = daysOfJob(it.job);
+            const outOfRange = jobDays.length > 0 && !jobDays.includes(it.date);
             return (
               <Box key={it.key} sx={{ bgcolor: "#fff", border: `1px solid ${bad ? "#fca5a5" : BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", overflow: "hidden" }}>
                 {/* หัวรายการ: เลขที่ · ประเภท · ชั่วโมง · คัดลอก/ลบ */}
@@ -252,28 +322,9 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
                 </Stack>
 
                 <Box sx={{ p: 1.5, display: "grid", gap: 1.25, alignItems: "start", gridTemplateColumns: { xs: "repeat(6, 1fr)", md: "repeat(12, 1fr)" } }}>
-                  {/* งานที่อิง — สำคัญสุด อยู่บนสุดเต็มแถว */}
-                  <Autocomplete
-                    sx={{ gridColumn: "1 / -1" }}
-                    options={opts} value={it.job} loading={jobLoading} filterOptions={(x) => x}
-                    onChange={(_, v) => setItem(it.key, { job: v })}
-                    onInputChange={(_, v, r) => { if (r === "input") setJobQuery(v); }}
-                    onOpen={() => setJobQuery("")}
-                    isOptionEqualToValue={(o, v) => o._id === v._id}
-                    getOptionLabel={(o) => [jobLabel(o), jobRangeText(o)].filter(Boolean).join(" · ")}
-                    renderOption={({ key: k, ...li }, o) => (
-                      <li {...li} key={o._id}>
-                        <JobOptionRow job={o} main={jobLabel(o)} sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
-                      </li>
-                    )}
-                    noOptionsText="ไม่พบงาน"
-                    renderInput={(params) => (
-                      <TextField {...params} size="small" label="งานที่ทำ OT *" error={touched && !it.job} placeholder="ค้นหาชื่องาน / โครงการ"
-                        InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
-                    )}
-                  />
+                  {/* 🔁 (27 ต.ค. 2569) วันที่มาก่อน → งานที่มีในวันนั้นขึ้นเป็นกลุ่มแรกของช่องเลือกงาน */}
                   <Box sx={{ gridColumn: { xs: "1 / -1", md: "span 4" } }}>
-                    <ThaiDatePicker label="วันที่" value={it.date} onChange={(v) => setItem(it.key, { date: v || it.date })} />
+                    <ThaiDatePicker label="วันที่ทำ OT" value={it.date} onChange={(v) => setItem(it.key, { date: v || it.date })} />
                   </Box>
                   <Box sx={{ gridColumn: { xs: "span 3", md: "span 2" } }}><TimeField label="เริ่ม" value={it.start} onChange={(v) => setItem(it.key, { start: v })} error={h === null} /></Box>
                   <Box sx={{ gridColumn: { xs: "span 3", md: "span 2" } }}><TimeField label="เลิก" value={it.end} onChange={(v) => setItem(it.key, { end: v })} error={h === null} /></Box>
@@ -285,6 +336,61 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
                       </MenuItem>
                     ))}
                   </TextField>
+                  <Autocomplete
+                    sx={{ gridColumn: "1 / -1" }}
+                    options={opts} value={it.job} loading={jobLoading || dayJobs[it.date] === null} filterOptions={(x) => x}
+                    groupBy={(o) => (o.__grp === "day" ? `งานในวันที่ ${thaiDate(it.date)} (${onDay.length})` : "งานอื่น · พิมพ์เพื่อค้นหา")}
+                    onChange={(_, v) => (v ? pickJob(it, v) : setItem(it.key, { job: null }))}
+                    onInputChange={(_, v, r) => { if (r === "input") setJobQuery(v); }}
+                    onOpen={() => setJobQuery("")}
+                    isOptionEqualToValue={(o, v) => o._id === v._id}
+                    getOptionLabel={(o) => [jobLabel(o), jobRangeText(o)].filter(Boolean).join(" · ")}
+                    renderGroup={(g) => (
+                      <li key={g.key}>
+                        <Box sx={{ position: "sticky", top: -8, zIndex: 1, px: 1.75, py: 0.75, bgcolor: String(g.group).startsWith("งานในวันที่") ? "#ecfeff" : "#f8fafc",
+                          color: String(g.group).startsWith("งานในวันที่") ? OT_DARK : TEXT_SUB, fontSize: "0.76rem", fontWeight: 800, borderBottom: `1px solid ${BORDER_MAIN}` }}>{g.group}</Box>
+                        <Box component="ul" sx={{ p: 0 }}>{g.children}</Box>
+                      </li>
+                    )}
+                    renderOption={({ key: k, ...li }, o) => (
+                      <li {...li} key={o._id}>
+                        <JobOptionRow job={o} main={jobLabel(o)} sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
+                      </li>
+                    )}
+                    noOptionsText={`ไม่มีงานในวันที่ ${thaiDate(it.date)} — พิมพ์ชื่องานเพื่อค้นหา`}
+                    renderInput={(params) => (
+                      <TextField {...params} size="small" label="งานที่ทำ OT *" error={touched && !it.job} placeholder={`งานในวันที่ ${thaiDate(it.date)} หรือพิมพ์ค้นหา`}
+                        InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
+                    )}
+                  />
+                  {/* งานหลายวัน → เลือกวันของงานที่ทำ OT จริง */}
+                  {jobDays.length > 1 && (
+                    <Box sx={{ gridColumn: "1 / -1", p: 1.25, borderRadius: 2.5, border: `1px solid ${outOfRange ? "#fcd34d" : BORDER_MAIN}`, bgcolor: outOfRange ? "#fffbeb" : "#f8fafc" }}>
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: outOfRange ? "#b45309" : TEXT_SUB, mb: 0.75 }}>
+                        {outOfRange ? `วันที่ ${thaiDate(it.date)} ไม่อยู่ในช่วงงานนี้ — เลือกวันที่ทำ OT` : `งานนี้มี ${jobDays.length} วัน — เลือกวันที่ทำ OT`}
+                      </Typography>
+                      <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+                        {jobDays.map((d) => {
+                          const on = d === it.date;
+                          return (
+                            <ButtonBase key={d} onClick={() => setItem(it.key, { date: d })}
+                              sx={{ flexDirection: "column", width: 52, py: 0.5, borderRadius: 2, fontFamily: "inherit", border: `1.5px solid ${on ? OT_ACCENT : BORDER_MAIN}`,
+                                bgcolor: on ? OT_ACCENT : "#fff", color: on ? "#fff" : TEXT_MAIN, "&:hover": { borderColor: OT_ACCENT } }}>
+                              <Box component="span" sx={{ fontSize: "0.66rem", fontWeight: 700, opacity: 0.85 }}>{DAY_SHORT[moment(d).day()]}</Box>
+                              <Box component="span" sx={{ fontSize: "0.95rem", fontWeight: 900, lineHeight: 1.1 }}>{moment(d).date()}</Box>
+                              <Box component="span" sx={{ fontSize: "0.6rem", opacity: 0.85 }}>{thaiDate(d).split(" ")[1]}</Box>
+                            </ButtonBase>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  )}
+                  {jobDays.length === 1 && outOfRange && (
+                    <Alert severity="warning" sx={{ gridColumn: "1 / -1", py: 0, borderRadius: 2 }}
+                      action={<Button size="small" onClick={() => setItem(it.key, { date: jobDays[0] })} sx={{ textTransform: "none", fontWeight: 800 }}>ใช้วันที่ {thaiDate(jobDays[0])}</Button>}>
+                      งานนี้อยู่วันที่ {thaiDate(jobDays[0])} ไม่ตรงกับวันที่ทำ OT
+                    </Alert>
+                  )}
                   {/* วันหยุด/วันทำงานของวันที่เลือก — ชุดเดียวกับปฏิทินงาน */}
                   <Box sx={{ gridColumn: "1 / -1" }}>
                     <OtDayInfo date={it.date} cfg={cfg} holidays={holidays} onPickDate={(d) => setItem(it.key, { date: d })} />
@@ -306,6 +412,7 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
         <TextField size="small" fullWidth label="เหตุผล / หมายเหตุ (ไม่บังคับ)" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2}
           inputProps={{ maxLength: 1000 }} placeholder="เช่น ลูกค้าขอให้เข้างานนอกเวลาเพื่อไม่กระทบการเปิดร้าน"
           sx={{ mt: 1.5, mb: 0.5, bgcolor: "#fff" }} />
+        <EvidencePicker files={evidence} onChange={setEvidence} existing={editing ? request.attachments || [] : []} />
       </DialogContent>
 
       <DialogActions sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 1, bgcolor: "#fff" }}>

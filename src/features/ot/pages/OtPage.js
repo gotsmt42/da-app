@@ -31,6 +31,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import OtFormDialog from "../components/OtFormDialog";
 import OtDetailDialog from "../components/OtDetailDialog";
 import OtStatusBadge from "../components/OtStatusBadge";
+import { useHolidays } from "../components/OtDayInfo";
 import {
   OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel,
 } from "../otMeta";
@@ -295,6 +296,8 @@ export default function OtPage({ view = "mine" }) {
   const [form, setForm] = useState({ open: false, request: null });
   const [detailId, setDetailId] = useState(routeId || "");
   const [notice, setNotice] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const holidays = useHolidays(null);
 
   useEffect(() => { if (routeId) setDetailId(routeId); }, [routeId]);
   const refresh = useCallback(() => { setReloadKey((k) => k + 1); refreshAppBadges(); }, []);
@@ -329,6 +332,19 @@ export default function OtPage({ view = "mine" }) {
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const cur = Math.min(page, pageCount);
   const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
+
+  // ✅ (27 ต.ค. 2569 ผู้ใช้: "หน้า OT ให้ Export Excel ได้ด้วยให้ครบถ้วน") — ส่งออกตามที่เห็น (ค้นหา/สถานะที่เลือก)
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const { exportOtList } = await import("../utils/otExcelExport");
+      await exportOtList({ requests: visible, holidays, scopeLabel: [status === "all" ? "ทุกสถานะ" : otStatus(status).label, q.trim() ? `ค้นหา “${q.trim()}”` : ""].filter(Boolean).join(" · ") });
+    } catch (err) {
+      setError(errorText(err, "ส่งออก Excel ไม่สำเร็จ"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (!canUse) return <Navigate to="/dashboard" replace />;
   if (view === "wages") return <Navigate to="/ot" replace />;
@@ -379,6 +395,13 @@ export default function OtPage({ view = "mine" }) {
                 {hoursText(liveHours(base.filter((r) => monthOf(r) === thisMonth)))}
               </Typography>
             </Box>
+          )}
+          {view !== "report" && (
+            <Button variant="outlined" startIcon={<FileDownload />} onClick={exportExcel} disabled={exporting || loading || !visible.length}
+              sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e2e8f0", bgcolor: "#fff",
+                "& .MuiButton-startIcon": { color: "#16a34a" }, "&:hover": { borderColor: "#16a34a", bgcolor: "#fff" } }}>
+              {exporting ? "กำลังส่งออก…" : "Excel"}
+            </Button>
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
             sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
@@ -493,10 +516,10 @@ export default function OtPage({ view = "mine" }) {
       <OtDetailDialog open={Boolean(detailId)} id={detailId} reloadKey={reloadKey} notice={notice} onClose={closeDetail} onChanged={refresh}
         onEdit={(r) => setForm({ open: true, request: r })} />
       <OtFormDialog open={form.open} request={form.request} onClose={() => setForm((f) => ({ ...f, open: false }))}
-        onSaved={(r, { created }) => {
+        onSaved={(r, { created, fileWarn }) => {
           setForm({ open: false, request: null });
           refresh();
-          setNotice(created ? `ส่งใบ ${r.docNo} แล้ว — รอตรวจสอบ` : "บันทึกการแก้ไขแล้ว");
+          setNotice(fileWarn || (created ? `ส่งใบ ${r.docNo} แล้ว — รอตรวจสอบ` : "บันทึกการแก้ไขแล้ว"));
           if (r?._id) openDetail(r._id);
         }} />
     </Box>

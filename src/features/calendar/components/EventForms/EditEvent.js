@@ -1374,6 +1374,8 @@ export const getEditEvent = async ({
   onOpenDeliveryNote,
   // ✅ เบิก Advance ของงานนี้ — ฟอร์มใบเบิกเป็น React Dialog เหมือนกล่องเอกสารด้านบน (ดู advanceJob ใน CalendarBoard)
   onRequestAdvance,
+  // ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้มีเมนูกดลงโอทีวันที่ลงเวลา ในหน้า editEvent ได้เลย") — ฟอร์ม OT (React) เปิดที่ CalendarBoard
+  onRequestOt,
   handleDeleteEvent,
   onCopyEvent,
   EventService,
@@ -1651,6 +1653,12 @@ export const getEditEvent = async ({
     && (isAdminOrManagerUser || isJobParticipantUser)
     && !isPendingForTech;
 
+  /** ✅ "ขอ OT งานนี้" — สิทธิ์ชุดเดียวกับระบบ OT (requestExpense) · คนในงานหรือหัวหน้า · งานต้องไม่รออนุมัติ */
+  const canRequestOt = Boolean(onRequestOt) && !readOnly
+    && (can(userData, "requestExpense") || can(userData, "viewAllExpenses"))
+    && (isAdminOrManagerUser || isJobParticipantUser)
+    && !isPendingForTech;
+
   // ✅ สีบนปฏิทิน — แก้ได้แม้งานปิดแล้วเช่นกัน เพราะเป็นแค่การแสดงผลบนปฏิทิน ไม่กระทบข้อมูลงาน
   // รายงาน หรือยอดเงินใดๆ เลย (ต่างจากวันที่/ทีม/สถานะ ที่แก้แล้วกระทบของจริง)
   const canEditColor = canEditDocFields;
@@ -1874,7 +1882,7 @@ export const getEditEvent = async ({
 
   // มีอะไรให้ใส่ในเมนู "เพิ่มเติม" ไหม — ถ้าไม่มีเลย (เช่น เซลเปิดดูอย่างเดียว) ก็ไม่ต้องมีปุ่มเมนู
   const hasMoreActions = Boolean(
-    canViewOperation || canRequestAdvance || !readOnly || (canEditDocFields && onOpenDeliveryNote)
+    canViewOperation || canRequestAdvance || canRequestOt || !readOnly || (canEditDocFields && onOpenDeliveryNote)
       || canAttachToContract || canDeleteEvent
   );
   const titleValues = (jobTypes?.items || []).map((t) => t.name);
@@ -2477,6 +2485,7 @@ export const getEditEvent = async ({
             ไม่ต้องเลื่อนไปหาการ์ดของช่วงนั้นในรายการวันที่ */""}
       ${canRequestAdvance && hasSiblings ? `<button class="ee-more-item" id="btnAdvanceByRange"><span>🗓</span> <span class="ee-more-item-text">เบิก Advance ตามช่วงวันที่…</span></button>
       <div id="ee-advance-range-list" class="ee-range-picker" hidden></div>` : ""}
+      ${canRequestOt ? `<button class="ee-more-item" id="btnRequestOt"><span>⏰</span> <b class="ee-more-item-text">ขอ OT งานนี้</b></button>` : ""}
       ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ${showBoard ? "การดำเนินงาน" : "งานของฉัน"}</button>` : ""}
       ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
       ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
@@ -4206,6 +4215,17 @@ export const getEditEvent = async ({
           });
         });
       }
+
+      /* ✅ ขอ OT งานนี้ — ปิดหน้าแก้ไขก่อนแล้วเปิดฟอร์ม OT (React Dialog) ที่ผูกงานนี้ + วันที่ให้แล้ว
+         ส่งช่วงวันของงาน (start/end) ไปด้วย — ฟอร์มตั้งวันที่เป็นวันนี้ถ้าอยู่ในช่วงงาน และให้กดเลือกวันของงานได้ */
+      document.getElementById("btnRequestOt")?.addEventListener("click", () => {
+        Swal.close();
+        onRequestOt?.({
+          _id: eventId, title: eventTitle || "", system: eventSystem, company: eventCompany, site: eventSite,
+          docNo: evendocNo, start: ev.start || null, end: ev.end || null,
+          round: eventTime ? String(eventTime) : "", visitCount: Number(eventVisitCount) || 0,
+        });
+      });
 
       /* ✅ ออกใบแจ้งเข้าปฏิบัติงาน — ทำแบบเดียวกับใบส่งมอบงานเป๊ะๆ: ปิดหน้าแก้ไขก่อนแล้วค่อยเปิดกล่อง
          ออกเอกสาร (React Dialog) ไม่ซ้อนกัน 2 ชั้น

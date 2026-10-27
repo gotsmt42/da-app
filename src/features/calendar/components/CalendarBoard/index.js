@@ -90,6 +90,7 @@ import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 // ⚠️ lazy — ฟอร์มใบเบิกใหญ่ (MUI Autocomplete/DatePicker/แนบไฟล์) และน้อยคนที่เปิดจากหน้าปฏิทิน ไม่ควรถ่วง
 // การโหลดหน้าปฏิทินซึ่งเป็นหน้าที่เปิดบ่อยที่สุดของแอป
 const ExpenseFormDialog = lazyWithRetry(() => import("@/features/expenses/components/ExpenseFormDialog"));
+const OtFormDialog = lazyWithRetry(() => import("@/features/ot/components/OtFormDialog"));
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {
@@ -1143,6 +1144,8 @@ function EventCalendar() {
       onOpenWorkNotice: setWorkNoticeJob,
       onOpenDeliveryNote: setDeliveryNoteJob,
       onRequestAdvance: setAdvanceJob,
+      // ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้อิงวันที่ที่กดในตารางอัตโนมัติเลย แต่ยังมีให้เลือก") — แนบวันที่ของช่องที่กดเปิดงาน
+      onRequestOt: (job) => setOtJob({ ...job, preferDate: clickedDateRef.current }),
       handleDeleteEvent,
       onCopyEvent: handleCopyEvent,
       EventService,
@@ -1216,6 +1219,9 @@ function EventCalendar() {
   const [workNoticeJob, setWorkNoticeJob] = useState(null);
   // ✅ งานที่กำลังจะเบิก Advance (เมนู "เบิก Advance งานนี้" ในหน้าแก้ไขงาน) — กลไกเดียวกับ deliveryNoteJob
   const [advanceJob, setAdvanceJob] = useState(null);
+  const [otJob, setOtJob] = useState(null);
+  /** วันที่ของช่องปฏิทินที่กดเปิดงานล่าสุด (งานหลายวัน = รู้ว่ากดที่วันไหน) — ใช้ตั้งวันที่ในฟอร์ม OT */
+  const clickedDateRef = useRef("");
   const handleExportExcel = async () => {
     if (exportingExcel || filteredCalendarEvents.length === 0) return;
     setExportingExcel(true);
@@ -2849,6 +2855,16 @@ function EventCalendar() {
             // "ไม่มีสิทธิ์" ทันที ทั้งที่เป็นคนที่ต้องไปทำงานนั้นเองและควรเห็นรายละเอียด/วันเวลา/สถานที่
             // ⚠️ เปิดได้ ≠ แก้ได้ — ฟอร์มจะล็อกทุกช่องให้เองเมื่อผู้ใช้เป็นลูกทีมล้วนๆ (isTeamMemberViewer
             // ใน EditEvent.js) จึงส่งเข้า handleEditEvent ตัวเดียวกันได้เลย ไม่ต้องทำหน้าจอแยกอีกชุด
+            // จำ "วันที่ของช่องที่กด" — มองทะลุแท่งงานลงไปหาช่องวัน (เดือน) หรือคอลัมน์วัน (สัปดาห์)
+            clickedDateRef.current = "";
+            const { clientX: cx, clientY: cy } = arg.jsEvent || {};
+            if (Number.isFinite(cx) && Number.isFinite(cy)) {
+              for (const el of document.elementsFromPoint?.(cx, cy) || []) {
+                if (el.closest?.(".fc-daygrid-event-harness, .fc-timegrid-event-harness")) continue;
+                const d = el.closest?.("[data-date]")?.getAttribute("data-date");
+                if (d) { clickedDateRef.current = d.slice(0, 10); break; }
+              }
+            }
             if (canViewEvent(arg.event.extendedProps)) {
               handleEditEvent(arg);
             } else {
@@ -3770,6 +3786,30 @@ function EventCalendar() {
           issuer={userData}
           canUseRunningNumber={isAdminOrManager}
         />
+      )}
+
+      {/* ✅ (27 ต.ค. 2569) ฟอร์มขอ OT ของงาน — เปิดจากเมนู "⋯ เพิ่มเติม" ในหน้าแก้ไขงาน (ดู onRequestOt) */}
+      {otJob && (
+        <Suspense fallback={null}>
+          <OtFormDialog
+            open
+            presetJob={otJob}
+            onClose={() => setOtJob(null)}
+            onSaved={async (req, { fileWarn } = {}) => {
+              setOtJob(null);
+              const r = await Swal.fire({
+                icon: fileWarn ? "warning" : "success",
+                title: `ส่งใบ OT ${req?.docNo || ""} แล้ว`,
+                text: fileWarn || "รอแอดมินตรวจสอบ → อนุมัติ — ดูสถานะได้ที่เมนู OT",
+                showCancelButton: Boolean(req?._id),
+                confirmButtonText: req?._id ? "ดูใบ OT" : "ตกลง",
+                cancelButtonText: "ปิด",
+                confirmButtonColor: "#0891b2",
+              });
+              if (r.isConfirmed && req?._id) navigate(`/ot/${req._id}`);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* ✅ ฟอร์มเบิก Advance ของงาน — เปิดจากเมนู "⋯ เพิ่มเติม" ในหน้าแก้ไขงาน (ดู onRequestAdvance)

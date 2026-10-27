@@ -74,9 +74,25 @@ export const crossesMidnight = (start, end) => {
  * เดาประเภท OT จากวันที่ — ✅ ให้กรอกง่าย: วันหยุด (นักขัตฤกษ์/วันหยุดประจำสัปดาห์) + เริ่มในเวลางาน = ทำงานวันหยุด
  * วันหยุด + เริ่มตั้งแต่ 17:30 (เวลาเลิกงาน) = OT วันหยุด · วันปกติ = OT วันทำงาน (ผู้ใช้เปลี่ยนเองได้เสมอ)
  */
+/**
+ * วันหยุดประจำสัปดาห์ — ✅ (27 ต.ค. 2569 ผู้ใช้: "วันเสาร์ อาทิตย์ คือทำงานวันหยุด · จ-ศ คือ OT วันทำงาน")
+ * เสาร์ (6) + อาทิตย์ (0) เป็นวันหยุดเสมอ รวมกับที่ตั้งไว้ในตั้งค่าองค์กร (ถ้ามีวันอื่นเพิ่ม)
+ */
+export const restDaysOf = (cfg) => [...new Set([0, 6, ...(cfg?.restDays || [])])];
+
+/**
+ * เวลาตั้งต้นตามประเภท OT — ✅ ผู้ใช้: "ทำงานวันหยุด 8.30-17.30 · OT วันทำงานเริ่ม 17.30 · OT วันหยุดเริ่ม 17.30"
+ */
+export const TYPE_TIME = {
+  workdayOT: { start: "17:30", end: "20:30" },
+  holidayWork: { start: "08:30", end: "17:30" },
+  holidayOT: { start: "17:30", end: "20:30" },
+};
+export const timeForType = (type) => TYPE_TIME[type] || TYPE_TIME.workdayOT;
+
 export const guessType = (date, start, cfg) => {
   if (!date) return "workdayOT";
-  const holiday = Boolean(cfg?.holidays?.[date]) || (cfg?.restDays || [0]).includes(moment(date).day());
+  const holiday = Boolean(cfg?.holidays?.[date]) || restDaysOf(cfg).includes(moment(date).day());
   if (!holiday) return "workdayOT";
   const a = toMin(start);
   return a !== null && a >= 17 * 60 + 30 ? "holidayOT" : "holidayWork"; // 🔁 (27 ต.ค. 2569) เลิกงาน 17:30
@@ -86,7 +102,7 @@ export const guessType = (date, start, cfg) => {
 export const holidayNote = (date, cfg) => {
   if (!date) return "";
   if (cfg?.holidays?.[date]) return cfg.holidays[date];
-  return (cfg?.restDays || [0]).includes(moment(date).day()) ? "วันหยุดประจำสัปดาห์" : "";
+  return restDaysOf(cfg).includes(moment(date).day()) ? "วันหยุดประจำสัปดาห์" : "";
 };
 
 /** "2026-09" → "ก.ย. 2569" */

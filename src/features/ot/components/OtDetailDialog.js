@@ -20,6 +20,7 @@ import OtStatusBadge from "./OtStatusBadge";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { useHolidays, dayKind } from "./OtDayInfo";
+import { EvidenceGallery, prepareEvidence } from "./OtEvidence";
 import {
   OT_ACCENT, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, typeMeta, hoursText, money, periodLabel, OT_TYPES,
 } from "../otMeta";
@@ -106,6 +107,7 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
   const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState("");
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [fileBusy, setFileBusy] = useState(false);
   const [otCfg, setOtCfg] = useState(null);
   useEffect(() => { if (open && !otCfg) OtService.config().then(setOtCfg).catch(() => {}); }, [open, otCfg]);
   const holidays = useHolidays(otCfg);
@@ -129,6 +131,8 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
   const chain = canReview && canApprove && can("approveOwnReview");
   const reviewedByMe = e && e.reviewedBy?.userId === me;
   const canEdit = e && ["pending", "rejected"].includes(e.status) && (isOwner || can("viewAllExpenses"));
+  // แนบหลักฐานเพิ่มได้จนกว่าใบจะยกเลิก/ปิดรอบ (ลบได้เฉพาะตอนใบยังแก้ได้ = canEdit)
+  const canAddFiles = e && !["cancelled", "paid"].includes(e.status) && (isOwner || can("viewAllExpenses"));
   const stepCap = e && { pending: "reviewExpense", reviewed: "approveExpense", approved: "disburseExpense" }[e.status];
   const canReject = Boolean(stepCap) && can(stepCap);
   const canCancel = e && ((isOwner && ["pending", "rejected"].includes(e.status))
@@ -290,6 +294,25 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
                       <Typography sx={{ fontWeight: 800, fontSize: "0.9rem" }}>{hoursText(p.hours)}</Typography>
                     </Stack>
                   ))}
+                </Card>
+              )}
+
+              {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้แนบหลักฐานการทำ OT ด้วย แต่ไม่บังคับ") */}
+              {((e.attachments || []).length > 0 || canAddFiles) && (
+                <Card title="หลักฐานการทำ OT" right={<Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 700 }}>{(e.attachments || []).length ? `${e.attachments.length} ไฟล์` : "ไม่บังคับ"}</Typography>}>
+                  <EvidenceGallery attachments={e.attachments || []} canAdd={canAddFiles} canRemove={canEdit} busy={fileBusy}
+                    onAdd={async (files) => {
+                      setFileBusy(true); setActionError("");
+                      try {
+                        const prepared = await prepareEvidence(files);
+                        if (prepared.length) setDoc(await OtService.addFiles(e._id, prepared.map((f) => f.file)));
+                        prepared.forEach((f) => URL.revokeObjectURL(f.preview));
+                      } catch (err) { setToast(""); setLoadError(errorText(err, "แนบไฟล์ไม่สำเร็จ")); } finally { setFileBusy(false); }
+                    }}
+                    onRemove={async (a) => {
+                      setFileBusy(true);
+                      try { setDoc(await OtService.removeFile(e._id, a._id)); } catch (err) { setLoadError(errorText(err, "ลบไฟล์ไม่สำเร็จ")); } finally { setFileBusy(false); }
+                    }} />
                 </Card>
               )}
 

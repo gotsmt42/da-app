@@ -12,6 +12,13 @@ const OtService = {
   async get(id) { return (await API.get(`/ot/${id}`)).data.request; },
   async create(fields) { return (await API.post("/ot", fields)).data.request; },
   async update(id, fields) { return (await API.put(`/ot/${id}`, fields)).data.request; },
+  /** หลักฐานการทำ OT (ไม่บังคับ) — files: File[] */
+  async addFiles(id, files) {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    return (await API.post(`/ot/${id}/files`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 })).data.request;
+  },
+  async removeFile(id, fileId) { return (await API.delete(`/ot/${id}/files/${fileId}`)).data.request; },
   async review(id, note = "") { return (await API.post(`/ot/${id}/review`, { note })).data.request; },
   async approve(id, note = "") { return (await API.post(`/ot/${id}/approve`, { note })).data.request; },
   async reject(id, reason) { return (await API.post(`/ot/${id}/reject`, { reason })).data.request; },
