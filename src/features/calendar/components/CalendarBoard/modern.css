@@ -298,3 +298,15 @@
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-team { margin: 2px 0 0 !important; padding: 2px 0 0 !important; }
 /* "+N เพิ่มเติม" ไม่ถูกตัดคำ */
 .ec-modern .fc .fc-daygrid-more-link { white-space: nowrap; overflow: visible; font-size: 11px; }
+
+/* 🐛 (ผู้ใช้: "เส้นทำไมเลยมาแบบนี้ กินพื้นที่") 
+   • ติ่งไอคอน: เลิกเส้นขอบ (เส้นซ้ายของติ่งลากทะลุลงมาในการ์ด) — ใช้พื้นสีงานล้วน กลืนกับการ์ด
+   • ขีดจับขยายวันด้านขวา: บางและจางมาก ไม่เป็นแท่งหนาบนการ์ดสีอ่อน (ยังลากได้เหมือนเดิม) */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-badges { border: 0 !important; right: 0 !important; }
+.modern-calendar-container.ec-modern .ec-timed-resize-handle::after {
+  width: 2px !important;
+  background: var(--ec-t, #fff) !important;
+  opacity: .22;
+}
+.modern-calendar-container.ec-modern .ec-timed-resize-handle:hover::after,
+.modern-calendar-container.ec-modern .ec-timed-resize-handle.is-resizing::after { opacity: .6; }
