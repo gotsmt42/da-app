@@ -46,6 +46,7 @@ import PageLoader from "@/shared/ui/PageLoader";
 
 
 import "./index.css";
+import "./modern.css"; // 🎨 (26 ต.ค. 2569) หน้าตาแบบใหม่ — คลาส ec-modern ที่กล่องปฏิทิน
 import FloatPersonPicker from "./FloatPersonPicker";
 
 import API from "@/shared/api/axiosInstance";
@@ -2608,7 +2609,7 @@ function EventCalendar() {
 
   return (
     <div
-      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}${isSalesView ? " ec-sales-page" : ""}`}
+      className={`modern-calendar-container ec-modern${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}${isSalesView ? " ec-sales-page" : ""}`}
       // ✅ (15 ต.ค. 2569 ผู้ใช้: "ไม่ให้ content ขึ้นก่อนหน้าโหลดเสร็จ ไม่มืออาชีพ") — โหลดครั้งแรก: ซ่อนเนื้อหาทั้งหน้า
       //    (visibility ไม่ใช่ display — ปฏิทินยังวัดขนาด/จัดหน้าได้ปกติ) เหลือแค่หน้าโหลด TidTam กลางจอ แล้วโผล่พร้อมกันทีเดียว
       style={{ "--ec-m-zoom": mobileColW, visibility: firstEventsLoaded ? "visible" : "hidden" }}
@@ -2638,7 +2639,7 @@ function EventCalendar() {
           exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
           title={isServiceObserver ? "ตารางงานช่าง (ดูอย่างเดียว)" : "ตารางงานช่าง"}
           // ✅ เซลดูตารางงานช่างแบบอ่านอย่างเดียว — ไม่ต้องเห็นตัวเลขสถานะงานของช่าง (ผู้ใช้สั่ง 9 ต.ค. 2569)
-          showKpis={techView !== "calendar" && !isServiceObserver}
+          showKpis={techView === "list" && !isServiceObserver}
         />
       )}
 
@@ -2668,7 +2669,7 @@ function EventCalendar() {
         {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
             ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
             ⚠️ ไม่ทำเป็นการตั้งค่าค้างถาวร — เป็นการสลับมุมมองชั่วคราวของการดูรอบนี้เท่านั้น */}
-        {!isSalesView && !techListMode && (
+        {!isSalesView && !listMode && (
         <button
           className={`filter-toggle-btn ${allCardsExpanded ? "filter-toggle-btn--open" : ""}`}
           onClick={toggleAllCards}
@@ -3129,16 +3130,18 @@ function EventCalendar() {
             // ⚠️ ใช้คู่สีเดียวกับป้ายบน (--ec-badge-bg/fg) ครึ่งบนที่ทับการ์ดจึงกลืนหายไปสนิท
             // เหลือเห็นเป็นติ่งมนๆ ที่ขอบล่าง อ่านออกว่าเป็นของการ์ดใบนั้น
             // ⚠️ title เก็บรายชื่อเต็มไว้ — ป้ายกว้างจำกัด ชื่อยาวจะถูกตัดด้วย ellipsis
+            // 🎨 (26 ต.ค. 2569 ผู้ใช้: "แสดงรายชื่อทุกคน ถ้าเกินค่อยตัดแถวลงมา") 👷 หัวหน้าทีม (ตัวหนา) ตามด้วยลูกทีมต่อกันเป็นข้อความเดียว
+            const [teamHead, ...teamRest] = allTeamNames;
             const teamBadgeHtml = allTeamNames.length
-              ? `<span class="ec-card-team" style="${badgeChipStyle}" title="ทีมที่เข้างาน: ${escapeHtml(allTeamNames.join(", "))}"><span class="ec-card-team-ico" aria-hidden="true">👷</span>${escapeHtml(allTeamNames.join(", "))}</span>`
+              ? `<span class="ec-card-team" style="${badgeChipStyle}" title="หัวหน้าทีม: ${escapeHtml(teamHead)}${teamRest.length ? ` · ลูกทีม: ${escapeHtml(teamRest.join(", "))}` : ""}"><span class="ec-card-team-ico" aria-hidden="true">👷</span><b class="ec-team-name">${escapeHtml(teamHead)}</b>${teamRest.length ? `<span class="ec-team-rest">, ${teamRest.map(escapeHtml).join(", ")}</span>` : ""}</span>`
               : "";
 
             const detailRows = [
               [systemDisplay, ""],
               [timeDisplay, ""],
               [teamDisplay, " ec-card-row--team"],
-              [contactDisplay, ""],
-              [contactTelDisplay, ""],
+              [contactDisplay, " ec-card-row--contact"],
+              [contactTelDisplay, " ec-card-row--contact"],
               [timeRangeDisplay, ""],
             ].filter(([html]) => html);
             const hasDetail = detailRows.length > 0;
@@ -3174,7 +3177,7 @@ function EventCalendar() {
             // ถ้าปล่อยให้ข้อความลอยกลางแท่ง (พฤติกรรมเดิม) จะอ่านไล่ลงมาเป็นคอลัมน์ไม่ได้เลย
             return {
               html: `
-                <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}">
+                <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}" style="--ec-c:${escapeHtml(backgroundColor || "#3788d8")}">
                   <div class="ec-card-head">
                     ${/* ⚠️ ลำดับใน DOM นี้ถูกจัดเพื่อ "โหมดลอยขวา (float)" บนมือถือโดยเฉพาะ — ตัวที่ float
                           ก่อนจะไปอยู่ขวาสุด เรียง toggle → สถานะ → กลุ่มงาน จึงได้ภาพ [🔗][✓][▲] ตามที่ต้องการ

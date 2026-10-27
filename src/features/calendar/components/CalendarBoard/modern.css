@@ -1,0 +1,263 @@
+/* ════════════════════════════════════════════════════════════════════════════
+ * 🎨 ปฏิทินงานช่าง — หน้าตาแบบใหม่ (ทดลอง 26 ต.ค. 2569)
+ * ผู้ใช้: "ลองแก้ไข ux ui หน้า event · ดูง่าย สะอาดขึ้น · ใช้บนมือถือง่ายขึ้น · เร็วและลื่นขึ้น · สวยงามทันสมัย"
+ *   • ตาราง: พื้นขาว เส้นบาง มุมโค้ง · หัววันเป็นตัวหนังสือเทา (เลิกแถบแดงทึบ) · เสาร์-อาทิตย์เทาอ่อนมาก
+ *   • วันนี้: เลขวันในวงกลมสีแบรนด์ (เลิกพื้นแดงทั้งช่อง + เส้นแดงข้าง)
+ *   • การ์ดงาน: พื้นสีอ่อนของสีงาน + แถบสีซ้าย · ตัวหนังสือเข้ม · ป้ายประเภทงานสีทึบเล็กๆ · ตัดอีโมจิ
+ * ⚠️ ทุกกฎอยู่ใต้ .ec-modern — ถอดคลาสนี้ออก = กลับเป็นหน้าตาเดิมทันที
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+.ec-modern {
+  --ecm-line: #edf0f4;
+  --ecm-frame: #e3e8ef;
+  --ecm-ink: #0f172a;
+  --ecm-sub: #64748b;
+  --ecm-brand: #dc2626;
+  --ec-weekend: #fafbfc;
+}
+.ec-modern.ec-sales-page { --ecm-brand: #2563eb; }
+
+/* ── กรอบตาราง ── */
+.ec-modern .fc { --fc-border-color: var(--ecm-line); --fc-today-bg-color: transparent; }
+.ec-modern .fc .fc-scrollgrid {
+  border: 1px solid var(--ecm-frame) !important;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.ec-modern .fc .fc-scrollgrid td:last-child, .ec-modern .fc .fc-scrollgrid th:last-child { border-right: 0; }
+
+/* ── หัววัน ── */
+.ec-modern .fc .fc-col-header-cell,
+.ec-modern .fc .fc-day-header {
+  background: #fff !important;
+  border-color: var(--ecm-line) !important;
+}
+.ec-modern .fc .fc-col-header-cell-cushion {
+  color: var(--ecm-sub) !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em;
+  padding: 9px 4px !important;
+}
+.ec-modern .fc thead .fc-scrollgrid-section > * { border-bottom: 1px solid var(--ecm-frame) !important; }
+
+/* ── ช่องวัน ── */
+.ec-modern .fc .fc-daygrid-day { background: #fff; }
+.ec-modern .fc .fc-day-sat,
+.ec-modern .fc .fc-day-sun { background: var(--ec-weekend) !important; }
+.ec-modern .fc .fc-day-other { opacity: 1 !important; background: #fcfcfd !important; }
+.ec-modern .fc .fc-day-other .fc-daygrid-day-number { color: #cbd5e1 !important; }
+.ec-modern .fc .fc-daygrid-day-number {
+  color: #334155 !important;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 8px !important;
+}
+.ec-modern .fc .fc-day-today {
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.ec-modern .fc .fc-day-today .fc-daygrid-day-number {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; margin: 4px 4px 0 0; padding: 0 7px !important;
+  border-radius: 999px;
+  background: var(--ecm-brand); color: #fff !important; font-weight: 800;
+}
+
+/* ── การ์ดงาน: สีทึบของงาน (เข้ม ชัด) บนตารางขาวสะอาด · ตัวหนังสือขาว · ป้ายประเภทงานพื้นขาว ── */
+.ec-modern .fc .fc-daygrid-event:not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-selected),
+.ec-modern .fc .fc-h-event:not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-selected),
+.ec-modern .fc .fc-timegrid-event:not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-selected) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.ec-modern .fc .fc-event-main { color: #fff !important; }
+.ec-modern .fc-daygrid .ec-card,
+.ec-modern .fc-timegrid .ec-card {
+  background: var(--ec-c, #3788d8);
+  border: 0;
+  border-radius: 4px;
+  color: #fff !important;
+  box-shadow: none;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+@media (hover: hover) {
+  .ec-modern .fc-daygrid .ec-card:hover { box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--ec-c, #3788d8) 80%, transparent); transform: translateY(-1px); }
+}
+.ec-modern .ec-card a { color: inherit !important; }
+.ec-modern .fc-daygrid .ec-card-type {
+  background: #fff !important;
+  color: var(--ec-c, #3788d8) !important;
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: .86em;
+  font-weight: 800;
+}
+.ec-modern .ec-card-title { color: #fff !important; }
+/* ไอคอนเดิมกลับมา — จัดให้เป็นช่องเดียวกันทุกแถว (กว้างคงที่ ชิดกึ่งกลาง) ข้อความเริ่มแนวเดียวกัน อ่านเป็นระเบียบ */
+.ec-modern .fc-daygrid .ec-card-ico {
+  display: inline-block;
+  width: auto;
+  margin-right: 4px;
+  text-align: left;
+  font-size: .95em;
+  line-height: 1;
+  vertical-align: -.06em;
+}
+.ec-modern .fc-daygrid .ec-card-team-ico { margin-right: 3px; font-size: .95em; }
+.ec-modern .fc-daygrid .ec-card-site .ec-card-ico,
+.ec-modern .fc-daygrid .ec-card-row .ec-card-ico { opacity: .95; }
+.ec-modern .ec-card-site { font-weight: 800; color: #fff !important; opacity: 1; }
+.ec-modern .ec-card-row { color: rgba(255, 255, 255, .92) !important; opacity: 1; }
+.ec-modern .ec-card-k, .ec-modern .ec-card-kw { color: rgba(255, 255, 255, .72) !important; }
+/* ติ่งนูนไอคอนสถานะ/ปุ่มพับ — สีเดียวกับการ์ดงาน ไอคอนขาว (ผู้ใช้ขอ) */
+.ec-modern .fc-daygrid .ec-card-badges {
+  background: var(--ec-c, #3788d8) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+/* ติ่งต้องเสมอขอบขวาของการ์ด (เดิมยื่นเกิน 1px) · มุมบนเข้าชุดกับการ์ด · มุมล่างเหลี่ยม กลืนเป็นชิ้นเดียว */
+.ec-modern .fc-daygrid .ec-card-badges {
+  right: 0 !important;
+  border-radius: 6px 4px 0 0 !important;
+}
+.ec-modern .fc-daygrid .ec-card-team {
+  background: #fff !important;
+  color: #1e293b !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
+  font-weight: 700;
+}
+.ec-modern .ec-card-grip { color: rgba(255, 255, 255, .6) !important; }
+
+/* ── ปุ่ม "+N งาน" ── */
+.ec-modern .fc .fc-daygrid-more-link {
+  color: var(--ecm-brand) !important;
+  font-weight: 800;
+  font-size: 11.5px;
+}
+
+/* ── แท่งจับขยายวัน: ขีดสีอ่อนของสีงาน (เดิมขีดขาวมีเงา ดูเป็นเส้นแตกบนการ์ดสีอ่อน) ── */
+.ec-modern .ec-timed-resize-handle::after {
+  background: rgba(255, 255, 255, .8);
+  box-shadow: none;
+}
+.ec-modern .ec-timed-resize-handle:hover::after,
+.ec-modern .ec-timed-resize-handle.is-resizing::after { background: #fff; box-shadow: none; }
+
+/* ── แถบหัวปฏิทิน (เดือน · ก่อน/ถัดไป · วันนี้ · ย่อ/ขยาย) ── */
+.ec-modern .fc .fc-toolbar-title { font-weight: 900; color: var(--ecm-ink); letter-spacing: -.01em; }
+.ec-modern .fc .fc-button {
+  background: #fff !important;
+  border: 1px solid var(--ecm-frame) !important;
+  color: #334155 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  font-weight: 700;
+  transition: background .15s ease, border-color .15s ease;
+}
+.ec-modern .fc .fc-button:hover:not(:disabled) { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.ec-modern .fc .fc-button:disabled { opacity: .55; }
+.ec-modern .fc .fc-today-button:not(:disabled) { color: var(--ecm-brand) !important; border-color: color-mix(in srgb, var(--ecm-brand) 35%, #fff) !important; }
+
+/* ── ตอนกดค้าง/ลาก/เลือกการ์ด: คงสีทึบของงานไว้ (เดิมกฎโปร่งใสด้านบนทำให้สีหายตอนยกการ์ด) ── */
+.ec-modern .fc .fc-event-mirror,
+.ec-modern .fc .fc-event-dragging,
+.ec-modern .fc .fc-event-selected,
+.ec-modern .fc .ec-reorder-dragging .fc-event {
+  border-radius: 4px !important;
+  color: #fff !important;
+}
+.ec-modern .fc .fc-event-mirror .ec-card,
+.ec-modern .fc .fc-event-dragging .ec-card { box-shadow: 0 10px 24px -8px rgba(15, 23, 42, .5); }
+
+/* ── มุมเหลี่ยมขึ้น เรียบสะอาด: ป้ายไอคอน/ทีม/ปุ่มเปลี่ยนเดือน ไม่โค้งมนเป็นเม็ดยา ── */
+.ec-modern .fc-daygrid .ec-card-badges { border-radius: 4px !important; box-shadow: none !important; }
+.ec-modern .fc-daygrid .ec-card-team { border-radius: 4px !important; box-shadow: none !important; }
+.ec-modern .fc .fc-button { border-radius: 6px !important; }
+.ec-modern .fc-daygrid .ec-card { gap: 2px; }
+
+/* ══ จัดการ์ดให้เรียบ ไม่รก (ผู้ใช้: "ยังดูแปลกๆ ไม่สวย รกๆ") ══
+   • ไอคอนสถานะ/ปุ่มพับ: ติ่งขาวนูนคร่อมขอบบนแบบเดิม (ผู้ใช้ขอคงไว้)
+   • ทีม: เป็นบรรทัดธรรมดาท้ายการ์ด (เลิกเม็ดขาวห้อยขอบล่าง)
+   • ผู้ติดต่อ/เบอร์โทร: ไม่แสดงบนตารางเดือน (ดูได้ในหน้างาน) — เหลือ ประเภท · โครงการ · ระบบ · ครั้งที่ · ทีม */
+.ec-modern .fc-daygrid .ec-card { padding-top: 5px !important; padding-bottom: 5px !important; }
+.ec-modern .fc-daygrid .ec-card-head { padding-right: 30px; }
+.ec-modern .fc-daygrid .fc-daygrid-day-events { margin-top: 2px !important; }
+.ec-modern .fc-daygrid .ec-card-team {
+  display: block;
+  width: auto !important;
+  max-width: none !important;
+  margin: 3px 0 0 !important;
+  padding: 3px 0 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, .25) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #fff !important;
+  text-align: left !important;
+  font-weight: 700;
+  box-shadow: none !important;
+}
+.ec-modern .fc-daygrid .ec-card-row--contact { display: none !important; }
+/* แท่งจับขยายวัน: จางลง (ยังลากได้เหมือนเดิม) */
+.ec-modern .ec-timed-resize-handle::after { background: rgba(255, 255, 255, .45) !important; width: 2px; }
+
+/* จอแคบ: ป้ายประเภทงานบรรทัดเดียว แสดงเต็ม (ติ่งไอคอนลอยอยู่นอกการ์ด ไม่แย่งที่) */
+@media (max-width: 1100px) {
+  /* 🐛 ป้ายถูกตัดครึ่ง ("PM" → "P|"): กฎเดิมของจอแคบตัด overflow ที่แถวชื่อ — เปิดให้เห็นเต็ม + ย่อป้ายให้พอดีการ์ด */
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card-title { overflow: visible !important; padding-right: 0 !important; }
+  /* วันหยุด (ไม่มีติ่งไอคอน) ชื่อยาว — ห่อบรรทัดได้ตามเดิม */
+  .ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) .ec-card-type { white-space: normal !important; }
+  .ec-modern .fc-daygrid .ec-card-type {
+    white-space: nowrap; overflow-wrap: normal; max-width: 100%;
+    font-size: .8em; padding: 0 3px; letter-spacing: 0;
+  }
+}
+/* มุมการ์ดเท่ากันทุกใบ (กฎเดิมบางจอบังคับมุมโค้งใหญ่) — ติ่งด้านบนใช้มุมขวาเท่าการ์ด */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card,
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event { border-radius: 5px !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-badges { border-radius: 6px 5px 0 0 !important; right: 0 !important; }
+
+/* ── ทีม: 👷 หัวหน้าทีม (ตัวหนา) + ลูกทีมต่อท้าย ห่อบรรทัดเมื่อไม่พอ ── */
+.ec-modern .fc-daygrid .ec-card-team { display: block !important; white-space: normal !important; overflow: visible; overflow-wrap: break-word; line-height: 1.45; }
+.ec-modern .fc-daygrid .ec-card-team-ico { margin-right: 2px !important; }
+.ec-card-team .ec-team-name { font-weight: 800; }
+.ec-card-team .ec-team-rest { font-weight: 600; opacity: .9; }
+/* ระยะไอคอน → ข้อความ: ชิด (ผู้ใช้: "ระยะห่างจาก icon มากไป") */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-ico { margin-right: 1px !important; width: auto !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-k { margin-right: 0 !important; padding-right: 0 !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-kw { display: none !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-v { margin-left: 0 !important; padding-left: 0 !important; }
+
+/* ── วันหยุด (การ์ดไม่มีไอคอน/ปุ่มพับ): ชื่อวันหยุดเต็มความกว้างการ์ด ตัวขาวบนพื้นแดง (เลิกกล่องขาวแคบๆ ห่อทีละคำ) ── */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-badges:empty { display: none !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) .ec-card-title {
+  flex: 1 1 auto; width: 100%; white-space: normal !important; overflow: visible !important;
+}
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) .ec-card-type {
+  display: block; width: 100%; max-width: none;
+  background: transparent !important; color: #fff !important;
+  padding: 0; font-size: 1em; font-weight: 800; line-height: 1.4;
+  white-space: normal !important; overflow-wrap: break-word;
+}
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) { display: block !important; width: 100%; padding-right: 0 !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) .ec-card-title { display: block; max-width: none !important; padding-right: 0 !important; }
+
+/* 🐛 ป้ายประเภทงานยาว ("ติดตั้งอุปกรณ์") ถูกตัดทั้งที่การ์ดมีที่เหลือ — แถวหัวการ์ดให้กว้างเต็มการ์ด
+   ป้ายยาวได้เต็มความกว้าง ถ้ายาวเกินค่อยขึ้นบรรทัดใหม่ (ติ่งไอคอนลอยอยู่นอกการ์ด ไม่ต้องเว้นที่) */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head { display: block !important; width: 100%; padding-right: 0 !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-grip { display: none !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-title {
+  display: block !important; width: 100%; max-width: none !important; padding-right: 0 !important;
+  overflow: visible !important; white-space: normal !important;
+}
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-type {
+  display: inline-block; max-width: 100% !important; overflow: visible !important;
+  white-space: normal !important; overflow-wrap: break-word !important; text-overflow: clip !important;
+}
+/* สระ/วรรณยุกต์ไทยบนป้ายไม่ถูกตัด — เผื่อความสูงบรรทัด */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-type { line-height: 1.7 !important; padding: 0 5px !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-head,
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-title { overflow: visible !important; height: auto !important; max-height: none !important; }

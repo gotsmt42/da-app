@@ -163,7 +163,7 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
           </Button>
         )}
         {canAdd && (
-          <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" }, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
+          <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" }, flexShrink: 0, whiteSpace: "nowrap", minWidth: "auto", px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
             <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มงาน</Box>
             <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
           </Button>
