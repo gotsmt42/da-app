@@ -8,7 +8,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, Skeleton,
   useMediaQuery, TextField, CircularProgress, Tooltip, Avatar,
 } from "@mui/material";
-import { Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, AccessTime, Check, CalendarMonth } from "@mui/icons-material";
+import { Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, AccessTime, Check, CalendarMonth, PictureAsPdf } from "@mui/icons-material";
+import PdfPrintDialog from "@/shared/components/PdfPrintDialog";
 import moment from "moment";
 
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
@@ -104,6 +105,7 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [toast, setToast] = useState("");
+  const [pdfOpen, setPdfOpen] = useState(false);
   const [otCfg, setOtCfg] = useState(null);
   useEffect(() => { if (open && !otCfg) OtService.config().then(setOtCfg).catch(() => {}); }, [open, otCfg]);
   const holidays = useHolidays(otCfg);
@@ -311,7 +313,9 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
 
         {e && (
           <DialogActions sx={{ px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 0.75, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {canCancel && <Button onClick={() => setAction("cancel")} startIcon={<Block />} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, mr: "auto" }}>ยกเลิก</Button>}
+            {canCancel && <Button onClick={() => setAction("cancel")} startIcon={<Block />} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ยกเลิก</Button>}
+            {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "ปริ้น PDF เอามาไว้ข้างล่างให้ชัดเจน ทำให้เป็นสีแดง") */}
+            <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)} sx={{ mr: "auto", textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e2e8f0", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } }}>พิมพ์ PDF</Button>
             {canEdit && <Button onClick={() => onEdit?.(e)} startIcon={<Edit />} sx={{ textTransform: "none", fontWeight: 700 }}>{e.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}</Button>}
             {canReject && <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>ตีกลับ</Button>}
             {chain && e.status === "pending" && (
@@ -338,6 +342,23 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
           </DialogActions>
         )}
       </Dialog>
+
+      {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้ออกเอกสารเป็น PDF ด้วย") */}
+      <PdfPrintDialog
+        open={pdfOpen && Boolean(e)}
+        onClose={() => setPdfOpen(false)}
+        jobKey={`${e?._id}:${e?.status}:${e?.updatedAt}`}
+        generate={async () => {
+          const { generateOtPdf } = await import("../utils/otPdf");
+          return generateOtPdf({ request: e, holidays, mode: "blob" });
+        }}
+        title={e?.docNo || "ใบขออนุมัติ OT"}
+        subtitle={e ? `ใบขออนุมัติ OT · ${e.requester?.name || ""} · ${hoursText(e.totalHours)}` : ""}
+        badge={<Box component="span" sx={{ px: 0.9, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 999, bgcolor: OT_ACCENT, color: "#fff", fontSize: "0.66rem", fontWeight: 900, letterSpacing: "0.06em" }}>OT</Box>}
+        color={OT_ACCENT} dark="#0e7490"
+        shareText={e ? `ใบขออนุมัติ OT ${e.docNo} · ${hoursText(e.totalHours)}` : ""}
+        email={e ? { docType: "ใบขออนุมัติ OT", docNo: e.docNo, refId: String(e._id), project: e.subject, audience: "internal" } : undefined}
+      />
 
       <Dialog open={Boolean(action)} onClose={() => !busy && setAction("")} fullWidth maxWidth="xs">
         {cfg && (

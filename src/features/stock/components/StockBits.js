@@ -1,7 +1,7 @@
 /** ชิ้นส่วนที่ใช้ซ้ำในระบบสต๊อก — ป้าย · รูปสินค้า · กล่องหัวข้อฟอร์ม */
 import { Box, Stack, Typography } from "@mui/material";
 import { Category, Handyman } from "@mui/icons-material";
-import { kindMeta, reqStatus, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STOCK_ACCENT } from "../stockMeta";
+import { kindMeta, reqStatus, reqView, REQ_VIEW, outstanding, fmt, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STOCK_ACCENT } from "../stockMeta";
 
 const pill = { display: "inline-flex", alignItems: "center", px: 0.9, height: 22, borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 };
 
@@ -10,7 +10,18 @@ export const KindTag = ({ kind }) => {
   return <Box component="span" sx={{ ...pill, bgcolor: m.bg, color: m.color }}>{m.label}</Box>;
 };
 
-export const ReqBadge = ({ status, label }) => {
+/** ป้ายสถานะใบเบิก — ส่ง r (ทั้งใบ) = แยก "ยืมอยู่ N" (ม่วง) กับ "เบิกจ่ายแล้ว" (เขียว) ให้เอง */
+export const ReqBadge = ({ status, label, r }) => {
+  if (r) {
+    const key = reqView(r);
+    const v = REQ_VIEW[key];
+    return (
+      <Box component="span" sx={{ ...pill, gap: 0.5, px: 1, height: 24, bgcolor: v.bg, color: v.color }}>
+        <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: v.color }} />
+        {v.label}{key === "loan" ? ` ${fmt(outstanding(r))}` : ""}
+      </Box>
+    );
+  }
   const m = reqStatus(status);
   return (
     <Box component="span" sx={{ ...pill, gap: 0.5, px: 1, height: 24, bgcolor: m.bg, color: m.color }}>
@@ -33,6 +44,30 @@ export const Thumb = ({ item, size = 40, radius = 2 }) => {
         ? <Box component="img" src={url.replace("/upload/", `/upload/c_fill,w_${size * 3},h_${size * 3},q_auto,f_auto/`)} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
         : item?.kind === "asset" ? <Handyman /> : <Category />}
     </Box>
+  );
+};
+
+/**
+ * รูปสินค้าของรายการในใบ (ใบเบิก/ใบคืน) — ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้มีรูปสินค้าทุกๆหน้าด้วยให้สมบูรณ์")
+ * รูปซ้อนกันไม่เกิน 3 รูป + ชื่อรายการแรก ×จำนวน · "+N รายการ"
+ */
+export const LineThumbs = ({ lines = [], itemById, size = 34, max = 3 }) => {
+  const first = lines[0];
+  if (!first) return null;
+  return (
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+      <Stack direction="row" sx={{ flexShrink: 0 }}>
+        {lines.slice(0, max).map((l, i) => (
+          <Box key={l._id || i} sx={{ ml: i ? `-${Math.round(size / 3)}px` : 0, borderRadius: 2, boxShadow: "0 0 0 2px #fff", zIndex: max - i }}>
+            <Thumb item={itemById?.get(String(l.item)) || { kind: l.kind }} size={size} />
+          </Box>
+        ))}
+      </Stack>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 600, color: TEXT_MAIN }}>{first.name} <Box component="span" sx={{ color: TEXT_SUB }}>×{fmt(first.qty)}</Box></Typography>
+        {lines.length > 1 && <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>และอีก {lines.length - 1} รายการ</Typography>}
+      </Box>
+    </Stack>
   );
 };
 

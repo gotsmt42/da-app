@@ -6,7 +6,9 @@
  * ✅ (ผู้ใช้: "กดอนุมัติควรมีการยืนยันอีกชั้น ไม่ใช่กดแล้วทำเลย กันพลาด")
  *    ทุกปุ่มที่เปลี่ยนยอด/สถานะ (อนุมัติ · ไม่อนุมัติ · ยกเลิก · รับคืน) ต้องผ่านกล่องยืนยันที่สรุปผลให้เห็นก่อน
  *   ผู้ยื่น: ยกเลิก (ตอนรออนุมัติ)
- *   ผู้ดูแลคลัง: อนุมัติจ่ายของ (ตัดยอด) · ไม่อนุมัติ (ปล่อยยอดจอง) · รับคืนทรัพย์สิน (ทีละรายการ/ครบ)
+ *   ผู้ดูแลคลัง: อนุมัติจ่ายของ (ตัดยอด) · ไม่อนุมัติ (ปล่อยยอดจอง)
+ * 🔁 (27 ต.ค. 2569 ผู้ใช้เลือก "ใบคืนของ + สภาพของ") การคืนทุกครั้งต้องผ่าน "ใบคืนของ" (RT) — เลิกปุ่มรับคืนตรงแบบเดิม
+ *    ใบเบิกแสดงรายการใบคืนที่อ้างใบนี้ · ผู้เบิก/ผู้ดูแลคลังกด "ยื่นใบคืนของ" ได้เมื่อยังมีของที่คืนได้
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -25,9 +27,12 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import StockService, { errorText } from "../services/StockService";
 import { STOCK_ACCENT, STOCK_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, outstanding, fmt, jobOf, reqStatus } from "../stockMeta";
 import { KindTag, ReqBadge, Thumb, FIELD_SX, Label } from "./StockBits";
+import StockReturnForm from "./StockReturnForm";
+import { RtBadge, RT_TONE } from "./StockReturnDetail";
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap" };
 const CARD = { bgcolor: "#fff", borderRadius: 3, border: `1px solid ${BORDER_MAIN}` };
+const PDF_SX = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e2e8f0", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } };
 
 /** แถบขั้นตอน — เห็นทันทีว่าใบอยู่ตรงไหนของวงจร */
 const Steps = ({ doc }) => {
@@ -69,19 +74,21 @@ const Info = ({ label, children }) => (
   </Box>
 );
 
-export default function StockRequestDetail({ id, open, canManage, myId, items = [], deptLabels = {}, onClose, onChanged }) {
+export default function StockRequestDetail({ id, open, canManage, myId, items = [], deptLabels = {}, onClose, onChanged, onOpenReturn }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [doc, setDoc] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState(null); // "issue" | "reject" | "cancel" | "return"
+  const [confirm, setConfirm] = useState(null); // "issue" | "reject" | "cancel"
   const [reason, setReason] = useState("");
-  const [ret, setRet] = useState({});
+  const [rts, setRts] = useState([]);
+  const [rtForm, setRtForm] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
 
   const load = useCallback(() => {
     if (!id) return;
     StockService.request(id).then(setDoc).catch((err) => setError(errorText(err, "โหลดใบเบิกไม่สำเร็จ")));
+    StockService.returns({ requestId: id }).then(setRts).catch(() => setRts([]));
   }, [id]);
   useEffect(() => { if (open) { setDoc(null); setError(""); setConfirm(null); setReason(""); load(); } }, [open, load]);
   useRealtime("stock", load, { enabled: open && !confirm });
@@ -102,14 +109,11 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
 
   const mine = doc && doc.requester?.userId === myId;
   const left = outstanding(doc);
-  const assetLines = (doc?.lines || []).filter((l) => l.kind === "asset" && l.qty - (l.returnedQty || 0) > 0);
+  // คืนได้: ใบที่จ่ายของแล้ว ยังมีของเหลือคืนได้ (วัสดุเหลือใช้/ทรัพย์สินค้างคืน) · ผู้เบิกหรือผู้ดูแลคลัง
+  const canReturn = doc && ["issued", "returned"].includes(doc.status) && (mine || canManage) && doc.lines.some((l) => l.qty - (l.returnedQty || 0) > 0);
   const overdue = doc?.status === "issued" && left > 0 && doc.dueReturnAt && new Date(doc.dueReturnAt) < new Date(new Date().toDateString());
   const totalUnits = (doc?.lines || []).reduce((t, l) => t + l.qty, 0);
   const deptLabel = deptLabels[doc?.dept] || doc?.dept || "";
-  const openReturn = () => {
-    setRet(Object.fromEntries(assetLines.map((l) => [l._id, l.qty - (l.returnedQty || 0)])));
-    setConfirm("return");
-  };
 
   const CONFIRM = {
     issue: { title: "ยืนยันอนุมัติและจ่ายของ", tone: STOCK_ACCENT, icon: <TaskAlt />, label: "ยืนยันอนุมัติ · ตัดยอด",
@@ -118,9 +122,6 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
       text: "ยอดที่จองไว้จะคืนเข้าคลัง และแจ้งผู้เบิกพร้อมเหตุผล", act: () => StockService.reject(doc._id, reason.trim()), need: !reason.trim() },
     cancel: { title: "ยกเลิกใบเบิกนี้", tone: "#475569", icon: <Close />, label: "ยืนยันยกเลิก",
       text: "ยอดที่จองไว้จะคืนเข้าคลัง — ยกเลิกแล้วแก้กลับไม่ได้ ต้องยื่นใบใหม่", act: () => StockService.cancel(doc._id) },
-    return: { title: "รับคืนทรัพย์สิน", tone: "#0f766e", icon: <AssignmentReturn />, label: "ยืนยันรับคืน",
-      text: "ตรวจของที่ได้รับคืนจริง แล้วใส่จำนวน — ยอดจะกลับเข้าคลังทันที",
-      act: () => StockService.returnItems(doc._id, Object.entries(ret).map(([lineId, qty]) => ({ lineId, qty }))), need: !Object.values(ret).some((n) => n > 0) },
   };
   const c = confirm && CONFIRM[confirm];
 
@@ -131,14 +132,10 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography sx={{ fontWeight: 800, fontSize: "1.1rem" }} noWrap>ใบเบิกของ {doc?.docNo || ""}</Typography>
-              {doc && <ReqBadge status={doc.status} label={doc.status === "issued" && left > 0 ? `ยืมอยู่ ${fmt(left)}` : undefined} />}
+              {doc && <ReqBadge r={doc} />}
             </Stack>
             {doc && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>ยื่นเมื่อ {thaiDateTime(doc.createdAt)} · คลัง{deptLabel}</Typography>}
           </Box>
-          {doc && (
-            <Button size="small" variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)}
-              sx={{ ...BTN, fontWeight: 700, color: "#334155", borderColor: "#e2e8f0", display: { xs: "none", sm: "inline-flex" } }}>PDF</Button>
-          )}
           <IconButton onClick={onClose} disabled={busy}><Close /></IconButton>
         </DialogTitle>
         <DialogContent sx={{ bgcolor: "#f8fafc", pt: "16px !important" }}>
@@ -212,6 +209,29 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
                 })}
               </Box>
 
+              {/* ใบคืนของที่อ้างใบนี้ */}
+              {rts.length > 0 && (
+                <Box sx={{ ...CARD, overflow: "hidden" }}>
+                  <Stack direction="row" alignItems="center" sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, borderBottom: `1px solid ${BORDER_MAIN}` }}>
+                    <AssignmentReturn sx={{ fontSize: 18, color: RT_TONE, mr: 1 }} />
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", flex: 1 }}>ใบคืนของ</Typography>
+                    <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 700 }}>{rts.length} ใบ</Typography>
+                  </Stack>
+                  {rts.map((r, i) => (
+                    <Stack key={r._id} direction="row" spacing={1.25} alignItems="center" role="button" onClick={() => onOpenReturn?.(r._id)}
+                      sx={{ px: { xs: 1.5, sm: 2 }, py: 1.1, borderTop: i ? `1px solid ${BORDER_MAIN}` : 0, cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" } }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: "0.88rem" }}>{r.docNo}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+                          {thaiDate(r.createdAt)} · {r.lines.map((l) => `${l.name} ×${fmt(l.qty)}`).join(", ")}
+                        </Typography>
+                      </Box>
+                      <RtBadge status={r.status} />
+                    </Stack>
+                  ))}
+                </Box>
+              )}
+
               {/* ประวัติ */}
               <Box sx={{ ...CARD, p: { xs: 1.5, sm: 2 } }}>
                 <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", mb: 1.25 }}>ประวัติการดำเนินการ</Typography>
@@ -237,8 +257,8 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
             {doc.status === "pending" && (mine || canManage) && (
               <Button onClick={() => setConfirm("cancel")} sx={{ ...BTN, fontWeight: 700, color: TEXT_SUB }}>ยกเลิกใบ</Button>
             )}
-            <Button size="small" variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)}
-              sx={{ ...BTN, fontWeight: 700, color: "#334155", borderColor: "#e2e8f0", display: { xs: "inline-flex", sm: "none" } }}>PDF</Button>
+            {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "ปริ้น PDF เอามาไว้ข้างล่างให้ชัดเจน ทำให้เป็นสีแดง") */}
+            <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)} sx={PDF_SX}>พิมพ์ PDF</Button>
             <Box sx={{ flex: 1 }} />
             {canManage && doc.status === "pending" && (
               <>
@@ -247,11 +267,11 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
                   sx={{ ...BTN, bgcolor: STOCK_ACCENT, "&:hover": { bgcolor: STOCK_DARK, boxShadow: "none" } }}>อนุมัติ · จ่ายของ</Button>
               </>
             )}
-            {canManage && doc.status === "issued" && left > 0 && (
-              <Button variant="contained" onClick={openReturn} startIcon={<AssignmentReturn />}
-                sx={{ ...BTN, bgcolor: "#0f766e", "&:hover": { bgcolor: "#115e59", boxShadow: "none" } }}>รับคืนทรัพย์สิน</Button>
+            {canReturn && (
+              <Button variant="contained" onClick={() => setRtForm(true)} startIcon={<AssignmentReturn />}
+                sx={{ ...BTN, bgcolor: RT_TONE, "&:hover": { bgcolor: "#115e59", boxShadow: "none" } }}>ยื่นใบคืนของ</Button>
             )}
-            {!(canManage && (doc.status === "pending" || (doc.status === "issued" && left > 0))) && (
+            {!(canManage && doc.status === "pending") && !canReturn && (
               <Button onClick={onClose} sx={{ ...BTN, fontWeight: 700, color: TEXT_SUB }}>ปิด</Button>
             )}
           </DialogActions>
@@ -274,28 +294,11 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
                 <WarningAmber sx={{ fontSize: 18, color: "#d97706", mt: 0.15 }} />
                 <Typography sx={{ fontSize: "0.82rem", color: "#78350f" }}>{c.text}</Typography>
               </Stack>
-              {confirm === "return" ? (
-                <Stack spacing={1}>
-                  {assetLines.map((l) => {
-                    const owe = l.qty - (l.returnedQty || 0);
-                    return (
-                      <Stack key={l._id} direction="row" spacing={1.25} alignItems="center">
-                        <Thumb item={photoOf.get(String(l.item)) || { kind: l.kind }} size={36} />
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography noWrap sx={{ fontWeight: 700, fontSize: "0.86rem" }}>{l.name}</Typography>
-                          <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>ค้างคืน {fmt(owe)} {l.unit}</Typography>
-                        </Box>
-                        <TextField size="small" type="number" value={ret[l._id] ?? 0} sx={{ ...FIELD_SX, width: 84 }}
-                          onChange={(e) => setRet((cur) => ({ ...cur, [l._id]: Math.min(owe, Math.max(0, Math.floor(Number(e.target.value) || 0))) }))}
-                          inputProps={{ min: 0, max: owe, inputMode: "numeric", style: { textAlign: "center", fontWeight: 800 } }} />
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              ) : (
+              {confirm && (
                 <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "hidden" }}>
                   {doc.lines.map((l, i) => (
-                    <Stack key={l._id} direction="row" alignItems="center" sx={{ px: 1.25, py: 0.9, borderTop: i ? `1px solid ${BORDER_MAIN}` : 0 }}>
+                    <Stack key={l._id} direction="row" alignItems="center" spacing={1} sx={{ px: 1.25, py: 0.9, borderTop: i ? `1px solid ${BORDER_MAIN}` : 0 }}>
+                      <Thumb item={photoOf.get(String(l.item)) || { kind: l.kind }} size={30} />
                       <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem" }}>{l.name}</Typography>
                       <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: confirm === "issue" ? "#dc2626" : TEXT_MAIN, whiteSpace: "nowrap" }}>
                         {confirm === "issue" ? "−" : ""}{fmt(l.qty)} {l.unit}
@@ -321,6 +324,9 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
           </>
         )}
       </Dialog>
+
+      <StockReturnForm open={rtForm} request={doc} items={items} canManage={canManage} onClose={() => setRtForm(false)}
+        onSaved={(rt) => { setRtForm(false); load(); onChanged?.(doc, rt); onOpenReturn?.(rt._id); }} />
 
       <PdfPrintDialog
         open={pdfOpen && Boolean(doc)}

@@ -53,7 +53,7 @@ export const BADGE_LABEL = {
   contractorPay: "ใบค่าจ้างผู้รับเหมาที่ถูกตีกลับ",
   ot: "ใบ OT ที่ต้องดำเนินการ",
   purchase: "ใบขอซื้อที่ต้องดำเนินการ",
-  stock: "ใบเบิกของรออนุมัติ",
+  stock: "ใบเบิกรออนุมัติ / ใบคืนรอตรวจรับ",
   expenseInbox: "ใบเบิกที่รอดำเนินการ",
   webLeads: "คำขอใหม่จากเว็บไซต์",
 };
@@ -294,7 +294,8 @@ const computeBadges = (userData, data) => {
     ot: (Number(data.ot?.rejectedMine) || 0) + (Number(data.ot?.inbox) || 0),
     // PR: ใบของฉันที่ถูกตีกลับ + ใบที่รอฉันตรวจสอบ/อนุมัติ/สั่งซื้อ
     purchase: (Number(data.purchase?.rejectedMine) || 0) + (Number(data.purchase?.inbox) || 0),
-    stock: scope.stock ? Number(data.stock?.pending) || 0 : 0,
+    // ใบเบิกรออนุมัติ + ใบคืนรอตรวจรับ (server รวมไว้ใน badge)
+    stock: scope.stock ? Number(data.stock?.badge ?? data.stock?.pending) || 0 : 0,
   };
 };
 

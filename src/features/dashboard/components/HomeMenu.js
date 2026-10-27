@@ -178,25 +178,16 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   ].filter((cat) => cat.items.length);
 };
 
-/**
- * แบ่งการ์ดหมวดลง 2 คอลัมน์ (จอกว้าง) ให้ความสูงสองฝั่งใกล้กันที่สุด โดยยังคงลำดับหมวดเดิม
- * ⚠️ ทำใน JS ไม่ใช้ CSS columns — CSS columns ตัดสินเองว่าการ์ดไหนไปฝั่งไหน คาดเดาไม่ได้ และบางทีหั่น
- * การ์ดใบเดียวแยกครึ่งไปคนละคอลัมน์
- */
-export const splitColumns = (cats) => {
-  const cols = [[], []];
-  const height = [0, 0];
-  cats.forEach((cat, index) => {
-    const side = height[1] < height[0] ? 1 : 0;
-    cols[side].push({ cat, index });
-    height[side] += cat.items.length + 1.2; // +หัวการ์ด
-  });
-  return cols;
-};
-
 const badgeText = (n) => (n > 99 ? "99+" : String(n));
 
 /**
+ * 🎨 (27 ต.ค. 2569 ผู้ใช้: "หน้าแรก ปุ่มเริ่มเยอะ และรก มีวิธีเรียงและจัดการยังไงให้สวยงาม ดูง่าย ใช้งานง่าย")
+ *   เดิม: การ์ดแยกทุกหมวด (8 ใบ) ปุ่มใหญ่ + คำอธิบายใต้ปุ่ม → หน้ายาว ที่ว่างเยอะ หาไม่เจอ
+ *   ตอนนี้ 2 ส่วน:
+ *     1. "ต้องดำเนินการ" — เฉพาะเมนูที่มีตัวเลขค้าง เรียงจากมากไปน้อย (กดจากตรงนี้ได้เลย ไม่ต้องหา)
+ *     2. "เมนูทั้งหมด" — การ์ดเดียว หมวดละแถว: ชื่อหมวดซ้าย · ไอคอนเล็กเรียงขวา (มือถือ: หัวหมวด + 4 ช่องต่อแถว)
+ *        คำอธิบายย้ายไปเป็น tooltip — หน้าจอเหลือแต่ชื่อ อ่านเร็ว
+ *   สี: คงสีประจำหมวดตามเดิม (ผู้ใช้เคยให้คงไว้) แต่ใช้เป็นพื้นอ่อนของไอคอนเท่านั้น ไม่ทาทั้งปุ่ม
  * @param {object} props
  * @param {object} props.userData
  * @param {object} [props.badges]   ตัวเลขที่หน้าแม่คำนวณไว้แล้ว เช่น { quotations: 3 }
@@ -211,74 +202,83 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
 
   // badges ที่หน้าแม่ส่งมา (ถ้ามี) ทับของ store ได้ — หน้านั้นมีข้อมูลสดกว่าเพราะโหลดเองอยู่แล้ว
   const counts = { ...shared, ...badges };
+  const countOf = (it) => (it.badgeKey ? Number(counts[it.badgeKey]) || 0 : 0);
 
-  // มือถือ: หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ — ถ้าเหลือใบเดียวไม่มีคู่ ให้เต็มแถวแทน (ไม่ทิ้งครึ่งจอว่าง)
-  const narrow = cats.filter((c) => c.items.length <= 2);
-  const loneNarrowKey = narrow.length % 2 === 1 ? narrow[narrow.length - 1].key : null;
-  // ✅ (17 ต.ค. 2569 ผู้ใช้: "วิเคราะห์หน้าแรก จุดไหนไม่มืออาชีพ") จอคอม: หมวดที่มี ≤3 เมนูเต็มแถวจะเหลือที่ว่างโล่ง 2 ใน 3
-  //    → จับคู่หมวดที่ "อยู่ติดกัน" ให้วางคู่กันครึ่งแถว (เช่น รับงาน·วางแผน | ปฏิบัติงาน) · ตัวที่ไม่มีคู่ยังเต็มแถว
-  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ขนาด กรอบ ระยะให้เท่ากัน รวมถึงเมนูหน้าแรก") ไม่ต้องอยู่ติดกันแล้ว —
-  //    หมวดสั้นทุกหมวดวางครึ่งแถว แล้วให้ grid-auto-flow: dense (CSS) เติมช่องว่างเอง
-  //    (เช่น งาน | จัดซื้อ → เบิกค่าใช้จ่ายเต็มแถว → เอกสาร | ข้อมูลหลัก) · ถ้าจำนวนคี่ ตัวสุดท้ายเต็มแถว
-  const shortKeys = cats.filter((c) => c.items.length <= 3).map((c) => c.key);
-  if (shortKeys.length % 2 === 1) shortKeys.pop();
-  const widePair = new Set(shortKeys);
+  // ── ต้องดำเนินการ: เมนูที่มีเลขค้าง (ไม่ซ้ำปลายทาง) เรียงมาก → น้อย ──
+  const seen = new Set();
+  const todo = cats.flatMap((c) => c.items.map((it) => ({ ...it, tone: it.tone || c.tone })))
+    .filter((it) => countOf(it) > 0 && !seen.has(it.href) && seen.add(it.href))
+    .sort((a, b) => (badgeTone(a.badgeKey, badges) === "act" ? 0 : 1) - (badgeTone(b.badgeKey, badges) === "act" ? 0 : 1) || countOf(b) - countOf(a));
+
+  // ✅ (27 ต.ค. 2569 ผู้ใช้เลือก "การ์ดรายการตัวอักษร")
+  // 🔁 (ผู้ใช้: "จัดหมู่ใหม่ให้แยกกัน และมองง่ายชัดเจน") — เลิกรวมหมวดเล็ก หมวดละการ์ดตามเมนูข้าง
+  //    การ์ดหัวสีอ่อนประจำหมวด + จำนวนเมนู · จอกว้าง 4 คอลัมน์ การ์ดสูงเท่ากันในแถว
+  const cards = cats.map((c) => ({ ...c, items: c.items.map((it) => ({ ...it, tone: it.tone || c.tone })) }));
 
   return (
     <nav className="hm" aria-label="เมนูหลัก">
-      <div className="hm-cols">
-        {splitColumns(cats).map((col, ci) => (
-          // มีแค่ 2 คอลัมน์ตายตัว ลำดับไม่มีวันสลับ — ใช้ลำดับเป็น key ได้
-          <div className="hm-col" key={ci === 0 ? "left" : "right"}>
-            {col.map(({ cat, index }) => {
-              const CatIcon = cat.icon;
-              const half = cat.items.length <= 2 && cat.key !== loneNarrowKey;
+      {todo.length > 0 && (
+        <section className="hm-todo" aria-labelledby="hm-todo-title">
+          <h6 className="hm-sec-title" id="hm-todo-title">ต้องดำเนินการ</h6>
+          <ul className="hm-todo-list">
+            {todo.map((it) => {
+              const Icon = it.icon;
+              const n = countOf(it);
+              const tone = badgeTone(it.badgeKey, badges);
               return (
-                <section
-                  key={cat.key}
-                  className={`hm-cat${half ? " hm-cat--half" : ""}${widePair.has(cat.key) ? " hm-cat--wpair" : ""}`}
-                  style={{ order: index, "--hm-tone": cat.tone }}
-                  aria-labelledby={`hm-cat-${cat.key}`}
-                >
-                  <header className="hm-cat-head">
-                    <span className="hm-cat-icon" aria-hidden="true"><CatIcon /></span>
-                    <h6 className="hm-cat-title" id={`hm-cat-${cat.key}`}>{cat.title}</h6>
-                  </header>
-                  <ul className={`hm-list${half ? " hm-list--half" : ""}`}>
-                    {cat.items.map((it) => {
-                      const Icon = it.icon;
-                      const count = it.badgeKey ? Number(counts[it.badgeKey]) || 0 : 0;
-                      return (
-                        <li key={it.key} className="hm-li">
-                          <Link
-                            to={it.href}
-                            className="hm-item"
-                            style={{ "--hm-tone": it.tone || cat.tone }}
-                            title={it.short ? it.title : undefined}
-                            aria-label={count ? `${it.title} (${BADGE_LABEL[it.badgeKey]} ${count})` : it.title}
-                          >
-                            <span className="hm-icon" aria-hidden="true">
-                              <Icon />
-                              {count > 0 && <span className={`hm-badge hm-badge--dot hm-badge--${badgeTone(it.badgeKey, badges)}`}>{badgeText(count)}</span>}
-                            </span>
-                            <span className="hm-text">
-                              <span className="hm-title-full">{it.title}</span>
-                              <span className="hm-title-short">{it.short || it.title}</span>
-                              <span className="hm-sub">{it.sub}</span>
-                            </span>
-                            {count > 0 && <span className={`hm-badge hm-badge--pill hm-badge--${badgeTone(it.badgeKey, badges)}`} aria-hidden="true">{badgeText(count)}</span>}
-                            <FaChevronRight className="hm-chevron" aria-hidden="true" />
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
+                <li key={it.key}>
+                  <Link to={it.href} className="hm-todo-item" style={{ "--hm-tone": it.tone }} title={BADGE_LABEL[it.badgeKey]}
+                    aria-label={`${it.title} (${BADGE_LABEL[it.badgeKey]} ${n})`}>
+                    <span className="hm-todo-icon" aria-hidden="true"><Icon /></span>
+                    <span className="hm-todo-text">
+                      <span className="hm-todo-name">{it.title}</span>
+                      <span className="hm-todo-sub">{BADGE_LABEL[it.badgeKey] || it.sub}</span>
+                    </span>
+                    <span className={`hm-todo-count hm-todo-count--${tone}`}>{badgeText(n)}</span>
+                  </Link>
+                </li>
               );
             })}
-          </div>
-        ))}
-      </div>
+          </ul>
+        </section>
+      )}
+
+      <section aria-labelledby="hm-all-title">
+        <h6 className="hm-sec-title" id="hm-all-title">เมนูทั้งหมด</h6>
+        <div className="hm-cards">
+          {cards.map((cat) => {
+            const CatIcon = cat.icon;
+            return (
+              <div key={cat.key} className="hm-card" style={{ "--hm-tone": cat.tone }}>
+                <div className="hm-card-head" id={`hm-cat-${cat.key}`}>
+                  <span className="hm-card-icon" aria-hidden="true"><CatIcon /></span>
+                  <span className="hm-card-title">{cat.title}</span>
+                  <span className="hm-card-count">{cat.items.length}</span>
+                </div>
+                <ul className="hm-links" aria-labelledby={`hm-cat-${cat.key}`}>
+                  {cat.items.map((it) => {
+                    const Icon = it.icon;
+                    const n = countOf(it);
+                    return (
+                      <li key={it.key}>
+                        <Link to={it.href} className="hm-link" style={{ "--hm-tone": it.tone }} title={it.sub || undefined}
+                          aria-label={n ? `${it.title} (${BADGE_LABEL[it.badgeKey]} ${n})` : it.title}>
+                          <span className="hm-link-icon" aria-hidden="true"><Icon /></span>
+                          <span className="hm-link-text hm-title-full">{it.title}</span>
+                          <span className="hm-link-text hm-title-short">{it.short || it.title}</span>
+                          {n > 0
+                            ? <span className={`hm-link-count hm-link-count--${badgeTone(it.badgeKey, badges)}`}>{badgeText(n)}</span>
+                            : <FaChevronRight className="hm-link-chev" aria-hidden="true" />}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </nav>
   );
 }

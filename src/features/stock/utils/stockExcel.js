@@ -1,6 +1,6 @@
 /**
  * ส่งออกข้อมูลสต๊อกทั้งคลังเป็น Excel
- * ✅ (27 ต.ค. 2569 ผู้ใช้: "ทำ excel ดึงข้อมูลทั้งหมดให้สมบูรณ์") — 4 ชีต:
+ * ✅ (27 ต.ค. 2569 ผู้ใช้: "ทำ excel ดึงข้อมูลทั้งหมดให้สมบูรณ์") — 5 ชีต (+ ใบคืน):
  *   1. คงคลัง      ทุกรายการ + ยอดในคลัง/จอง/ยืมออก/เบิกได้/สถานะ
  *   2. ใบเบิก      หัวใบ (ผู้เบิก · งาน · สถานะ · อนุมัติ · กำหนดคืน)
  *   3. รายการเบิก   หนึ่งแถวต่อรายการในใบ — กรอง/Pivot ตามงานหรือสินค้าได้ทันที
@@ -11,7 +11,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
-import { KINDS, MOVE_TYPES, reqStatus, available, isLow, isOut, outstanding } from "../stockMeta";
+import { KINDS, MOVE_TYPES, REQ_VIEW, reqView, available, isLow, isOut, outstanding } from "../stockMeta";
 
 const HEAD_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } };
 const ZEBRA = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
@@ -53,7 +53,7 @@ const sheet = (wb, name, title, columns, rows) => {
  * @param {object} p.moves     ประวัติ (StockService.moves)
  * @param {string} p.deptLabel ชื่อคลัง
  */
-export async function exportStockExcel({ items = [], requests = [], moves = [], deptLabel = "" }) {
+export async function exportStockExcel({ items = [], requests = [], moves = [], returns = [], deptLabel = "" }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "TidTam";
   const where = deptLabel ? `คลัง${deptLabel}` : "คลังแผนก";
@@ -78,7 +78,7 @@ export async function exportStockExcel({ items = [], requests = [], moves = [], 
   ], requests.map((r) => ({
     docNo: r.docNo, date: thaiDate(r.createdAt), requester: r.requester?.name, position: r.requester?.position,
     job: r.jobTitle, lines: (r.lines || []).length, units: (r.lines || []).reduce((t, l) => t + l.qty, 0),
-    status: reqStatus(r.status).label, issuedBy: r.issuedBy?.name || "", issuedAt: r.issuedAt ? thaiDate(r.issuedAt) : "",
+    status: REQ_VIEW[reqView(r)].label, issuedBy: r.issuedBy?.name || "", issuedAt: r.issuedAt ? thaiDate(r.issuedAt) : "",
     due: r.dueReturnAt ? thaiDate(r.dueReturnAt) : "", owe: outstanding(r), reason: r.rejectReason || "", note: r.note || "",
   })));
 
@@ -89,7 +89,18 @@ export async function exportStockExcel({ items = [], requests = [], moves = [], 
   ], requests.flatMap((r) => (r.lines || []).map((l) => ({
     docNo: r.docNo, date: thaiDate(r.createdAt), requester: r.requester?.name, job: r.jobTitle,
     code: l.code, name: l.name, kind: KINDS[l.kind]?.label, qty: l.qty, unit: l.unit,
-    returned: l.kind === "asset" ? l.returnedQty || 0 : "", status: reqStatus(r.status).label,
+    returned: l.kind === "asset" ? l.returnedQty || 0 : "", status: REQ_VIEW[reqView(r)].label,
+  }))));
+
+  const COND = { good: "ปกติ", damaged: "ชำรุด", lost: "สูญหาย" };
+  const RT = { pending: "รอตรวจรับ", received: "รับคืนแล้ว", rejected: "ไม่รับคืน", cancelled: "ยกเลิก" };
+  sheet(wb, "ใบคืน", `ใบคืนของ — ${where}`, [
+    { k: "docNo", h: "เลขที่ใบคืน" }, { k: "date", h: "วันที่" }, { k: "ref", h: "อ้างใบเบิก" }, { k: "requester", h: "ผู้คืน" },
+    { k: "name", h: "รายการ", min: 24 }, { k: "qty", h: "จำนวน", num: true }, { k: "unit", h: "หน่วย" }, { k: "cond", h: "สภาพ" },
+    { k: "lineNote", h: "รายละเอียดสภาพ", wrap: true }, { k: "status", h: "สถานะ" }, { k: "receivedBy", h: "ผู้ตรวจรับ" }, { k: "job", h: "งาน", max: 60 },
+  ], returns.flatMap((r) => r.lines.map((l) => ({
+    docNo: r.docNo, date: thaiDate(r.createdAt), ref: r.requestDocNo, requester: r.requester?.name, name: l.name, qty: l.qty, unit: l.unit,
+    cond: COND[l.condition] || l.condition, lineNote: l.note || "", status: RT[r.status] || r.status, receivedBy: r.receivedBy?.name || "", job: r.jobTitle,
   }))));
 
   sheet(wb, "ประวัติ", `ประวัติการเคลื่อนไหว — ${where}`, [

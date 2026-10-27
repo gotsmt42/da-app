@@ -217,3 +217,155 @@ export async function generateStockPdf({ request: r, deptLabel = "", mode = "ope
   doc.setProperties({ title: `ใบเบิกของ ${r.docNo || ""}`, subject: r.jobTitle || "", creator: ISSUER.nameEn });
   return outputDocument(doc, r.docNo ? `ใบเบิกของ ${r.docNo}` : "ใบเบิกของ", mode);
 }
+
+/**
+ * ใบคืนของ (RT) — ✅ (27 ต.ค. 2569 ผู้ใช้เลือก "ใบคืนของ + สภาพของ")
+ *   รูปแบบเดียวกับใบเบิก: หัวกระดาษ → เลขที่/อ้างใบเบิก → ตารางรายการ + สภาพ → หมายเหตุ/ประวัติ → ลงนาม ผู้คืน · ผู้ตรวจรับ
+ */
+const COND_TXT = { good: "ปกติ", damaged: "ชำรุด", lost: "สูญหาย" };
+const RT_TXT = { pending: "รอตรวจรับ", received: "รับคืนแล้ว", rejected: "ไม่รับคืน", cancelled: "ยกเลิก" };
+export async function generateReturnPdf({ doc: r, deptLabel = "", mode = "open" }) {
+  const [{ jsPDF }, fontModule, boldFont] = await Promise.all([import("jspdf"), import("@/assets/fonts/THSarabunNew_base64"), loadBoldFont()]);
+  await preparePrintAssets();
+  const doc = newDoc(jsPDF, fontModule.default, boldFont);
+  const hasBold = Boolean(boldFont);
+  const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
+  const size = (pt) => doc.setFontSize(pt);
+  const color = (rgb) => doc.setTextColor(...rgb);
+  const T = (t) => spaceThaiLatin(String(t ?? ""));
+
+  doc.setFontSize(17);
+  let y = drawLetterhead(doc) + 3.5;
+  doc.setDrawColor(...INK); doc.setLineWidth(0.4);
+  doc.line(L, y, R, y);
+  y += 9;
+  color(INK); bold(true); size(20);
+  doc.text("ใบคืนของ", W_PAGE / 2, y, { align: "center" });
+  bold(false); size(11); color(SUB);
+  doc.text("STOCK RETURN", W_PAGE / 2, y + 5, { align: "center" });
+  const kvRight = (label, value, yy) => { size(12.5); bold(false); color(SUB); doc.text(label, R - 46, yy); bold(true); color(INK); doc.text(value, R, yy, { align: "right" }); };
+  kvRight("เลขที่", r.docNo || "-", y - 4);
+  kvRight("วันที่", thaiDate(r.createdAt), y + 1.5);
+  y += 10;
+
+  const infoRow = (cells) => {
+    const total = cells.reduce((sum, c) => sum + (c.w || 1), 0);
+    size(13.5); bold(false);
+    const layout = cells.map((c) => { const cw = (W * (c.w || 1)) / total; return { ...c, cw, lines: wrapText(doc, T(c.value || "-"), cw - 5).slice(0, 3) }; });
+    const h = 6 + Math.max(...layout.map((c) => c.lines.length)) * 5.5;
+    let x = L;
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.25);
+    layout.forEach((c, i) => {
+      if (i) doc.line(x, y, x, y + h);
+      size(10.5); bold(false); color(SUB); doc.text(c.label, x + 2.5, y + 4.1);
+      size(13.5); color(INK); c.lines.forEach((ln, j) => doc.text(ln, x + 2.5, y + 9.2 + j * 5.5));
+      x += c.cw;
+    });
+    doc.line(L, y + h, R, y + h);
+    y += h;
+  };
+  const boxTop = y;
+  infoRow([
+    { label: "ผู้คืน (ผู้เบิก)", value: r.requester?.name, w: 1.2 },
+    { label: "อ้างใบเบิก", value: r.requestDocNo, w: 0.9 },
+    { label: "คลัง / แผนก", value: deptLabel || r.dept, w: 0.9 },
+  ]);
+  infoRow([{ label: "ใช้กับงาน / โครงการ", value: r.jobTitle || "-" }]);
+  infoRow([
+    { label: "สถานะ", value: RT_TXT[r.status] || r.status, w: 1 },
+    { label: "ตรวจรับโดย", value: r.receivedAt ? `${r.receivedBy?.name || "-"} · ${thaiDate(r.receivedAt)}` : "-", w: 2 },
+  ]);
+  doc.setDrawColor(...RULE); doc.setLineWidth(0.25);
+  doc.rect(L, boxTop, W, y - boxTop);
+  y += 6;
+
+  const cols = [{ k: "no", w: 11 }, { k: "code", w: 24 }, { k: "desc", w: 0 }, { k: "kind", w: 20 }, { k: "cond", w: 20 }, { k: "qty", w: 16 }, { k: "unit", w: 16 }];
+  cols[2].w = W - cols.reduce((sum, c) => sum + c.w, 0);
+  let cx = L; cols.forEach((c) => { c.x = cx; cx += c.w; });
+  const col = (k) => cols.find((c) => c.k === k);
+  const HEAD_TXT = { no: "ลำดับ", code: "รหัส", desc: "รายการ / หมายเหตุ", kind: "ชนิด", cond: "สภาพ", qty: "จำนวน", unit: "หน่วย" };
+  let tableTop = y;
+  const drawHead = () => {
+    doc.setFillColor(...ZEBRA); doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
+    doc.rect(L, y, W, 8, "FD");
+    size(12.5); bold(true); color(INK);
+    cols.forEach((c, i) => { doc.text(HEAD_TXT[c.k], c.x + c.w / 2, y + 5.5, { align: "center" }); if (i) doc.line(c.x, y, c.x, y + 8); });
+    y += 8;
+  };
+  const closeTable = () => { doc.setDrawColor(...LINE); doc.setLineWidth(0.25); cols.forEach((c, i) => { if (i) doc.line(c.x, tableTop, c.x, y); }); doc.rect(L, tableTop, W, y - tableTop); };
+  drawHead();
+  (r.lines || []).forEach((l, idx) => {
+    size(13.5); bold(false);
+    const descLines = wrapText(doc, T(l.name), col("desc").w - 4);
+    size(11);
+    const noteLines = l.note ? wrapText(doc, T(l.note), col("desc").w - 4) : [];
+    const rh = Math.max(8.5, 3.5 + descLines.length * 5.4 + noteLines.length * 4.5);
+    if (y + rh > BODY_LIMIT) { closeTable(); doc.addPage(); y = 16; tableTop = y; drawHead(); }
+    const base = y + 5.6;
+    size(13.5); color(INK);
+    doc.text(String(idx + 1), col("no").x + col("no").w / 2, base, { align: "center" });
+    size(12); doc.text(T(l.code || "-"), col("code").x + 2, base); size(13.5);
+    descLines.forEach((ln, i) => doc.text(ln, col("desc").x + 2, base + i * 5.4));
+    if (noteLines.length) { size(11); color(SUB); noteLines.forEach((ln, i) => doc.text(ln, col("desc").x + 2, base + descLines.length * 5.4 + i * 4.5 - 0.4)); size(13.5); color(INK); }
+    doc.text(kindMeta(l.kind).label, col("kind").x + col("kind").w / 2, base, { align: "center" });
+    if (l.condition !== "good") color([185, 28, 28]);
+    bold(l.condition !== "good"); doc.text(COND_TXT[l.condition] || "-", col("cond").x + col("cond").w / 2, base, { align: "center" }); bold(false); color(INK);
+    bold(true); doc.text(fmt(l.qty), col("qty").x + col("qty").w / 2, base, { align: "center" }); bold(false);
+    doc.text(T(l.unit || "-"), col("unit").x + col("unit").w / 2, base, { align: "center" });
+    y += rh;
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.2); doc.line(L, y, R, y);
+  });
+  closeTable();
+  size(12); bold(false); color(SUB);
+  y += 5;
+  doc.text(`รวม ${fmt((r.lines || []).length)} รายการ · ${fmt((r.lines || []).reduce((t, l) => t + l.qty, 0))} หน่วย`, R, y, { align: "right" });
+  y += 5;
+
+  const section = (title, rows) => {
+    const content = rows.filter(Boolean);
+    if (!content.length) return;
+    size(12.5); bold(false);
+    const wrapped = content.flatMap(([label, text]) => { const lw = label ? doc.getTextWidth(label) + 2 : 0; return wrapText(doc, T(text), W - 4 - lw).slice(0, 4).map((ln, i) => ({ label: i === 0 ? label : "", lw, ln })); });
+    const h = 6 + wrapped.length * 5.4;
+    if (y + h > BODY_LIMIT) { doc.addPage(); y = 16; }
+    size(12.5); bold(true); color(INK); doc.text(title, L, y + 4);
+    let yy = y + 9.6;
+    wrapped.forEach(({ label, lw, ln }) => { size(12.5); if (label) { bold(false); color(SUB); doc.text(label, L + 2, yy); } bold(false); color(INK); doc.text(ln, L + 2 + lw, yy); yy += 5.4; });
+    y += h + 3;
+  };
+  section("หมายเหตุ", [
+    r.note && ["", r.note],
+    r.photos?.length && ["รูปหลักฐาน", `${r.photos.length} รูป (ดูในระบบ)`],
+    r.status === "rejected" && ["เหตุผลที่ไม่รับคืน", `${r.rejectReason || "-"}${r.rejectedBy?.name ? ` · โดย ${r.rejectedBy.name}` : ""}`],
+  ]);
+  section("ประวัติการดำเนินการ", (r.activityLog || []).map((a) => [thaiDateTime(a.timestamp), `${a.detail} — ${a.userName}`]));
+
+  if (y > SIG_TOP - 2) doc.addPage();
+  const boxes = [
+    { role: "ผู้คืนของ", name: r.createdBy?.name || r.requester?.name, date: r.createdAt },
+    { role: "ผู้ตรวจรับคืน", name: r.receivedBy?.name, date: r.receivedAt },
+  ];
+  const colW = W / boxes.length;
+  boxes.forEach((b, i) => {
+    const cxm = L + colW * i + colW / 2;
+    const half = colW / 2 - 14;
+    const lineY = SIG_TOP + 14;
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
+    doc.line(cxm - half, lineY, cxm + half, lineY);
+    size(12.5); bold(false); color(INK);
+    doc.text(b.name ? `( ${T(b.name)} )` : "(                                   )", cxm, lineY + 5.5, { align: "center" });
+    bold(true); doc.text(b.role, cxm, lineY + 11, { align: "center" });
+    bold(false); size(11); color(SUB);
+    doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : "วันที่ ......../......../..........", cxm, lineY + 16, { align: "center" });
+  });
+
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p += 1) {
+    doc.setPage(p);
+    bold(false); size(10); color(FAINT);
+    doc.text(`พิมพ์จากระบบเมื่อ ${thaiDateTime(new Date())} · ${ISSUER.nameEn}`, L, H_PAGE - 5);
+    doc.text(`${r.docNo || ""} · สถานะ: ${RT_TXT[r.status] || ""} · หน้า ${p}/${pages}`, R, H_PAGE - 5, { align: "right" });
+  }
+  doc.setProperties({ title: `ใบคืนของ ${r.docNo || ""}`, subject: r.jobTitle || "", creator: ISSUER.nameEn });
+  return outputDocument(doc, r.docNo ? `ใบคืนของ ${r.docNo}` : "ใบคืนของ", mode);
+}

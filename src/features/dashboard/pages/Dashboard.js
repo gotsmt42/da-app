@@ -43,7 +43,7 @@ import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
 import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
-import { Widget, Row, Empty, Loading, Pager, GroupTitle, Pill, DateTile, IconTile } from "../components/DashWidgets";
+import { Widget, Row, Empty, Loading, Pager, Pill, DateTile, IconTile } from "../components/DashWidgets";
 import { alpha } from "@mui/material/styles";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
@@ -726,7 +726,7 @@ const Dashboard = () => {
           ปุ่มสีจัดเต็มแถวแย่งสายตากับตัวเลขสถานะงานที่อยู่ถัดลงมา และทางเข้าแต่ละหน้าหน้าตาไม่เหมือนกันเลย
           ✅ ทุกหน้ารวมเป็นกริดเดียว หน้าตาเดียวกัน ตามสิทธิ์ของผู้ใช้ (เงื่อนไขเดียวกับเมนูข้าง)
           ✅ ตัวเลขใบเสนอราคาที่ต้องติดตามยังเห็นอยู่ เป็นป้ายแดงบนช่อง "ใบเสนอราคา" แทนแบนเนอร์ ─── */}
-            <GroupTitle>เมนูหลัก</GroupTitle>
+            {/* 🔁 (27 ต.ค. 2569) หัว "เมนูหลัก" ย้ายเข้าไปอยู่ใน HomeMenu เอง (ต้องดำเนินการ · เมนูทั้งหมด) */}
             <HomeMenu
               userData={userData}
               badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}

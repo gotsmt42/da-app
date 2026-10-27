@@ -64,16 +64,17 @@ const PhotoPicker = ({ item, preview, onPick, onRemove, error }) => {
   );
 };
 
-export function ItemFormDialog({ open, item, dept, categories = [], onClose, onSaved }) {
+export function ItemFormDialog({ open, item, dept, categories = [], onClose, onSaved, onDeleted }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const editing = Boolean(item?._id);
   const [f, setF] = useState(blank);
   const [photo, setPhoto] = useState({ file: null, preview: "", remove: false, error: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [askDelete, setAskDelete] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setError("");
+    setError(""); setAskDelete(false);
     setPhoto({ file: null, preview: "", remove: false, error: "" });
     setF(editing ? { ...blank, ...item, qty: "", minQty: item.minQty || "" } : blank);
   }, [open, editing, item]);
@@ -104,6 +105,19 @@ export function ItemFormDialog({ open, item, dept, categories = [], onClose, onS
     }
   };
 
+  // ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้แอดมินลบข้อมูลสินค้าได้ด้วย") — ยืนยันอีกชั้น · server ห้ามลบถ้ามีเอกสารอ้างถึง
+  const remove = async () => {
+    setBusy(true); setError("");
+    try {
+      await StockService.deleteItem(item._id);
+      onDeleted?.(item);
+    } catch (err) {
+      setError(errorText(err, "ลบไม่สำเร็จ"));
+      setAskDelete(false);
+    } finally {
+      setBusy(false);
+    }
+  };
   const shownItem = photo.remove ? null : item;
   return (
     <Dialog open={open} onClose={() => !busy && onClose()} fullWidth maxWidth="md" fullScreen={isMobile}>
@@ -193,8 +207,25 @@ export function ItemFormDialog({ open, item, dept, categories = [], onClose, onS
           </Box>
         </Box>
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {askDelete && (
+          <Alert severity="error" icon={<DeleteOutline />} sx={{ mt: 2, alignItems: "center" }}
+            action={(
+              <Stack direction="row" spacing={1}>
+                <Button size="small" onClick={() => setAskDelete(false)} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB, fontWeight: 700 }}>ไม่ลบ</Button>
+                <Button size="small" variant="contained" color="error" onClick={remove} disabled={busy} sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none" }}>
+                  {busy ? <CircularProgress size={14} color="inherit" /> : "ยืนยันลบ"}
+                </Button>
+              </Stack>
+            )}>
+            ลบ “{item?.name}” ออกจากคลังถาวร? — ลบได้เฉพาะรายการที่ยังไม่เคยอยู่ในใบเบิก/ใบคืน
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${BORDER_MAIN}` }}>
+        {editing && (
+          <Button onClick={() => setAskDelete(true)} disabled={busy || askDelete} startIcon={<DeleteOutline />}
+            sx={{ mr: "auto", textTransform: "none", fontWeight: 700, color: "#dc2626" }}>ลบสินค้า</Button>
+        )}
         <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB, fontWeight: 700 }}>ยกเลิก</Button>
         <Button variant="contained" onClick={save} disabled={busy} startIcon={busy ? <CircularProgress size={15} color="inherit" /> : null} sx={BTN}>
           {editing ? "บันทึก" : "เพิ่มเข้าคลัง"}

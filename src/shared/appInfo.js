@@ -18,5 +18,10 @@ import APP_VERSION from "virtual:app-version";
  */
 export const APP_NAME = "TidTam";
 export { APP_VERSION };
-/** เลขเวอร์ชันสำหรับแสดงผล — ตัด ".0" ท้ายออก (2.35.0 → 2.35) · package.json ยังต้องเป็น semver 3 ท่อน */
-export const APP_VERSION_LABEL = String(APP_VERSION || "").replace(/\.0$/, "");
+/**
+ * เลขเวอร์ชันสำหรับแสดงผล — ตัด ".0" ท้ายออก (2.35.0 → 2.35) · package.json ยังต้องเป็น semver 3 ท่อน
+ * ✅ (27 ต.ค. 2569 ผู้ใช้: "อัพเดตเวอร์ชั่นเป็น 2.50 Beta") รองรับ prerelease: 2.50.0-beta → "2.50 Beta"
+ */
+export const APP_VERSION_LABEL = String(APP_VERSION || "")
+  .replace(/\.0(?=$|-)/, "")
+  .replace(/-([a-z]+)(\.\d+)?$/i, (_, tag, n) => ` ${tag.charAt(0).toUpperCase()}${tag.slice(1)}${n ? ` ${n.slice(1)}` : ""}`);
