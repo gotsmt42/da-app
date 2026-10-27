@@ -8,7 +8,7 @@
  * ✅ error จาก "ไฟล์รุ่นเก่าหาย" (หลัง deploy) → รีโหลดให้เองทันที 1 ครั้ง (ดู lazyWithRetry)
  */
 import { Component } from "react";
-import { isChunkLoadError, reloadForFreshBuild } from "@/shared/utils/lazyWithRetry";
+import { isChunkLoadError, reloadForFreshBuild, hardReload } from "@/shared/utils/lazyWithRetry";
 
 const box = {
   maxWidth: 420, margin: "12vh auto 0", padding: "28px 24px", textAlign: "center",
@@ -56,7 +56,7 @@ export default class AppErrorBoundary extends Component {
               ? "ระบบเพิ่งอัปเดต หรือสัญญาณเน็ตสะดุดระหว่างโหลด — กด “โหลดใหม่” เพื่อใช้เวอร์ชันล่าสุด"
               : "ข้อมูลของคุณยังอยู่ครบ — กดโหลดใหม่เพื่อลองอีกครั้ง ถ้ายังเป็นอยู่ แจ้งผู้ดูแลระบบพร้อมบอกว่าเปิดหน้าไหน"}
           </div>
-          <button type="button" style={btn} onClick={() => window.location.reload()}>โหลดใหม่</button>
+          <button type="button" style={btn} onClick={() => (chunk ? hardReload() : window.location.reload())}>โหลดใหม่</button>
           {this.props.variant === "page" && (
             <div>
               <button type="button" onClick={() => { window.location.href = "/dashboard"; }}

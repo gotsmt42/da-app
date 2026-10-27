@@ -57,6 +57,11 @@ installNativeBridge();
 
 // ✅ หลัง deploy ไฟล์ CSS/JS รุ่นเก่าถูกลบ — Vite แจ้ง "vite:preloadError" ก่อน import ล้ม
 //    รีโหลดเอาไฟล์รุ่นใหม่ทันที (ไม่เกิน 1 ครั้ง/30 วินาที) แทนที่จะปล่อยให้เป็นจอขาว ดู lazyWithRetry.js
+// โหลดใหม่แบบบังคับ (hardReload) ใส่ ?_r= ไว้กันแคช — ลบออกจาก URL หลังเปิดหน้าแล้ว ให้ลิงก์สะอาดเหมือนเดิม
+try {
+  const u = new URL(window.location.href);
+  if (u.searchParams.has("_r")) { u.searchParams.delete("_r"); window.history.replaceState(window.history.state, "", u.toString()); }
+} catch { /* ignore */ }
 window.addEventListener("vite:preloadError", (e) => {
   if (reloadForFreshBuild()) e.preventDefault();
 });

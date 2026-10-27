@@ -30,8 +30,28 @@ export const reloadForFreshBuild = () => {
     /* sessionStorage ใช้ไม่ได้ (โหมดส่วนตัวบางเบราว์เซอร์) — ยังรีโหลดได้ แต่ไม่มีตัวกันวน จึงไม่รีโหลด */
     return false;
   }
-  window.location.reload();
+  hardReload();
   return true;
+};
+
+/**
+ * ✅ (27 ต.ค. 2569 ผู้ใช้: "ในมือถือเปิดไม่ได้ · คอม/แท็บเล็ตเปิดได้") แอปมือถือ (WebView) บางรุ่นเก็บหน้าแรก (index.html)
+ *    รุ่นเก่าไว้ในหน่วยความจำ — reload() ธรรมดาได้หน้าเก่าที่ชี้ไปไฟล์ที่ถูกลบแล้วซ้ำ ติดหน้า "มีเวอร์ชันใหม่" วนไป
+ *    โหลดใหม่ด้วยพารามิเตอร์เวลา (?_r=) บังคับขอหน้าใหม่จากเซิร์ฟเวอร์เสมอ + ล้าง Cache Storage ถ้ามี
+ */
+export const hardReload = () => {
+  const go = () => {
+    const u = new URL(window.location.href);
+    u.searchParams.set("_r", String(Date.now()));
+    window.location.replace(u.toString());
+  };
+  try {
+    if (window.caches?.keys) {
+      window.caches.keys().then((ks) => Promise.all(ks.map((k) => window.caches.delete(k)))).finally(go);
+      return;
+    }
+  } catch { /* ไม่มี Cache Storage — โหลดใหม่เลย */ }
+  go();
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
