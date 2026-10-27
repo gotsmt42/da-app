@@ -27,9 +27,9 @@ import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
 import { appLogoFor } from "@/shared/services/OrgSettingService";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
-// (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
+// 🔁 (27 ต.ค. 2569 ผู้ใช้: "แก้ไข icon header ให้ตรงกัน") ไอคอนชุดเดียวกับเมนูข้าง/หน้าแรก (navConfig) — (FaTasks="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
-  FaBars, FaUserCircle, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
+  FaBars, FaUserCircle, FaTasks, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
   FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaClipboardCheck, FaChartBar, FaWallet,
 } from "react-icons/fa";
 import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
@@ -49,13 +49,13 @@ import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/r
 const scheduleOptionsFor = (isAdminOrManagerRole) =>
   isAdminOrManagerRole
     ? {
-        primary: { label: "ตารางงานช่าง", href: "/event", icon: FaWrench },
+        primary: { label: "ตารางงานช่าง", href: "/event", icon: FaCalendarAlt },
         secondary: { label: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase, dept: "sales" },
       }
     : {
         primary: { label: "แผนงานของฉัน", href: "/event", icon: FaCalendarAlt },
         secondary: {
-          label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench,
+          label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt,
           dept: DEPARTMENT.SERVICE,
         },
       };
@@ -265,7 +265,7 @@ const Header = ({ toggleMobileSidebar }) => {
               to="/operation"
               className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/operation") ? "active" : ""}`}
             >
-              <FaWrench size={13} /> การดำเนินงาน
+              <FaTasks size={13} /> การดำเนินงาน
               <HeaderCount n={badges.closeRequests} />
             </Link>
           </NavItem>

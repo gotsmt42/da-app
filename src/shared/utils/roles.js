@@ -147,6 +147,12 @@ export const CAPABILITIES = {
    */
   requestPurchase: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD, ROLES.SALE],
   /**
+   * ✅ (27 ต.ค. 2569 ผู้ใช้: "ทำระบบสต๊อกสินค้าแผนก ต้องให้กรอกใบเบิกเพื่อขอเบิก") — คู่แฝดของ server
+   * requestStock = ยื่นใบเบิก/ยืมของจากคลังแผนกตัวเอง · manageStock = จัดการคลังทุกแผนก + อนุมัติจ่าย/รับคืน
+   */
+  requestStock: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD, ROLES.SALE],
+  manageStock: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  /**
    * ── ลำดับการเบิกค่าใช้จ่าย 3 ส่วน (เหตุผลเต็มที่ da-app-server/src/config/roles.js) ──
    *   ส่วนที่ 1 ส่งขอเบิก → ส่วนที่ 2 ตรวจสอบ/อนุมัติ (แอดมินช่างตรวจสอบ → ผู้จัดการฯ อนุมัติ)
    *   → ส่วนที่ 3 อนุมัติเบิกจ่าย (ผู้จัดการฯ/กรรมการผู้จัดการ)

@@ -45,6 +45,7 @@ import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
   differenceMeta, money, jobText, jobSubject, jobsSubject, jobChipText, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import JobTypeChip, { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const MAX_ITEMS = 40;
@@ -619,7 +620,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} sx={{ mt: 1.25 }} alignItems="center">
                 <Chip size="small" label={`ผู้เบิก ${advance.requester?.name || "-"}`} />
                 <Chip size="small" label={`ยอดเบิก ${baht(advance.total)}`} sx={{ fontWeight: 700, bgcolor: alpha(KIND_META.advance.color, 0.12), color: KIND_META.advance.dark }} />
-                {advance.job?.title && <Chip size="small" label={jobText(advance.job)} />}
+                {advance.job?.title && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, minWidth: 0 }}><JobTypeChip job={advance.job} /><Typography component="span" noWrap sx={{ fontSize: "0.8rem", fontWeight: 700 }}>{(jobText(advance.job) || "").replace(advance.job.title, "").trim()}</Typography></Box>}
                 {/* จอแคบ: แผงใบ Advance พับเก็บไว้ใต้ช่องเลือก กดเปิดดูเทียบได้ */}
                 {showAdvancePanel && !isDesktop && (
                   <Button size="small" onClick={() => setPanelOpen((v) => !v)}
@@ -769,26 +770,21 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                           🐛 เดิมบรรทัดหลักมีแค่ "PM · Fire Alarm" ทุกงานหน้าตาเหมือนกันหมด ต้องอ่านบรรทัดเล็กถึงจะแยกออก
                           และไม่มี "ครั้งที่" งาน PM ของโครงการเดียวกันหลายครั้งจึงแยกกันไม่ได้เลย
                           ⚠️ ไม่ตัดคำ (noWrap) บรรทัดหลัก — ชื่อโครงการยาวต้องอ่านได้ครบ ไม่ใช่ถูกตัดเป็น "..." */}
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
-                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
-                          {/* ✅ งานเดียวกันที่เข้าหลายช่วง จะขึ้นชื่อซ้ำกันหลายบรรทัด — ป้ายนี้คือสิ่งที่แยกแต่ละแถวออกจากกัน */}
-                          {jobPartText(o) && (
-                            <Chip size="small" label={jobPartText(o)}
-                              sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
-                          )}
-                        </Stack>
-                        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.4 }} component="div">
-                          {[
+                      {/* 🎨 (27 ต.ค. 2569) ป้ายประเภทงานแยกสี (PM · Service · PO ...) — shared/ui/JobTypeChip.js */}
+                      <JobOptionRow job={o} main={jobText(o) || o.title}
+                        extra={jobPartText(o) ? (
+                          /* ✅ งานเดียวกันที่เข้าหลายช่วง จะขึ้นชื่อซ้ำกันหลายบรรทัด — ป้ายนี้คือสิ่งที่แยกแต่ละแถวออกจากกัน */
+                          <Chip size="small" label={jobPartText(o)}
+                            sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
+                        ) : null}
+                        sub={[
                             // ✅ ช่วงวันที่เต็ม (เริ่ม–สิ้นสุด · กี่วัน) — แยกช่วงที่เข้าคนละรอบของงานเดียวกันออกจากกันได้
                             jobRangeText(o),
                             o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
                             o.teamNames?.length ? `ผู้เข้างานช่วงนี้ ${o.teamNames.join(", ")}` : "",
                             o.docNo ? `เลขที่ ${o.docNo}` : "",
                             o.status || "",
-                          ].filter(Boolean).join(" · ")}
-                        </Typography>
-                      </Box>
+                          ].filter(Boolean).join(" · ")} />
                       {taken && (
                         <Chip size="small" label={`ช่วงนี้มีใบแล้ว ${o.advance.docNo}`}
                           sx={{ ml: 1, flexShrink: 0, height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(KIND_META.advance.color, 0.12), color: KIND_META.advance.dark }} />

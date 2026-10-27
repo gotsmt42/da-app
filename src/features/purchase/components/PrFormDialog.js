@@ -21,6 +21,7 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
+import { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import PurchaseService, { errorText } from "../services/PurchaseService";
 import {
   PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, PRIORITIES, PR_CATEGORIES, FILE_KINDS, money, fmtMoney, baht,
@@ -223,6 +224,11 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
               onInputChange={(_, v, r) => { if (r === "input") setJobQuery(v); }}
               isOptionEqualToValue={(o, v) => o._id === v._id}
               getOptionLabel={(o) => [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ")}
+              renderOption={({ key: k, ...li }, o) => (
+                <li {...li} key={o._id}>
+                  <JobOptionRow job={o} main={jobText(o) || o.title} sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
+                </li>
+              )}
               renderInput={(params) => (
                 <TextField {...params} size="small" label="ใช้กับงาน / โครงการ" placeholder="ค้นหาชื่องาน / โครงการ (ไม่บังคับ)"
                   InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />

@@ -15,7 +15,7 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock, FaTools,
+  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock, FaTools, FaBoxes,
 } from "react-icons/fa";
 
 import { can, seesOperationBoard } from "@/shared/utils/roles";
@@ -40,6 +40,7 @@ const TONE = {
   work: "#dc2626",
   expense: "#0d9488",
   purchase: "#4338ca",
+  stock: "#b45309",
   people: "#0891b2",
   docs: "#d97706",
   master: "#2563eb",
@@ -134,8 +135,10 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — แยกแค่ "หมวด" ไม่ได้แยกสิทธิ์
   // ✅ (10 ต.ค. 2569) จัดซื้อใช้สิทธิ์ของตัวเอง (requestPurchase) — ฝ่ายขายขอซื้อได้โดยไม่มีเมนูเบิก
   const purchase = can(userData, "requestPurchase") || can(userData, "viewAllExpenses") ? [dest("purchase"), dest("purchaseReport")] : [];
-  // 🚧 (11 ต.ค. 2569 ผู้ใช้: "ตัดเมนู OT ออกไปก่อน เดี๋ยวมาทำอีกทีหลัง") — หน้า /ot ยังอยู่ แค่ซ่อนทางเข้า
-  const people = [];
+  // ✅ (27 ต.ค. 2569 ผู้ใช้: "เอาระบบทำโอทีกลับมา แต่ไม่ต้องระบุเงิน แค่กรอกชั่วโมง อิงงาน") — เปิดเมนู OT กลับมา (สิทธิ์ชุดเดียวกับระบบเบิก)
+  const people = canExpense ? [dest("ot")] : [];
+  // ✅ (27 ต.ค. 2569) สต๊อก · ทรัพย์สินแผนก — สิทธิ์ของตัวเอง
+  const stock = can(userData, "requestStock") || can(userData, "manageStock") ? [dest("stock")] : [];
 
   // ── เอกสาร ──────────────────────────────────────────────────────────────
   const docs = [];
@@ -167,6 +170,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าการเงิน ไม่ได้เน้น และสลับจุดแสดงกับจัดซื้อ")
     // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าแรกสลับหมวดตำแหน่งเอกสาร และจัดซื้อ")
     { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
+    { key: "stock", title: "คลังแผนก", icon: FaBoxes, tone: TONE.stock, items: stock },
     { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
     { key: "docs", title: "เอกสาร", icon: FaFolderOpen, tone: TONE.docs, items: docs },
     { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },

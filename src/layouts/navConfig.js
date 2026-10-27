@@ -16,7 +16,7 @@
  */
 import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaCalendarCheck, FaBriefcase,
-  FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
+  FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar, FaBoxes,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
   FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText, FaMapMarkerAlt,
   FaTasks, FaUserCheck,
@@ -68,7 +68,9 @@ export const DEST = {
   claim: { title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" },
   purchase: { title: "ใบขอซื้อสินค้า (PR)", short: "ขอซื้อ", sub: "ขอซื้อ · อนุมัติ · สั่งซื้อ · รับของ", href: "/purchase", icon: FaShoppingCart, badgeKey: "purchase" },
   purchaseReport: { title: "รายงานการจัดซื้อ", short: "รายงาน", sub: "ยอดซื้อ · ร้านค้า · ค้างรับ", href: "/purchase/report", icon: FaChartBar },
-  ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "ขออนุมัติ OT · จ่ายพร้อมเงินเดือน", href: "/ot", icon: FaUserClock, badgeKey: "ot" },
+  // ✅ (27 ต.ค. 2569) คลังของแผนก — วัสดุเบิกแล้วตัดยอด · ทรัพย์สินยืม-คืน · ทุกใบอิงงาน
+  stock: { title: "สต๊อก · ทรัพย์สินแผนก", short: "สต๊อก", sub: "เบิกของ · ยืม-คืน · คงคลัง", href: "/stock", icon: FaBoxes, badgeKey: "stock" },
+  ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "บันทึกชั่วโมง OT · อิงงาน · ขออนุมัติ", href: "/ot", icon: FaUserClock, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: FaHardHat, badgeKey: "contractorPay" },
   // ✅ (11 ต.ค. 2569) คิวอนุมัติใบเบิก — คลิปบอร์ดติ๊กถูก (ไม่ใช้ถาดรับเข้าซ้ำกับคำขอลงงาน) · ชื่อบอกตรงๆ ว่าต้องอนุมัติ
   expenseInbox: { title: "รออนุมัติเบิก", short: "รออนุมัติ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaClipboardCheck, badgeKey: "expenseInbox" },

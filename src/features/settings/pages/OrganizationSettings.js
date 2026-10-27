@@ -392,7 +392,7 @@ export default function OrganizationSettings() {
 
       {/* ✅ ระบบ OT (ผู้ใช้สั่ง "ให้ตั้งค่าตัว x ได้") — ค่าต่ำสุดตามกฎหมายแรงงาน server ตรวจซ้ำ */}
       <Section icon={RestartAlt} title="ค่าตั้งต้นของระบบ OT"
-        hint="ตัวคูณ = กี่เท่าของค่าจ้างต่อชั่วโมง · ขั้นต่ำตามกฎหมาย: OT วันทำงาน 1.5 · ทำงานวันหยุด 1 · OT วันหยุด 3 · ใบที่บันทึกแล้วไม่เปลี่ยนตาม">
+        hint="ประเภท OT และตัวคูณ (×) ที่แสดงในใบ OT/รายงานชั่วโมง ให้ฝ่ายบุคคล/บัญชีใช้คิดค่าแรง · ขั้นต่ำตามกฎหมาย: OT วันทำงาน 1.5 · ทำงานวันหยุด 1 · OT วันหยุด 3 · ใบที่บันทึกแล้วไม่เปลี่ยนตาม">
         <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } }}>
           {[
             ["workdayOT", "OT วันทำงาน (เท่า)", 1.5],
@@ -407,7 +407,7 @@ export default function OrganizationSettings() {
               helperText={Number(form.otMultipliers?.[k]) < min ? `ต่ำสุด ${min}` : " "} />
           ))}
           <TextField size="small" type="number" label="ชั่วโมงทำงานต่อวัน" value={form.otHoursPerDay ?? ""} onChange={set("otHoursPerDay")}
-            inputProps={{ min: 1, max: 12 }} helperText="ใช้แปลงเงินเดือน → ค่าจ้างต่อชั่วโมง" />
+            inputProps={{ min: 1, max: 12 }} helperText="ชั่วโมงงานปกติต่อวัน" />
         </Box>
         <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", mt: 1 }}>วันหยุดประจำสัปดาห์ (ระบบเดาประเภทวันให้อัตโนมัติ)</Typography>
         <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mt: 0.5 }}>

@@ -87,6 +87,7 @@ const ExpensesPage = lazyWithRetry(() => import("@/features/expenses/pages/Expen
 const OtPage = lazyWithRetry(() => import("@/features/ot/pages/OtPage.js"));
 const PurchasePage = lazyWithRetry(() => import("@/features/purchase/pages/PurchasePage.js"));
 const PurchaseReport = lazyWithRetry(() => import("@/features/purchase/pages/PurchaseReport.js"));
+const StockPage = lazyWithRetry(() => import("@/features/stock/pages/StockPage.js"));
 
 // ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
 // (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
@@ -484,6 +485,16 @@ const ThemeRoutes = [
         ),
         title,
       })),
+      // ── สต๊อก · ทรัพย์สินแผนก (27 ต.ค. 2569) — หน้าเช็คสิทธิ์ requestStock/manageStock เอง · ?tab=&id= เปิดแท็บ/ใบ
+      {
+        path: "stock",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <StockPage />
+          </Suspense>
+        ),
+        title: "สต๊อก · ทรัพย์สินแผนก",
+      },
       /**
        * ── ระบบ OT (ผู้ใช้สั่ง 28 ก.ย. 2569) — path ตายตัวก่อน "ot/:id" เหตุผลเดียวกับระบบเบิกด้านล่าง
        * ⚠️ ไม่ห่อ AdminRoute — ช่างยื่น OT ได้ ตัวหน้าเช็คสิทธิ์เอง

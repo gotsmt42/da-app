@@ -1,5 +1,5 @@
 /**
- * ส่งออกรายงาน OT รายเดือน (สำหรับทำเงินเดือน) เป็น Excel
+ * ส่งออกรายงานชั่วโมง OT รายเดือน เป็น Excel (🔁 27 ต.ค. 2569 — ชั่วโมงอย่างเดียว ไม่มีเงิน)
  * ⚠️ exceljs ใหญ่ — import แบบ dynamic จากหน้ารายงานเฉพาะตอนกดส่งออก
  */
 import ExcelJS from "exceljs";
@@ -9,13 +9,12 @@ import { OT_TYPES, periodLabel } from "../otMeta";
 export async function exportOtReport(report) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(`OT ${report.period}`);
-  ws.addRow([`รายงาน OT รอบเงินเดือน ${periodLabel(report.period)}`]).font = { bold: true, size: 14 };
+  ws.addRow([`รายงานชั่วโมง OT รอบ ${periodLabel(report.period)}`]).font = { bold: true, size: 14 };
   ws.addRow([]);
   const head = ws.addRow([
     "พนักงาน",
     ...OT_TYPES.map((t) => `${t.label} (ชม.)`),
-    ...OT_TYPES.map((t) => `${t.label} (บาท)`),
-    "ชม. อนุมัติรวม", "ยอดอนุมัติรวม (บาท)", "จ่ายแล้ว (บาท)", "รออนุมัติ (ชม.)",
+    "ชม. อนุมัติรวม", "ปิดรอบแล้ว (ชม.)", "รออนุมัติ (ชม.)",
   ]);
   head.font = { bold: true };
   head.eachCell((c) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } }; });
@@ -24,8 +23,7 @@ export async function exportOtReport(report) {
     ws.addRow([
       p.name,
       ...OT_TYPES.map((t) => bt[t.value]?.hours || 0),
-      ...OT_TYPES.map((t) => bt[t.value]?.amount || 0),
-      p.approved.hours + p.paid.hours, p.approved.amount + p.paid.amount, p.paid.amount, p.waiting.hours,
+      p.approved.hours + p.paid.hours, p.paid.hours, p.waiting.hours,
     ]);
   });
   // 🔁 (24 ต.ค. 2569 ผู้ใช้: "export excel ดูง่าย ครบถ้วน") แถวรวมท้ายตาราง · เส้นตาราง · ตรึงหัวตาราง · หัวคอลัมน์ตัดบรรทัด

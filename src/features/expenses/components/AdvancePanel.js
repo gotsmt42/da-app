@@ -14,6 +14,7 @@ import StatusBadge from "./StatusBadge";
 import {
   KIND_META, baht, fmtMoney, qtyText, paymentLabel, jobText, categoryMeta, TEXT_SUB, TEXT_MAIN, personFullName,
 } from "../expenseMeta";
+import JobTypeChip from "@/shared/ui/JobTypeChip";
 
 const M = KIND_META.advance;
 
@@ -58,7 +59,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
       <Row label="วันที่">{thaiDate(advance.docDate)}</Row>
       <Row label="ผู้เบิก">{personFullName(advance.requester)}{advance.requester?.position ? ` · ${advance.requester.position}` : ""}</Row>
       {advance.to && <Row label="ถึง">{advance.to}</Row>}
-      <Row label="งาน">{advance.job?.title ? jobText(advance.job) : "ไม่ผูกงาน"}</Row>
+      <Row label="งาน">{advance.job?.title ? <><JobTypeChip job={advance.job} sx={{ mr: 0.5, verticalAlign: "middle" }} />{(jobText(advance.job) || "").replace(advance.job.title, "").trim()}</> : "ไม่ผูกงาน"}</Row>
       {pay.at && <Row label="รับเงิน">{thaiDate(pay.at)} · {paymentLabel(pay.method)}{pay.ref ? ` · ${pay.ref}` : ""}</Row>}
       {advance.dueClearAt && <Row label="กำหนดเคลียร์">{thaiDate(advance.dueClearAt)}</Row>}
       {advance.approvedBy?.name && <Row label="อนุมัติโดย">{personFullName(advance.approvedBy)}</Row>}

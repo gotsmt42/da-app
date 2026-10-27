@@ -40,6 +40,7 @@ import {
   installmentText, bahtText, jobRangesText, itemTitle,
   jobsOf,
 } from "../expenseMeta";
+import JobTypeChip from "@/shared/ui/JobTypeChip";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import BankLogo from "./BankLogo";
@@ -1160,7 +1161,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                         <Box key={jj.eventId || ji} sx={{ p: 1.25, px: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
                           {/* 🧹 ตัดไอคอนประแจในการ์ดออก (ผู้ใช้ขอ) — หัวข้อด้านบนมีไอคอนอยู่แล้ว */}
                           <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.45 }}>{title || "-"}</Typography>
+                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
+                              {/* 🎨 (27 ต.ค. 2569) ป้ายประเภทงานแยกสี */}
+                              <JobTypeChip job={jj} />
+                              <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.45 }}>{(jj.title && title.startsWith(jj.title) ? title.slice(jj.title.length).trim() : title) || "-"}</Typography>
+                            </Stack>
                             {(tags.length > 0 || when) && (
                               <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={0.75} sx={{ mt: 0.6 }}>
                                 {tags.map((t) => (

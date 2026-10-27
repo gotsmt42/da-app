@@ -20,6 +20,7 @@ import EventService from "@/shared/services/EventService";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import OtService from "@/features/ot/services/OtService";
 import PurchaseService from "@/features/purchase/services/PurchaseService";
+import StockService from "@/features/stock/services/StockService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
 import WebsiteService from "@/features/website/services/WebsiteService";
 import AttendanceService from "@/shared/services/AttendanceService";
@@ -52,6 +53,7 @@ export const BADGE_LABEL = {
   contractorPay: "ใบค่าจ้างผู้รับเหมาที่ถูกตีกลับ",
   ot: "ใบ OT ที่ต้องดำเนินการ",
   purchase: "ใบขอซื้อที่ต้องดำเนินการ",
+  stock: "ใบเบิกของรออนุมัติ",
   expenseInbox: "ใบเบิกที่รอดำเนินการ",
   webLeads: "คำขอใหม่จากเว็บไซต์",
 };
@@ -91,7 +93,7 @@ const POLL_MS = 30_000;
 const EMPTY = {
   pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0, jobIntake: 0, attendanceFixes: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
-  advance: 0, claim: 0, contractorPay: 0, ot: 0, purchase: 0, expenseInbox: 0, webLeads: 0,
+  advance: 0, claim: 0, contractorPay: 0, ot: 0, purchase: 0, stock: 0, expenseInbox: 0, webLeads: 0,
 };
 
 /** สิ่งที่ผู้ใช้คนนี้มีสิทธิ์เห็น = สิ่งที่ต้องดึง (ไม่ยิง endpoint ที่จะโดน 403 อยู่แล้ว) */
@@ -106,18 +108,20 @@ const scopeOf = (userData) => ({
   webLeads: can(userData, "viewLeads"),
   // ✅ (10 ต.ค. 2569) คำขอแก้เวลาเช็คอิน/เช็คเอาต์ — ผู้อนุมัติ (approveJobs) เท่านั้น
   attendance: can(userData, "approveJobs"),
+  // ✅ (27 ต.ค. 2569) ใบเบิกของรออนุมัติ — ผู้ดูแลคลังเท่านั้น
+  stock: can(userData, "manageStock"),
 });
 
 let lastUser = null;
-let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null }, at: 0, loading: false };
+let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
 const subscribers = new Set();
 let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase", "attendance"];
+const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase", "attendance", "stock"];
 /** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
-const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"], attendance: ["attendance"] };
+const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"], attendance: ["attendance"], stock: ["stock"] };
 let queuedParts = null;
 
 /** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
@@ -130,7 +134,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   }
   store.loading = true;
   const want = new Set(parts);
-  const [events, drafts, expense, dispatch, leads, ot, purchase, attendance] = await Promise.all([
+  const [events, drafts, expense, dispatch, leads, ot, purchase, attendance, stock] = await Promise.all([
     scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
     scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
     scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
@@ -140,6 +144,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     scope.expense && want.has("ot") ? OtService.summary().catch(() => null) : null,
     scope.expense && want.has("purchase") ? PurchaseService.summary().catch(() => null) : null,
     scope.attendance && want.has("attendance") ? AttendanceService.list({ pending: 1 }).then((r) => ({ pending: Number(r?.pendingCount) || 0 })).catch(() => null) : null,
+    scope.stock && want.has("stock") ? StockService.summary().catch(() => null) : null,
   ]);
   store.loading = false;
   // ⚠️ ค่าที่ดึงไม่สำเร็จ (null) ต้องคงของเดิมไว้ ไม่ใช่ล้างเป็นว่าง — เน็ตสะดุดทีเดียวป้ายหายทั้งแอป
@@ -152,6 +157,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     ot: ot ?? store.data.ot,
     purchase: purchase ?? store.data.purchase,
     attendance: attendance ?? store.data.attendance,
+    stock: stock ?? store.data.stock,
   };
   if (want.size === ALL_PARTS.length) store.at = Date.now();
   emit();
@@ -198,7 +204,7 @@ const start = (userData) => {
   const uid = String(userData?.userId || "");
   // เปลี่ยนบัญชี = ทิ้งของเก่าทั้งหมด ห้ามให้ป้ายของคนก่อนหน้าค้างอยู่
   if (store.userId !== uid) {
-    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null }, at: 0, loading: false };
+    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
     emit();
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
@@ -288,6 +294,7 @@ const computeBadges = (userData, data) => {
     ot: (Number(data.ot?.rejectedMine) || 0) + (Number(data.ot?.inbox) || 0),
     // PR: ใบของฉันที่ถูกตีกลับ + ใบที่รอฉันตรวจสอบ/อนุมัติ/สั่งซื้อ
     purchase: (Number(data.purchase?.rejectedMine) || 0) + (Number(data.purchase?.inbox) || 0),
+    stock: scope.stock ? Number(data.stock?.pending) || 0 : 0,
   };
 };
 

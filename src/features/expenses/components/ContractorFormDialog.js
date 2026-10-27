@@ -38,6 +38,7 @@ import {
   KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
   contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import { useAttendanceByDay, AttendanceDayStrip } from "./AttendanceRefs";
@@ -557,15 +558,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                     <Checkbox size="small" checked={selected} sx={{ mr: 0.5, p: 0.5, "&.Mui-checked": { color: ACCENT } }}
                       icon={<CheckBoxOutlineBlank fontSize="small" />} checkedIcon={<CheckBox fontSize="small" />} />
                   )}
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
-                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
-                      {jobPartText(o) && <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800 }} />}
-                    </Stack>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
-                      {[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")}
-                    </Typography>
-                  </Box>
+                  <JobOptionRow job={o} main={jobText(o) || o.title}
+                    extra={jobPartText(o) ? <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800 }} /> : null}
+                    sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
                 </li>
               )}
               renderInput={(params) => (

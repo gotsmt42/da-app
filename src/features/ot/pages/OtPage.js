@@ -14,10 +14,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Button, Chip, TextField, InputAdornment, Skeleton, Alert, Pagination, IconButton,
-  Table, TableHead, TableRow, TableCell, TableBody, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
-  useMediaQuery,
+  Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
+  useMediaQuery, ButtonBase, Avatar,
 } from "@mui/material";
-import { Add, AccessTime, Search, Close, ChevronLeft, ChevronRight, FileDownload, TaskAlt, WarningAmber, Inbox } from "@mui/icons-material";
+import JobTypeChip from "@/shared/ui/JobTypeChip";
+import { Add, AccessTime, Search, Close, ChevronLeft, ChevronRight, FileDownload, TaskAlt, Inbox, Apps, CalendarMonth } from "@mui/icons-material";
 import moment from "moment";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -25,11 +26,13 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { thaiDate } from "@/shared/utils/thaiDate";
 import OtService, { errorText } from "../services/OtService";
+import ViewTiles from "@/shared/ui/ViewTiles";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import OtFormDialog from "../components/OtFormDialog";
 import OtDetailDialog from "../components/OtDetailDialog";
 import OtStatusBadge from "../components/OtStatusBadge";
 import {
-  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, baht, money, periodLabel,
+  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel,
 } from "../otMeta";
 import { PAGE_SX } from "@/shared/ui/PageKit";
 
@@ -47,54 +50,110 @@ const Pill = ({ label, value, alert, active, onClick }) => (
 );
 
 const peopleCount = (r) => new Set((r.lines || []).map((l) => l.person.userId)).size;
+/** งานที่อิง (ไม่ซ้ำ) — ประเภทงานคือคำแรกของชื่องาน ("PM · Fire Alarm · …") ใช้ทำสีชิป */
+const jobsList = (r) => [...new Set((r.lines || []).map((l) => l.jobTitle).filter(Boolean))];
+const JobLine = ({ title }) => {
+  const [type, ...rest] = String(title).split(" · ");
+  return (
+    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+      <JobTypeChip job={{ title: type }} />
+      <Typography noWrap sx={{ fontSize: "0.84rem", color: TEXT_MAIN, minWidth: 0 }}>{rest.join(" · ") || type}</Typography>
+    </Stack>
+  );
+};
+const Jobs = ({ r, max = 2 }) => {
+  const list = jobsList(r);
+  if (!list.length) return <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>—</Typography>;
+  return (
+    <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+      {list.slice(0, max).map((j) => <JobLine key={j} title={j} />)}
+      {list.length > max && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>+ อีก {list.length - max} งาน</Typography>}
+    </Stack>
+  );
+};
 
+/** การ์ดใบ OT บนมือถือ — ผู้ยื่น + ชั่วโมงตัวใหญ่ · งานที่อิง (สีตามประเภท) · เลขที่/วันที่ + สถานะ */
 const RowCard = ({ r, onOpen }) => (
-  <Box role="button" onClick={() => onOpen(r._id)} sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, cursor: "pointer", "&:active": { bgcolor: "#f8fafc" } }}>
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+  <Box role="button" onClick={() => onOpen(r._id)} sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer", "&:active": { bgcolor: "#f8fafc" } }}>
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <Avatar sx={{ width: 36, height: 36, fontSize: "0.9rem", fontWeight: 800, bgcolor: personColor(r.requester?.name), flexShrink: 0 }}>{personInitial(r.requester?.name)}</Avatar>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: "0.93rem", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.subject}</Typography>
-        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-          {[r.docNo, thaiDate(r.docDate), r.requester?.name, `${peopleCount(r)} คน`].join(" · ")}
-        </Typography>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN }}>{r.requester?.name || "-"}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{r.docNo} · {thaiDate(r.docDate)}</Typography>
       </Box>
       <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.95rem" }}>{hoursText(r.totalHours)}</Typography>
-        {r.totalAmount > 0 && <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>{baht(r.totalAmount)}</Typography>}
+        <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", lineHeight: 1, color: TEXT_MAIN }}>{hoursText(r.totalHours).replace(" ชม.", "")}</Typography>
+        <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>ชั่วโมง</Typography>
       </Box>
     </Stack>
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+    <Box sx={{ mt: 1.25 }}><Jobs r={r} /></Box>
+    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${BORDER_MAIN}` }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+        <MonthTag r={r} />
+        <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }} noWrap>{(r.lines || []).length} รายการ</Typography>
+      </Stack>
       <OtStatusBadge status={r.status} short />
-      <Typography variant="caption" sx={{ color: TEXT_SUB }}>รอบ {periodLabel(r.period)}</Typography>
     </Stack>
   </Box>
 );
 
 const RowTable = ({ rows, onOpen }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflowX: "auto" }}>
-    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto" }}>
+    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1.1, borderColor: BORDER_MAIN },
+      "& td": { py: 1.25, borderColor: BORDER_MAIN }, "& tbody tr:last-of-type td": { borderBottom: 0 } }}>
       <TableHead>
         <TableRow>
-          <TableCell>เลขที่ / วันที่</TableCell><TableCell>ผู้ยื่น</TableCell><TableCell>เรื่อง</TableCell>
-          <TableCell align="right">ชั่วโมง</TableCell><TableCell align="right">ค่า OT</TableCell><TableCell>รอบ</TableCell><TableCell>สถานะ</TableCell>
+          <TableCell>เดือน</TableCell><TableCell>ผู้ยื่น</TableCell><TableCell>เลขที่ / วันที่</TableCell><TableCell>งานที่อิง</TableCell>
+          <TableCell align="right">รายการ</TableCell><TableCell align="right">ชั่วโมง</TableCell><TableCell>สถานะ</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
         {rows.map((r) => (
-          <TableRow key={r._id} hover onClick={() => onOpen(r._id)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER_MAIN } }}>
+          <TableRow key={r._id} hover onClick={() => onOpen(r._id)} sx={{ cursor: "pointer" }}>
+            <TableCell sx={{ whiteSpace: "nowrap" }}><MonthTag r={r} /></TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }}>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{r.docNo}</Typography>
-              <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(r.docDate)}</Typography>
+              <Stack direction="row" spacing={1.25} alignItems="center">
+                <Avatar sx={{ width: 32, height: 32, fontSize: "0.82rem", fontWeight: 800, bgcolor: personColor(r.requester?.name) }}>{personInitial(r.requester?.name)}</Avatar>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.88rem" }}>{r.requester?.name}</Typography>
+                  {peopleCount(r) > 1 && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{peopleCount(r)} คน</Typography>}
+                </Box>
+              </Stack>
             </TableCell>
-            <TableCell sx={{ whiteSpace: "nowrap" }}>{r.requester?.name}<Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{peopleCount(r)} คน</Typography></TableCell>
-            <TableCell sx={{ maxWidth: 360 }}><Typography noWrap sx={{ fontSize: "0.86rem", fontWeight: 600 }}>{r.subject}</Typography></TableCell>
-            <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>{hoursText(r.totalHours)}</TableCell>
-            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>{r.totalAmount > 0 ? baht(r.totalAmount) : "—"}</TableCell>
-            <TableCell sx={{ whiteSpace: "nowrap" }}>{periodLabel(r.period)}</TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap" }}>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.86rem" }}>{r.docNo}</Typography>
+              <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{thaiDate(r.docDate)}</Typography>
+            </TableCell>
+            <TableCell sx={{ maxWidth: 420 }}><Jobs r={r} /></TableCell>
+            <TableCell align="right" sx={{ color: TEXT_SUB, whiteSpace: "nowrap" }}>{(r.lines || []).length}</TableCell>
+            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+              <Typography component="span" sx={{ fontWeight: 900, fontSize: "1.02rem" }}>{hoursText(r.totalHours).replace(" ชม.", "")}</Typography>
+              <Typography component="span" sx={{ ml: 0.5, fontSize: "0.76rem", color: TEXT_SUB }}>ชม.</Typography>
+            </TableCell>
             <TableCell><OtStatusBadge status={r.status} short /></TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
+  </Box>
+);
+
+/** เดือนของใบ (รอบ OT) — ✅ ผู้ใช้: "ให้แสดงเดือนตรงรายการให้ชัดเจน ไม่ต้องแยกค้นหาข้างบน" */
+const monthOf = (r) => r.period || moment(r.docDate).format("YYYY-MM");
+const MonthTag = ({ r }) => (
+  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 1, height: 26, borderRadius: 2, flexShrink: 0,
+    bgcolor: "#ecfeff", color: OT_DARK, border: "1px solid #a5f3fc", fontSize: "0.8rem", fontWeight: 800, whiteSpace: "nowrap" }}>
+    <CalendarMonth sx={{ fontSize: 15 }} />{periodLabel(monthOf(r))}
+  </Box>
+);
+
+const Stat = ({ label, value, unit, tone }) => (
+  <Box sx={{ flex: "1 1 0", minWidth: 120, px: 1.75, py: 1.25, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, position: "relative", overflow: "hidden" }}>
+    <Box sx={{ position: "absolute", left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2, bgcolor: tone }} />
+    <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, fontWeight: 700 }} noWrap>{label}</Typography>
+    <Typography sx={{ fontWeight: 900, fontSize: "1.35rem", color: TEXT_MAIN, lineHeight: 1.25 }} noWrap>
+      {value}<Box component="span" sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 600, ml: 0.5 }}>{unit}</Box>
+    </Typography>
   </Box>
 );
 
@@ -113,13 +172,12 @@ const ReportView = ({ reloadKey, canClose }) => {
   useEffect(() => { setData(null); load(); }, [load, reloadKey]);
   const shift = (n) => setPeriod((p) => moment(`${p}-01`).add(n, "month").format("YYYY-MM"));
   const sum = (f) => money((data?.people || []).reduce((s, p) => s + f(p), 0));
-  const waitingAmount = sum((p) => p.approved.amount);
 
   const doClose = async () => {
     setClosing(true);
     try {
       const r = await OtService.closePayroll(period);
-      setToast(`ปิดรอบจ่ายแล้ว ${r.closed} ใบ · ${baht(r.amount)}`);
+      setToast(`ปิดรอบแล้ว ${r.closed} ใบ — ส่งชั่วโมง OT ให้ฝ่ายบุคคล/บัญชีแล้ว`);
       setConfirm(false);
       load();
     } catch (err) {
@@ -142,24 +200,19 @@ const ReportView = ({ reloadKey, canClose }) => {
         {canClose && (
           <Button variant="contained" startIcon={<TaskAlt />} disabled={!data?.approvedCount} onClick={() => setConfirm(true)}
             sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
-            ปิดรอบจ่าย{data?.approvedCount ? ` (${data.approvedCount} ใบ)` : ""}
+            ปิดรอบ{data?.approvedCount ? ` (${data.approvedCount} ใบ)` : ""}
           </Button>
         )}
       </Stack>
       {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError("")}>{error}</Alert>}
       {toast && <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setToast("")}>{toast}</Alert>}
-      {data?.missingRate?.length > 0 && (
-        <Alert severity="warning" icon={<WarningAmber />} sx={{ mb: 1.5 }}>
-          ยังไม่ได้ตั้งค่าจ้างต่อชั่วโมง: {data.missingRate.join(", ")} — ยอดเงินของคนกลุ่มนี้เป็น 0 จนกว่าจะตั้งค่า (เมนู “ค่าจ้างต่อชั่วโมง”)
-        </Alert>
-      )}
       {!data ? <Skeleton variant="rounded" height={240} /> : (
         <>
           <Stack direction="row" spacing={1} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5 }}>
             <Pill label="พนักงานที่มี OT" value={`${data.people.length} คน`} />
             <Pill label="ชั่วโมงอนุมัติแล้ว" value={hoursText(sum((p) => p.approved.hours + p.paid.hours))} />
-            <Pill label="รอจ่ายพร้อมเงินเดือน" value={baht(waitingAmount)} />
-            <Pill label="จ่ายแล้ว" value={baht(sum((p) => p.paid.amount))} />
+            <Pill label="อนุมัติแล้ว · รอปิดรอบ" value={hoursText(sum((p) => p.approved.hours))} />
+            <Pill label="ปิดรอบแล้ว" value={hoursText(sum((p) => p.paid.hours))} />
             <Pill label="ยังไม่ผ่านอนุมัติ" value={hoursText(sum((p) => p.waiting.hours))} />
           </Stack>
           {!data.people.length ? (
@@ -174,7 +227,7 @@ const ReportView = ({ reloadKey, canClose }) => {
                   <TableRow>
                     <TableCell>พนักงาน</TableCell>
                     {OT_TYPES.map((t) => <TableCell key={t.value} align="right">{t.label}</TableCell>)}
-                    <TableCell align="right">รวมอนุมัติ</TableCell><TableCell align="right">ค่า OT</TableCell><TableCell align="right">สถานะเงิน</TableCell>
+                    <TableCell align="right">รวมอนุมัติ</TableCell><TableCell align="right">สถานะ</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -187,9 +240,8 @@ const ReportView = ({ reloadKey, canClose }) => {
                         </TableCell>
                       ))}
                       <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>{hoursText(p.approved.hours + p.paid.hours)}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>{baht(p.approved.amount + p.paid.amount)}</TableCell>
                       <TableCell align="right" sx={{ whiteSpace: "nowrap", fontSize: "0.78rem", color: TEXT_SUB }}>
-                        {p.approved.amount ? `รอจ่าย ${baht(p.approved.amount)}` : p.paid.amount ? "จ่ายแล้ว" : "—"}
+                        {p.approved.hours ? `รอปิดรอบ ${hoursText(p.approved.hours)}` : p.paid.hours ? "ปิดรอบแล้ว" : "—"}
                         {p.waiting.hours ? ` · รออนุมัติ ${hoursText(p.waiting.hours)}` : ""}
                       </TableCell>
                     </TableRow>
@@ -206,10 +258,10 @@ const ReportView = ({ reloadKey, canClose }) => {
         </>
       )}
       <Dialog open={confirm} onClose={() => !closing && setConfirm(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 800 }}>ปิดรอบจ่าย OT · {periodLabel(period)}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>ปิดรอบ OT · {periodLabel(period)}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: TEXT_SUB }}>
-            ใบที่อนุมัติแล้ว {data?.approvedCount || 0} ใบ รวม {baht(waitingAmount)} จะถูกบันทึกว่า “จ่ายพร้อมเงินเดือนแล้ว” และแจ้งพนักงาน —
+            ใบที่อนุมัติแล้ว {data?.approvedCount || 0} ใบ รวม {hoursText(sum((p) => p.approved.hours))} จะถูกบันทึกว่า “ปิดรอบแล้ว” (ส่งชั่วโมงให้ฝ่ายบุคคล/บัญชี) และแจ้งพนักงาน —
             ใบที่ยังไม่อนุมัติจะไม่ถูกแตะ
           </Typography>
         </DialogContent>
@@ -219,69 +271,6 @@ const ReportView = ({ reloadKey, canClose }) => {
             sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT }}>ยืนยันปิดรอบ</Button>
         </DialogActions>
       </Dialog>
-    </Box>
-  );
-};
-
-/** ── ค่าจ้างต่อชั่วโมง (ลับ) ─────────────────────────────────────────── */
-const BASIS = [
-  { value: "monthly", label: "เงินเดือน" },
-  { value: "daily", label: "ค่าจ้างรายวัน" },
-  { value: "hourly", label: "ต่อชั่วโมง" },
-];
-const WageRow = ({ row, hoursPerDay, onSaved }) => {
-  const [basis, setBasis] = useState(row.basis);
-  const [amount, setAmount] = useState(row.baseAmount ? String(row.baseAmount) : "");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const dirty = basis !== row.basis || money(amount) !== money(row.baseAmount);
-  const preview = money(basis === "monthly" ? Number(amount) / 30 / hoursPerDay : basis === "daily" ? Number(amount) / hoursPerDay : Number(amount));
-  const save = async () => {
-    setBusy(true); setErr("");
-    try { onSaved(await OtService.saveWage(row.userId, { basis, baseAmount: Number(amount) || 0 })); } catch (e) { setErr(errorText(e)); } finally { setBusy(false); }
-  };
-  return (
-    <Box sx={{ display: "grid", gap: 1, alignItems: "center", p: 1.25, borderBottom: `1px solid ${BORDER_MAIN}`, gridTemplateColumns: { xs: "1fr 1fr", md: "1.6fr 150px 160px 140px 90px" } }}>
-      <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: "0.88rem" }} noWrap>{row.fullName}</Typography>
-        <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{row.position}{row.updatedAt ? ` · แก้ ${thaiDate(row.updatedAt)} ${row.updatedBy}` : ""}</Typography>
-      </Box>
-      <TextField select size="small" value={basis} onChange={(e) => setBasis(e.target.value)}>
-        {BASIS.map((b) => <MenuItem key={b.value} value={b.value}>{b.label}</MenuItem>)}
-      </TextField>
-      <TextField size="small" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" inputProps={{ min: 0, step: "any" }}
-        InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} error={Boolean(err)} helperText={err || undefined} />
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: preview ? TEXT_MAIN : "#dc2626" }}>
-        {preview ? `${baht(preview)} / ชม.` : "ยังไม่ตั้ง"}
-      </Typography>
-      <Button size="small" variant={dirty ? "contained" : "outlined"} disabled={!dirty || busy} onClick={save}
-        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", ...(dirty ? { bgcolor: OT_ACCENT } : {}) }}>
-        {busy ? "…" : "บันทึก"}
-      </Button>
-    </Box>
-  );
-};
-const WagesView = () => {
-  const [data, setData] = useState(null);
-  const [q, setQ] = useState("");
-  const [error, setError] = useState("");
-  useEffect(() => { OtService.wages().then(setData).catch((err) => setError(errorText(err))); }, []);
-  const rows = (data?.rows || []).filter((r) => !q.trim() || r.fullName.toLowerCase().includes(q.trim().toLowerCase()));
-  const onSaved = (w) => setData((d) => ({ ...d, rows: d.rows.map((r) => (r.userId === w.userId ? { ...r, ...w } : r)) }));
-  return (
-    <Box sx={{ pt: 1 }}>
-      <Alert severity="info" sx={{ mb: 1.5, borderRadius: 2 }}>
-        🔒 ข้อมูลลับ — เห็นเฉพาะผู้ดูแลค่าจ้าง · ค่าจ้างต่อชั่วโมง = เงินเดือน ÷ 30 ÷ {data?.hoursPerDay || 8} ชม. (ม.68 พ.ร.บ.คุ้มครองแรงงาน) ·
-        แก้แล้วใบ OT ที่ตรวจสอบไปแล้วไม่เปลี่ยน (ใบที่รอตรวจสอบจะคิดใหม่ตอนตรวจ)
-      </Alert>
-      {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
-      <TextField size="small" fullWidth placeholder="ค้นหาชื่อพนักงาน" value={q} onChange={(e) => setQ(e.target.value)} sx={{ mb: 1.25, bgcolor: "#fff" }}
-        InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19 }} /></InputAdornment> }} />
-      {!data ? <Skeleton variant="rounded" height={240} /> : (
-        <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflow: "hidden" }}>
-          {rows.map((r) => <WageRow key={r.userId} row={r} hoursPerDay={data.hoursPerDay} onSaved={onSaved} />)}
-        </Box>
-      )}
     </Box>
   );
 };
@@ -327,14 +316,23 @@ export default function OtPage({ view = "mine" }) {
     return rows.filter((r) => !needle || [r.docNo, r.subject, r.requester?.name, ...(r.lines || []).map((l) => l.person.name)]
       .some((v) => String(v || "").toLowerCase().includes(needle)));
   }, [rows, q]);
-  const counts = useMemo(() => base.reduce((c, r) => ({ ...c, [r.status]: (c[r.status] || 0) + 1 }), {}), [base]);
-  const visible = status === "all" ? base : base.filter((r) => r.status === status);
+  const liveHours = (list) => list.filter((r) => !["cancelled", "rejected"].includes(r.status)).reduce((t, r) => t + (r.totalHours || 0), 0);
+  const monthList = useMemo(() => {
+    const m = new Map();
+    base.forEach((r) => { const k = monthOf(r); m.set(k, [...(m.get(k) || []), r]); });
+    return [...m.entries()].sort((x, y) => y[0].localeCompare(x[0]));
+  }, [base]);
+  const thisMonth = moment().format("YYYY-MM");
+  const inMonth = base;
+  const counts = useMemo(() => inMonth.reduce((c, r) => ({ ...c, [r.status]: (c[r.status] || 0) + 1 }), {}), [inMonth]);
+  const visible = status === "all" ? inMonth : inMonth.filter((r) => r.status === status);
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const cur = Math.min(page, pageCount);
   const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
 
   if (!canUse) return <Navigate to="/dashboard" replace />;
-  if ((view === "report" || view === "wages") && !canMoney) return <Navigate to="/ot" replace />;
+  if (view === "wages") return <Navigate to="/ot" replace />;
+  if (view === "report" && !canMoney) return <Navigate to="/ot" replace />;
   if (view === "inbox" && !canHandle) return <Navigate to="/ot" replace />;
 
   const openDetail = (id) => { setDetailId(id); navigate(`/ot/${id}`, { replace: Boolean(routeId), state: { fromView: view } }); };
@@ -346,7 +344,8 @@ export default function OtPage({ view = "mine" }) {
   const tabs = [
     { to: "/ot", label: "ใบ OT", key: "mine" },
     ...(canHandle ? [{ to: "/ot/approvals", label: `รอดำเนินการ${summary?.inbox ? ` (${summary.inbox})` : ""}`, key: "inbox" }] : []),
-    ...(canMoney ? [{ to: "/ot/report", label: "รายงานรายเดือน", key: "report" }, { to: "/ot/wages", label: "ค่าจ้างต่อชั่วโมง", key: "wages" }] : []),
+    // 🔁 (27 ต.ค. 2569) ไม่มีเรื่องเงินในระบบ OT — เหลือรายงานชั่วโมงรายเดือน (เลิกหน้า "ค่าจ้างต่อชั่วโมง")
+    ...(canMoney ? [{ to: "/ot/report", label: "รายงานชั่วโมงรายเดือน", key: "report" }] : []),
   ];
 
   const inboxGroups = view === "inbox" ? [
@@ -358,63 +357,81 @@ export default function OtPage({ view = "mine" }) {
 
   return (
     <Box sx={PAGE_SX}>
+      {/* 🎨 (27 ต.ค. 2569 ผู้ใช้: "UX UI ดูยาก ไม่สวย ไม่ทันสมัย สีไม่เหมือน advance") หัวเพจ + แถบเมนูแบบเดียวกับหน้าใบ Advance */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: OT_ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><AccessTime /></Box>
+          <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }} sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, borderRadius: 2.25, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: OT_ACCENT, color: "#fff", "& svg": { fontSize: { xs: 20, sm: 24 } } }}>
+              <AccessTime />
+            </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>OT · ทำงานล่วงเวลา</Typography>
-              <Typography variant="caption" sx={{ color: TEXT_SUB }}>ยื่นขอ OT ของตัวเองหรือทั้งทีม · ตรวจสอบ → อนุมัติ → จ่ายพร้อมเงินเดือน</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.08rem", sm: "1.2rem" }, color: TEXT_MAIN, lineHeight: 1.3 }}>OT · ทำงานล่วงเวลา</Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: { xs: "none", sm: "block" }, lineHeight: 1.35 }}>
+                พนักงานกรอกชั่วโมง OT ของตัวเอง อิงงาน · แอดมินตรวจสอบ → อนุมัติ
+              </Typography>
             </Box>
           </Stack>
+          {view !== "report" && (
+            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: { xs: "row", sm: "column" }, alignItems: { xs: "center", sm: "flex-end" }, justifyContent: "space-between", gap: 1,
+              px: 1.5, py: { xs: 1, sm: 0 }, borderRadius: { xs: 2, sm: 0 }, bgcolor: { xs: "#f8fafc", sm: "transparent" }, border: { xs: `1px solid ${BORDER_MAIN}`, sm: 0 }, borderLeft: { sm: `1px solid ${BORDER_MAIN}` } }}>
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>ชั่วโมง {periodLabel(thisMonth)}</Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.05rem", sm: "1.1rem" }, color: TEXT_MAIN, lineHeight: 1.25, whiteSpace: "nowrap" }}>
+                {hoursText(liveHours(base.filter((r) => monthOf(r) === thisMonth)))}
+              </Typography>
+            </Box>
+          )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
+            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
             ยื่นขอ OT
           </Button>
         </Stack>
+        <Box component="nav" aria-label="เมนู OT"
+          sx={{ display: "flex", gap: { xs: 0.25, sm: 0.5 }, mt: { xs: 1.25, sm: 1.5 }, mb: { xs: -1.25, sm: -1.75 }, mx: { xs: -1.5, sm: -2 }, px: { xs: 1, sm: 1.5 },
+            borderTop: `1px solid ${BORDER_MAIN}`, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
+          {tabs.map((t) => {
+            const on = view === t.key;
+            const c = t.key === "inbox" ? "#d97706" : t.key === "report" ? "#1d4ed8" : OT_ACCENT;
+            return (
+              <ButtonBase key={t.key} component={RouterLink} to={t.to} aria-current={on ? "page" : undefined}
+                sx={{ flexShrink: 0, px: { xs: 1.25, sm: 1.5 }, py: 1.1, fontFamily: "inherit", whiteSpace: "nowrap", fontSize: "0.84rem", fontWeight: on ? 800 : 600,
+                  color: on ? c : TEXT_SUB, borderBottom: `2px solid ${on ? c : "transparent"}`, mb: "-1px", "&:hover": { color: on ? c : TEXT_MAIN } }}>
+                {t.label}
+              </ButtonBase>
+            );
+          })}
+        </Box>
       </Box>
 
-      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5 }}>
-        {tabs.map((t) => (
-          <Chip key={t.key} component={RouterLink} to={t.to} clickable label={t.label}
-            sx={{ flexShrink: 0, height: 32, fontWeight: 800, borderRadius: 2, bgcolor: view === t.key ? DARK : "#fff", color: view === t.key ? "#fff" : TEXT_SUB, border: `1px solid ${view === t.key ? DARK : BORDER_MAIN}` }} />
-        ))}
-      </Stack>
-
       {view === "report" && <ReportView reloadKey={reloadKey} canClose={can("disburseExpense")} />}
-      {view === "wages" && <WagesView />}
 
       {(view === "mine" || view === "inbox") && (
         <>
-          {view === "mine" && (
-            <Stack direction="row" spacing={1} sx={{ mb: 1.25, overflowX: "auto", pb: 0.5 }}>
-              <Pill label="รอตรวจสอบ" value={summary?.pending ?? "–"} active={status === "pending"} onClick={() => setStatus((s) => (s === "pending" ? "all" : "pending"))} />
-              <Pill label="รออนุมัติ" value={summary?.reviewing ?? "–"} active={status === "reviewed"} onClick={() => setStatus((s) => (s === "reviewed" ? "all" : "reviewed"))} />
-              <Pill label="รอจ่ายพร้อมเงินเดือน" value={summary?.approved ?? "–"} active={status === "approved"} onClick={() => setStatus((s) => (s === "approved" ? "all" : "approved"))} />
-              {summary?.rejectedMine > 0 && <Pill label="ถูกตีกลับ (ของฉัน)" value={summary.rejectedMine} alert active={status === "rejected"} onClick={() => setStatus((s) => (s === "rejected" ? "all" : "rejected"))} />}
-            </Stack>
-          )}
           <TextField size="small" fullWidth placeholder="ค้นหาเลขที่ / เรื่อง / ชื่อพนักงาน" value={q} onChange={(e) => setQ(e.target.value)} sx={{ mb: 1.25, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
               endAdornment: q ? <InputAdornment position="end"><IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 17 }} /></IconButton></InputAdornment> : null,
             }} />
+          {view === "mine" && monthList.length > 0 && (
+            <>
+              <Stack direction="row" spacing={1} sx={{ mb: 1.5, overflowX: "auto", pb: 0.25 }}>
+                <Stat label="อนุมัติเดือนนี้" value={hoursText(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth).filter((r) => ["approved", "paid"].includes(r.status)))).replace(" ชม.", "")} unit="ชม." tone="#16a34a" />
+                <Stat label="รออนุมัติ" value={hoursText(liveHours(inMonth.filter((r) => ["pending", "reviewed"].includes(r.status)))).replace(" ชม.", "")} unit="ชม." tone="#d97706" />
+                <Stat label="ใบทั้งหมด" value={inMonth.length} unit="ใบ" tone={OT_ACCENT} />
+                {(counts.rejected || 0) > 0 && <Stat label="ถูกตีกลับ" value={counts.rejected} unit="ใบ" tone="#dc2626" />}
+              </Stack>
+            </>
+          )}
           {view === "mine" && (
-            <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5 }}>
-              {["all", ...STATUS_ORDER].map((s) => {
-                const n = s === "all" ? base.length : counts[s] || 0;
-                if (s !== "all" && s !== status && !n) return null;
-                const active = status === s;
-                return (
-                  <Chip key={s} clickable onClick={() => setStatus(s)}
-                    label={<Stack direction="row" spacing={0.6} alignItems="center" component="span">
-                      {s !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: active ? "#fff" : otStatus(s).color }} />}
-                      <span>{s === "all" ? "ทุกสถานะ" : otStatus(s).short || otStatus(s).label} <b>{n}</b></span>
-                    </Stack>}
-                    sx={{ flexShrink: 0, height: 30, fontWeight: 700, fontSize: "0.78rem", borderRadius: 2, bgcolor: active ? DARK : "#fff", color: active ? "#fff" : TEXT_MAIN, border: `1px solid ${active ? DARK : BORDER_MAIN}` }} />
-                );
-              })}
-            </Stack>
+            <Box sx={{ mb: 1.5 }}>
+              <ViewTiles compact value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: [
+                { value: "all", label: "ทุกสถานะ", count: inMonth.length, unit: "ใบ", icon: <Apps />, color: "#475569" },
+                ...STATUS_ORDER.filter((st) => st === status || (counts[st] || 0) > 0).map((st) => ({
+                  value: st, label: otStatus(st).label, shortLabel: otStatus(st).short || otStatus(st).label, count: counts[st] || 0, unit: "ใบ",
+                  icon: <Box component="span" sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: otStatus(st).color, display: "inline-block" }} />,
+                  color: otStatus(st).color, alert: st === "rejected",
+                })),
+              ] }]} />
+            </Box>
           )}
           {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
           {loading ? <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
@@ -434,8 +451,26 @@ export default function OtPage({ view = "mine" }) {
               ) : <Stack alignItems="center" sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}><Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>ไม่มีใบ OT ที่รอดำเนินการ 🎉</Typography></Stack>
             ) : visible.length ? (
               <>
-                {renderRows(pageRows)}
-                {pageCount > 1 && (
+                {monthList.length > 1 ? (
+                  <Stack spacing={2}>
+                    {monthList.map(([k]) => {
+                      const list = visible.filter((r) => monthOf(r) === k);
+                      if (!list.length) return null;
+                      return (
+                        <Box key={k}>
+                          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1 }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center"><CalendarMonth sx={{ fontSize: 20, color: OT_ACCENT }} />
+                              <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN }}>{periodLabel(k)}{k === thisMonth ? " (เดือนนี้)" : ""}</Typography></Stack>
+                            <Box sx={{ flex: 1, height: 1, bgcolor: BORDER_MAIN }} />
+                            <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 700 }}>{list.length} ใบ · {hoursText(liveHours(list))}</Typography>
+                          </Stack>
+                          {renderRows(list)}
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                ) : renderRows(pageRows)}
+                {monthList.length <= 1 && pageCount > 1 && (
                   <Stack alignItems="center" sx={{ mt: 1.5 }}>
                     <Pagination count={pageCount} page={cur} onChange={(_, n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                       shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
@@ -443,13 +478,13 @@ export default function OtPage({ view = "mine" }) {
                   </Stack>
                 )}
                 <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
-                  {visible.length} ใบ · รวม {hoursText(visible.filter((r) => r.status !== "cancelled").reduce((s, r) => s + r.totalHours, 0))}
+                  {visible.length} ใบ · รวม {hoursText(liveHours(visible))} (ไม่นับใบที่ยกเลิก/ตีกลับ)
                 </Typography>
               </>
             ) : (
               <Stack alignItems="center" spacing={1.25} sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}>
                 <AccessTime sx={{ fontSize: 40, color: "#cbd5e1" }} />
-                <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>{rows.length ? "ไม่พบรายการตามตัวกรอง" : "ยังไม่มีใบ OT"}</Typography>
+                <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>{rows.length ? (inMonth.length ? "ไม่พบรายการตามตัวกรอง" : "ไม่พบรายการตามตัวกรอง") : "ยังไม่มีใบ OT"}</Typography>
               </Stack>
             )}
         </>

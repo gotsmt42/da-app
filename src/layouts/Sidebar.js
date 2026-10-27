@@ -207,8 +207,10 @@ const side = (key, extra) => {
   // เดิม OT/ใบขอซื้อต่อท้ายหมวดเบิก — ตอนนี้: จัดซื้อ = ใบขอซื้อ PR · บุคคล = OT
   // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — เปลี่ยนแค่จุดวาง · ลำดับหมวดตรงกับหน้าแรก (HomeMenu)
   const purchaseMenu = [side("purchase"), side("purchaseReport")];
-  // 🚧 (11 ต.ค. 2569 ผู้ใช้: "ตัดเมนู OT ออกไปก่อน") — ซ่อนทางเข้า หน้า /ot ยังอยู่
-  const peopleMenu = [];
+  // ✅ (27 ต.ค. 2569) สต๊อกแผนก — สิทธิ์ของตัวเอง (requestStock / manageStock)
+  const canStock = can(userData, "requestStock") || can(userData, "manageStock");
+  // ✅ (27 ต.ค. 2569 ผู้ใช้: "เอาระบบทำโอทีกลับมา แต่ไม่ต้องระบุเงิน แค่กรอกชั่วโมง อิงงาน") — เปิดเมนู OT กลับมา
+  const peopleMenu = [side("ot")];
 
   const masterDataMenu = [side("customers"), side("staff")];
 
@@ -444,6 +446,12 @@ const side = (key, extra) => {
             <>
               <div className="admin-divider-label">จัดซื้อ</div>
               {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
+            </>
+          )}
+          {canStock && (
+            <>
+              <div className="admin-divider-label">คลังแผนก</div>
+              {renderLink(side("stock"), "stock-0")}
             </>
           )}
 

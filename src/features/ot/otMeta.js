@@ -5,8 +5,9 @@
  */
 import moment from "moment";
 
-export const OT_ACCENT = "#0f766e";
-export const OT_DARK = "#115e59";
+// 🎨 (27 ต.ค. 2569 ผู้ใช้: "ไม่ให้สีเหมือน advance") สีประจำหมวด "บุคคล" ชุดเดียวกับไอคอนหมวดบนหน้าแรก (ฟ้าอมเขียว)
+export const OT_ACCENT = "#0891b2";
+export const OT_DARK = "#0e7490";
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
 export const BORDER_MAIN = "#e2e8f0";
@@ -23,8 +24,9 @@ export const typeMeta = (v) => OT_TYPES.find((t) => t.value === v) || OT_TYPES[0
 export const OT_STATUS = {
   pending: { label: "รอตรวจสอบ", color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
   reviewed: { label: "รออนุมัติ", color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd" },
-  approved: { label: "อนุมัติแล้ว · รอจ่ายพร้อมเงินเดือน", short: "รอจ่ายพร้อมเงินเดือน", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" },
-  paid: { label: "จ่ายพร้อมเงินเดือนแล้ว", short: "จ่ายแล้ว", color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+  // 🔁 (27 ต.ค. 2569) ระบบ OT ไม่ยุ่งกับเงินแล้ว — อนุมัติ = จบ · ปิดรอบ = ส่งชั่วโมงให้ฝ่ายบุคคล/บัญชีแล้ว
+  approved: { label: "อนุมัติแล้ว", short: "อนุมัติแล้ว", color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+  paid: { label: "ปิดรอบแล้ว · ส่งชั่วโมงแล้ว", short: "ปิดรอบแล้ว", color: "#475569", bg: "#f8fafc", border: "#cbd5e1" },
   rejected: { label: "ตีกลับให้แก้", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
   cancelled: { label: "ยกเลิก", color: "#64748b", bg: "#f8fafc", border: "#cbd5e1" },
 };
@@ -70,14 +72,14 @@ export const crossesMidnight = (start, end) => {
 
 /**
  * เดาประเภท OT จากวันที่ — ✅ ให้กรอกง่าย: วันหยุด (นักขัตฤกษ์/วันหยุดประจำสัปดาห์) + เริ่มในเวลางาน = ทำงานวันหยุด
- * วันหยุด + เริ่มหลัง 17:00 = OT วันหยุด · วันปกติ = OT วันทำงาน (ผู้ใช้เปลี่ยนเองได้เสมอ)
+ * วันหยุด + เริ่มตั้งแต่ 17:30 (เวลาเลิกงาน) = OT วันหยุด · วันปกติ = OT วันทำงาน (ผู้ใช้เปลี่ยนเองได้เสมอ)
  */
 export const guessType = (date, start, cfg) => {
   if (!date) return "workdayOT";
   const holiday = Boolean(cfg?.holidays?.[date]) || (cfg?.restDays || [0]).includes(moment(date).day());
   if (!holiday) return "workdayOT";
   const a = toMin(start);
-  return a !== null && a >= 17 * 60 ? "holidayOT" : "holidayWork";
+  return a !== null && a >= 17 * 60 + 30 ? "holidayOT" : "holidayWork"; // 🔁 (27 ต.ค. 2569) เลิกงาน 17:30
 };
 
 /** ชื่อวันหยุด (ถ้ามี) — "วันหยุด: วันจักรี" / "วันหยุดประจำสัปดาห์" */
