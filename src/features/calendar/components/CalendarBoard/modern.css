@@ -325,3 +325,13 @@
 @media (max-width: 768px) {
   .modern-calendar-container.ec-modern .fc-daygrid .fc-event[class*="fc-event-type-"] { border-left-width: 2px !important; }
 }
+/* ป้ายประเภทงานไม่ทับติ่งไอคอน และไม่เพิ่มความสูงการ์ด: ป้ายอยู่ "ข้าง" ติ่ง (เว้นที่ขวาเท่าความกว้างติ่ง)
+   ถ้าชื่อประเภทยาวเกินค่อยขึ้นบรรทัดใหม่ในป้าย — ไม่ตัดคำ ไม่ล้นออกนอกการ์ด */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card:has(.ec-card-badges:not(:empty)) .ec-card-type {
+  max-width: calc(100% - var(--ec-tab-w, 40px)) !important;
+}
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card,
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event { overflow: visible; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-site,
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-row,
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-team { overflow-wrap: anywhere; }
