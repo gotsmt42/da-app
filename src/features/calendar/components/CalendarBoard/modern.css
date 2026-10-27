@@ -290,3 +290,11 @@
   border-bottom: 0 !important;
   border-radius: 6px 5px 0 0 !important;
 }
+
+/* ระยะว่างด้านล่าง/ก่อนเส้นคั่นทีม ลดให้พอดี (ผู้ใช้: "ระยะด้านล่างเยอะไป") */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card { padding-bottom: 3px !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-detail,
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-detail-inner { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card-team { margin: 2px 0 0 !important; padding: 2px 0 0 !important; }
+/* "+N เพิ่มเติม" ไม่ถูกตัดคำ */
+.ec-modern .fc .fc-daygrid-more-link { white-space: nowrap; overflow: visible; font-size: 11px; }
