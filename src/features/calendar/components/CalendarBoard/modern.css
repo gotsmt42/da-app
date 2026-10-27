@@ -327,8 +327,13 @@
 }
 /* ป้ายประเภทงานไม่ทับติ่งไอคอน และไม่เพิ่มความสูงการ์ด: ป้ายอยู่ "ข้าง" ติ่ง (เว้นที่ขวาเท่าความกว้างติ่ง)
    ถ้าชื่อประเภทยาวเกินค่อยขึ้นบรรทัดใหม่ในป้าย — ไม่ตัดคำ ไม่ล้นออกนอกการ์ด */
-.modern-calendar-container.ec-modern .fc-daygrid .ec-card:has(.ec-card-badges:not(:empty)) .ec-card-type {
-  max-width: calc(100% - var(--ec-tab-w, 40px)) !important;
+/* 🔁 (ผู้ใช้: "เพี้ยนมาก") เลิกบีบป้ายด้านข้าง (การ์ดแคบ → ป้ายเรียงทีละตัวอักษร) — ป้ายเต็มความกว้าง
+   ดันลงพ้นส่วนที่ติ่งจมลงมาแค่ไม่กี่ px (วัดแล้ว: มือถือ 7px · จอคอม 11px) */
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card .ec-card-type { max-width: 100% !important; white-space: nowrap !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .ec-card:has(.ec-card-badges:not(:empty)) { padding-top: 11px !important; }
+@media (max-width: 1100px) {
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card:has(.ec-card-badges:not(:empty)) { padding-top: 7px !important; }
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card .ec-card-type { white-space: normal !important; overflow-wrap: normal !important; word-break: keep-all; }
 }
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card,
 .modern-calendar-container.ec-modern .fc-daygrid .fc-event { overflow: visible; }
