@@ -3177,7 +3177,7 @@ function EventCalendar() {
             // ถ้าปล่อยให้ข้อความลอยกลางแท่ง (พฤติกรรมเดิม) จะอ่านไล่ลงมาเป็นคอลัมน์ไม่ได้เลย
             return {
               html: `
-                <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}" style="--ec-c:${escapeHtml(backgroundColor || "#3788d8")}">
+                <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}" style="--ec-c:${escapeHtml(backgroundColor || "#3788d8")};--ec-t:${escapeHtml(textColor || "#ffffff")}">
                   <div class="ec-card-head">
                     ${/* ⚠️ ลำดับใน DOM นี้ถูกจัดเพื่อ "โหมดลอยขวา (float)" บนมือถือโดยเฉพาะ — ตัวที่ float
                           ก่อนจะไปอยู่ขวาสุด เรียง toggle → สถานะ → กลุ่มงาน จึงได้ภาพ [🔗][✓][▲] ตามที่ต้องการ

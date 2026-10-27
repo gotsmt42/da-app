@@ -71,16 +71,16 @@
 .ec-modern .fc .fc-h-event:not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-selected),
 .ec-modern .fc .fc-timegrid-event:not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-selected) {
   background: transparent !important;
-  border: 0 !important;
+  border-top: 0 !important; border-right: 0 !important; border-bottom: 0 !important;
   box-shadow: none !important;
 }
-.ec-modern .fc .fc-event-main { color: #fff !important; }
+.ec-modern .fc .fc-event-main { color: var(--ec-t, #fff) !important; }
 .ec-modern .fc-daygrid .ec-card,
 .ec-modern .fc-timegrid .ec-card {
   background: var(--ec-c, #3788d8);
   border: 0;
   border-radius: 4px;
-  color: #fff !important;
+  color: var(--ec-t, #fff) !important;
   box-shadow: none;
   transition: box-shadow .15s ease, transform .15s ease;
 }
@@ -89,14 +89,14 @@
 }
 .ec-modern .ec-card a { color: inherit !important; }
 .ec-modern .fc-daygrid .ec-card-type {
-  background: #fff !important;
+  background: var(--ec-t, #fff) !important;
   color: var(--ec-c, #3788d8) !important;
   border-radius: 3px;
   padding: 0 5px;
   font-size: .86em;
   font-weight: 800;
 }
-.ec-modern .ec-card-title { color: #fff !important; }
+.ec-modern .ec-card-title { color: var(--ec-t, #fff) !important; }
 /* ไอคอนเดิมกลับมา — จัดให้เป็นช่องเดียวกันทุกแถว (กว้างคงที่ ชิดกึ่งกลาง) ข้อความเริ่มแนวเดียวกัน อ่านเป็นระเบียบ */
 .ec-modern .fc-daygrid .ec-card-ico {
   display: inline-block;
@@ -110,13 +110,13 @@
 .ec-modern .fc-daygrid .ec-card-team-ico { margin-right: 3px; font-size: .95em; }
 .ec-modern .fc-daygrid .ec-card-site .ec-card-ico,
 .ec-modern .fc-daygrid .ec-card-row .ec-card-ico { opacity: .95; }
-.ec-modern .ec-card-site { font-weight: 800; color: #fff !important; opacity: 1; }
-.ec-modern .ec-card-row { color: rgba(255, 255, 255, .92) !important; opacity: 1; }
-.ec-modern .ec-card-k, .ec-modern .ec-card-kw { color: rgba(255, 255, 255, .72) !important; }
+.ec-modern .ec-card-site { font-weight: 800; color: var(--ec-t, #fff) !important; opacity: 1; }
+.ec-modern .ec-card-row { color: var(--ec-t, #fff) !important; opacity: .92; }
+.ec-modern .ec-card-k, .ec-modern .ec-card-kw { color: var(--ec-t, #fff) !important; }
 /* ติ่งนูนไอคอนสถานะ/ปุ่มพับ — สีเดียวกับการ์ดงาน ไอคอนขาว (ผู้ใช้ขอ) */
 .ec-modern .fc-daygrid .ec-card-badges {
   background: var(--ec-c, #3788d8) !important;
-  color: #fff !important;
+  color: var(--ec-t, #fff) !important;
   box-shadow: none !important;
 }
 /* ติ่งต้องเสมอขอบขวาของการ์ด (เดิมยื่นเกิน 1px) · มุมบนเข้าชุดกับการ์ด · มุมล่างเหลี่ยม กลืนเป็นชิ้นเดียว */
@@ -124,13 +124,7 @@
   right: 0 !important;
   border-radius: 6px 4px 0 0 !important;
 }
-.ec-modern .fc-daygrid .ec-card-team {
-  background: #fff !important;
-  color: #1e293b !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, .18);
-  font-weight: 700;
-}
-.ec-modern .ec-card-grip { color: rgba(255, 255, 255, .6) !important; }
+.ec-modern .ec-card-grip { color: var(--ec-t, #fff) !important; opacity: .6; }
 
 /* ── ปุ่ม "+N งาน" ── */
 .ec-modern .fc .fc-daygrid-more-link {
@@ -141,11 +135,11 @@
 
 /* ── แท่งจับขยายวัน: ขีดสีอ่อนของสีงาน (เดิมขีดขาวมีเงา ดูเป็นเส้นแตกบนการ์ดสีอ่อน) ── */
 .ec-modern .ec-timed-resize-handle::after {
-  background: rgba(255, 255, 255, .8);
+  background: color-mix(in srgb, var(--ec-t, #fff) 70%, transparent);
   box-shadow: none;
 }
 .ec-modern .ec-timed-resize-handle:hover::after,
-.ec-modern .ec-timed-resize-handle.is-resizing::after { background: #fff; box-shadow: none; }
+.ec-modern .ec-timed-resize-handle.is-resizing::after { background: var(--ec-t, #fff); box-shadow: none; }
 
 /* ── แถบหัวปฏิทิน (เดือน · ก่อน/ถัดไป · วันนี้ · ย่อ/ขยาย) ── */
 .ec-modern .fc .fc-toolbar-title { font-weight: 900; color: var(--ecm-ink); letter-spacing: -.01em; }
@@ -168,7 +162,6 @@
 .ec-modern .fc .fc-event-selected,
 .ec-modern .fc .ec-reorder-dragging .fc-event {
   border-radius: 4px !important;
-  color: #fff !important;
 }
 .ec-modern .fc .fc-event-mirror .ec-card,
 .ec-modern .fc .fc-event-dragging .ec-card { box-shadow: 0 10px 24px -8px rgba(15, 23, 42, .5); }
@@ -192,17 +185,17 @@
   max-width: none !important;
   margin: 3px 0 0 !important;
   padding: 3px 0 0 !important;
-  border-top: 1px solid rgba(255, 255, 255, .25) !important;
+  border-top: 1px solid color-mix(in srgb, var(--ec-t, #fff) 28%, transparent) !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: #fff !important;
+  color: var(--ec-t, #fff) !important;
   text-align: left !important;
   font-weight: 700;
   box-shadow: none !important;
 }
 .ec-modern .fc-daygrid .ec-card-row--contact { display: none !important; }
 /* แท่งจับขยายวัน: จางลง (ยังลากได้เหมือนเดิม) */
-.ec-modern .ec-timed-resize-handle::after { background: rgba(255, 255, 255, .45) !important; width: 2px; }
+.ec-modern .ec-timed-resize-handle::after { background: color-mix(in srgb, var(--ec-t, #fff) 45%, transparent) !important; width: 2px; }
 
 /* จอแคบ: ป้ายประเภทงานบรรทัดเดียว แสดงเต็ม (ติ่งไอคอนลอยอยู่นอกการ์ด ไม่แย่งที่) */
 @media (max-width: 1100px) {
@@ -238,7 +231,7 @@
 }
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-head:not(:has(.ec-card-toggle, .ec-card-icon)) .ec-card-type {
   display: block; width: 100%; max-width: none;
-  background: transparent !important; color: #fff !important;
+  background: transparent !important; color: var(--ec-t, #fff) !important;
   padding: 0; font-size: 1em; font-weight: 800; line-height: 1.4;
   white-space: normal !important; overflow-wrap: break-word;
 }
@@ -261,3 +254,12 @@
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-type { line-height: 1.7 !important; padding: 0 5px !important; }
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-head,
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-title { overflow: visible !important; height: auto !important; max-height: none !important; }
+
+/* ทีมบนการ์ดที่ไม่ได้ใช้ตัวขาว (เช่น พื้นเหลือง ตัวดำ) — สีข้อความตามที่เลือก */
+.ec-modern .fc-daygrid .ec-card-team .ec-team-name,
+.ec-modern .fc-daygrid .ec-card-team .ec-team-rest { color: var(--ec-t, #fff) !important; }
+/* แถบขอบซ้าย (ประเภทงาน · เส้นประ = งานต่อเนื่องจากวัน/สัปดาห์/เดือนก่อน) แสดงแบบเดิม — การ์ดชิดแถบ มุมซ้ายเหลี่ยม */
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event[class*="fc-event-type-"] { border-radius: 5px !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event[class*="fc-event-type-"] .ec-card,
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event:not(.fc-event-start) .ec-card { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.modern-calendar-container.ec-modern .fc-daygrid .fc-event:not(.fc-event-end) .ec-card { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
