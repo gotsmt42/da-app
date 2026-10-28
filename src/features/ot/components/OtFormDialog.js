@@ -321,9 +321,9 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
           <Alert severity="info" icon={false} sx={{ mb: 1.5, borderRadius: 2.5, bgcolor: "#ecfeff", color: OT_DARK, border: "1px solid #a5f3fc", "& .MuiAlert-message": { width: "100%" } }}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
               <Box sx={{ flex: 1, fontSize: "0.84rem" }}>
-                <b>รายการ OT รอส่ง {items.length} รายการ</b> — กด “เก็บไว้ก่อน” แล้วไปกด “ขอ OT งานนี้” ที่งาน/วันอื่นเพิ่มได้ ครบแล้วค่อยส่งทีเดียว
+                <b>ฉบับร่าง OT {items.length} รายการ</b> — กด “บันทึกฉบับร่าง” แล้วไปกด “ขอ OT งานนี้” ที่งาน/วันอื่นต่อได้ ครบแล้วค่อยส่งขออนุมัติทีเดียว
               </Box>
-              <Button size="small" onClick={clearBasket} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>ล้างรายการ</Button>
+              <Button size="small" onClick={clearBasket} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>ล้างฉบับร่าง</Button>
             </Stack>
           </Alert>
         )}
@@ -471,7 +471,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
         )}
         <Button onClick={() => onClose?.({ kept: basketMode, count: items.length })} disabled={saving}
           sx={{ textTransform: "none", color: basketMode ? OT_DARK : TEXT_SUB, fontWeight: basketMode ? 800 : 500, display: { xs: error ? "none" : "inline-flex", sm: "inline-flex" } }}>
-          {basketMode ? "เก็บไว้ก่อน" : "ยกเลิก"}
+          {basketMode ? "บันทึกฉบับร่าง" : "ยกเลิก"}
         </Button>
         <Button variant="contained" onClick={submit} disabled={saving}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : editing && !resubmit ? <Save /> : <Send />}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
+import { Snackbar, Alert, Button as MuiButton } from "@mui/material";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import SelectField from "@/shared/ui/SelectField";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -1220,6 +1221,7 @@ function EventCalendar() {
   // ✅ งานที่กำลังจะเบิก Advance (เมนู "เบิก Advance งานนี้" ในหน้าแก้ไขงาน) — กลไกเดียวกับ deliveryNoteJob
   const [advanceJob, setAdvanceJob] = useState(null);
   const [otJob, setOtJob] = useState(null);
+  const [otNote, setOtNote] = useState("");
   /** วันที่ของช่องปฏิทินที่กดเปิดงานล่าสุด (งานหลายวัน = รู้ว่ากดที่วันไหน) — ใช้ตั้งวันที่ในฟอร์ม OT */
   const clickedDateRef = useRef("");
   const handleExportExcel = async () => {
@@ -3788,6 +3790,15 @@ function EventCalendar() {
         />
       )}
 
+      <Snackbar open={Boolean(otNote)} autoHideDuration={2500} onClose={(_, r) => { if (r !== "clickaway") setOtNote(""); }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }} sx={{ "&.MuiSnackbar-root": { bottom: { xs: 80, sm: 24 } } }}>
+        <Alert severity="success" variant="filled" onClose={() => setOtNote("")}
+          action={<MuiButton size="small" color="inherit" onClick={() => { setOtNote(""); navigate("/ot"); }} sx={{ fontWeight: 800, textTransform: "none" }}>ดูฉบับร่าง</MuiButton>}
+          sx={{ alignItems: "center", fontWeight: 700, borderRadius: 2.5, boxShadow: "0 8px 24px rgba(15,23,42,.18)", bgcolor: "#0e7490" }}>
+          {otNote}
+        </Alert>
+      </Snackbar>
+
       {/* ✅ (27 ต.ค. 2569) ฟอร์มขอ OT ของงาน — เปิดจากเมนู "⋯ เพิ่มเติม" ในหน้าแก้ไขงาน (ดู onRequestOt) */}
       {otJob && (
         <Suspense fallback={null}>
@@ -3796,10 +3807,8 @@ function EventCalendar() {
             presetJob={otJob}
             onClose={(info) => {
               setOtJob(null);
-              if (info?.kept) {
-                Swal.fire({ toast: true, position: "bottom", icon: "info", timer: 3500, showConfirmButton: false,
-                  title: `เก็บไว้ในรายการ OT แล้ว (${info.count} รายการ)`, text: "กด “ขอ OT งานนี้” ที่งานอื่นเพื่อเพิ่ม · ส่งทีเดียวเมื่อครบ" });
-              }
+              // 🔁 (28 ต.ค. 2569 ผู้ใช้: "ไม่ให้แจ้งเตือนบังแบบนี้ บังนานเกิน ไม่มืออาชีพ") — แถบเล็กมุมล่าง ไม่บังจอ หายเองใน 2.5 วินาที
+              if (info?.kept) setOtNote(`บันทึกฉบับร่าง OT แล้ว · ${info.count} รายการ`);
             }}
             onSaved={async (req, { fileWarn } = {}) => {
               setOtJob(null);

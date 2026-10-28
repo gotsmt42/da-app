@@ -410,7 +410,7 @@ export default function OtPage({ view = "mine" }) {
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
             sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
-            {basketN ? `ส่งรายการ OT (${basketN})` : "ยื่นขอ OT"}
+            {basketN ? `ฉบับร่าง OT (${basketN})` : "ยื่นขอ OT"}
           </Button>
         </Stack>
         <Box component="nav" aria-label="เมนู OT"
