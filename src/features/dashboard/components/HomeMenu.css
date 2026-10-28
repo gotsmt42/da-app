@@ -238,7 +238,41 @@
     display: none;
   }
   .hm-todo-list > li {
-    flex: 0 0 210px;
+    flex: 0 0 190px;
+  }
+  /* 🔁 (28 ต.ค. 2569 ผู้ใช้: "เมนูหน้าแรกของมือถือ ตัวหนา และขนาดใหญ่ไป ลดลงอีกหน่อย") */
+  .hm-todo-item {
+    height: 54px;
+    gap: 8px;
+    padding: 0 12px 0 8px;
+  }
+  .hm-todo-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+  .hm-todo-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+  .hm-todo-sub {
+    font-size: 0.68rem;
+  }
+  .hm-todo-count {
+    font-size: 1.2rem;
+  }
+  .hm-card-head {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+  .hm-card-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+  }
+  .hm-card-title {
+    font-size: 0.84rem;
+    font-weight: 700;
   }
 }
 
@@ -251,21 +285,21 @@
   .hm-links {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 2px;
-    padding: 10px 6px 8px;
+    gap: 0;
+    padding: 6px 4px 4px;
   }
   .hm-link {
     position: relative;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 6px;
+    gap: 4px;
     height: auto;
     padding: 6px 2px;
   }
   .hm-link-icon {
-    width: 40px;
-    height: 34px;
-    font-size: 26px;
+    width: 34px;
+    height: 28px;
+    font-size: 21px;
   }
   .hm-title-full {
     display: none;
@@ -276,8 +310,8 @@
     -webkit-box-orient: vertical;
     white-space: normal;
     text-align: center;
-    font-size: 0.76rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 500;
     line-height: 1.3;
   }
   .hm-link-chev {
@@ -286,11 +320,11 @@
   .hm-link-count {
     position: absolute;
     top: 0;
-    left: calc(50% + 10px);
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    font-size: 0.68rem;
+    left: calc(50% + 7px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 0.64rem;
     border: 2px solid #ffffff;
   }
 }
