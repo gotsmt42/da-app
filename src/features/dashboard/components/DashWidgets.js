@@ -11,14 +11,15 @@
 import { Link } from "react-router-dom";
 import { Box, Stack, Typography, Skeleton, IconButton } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ChevronRight, ChevronLeft } from "@mui/icons-material";
+import { ChevronRightRounded as ChevronRight, ChevronLeftRounded as ChevronLeft } from "@mui/icons-material";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
 
 /** ป้ายพื้นอ่อน — ใช้แสดงสถานะ/ค่าด้านขวาของแถว */
 export function Pill({ color = MUTED, solid, icon, children, sx }) {
   return (
-    <Box component="span" sx={{
-      display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 1, borderRadius: 99,
+    <Box component="span" className={solid ? "dw-pill dw-pill--solid" : "dw-pill"} style={{ "--pill-c": color }} sx={{
+      // 🎨 ป้ายสี่เหลี่ยมมุมโค้งเล็กแบบ Agoda (เดิมแคปซูลกลม)
+      display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 1, borderRadius: "6px",
       fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums",
       color: solid ? "#fff" : color, bgcolor: solid ? color : alpha(color, 0.1),
       ...sx,
@@ -42,10 +43,10 @@ export function DateTile({ top, bottom, color = INK_2, strong }) {
 }
 
 /** ช่องไอคอนพื้นอ่อน (หัวกล่อง / หน้าแถว) */
-export function IconTile({ icon: Icon, color = ACCENT, size = 32 }) {
+export function IconTile({ icon: Icon, color = ACCENT, size = 32, className }) {
   if (!Icon) return null;
   return (
-    <Box sx={{ width: size, height: size, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color }}>
+    <Box className={className} sx={{ width: size, height: size, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color }}>
       <Icon sx={{ fontSize: size * 0.56 }} />
     </Box>
   );
@@ -54,14 +55,15 @@ export function IconTile({ icon: Icon, color = ACCENT, size = 32 }) {
 /** กล่องข้อมูล: หัว (ไอคอน + ชื่อ + จำนวน + ลิงก์ดูทั้งหมด) + แถบสรุป + เนื้อหา */
 export function Widget({ title, count, hint, icon, tone = ACCENT, summary, to, toLabel = "ดูทั้งหมด", children, footer, sx }) {
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW, overflow: "hidden", mb: 2, breakInside: "avoid", ...sx }}>
-      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 2, py: 1.4, borderBottom: `1px solid ${LINE}` }}>
-        <IconTile icon={icon} color={tone} />
+    // className dw-* — ให้หน้าแรกมือถือ (MobileHome.css · .dash-phone) ปรับเป็นแบบรายการบนพื้นขาวได้ โดยจอคอมเหมือนเดิม
+    <Box className="dw" sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW, overflow: "hidden", mb: 2, breakInside: "avoid", ...sx }}>
+      <Stack className="dw-head" direction="row" alignItems="center" spacing={1.25} sx={{ px: 2, py: 1.4, borderBottom: `1px solid ${LINE}` }}>
+        <IconTile icon={icon} color={tone} className="dw-icon" />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" alignItems="center" spacing={0.75}>
-            <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.95rem", color: INK }}>{title}</Typography>
+            <Typography className="dw-title" noWrap sx={{ fontWeight: 800, fontSize: "0.95rem", color: INK }}>{title}</Typography>
             {count !== undefined && count !== null && count !== "" && (
-              <Box component="span" sx={{ px: 0.8, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, color: tone, bgcolor: alpha(tone, 0.1), fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{count}</Box>
+              <Box component="span" className="dw-count" sx={{ px: 0.8, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, color: tone, bgcolor: alpha(tone, 0.1), fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{count}</Box>
             )}
           </Stack>
           {hint && <Typography noWrap sx={{ fontSize: "0.72rem", color: FAINT }}>{hint}</Typography>}
@@ -73,7 +75,7 @@ export function Widget({ title, count, hint, icon, tone = ACCENT, summary, to, t
         )}
       </Stack>
       {summary && (
-        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ px: 2, py: 1, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
+        <Stack className="dw-summary" direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ px: 2, py: 1, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
           {summary}
         </Stack>
       )}

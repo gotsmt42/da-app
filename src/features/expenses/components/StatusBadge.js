@@ -9,9 +9,7 @@
  * ⚠️ สี/คำมาจาก statusMeta() ใน expenseMeta.js ที่เดียว — ไอคอนอยู่ที่นี่เพราะ expenseMeta เป็นไฟล์ข้อมูลล้วน
  */
 import { Box } from "@mui/material";
-import {
-  HourglassTop, FactCheck, Payments, AccountBalanceWallet, Sync, CheckCircle, Undo, Block, HelpOutline,
-} from "@mui/icons-material";
+import { HourglassTopRounded as HourglassTop, FactCheckRounded as FactCheck, PaymentsRounded as Payments, AccountBalanceWalletRounded as AccountBalanceWallet, SyncRounded as Sync, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, HelpOutlineRounded as HelpOutline } from "@mui/icons-material";
 import { statusMeta } from "../expenseMeta";
 
 export const STATUS_ICON = {

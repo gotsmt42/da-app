@@ -32,7 +32,7 @@ export default function SiteMapCard({ company, site, canEdit = false, height = 2
   if (!site && !company) return null;
 
   return (
-    <Box sx={{ borderRadius: 2.5, overflow: "hidden", border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
+    <Box sx={{ borderRadius: 2.5, overflow: "hidden", border: "1px solid #e6e9ef", bgcolor: "#fff" }}>
       <Box sx={{ position: "relative", height, bgcolor: "#f1f5f9" }}>
         {src ? (
           <Box component="iframe" title={`แผนที่ ${site || company}`} src={src} loading="lazy"
@@ -44,7 +44,7 @@ export default function SiteMapCard({ company, site, canEdit = false, height = 2
           </Stack>
         )}
       </Box>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, py: 1, borderTop: "1px solid #e2e8f0", flexWrap: "wrap", rowGap: 0.75 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, py: 1, borderTop: "1px solid #e6e9ef", flexWrap: "wrap", rowGap: 0.75 }}>
         <Box sx={{ flex: 1, minWidth: 160 }}>
           <Stack direction="row" spacing={0.6} alignItems="center">
             <GoogleMapsPin size={15} />

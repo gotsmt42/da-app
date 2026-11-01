@@ -3,9 +3,7 @@ import {
   Box, Button, CircularProgress, FormControlLabel, IconButton, Link, MenuItem, Skeleton, Stack, Switch,
   TextField, Tooltip, Typography,
 } from "@mui/material";
-import {
-  Add, AddPhotoAlternate, ArrowDownward, ArrowUpward, Close, HideImage, Save, Star, StarBorder, Visibility, VisibilityOff,
-} from "@mui/icons-material";
+import { AddRounded as Add, AddPhotoAlternateRounded as AddPhotoAlternate, ArrowDownwardRounded as ArrowDownward, ArrowUpwardRounded as ArrowUpward, CloseRounded as Close, HideImageRounded as HideImage, SaveRounded as Save, StarRounded as Star, StarBorderRounded as StarBorder, VisibilityRounded as Visibility, VisibilityOffRounded as VisibilityOff } from "@mui/icons-material";
 
 import ImageManager from "../components/ImageManager";
 import {

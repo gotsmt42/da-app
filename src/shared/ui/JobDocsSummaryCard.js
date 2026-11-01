@@ -8,7 +8,7 @@
  */
 import { Box, Stack, Typography, Button, LinearProgress } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircle, RadioButtonUnchecked, Description, TaskAlt } from "@mui/icons-material";
+import { CheckCircleRounded as CheckCircle, RadioButtonUncheckedRounded as RadioButtonUnchecked, DescriptionRounded as Description, TaskAltRounded as TaskAlt } from "@mui/icons-material";
 import { INK, MUTED, ACCENT } from "@/shared/ui/PageKit";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";

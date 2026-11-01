@@ -17,7 +17,7 @@ import {
   ButtonBase,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CalendarMonth, BarChart, DonutLarge, Work, FactCheck, Engineering, ReceiptLong, Insights, WarningAmber, Close, ExpandMore, Groups } from "@mui/icons-material";
+import { CalendarMonthRounded as CalendarMonth, BarChartRounded as BarChart, DonutLargeRounded as DonutLarge, WorkRounded as Work, FactCheckRounded as FactCheck, EngineeringRounded as Engineering, ReceiptLongRounded as ReceiptLong, InsightsRounded as Insights, WarningAmberRounded as WarningAmber, CloseRounded as Close, ExpandMoreRounded as ExpandMore, GroupsRounded as Groups } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SelectField from "@/shared/ui/SelectField";
@@ -315,7 +315,7 @@ const slipGroups = (lines) => {
 /** ส่วนต่างของแถว — สีเฉพาะที่มีความหมาย (เกิน = แดง · เหลือ = ฟ้า · พอดี = เขียว) */
 const diffOf = (r, hasClaim) => {
   if (!hasClaim) return { text: "—", color: "#cbd5e1" };
-  if (!r.requested && r.actual) return { text: "เคลมเพิ่ม", hint: "ไม่มีในใบเบิก — บรรทัดนี้มีแค่ในใบเคลม", color: "#7c3aed" };
+  if (!r.requested && r.actual) return { text: "เคลมเพิ่ม", hint: "ไม่มีในใบเบิก — บรรทัดนี้มีแค่ในใบเคลม", color: "#0284c7" };
   if (r.requested && !r.actual) return { text: "ไม่มีในใบเคลม", color: "#94a3b8" };
   const d = r.actual - r.requested;
   if (Math.abs(d) < 0.005) return { text: "พอดี", color: "#16a34a" };
@@ -827,7 +827,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
     <Stack
       direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
       sx={isDesktop
-        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }
+        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "none" }
         : { "& > *": { width: "100%" } }}
     >
       <SelectField label="ช่วงเวลา" value={preset} onChange={(e) => applyPreset(e.target.value)} sx={{ minWidth: 170 }}>
@@ -950,7 +950,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
             </Stack>
           )}
           {personView && ledger[0] && (ledger[0].byOthers > 0 || ledger[0].forOthers > 0) && (
-            <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2, bgcolor: "#f5f3ff", border: "1px solid #ddd6fe", fontSize: "0.8rem", color: "#4c1d95", lineHeight: 1.5 }}>
+            <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2, bgcolor: "#f0f9ff", border: "1px solid #bae6fd", fontSize: "0.8rem", color: "#075985", lineHeight: 1.5 }}>
               ตัวเลขด้านบนนับเฉพาะใบที่ <b>{ledger[0].label}</b> เป็นผู้เบิก ·
               ยอดของ {ledger[0].label} ตามชื่อในรายการ <b>{baht(ledger[0].requested)}</b>
               {ledger[0].byOthers > 0 && <> (รวมที่คนอื่นเบิกให้ {baht(ledger[0].byOthers)})</>}

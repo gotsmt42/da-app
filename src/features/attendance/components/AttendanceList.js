@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse, Dialog, IconButton } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyOutlined, Close, PhotoCameraOutlined } from "@mui/icons-material";
+import { ExpandMoreRounded as ExpandMore, EditCalendarRounded, ChevronRightRounded as ChevronRight, DescriptionRounded, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyRounded, CloseRounded as Close, PhotoCameraRounded } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
@@ -56,7 +56,7 @@ const Files = ({ photos, onPreview }) => (photos?.length ? (
       ) : (
         <ButtonBase key={p.fileId} onClick={open}
           sx={{ gap: 0.5, px: 1, height: 32, maxWidth: "100%", borderRadius: "10px", bgcolor: SURFACE, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 500, color: ACCENT }}>
-          <DescriptionOutlined sx={{ fontSize: 16 }} />
+          <DescriptionRounded sx={{ fontSize: 16 }} />
           <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>{p.fileName}</Box>
         </ButtonBase>
       );
@@ -222,9 +222,9 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded, def
           )}
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.65 }}>
             {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
-            {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
-            {pending.length > 0 && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา · รออนุมัติ</Tag>}
-            {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
+            {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyRounded />}>นอกวันนัด</Tag>}
+            {pending.length > 0 && <Tag tone={TONE.warn} icon={<EditCalendarRounded />}>ขอแก้เวลา · รออนุมัติ</Tag>}
+            {fixed && <Tag tone={MUTED} icon={<EditCalendarRounded />}>แก้เวลาแล้ว</Tag>}
           </Stack>
         </Box>
         <ExpandMore sx={{ fontSize: 20, color: FAINT, flexShrink: 0, mt: 0.2, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
@@ -288,7 +288,7 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded, def
           {(showJob || mine || isApprover) && (
             <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.25 }}>
               {(mine || isApprover) && (
-                <Button variant="outlined" startIcon={<EditCalendarOutlined sx={{ fontSize: "18px !important" }} />} onClick={() => setFixOpen(true)}
+                <Button variant="outlined" startIcon={<EditCalendarRounded sx={{ fontSize: "18px !important" }} />} onClick={() => setFixOpen(true)}
                   sx={{ ...SMALL_BTN, color: INK_2, borderColor: LINE }}>
                   {isApprover ? "แก้เวลา" : "ขอแก้เวลา"}
                 </Button>
@@ -339,7 +339,7 @@ export function AttendanceTable({ rows = [], me, isApprover, onPreview, onChange
   const COLS = ["วันที่ · เวลา", "ผู้บันทึก", "ทีม", "งาน", "โครงการ / บริษัท", "ตำแหน่ง", "หมายเหตุ", "รูป", ""];
   const fullScreen = typeof window !== "undefined" && window.innerWidth < 600;
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1240, borderCollapse: "collapse" }}>
         <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
         <tbody>
@@ -391,9 +391,9 @@ export function AttendanceTable({ rows = [], me, isApprover, onPreview, onChange
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
                   {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
                   <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
-                    {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
-                    {pending && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา</Tag>}
-                    {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
+                    {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyRounded />}>นอกวันนัด</Tag>}
+                    {pending && <Tag tone={TONE.warn} icon={<EditCalendarRounded />}>ขอแก้เวลา</Tag>}
+                    {fixed && <Tag tone={MUTED} icon={<EditCalendarRounded />}>แก้เวลาแล้ว</Tag>}
                   </Stack>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 220 }}>
@@ -405,7 +405,7 @@ export function AttendanceTable({ rows = [], me, isApprover, onPreview, onChange
                   {photos.length ? (
                     <ButtonBase onClick={() => (onPreview ? onPreview(photos[0].fileUrl, photos[0].fileName, photos) : window.open(photos[0].fileUrl, "_blank", "noopener"))}
                       sx={{ gap: 0.5, px: 0.9, height: 28, borderRadius: 2, border: `1px solid ${LINE}`, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: INK_2, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-                      <PhotoCameraOutlined sx={{ fontSize: 16 }} />{photos.length}
+                      <PhotoCameraRounded sx={{ fontSize: 16 }} />{photos.length}
                     </ButtonBase>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>

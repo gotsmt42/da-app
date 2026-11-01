@@ -15,7 +15,7 @@ const CSS = `
 .swal2-container.swal2-backdrop-show:has(.tt-swal) { background: rgba(15,23,42,.42) !important; backdrop-filter: blur(3px); }
 .tt-swal:not(.swal2-toast) {
   width: min(92vw, 440px) !important; padding: 22px 22px 18px !important; border-radius: 18px !important;
-  font-family: inherit !important; border: 1px solid #e2e8f0; box-shadow: 0 24px 60px -18px rgba(15,23,42,.45) !important;
+  font-family: inherit !important; border: 1px solid #e6e9ef; box-shadow: 0 24px 60px -18px rgba(15,23,42,.45) !important;
 }
 .tt-swal.swal2-show { animation: ttSwalIn .18s cubic-bezier(.2,.8,.2,1) !important; }
 .tt-swal.swal2-hide { animation: ttSwalOut .12s ease-in forwards !important; }
@@ -40,7 +40,7 @@ const CSS = `
 .tt-swal:not(.swal2-toast) .swal2-actions.tt-swal-stack button { width: 100%; flex: 0 0 auto; }
 .tt-swal .swal2-styled { height: 42px; padding: 0 18px !important; border-radius: 10px !important; font-family: inherit !important; font-size: .9rem !important; font-weight: 800 !important; box-shadow: none !important; }
 .tt-swal .swal2-styled:focus-visible { box-shadow: 0 0 0 3px rgba(37,99,235,.25) !important; }
-.tt-swal .swal2-styled.swal2-cancel { color: #334155 !important; border: 1px solid #e2e8f0 !important; background: #fff !important; }
+.tt-swal .swal2-styled.swal2-cancel { color: #334155 !important; border: 1px solid #e6e9ef !important; background: #fff !important; }
 .tt-swal .swal2-styled.swal2-cancel:hover { background: #f8fafc !important; background-image: none !important; }
 .tt-swal .swal2-styled.swal2-confirm:hover, .tt-swal .swal2-styled.swal2-deny:hover { filter: brightness(.93); background-image: none !important; }
 .tt-swal .swal2-close { border-radius: 10px; color: #94a3b8; }

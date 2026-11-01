@@ -1,5 +1,5 @@
 import { Box, Button, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
-import { Add, ArrowDownward, ArrowUpward, DeleteOutline } from "@mui/icons-material";
+import { AddRounded as Add, ArrowDownwardRounded as ArrowDownward, ArrowUpwardRounded as ArrowUpward, DeleteOutlineRounded as DeleteOutline } from "@mui/icons-material";
 
 import { BLOCK_TYPES, emptyBlock } from "../utils/webContent";
 import ImageManager from "./ImageManager";

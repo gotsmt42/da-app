@@ -1,0 +1,379 @@
+/* MobileHome — หน้าแรกจอมือถือ (ดูเหตุผลใน MobileHome.js)
+ * 🎨 (1 พ.ย. 2569 ผู้ใช้: "อยากได้ UX UI สะอาดตาแบบ Agoda")
+ *   • พื้นขาวเต็มจอ (ทะลุ padding ของหน้า) · ไม่มีเงา ใช้เส้นขอบบาง #e6e9ef
+ *   • หัวข้อส่วนตัวหนาใหญ่ · แบ่งส่วนด้วยแถบเทา 8px เต็มจอ
+ *   • ไอคอน Material Rounded ไล่สี ขนาดเท่ากันทุกจุดในกรอบเมนู (24px)
+ * ⚠️ font-weight ห้ามเกิน 700 — IBM Plex Sans Thai โหลดไว้แค่ 400–700
+ * ⚠️ selector ไอคอนต้องมี 2 ชั้น (.mh .mh-icon) — ชนะ .MuiSvgIcon-root
+ */
+.mh {
+  --mh-red: #dc2626;
+  --mh-ink: #111827;
+  --mh-ink-2: #374151;
+  --mh-muted: #6b7280;
+  --mh-line: #e6e9ef;
+  --mh-band: #f2f4f7;
+  --mh-radius: 16px;
+
+  /* หน้าแรกมือถือพื้นขาวทั้งหน้า (Dashboard ตั้ง .dash-phone) — ขอบซ้ายขวา 16px */
+  /* 🔁 (1 พ.ย. 2569 ผู้ใช้: "ระยะขอบให้เท่ากันกับด้านล่าง") ขอบซ้ายขวา 12px ทั้งหน้า — กล่องข้อมูลด้านล่างใช้ค่าเดียวกัน */
+  --mh-pad: 12px;
+  margin: -12px -14px 0;
+  padding: 14px var(--mh-pad) 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── 1. ทักทาย ── */
+.mh-greet-hi {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--mh-muted);
+}
+.mh .mh-greet-icon { font-size: 15px; }
+.mh-greet-row { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 2px; }
+.mh-greet-name {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--mh-ink);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* ป้ายตำแหน่ง — แคปซูลสองโทนแบบป้าย VIP */
+.mh-rank {
+  flex-shrink: 0;
+  max-width: 55%;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #1f2937 0%, #1f2937 45%, #dc2626 100%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* งานของฉัน — แบบเดียวกับปุ่ม 4 ช่อง (ไอคอนวงกลมสีอ่อน · ชื่อตัวหนา · สรุปใต้ชื่อ · ลูกศร) */
+.mh-myjobs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: -6px;
+  padding: 9px 10px;
+  border: 1px solid #f8d7d7;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #fdecec 0%, #fff 70%);
+  text-decoration: none;
+  color: var(--mh-ink);
+  min-width: 0;
+}
+.mh-myjobs:active { transform: scale(0.99); }
+.mh-myjobs--plain { border: 0; padding: 0; background: none; font-size: 0.78rem; color: var(--mh-ink-2); }
+.mh-myjobs-art {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fde2e2;
+  display: grid;
+  place-items: center;
+}
+.mh .mh-myjobs-icon { font-size: 20px; filter: drop-shadow(0 2px 3px rgba(17, 24, 39, 0.15)); }
+.mh-myjobs-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.mh-myjobs-title { font-size: 0.86rem; font-weight: 700; line-height: 1.3; }
+.mh-myjobs-sum {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--mh-muted);
+  line-height: 1.35;
+}
+.mh-myjobs-sum i { font-style: normal; color: #d1d5db; margin: 0 6px; }
+.mh .mh-myjobs-go { margin-left: auto; flex-shrink: 0; font-size: 20px; color: #9ca3af; }
+
+/* ── 2. ปุ่มหลัก 4 ช่อง (หมวด "งาน") — แบบหน้าแรก Agoda ──
+ * 🔁 (1 พ.ย. 2569 ผู้ใช้ส่งภาพ Agoda เทียบ) พื้นพาสเทลเต็มช่อง · ชื่อตัวหนาด้านบน
+ *    เนินสีสดครึ่งวงกลมที่ก้นช่อง · ไอคอนขาววางบนเนิน · ตัวเลขค้างติดมุมไอคอน */
+.mh-hubs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.mh-hub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  aspect-ratio: 1 / 1.06;
+  padding: 9px 4px 0;
+  border-radius: 16px;
+  background: var(--hub-tint);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--mh-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.mh-hub:active { transform: scale(0.97); }
+.mh-hub-title {
+  position: relative;
+  z-index: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.22;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mh-hub-hill {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -34%;
+  height: 66%;
+  border-radius: 50%;
+  background: var(--hub-hill);
+}
+.mh-hub-art {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  transform: translateX(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 4px 10px -4px rgba(17, 24, 39, 0.35);
+  display: grid;
+  place-items: center;
+}
+.mh .mh-hub-icon { font-size: 22px; }
+.mh-hub-badge {
+  position: absolute;
+  top: -6px;
+  right: -9px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mh-red);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* ── 3. เมนูอื่นทั้งหมด — กรอบเดียวขอบบาง แบ่งหมวดด้วยชื่อเล็ก + เส้นคั่น ──
+ * 🔁 (1 พ.ย. 2569 ผู้ใช้: "เมนูอยากแยกหมวดหมู่ให้ใช้งานง่าย") หมวดใหญ่ 4 ช่องต่อแถว · หมวดเล็กวางคู่ครึ่งกรอบ */
+.mh-quick {
+  border: 1px solid var(--mh-line);
+  border-radius: var(--mh-radius);
+  overflow: hidden;
+}
+.mh-qgroup { padding: 12px 4px 14px; min-width: 0; }
+.mh-quick > * + * { border-top: 1px solid var(--mh-line); }
+.mh-qpair { display: grid; grid-template-columns: 1fr 1fr; }
+.mh-qpair > .mh-qgroup + .mh-qgroup { border-left: 1px solid var(--mh-line); }
+.mh-qpair > .mh-qgroup:only-child { grid-column: 1 / -1; }
+.mh-qlabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--mh-muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mh-qlabel::before { content: ""; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--mh-tone); }
+.mh-qgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: 14px;
+}
+.mh-qgroup--half .mh-qgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mh-qpair > .mh-qgroup--half:only-child .mh-qgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mh-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 3px;
+  min-width: 0;
+  text-decoration: none;
+  color: var(--mh-ink-2);
+  -webkit-tap-highlight-color: transparent;
+}
+.mh-icon-btn:active { opacity: 0.7; }
+.mh-icon-wrap { position: relative; display: inline-flex; }
+.mh .mh-icon {
+  font-size: 24px;
+  color: var(--mh-tone, var(--mh-red));
+}
+.mh-icon-label {
+  max-width: 100%;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.mh-badge {
+  position: absolute;
+  top: -5px;
+  right: -11px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mh-red);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* ── แถบเทาแบ่งส่วน (เต็มจอ) ── */
+.mh-band {
+  height: 8px;
+  margin: 2px calc(-1 * var(--mh-pad));
+  background: var(--mh-band);
+}
+.mh-band--end { margin-bottom: 0; }
+
+/* ── 4. ต้องดำเนินการ ── */
+.mh-sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mh-sec-head h2 { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--mh-ink); }
+.mh-sec-pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--mh-red);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+/* การ์ดขอบบาง เลื่อนข้าง — ใบถัดไปโผล่ให้เห็นว่ายังมีอีก */
+.mh-todo {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  margin: 0 calc(-1 * var(--mh-pad));
+  padding: 0 var(--mh-pad) 2px;
+  scroll-padding: 0 var(--mh-pad);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.mh-todo::-webkit-scrollbar { display: none; }
+.mh-todo-item {
+  flex: 0 0 min(150px, 42%);
+  min-width: 0;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--mh-line);
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--mh-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.mh-todo-item:active { background: #f9fafb; }
+.mh-todo-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.mh .mh-todo-icon { font-size: 24px; color: var(--mh-tone); }
+.mh-todo-count { font-size: 1.2rem; font-weight: 700; color: var(--mh-red); line-height: 1; }
+.mh-todo-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mh-todo-sub {
+  font-size: 0.68rem;
+  color: var(--mh-muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ปุ่ม "ทั้งหมด" ในกรอบเมนู */
+.mh-more { border: 0; background: none; font: inherit; cursor: pointer; }
+.mh .mh-more .mh-icon { color: #6b7280; }
+
+/* ── 5. กล่องข้อมูลด้านล่าง (งานวันนี้ · งานค้าง ฯลฯ) แบบรายการบนพื้นขาว ──
+ * 🎨 (1 พ.ย. 2569 ผู้ใช้: ภาพตัวอย่าง Agoda ส่วน "จุดหมายปลายทางยอดนิยม") ไม่มีกรอบการ์ด หัวข้อตัวหนาใหญ่
+ *    แบ่งแต่ละกล่องด้วยแถบเทาเต็มจอ — ใช้เฉพาะจอมือถือ (.dash-phone) จอคอมยังเป็นการ์ดเดิม */
+.dash-phone .dashboard-widgets { margin: 0 -14px; }
+.dash-phone .dw {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-bottom: 8px solid #f2f4f7 !important;
+}
+.dash-phone .dw-head { border-bottom: 0 !important; padding: 16px 12px 4px !important; }
+/* ทุกแถวในกล่อง (หัว · แถบสรุป · รายการ · ตัวแบ่งหน้า) ขอบซ้ายขวา 12px เท่าส่วนบนของหน้า */
+.dash-phone .dw > * { padding-left: 12px !important; padding-right: 12px !important; }
+.dash-phone .dw-icon { display: none !important; }
+.dash-phone .dw-title { font-size: 1.12rem !important; font-weight: 700 !important; }
+/* ไอคอนหัวกล่องซ่อนอยู่ แต่ Stack spacing ยังเว้นระยะให้ตัวถัดไป → ชื่อเยื้อง 10px · ตัดออกให้ตรงแนวส่วนบน */
+.dash-phone .dw-head > .dw-icon + * { margin-left: 0 !important; }
+
+/* 🎨 (1 พ.ย. 2569 ผู้ใช้: "แถบต่างๆ ให้แก้ให้เข้าธีมด้วย") ป้าย/แถบในกล่องข้อมูลชุดเดียวกันทั้งหน้า
+ *   • แถบสรุปใต้หัวข้อ: พื้นขาว ไม่มีเส้น (เดิมแถบเทา)
+ *   • ป้ายทึบสีเข้ม (เช่น "เลยกำหนด 14 ด.") → ป้ายพื้นอ่อนแบบเดียวกับป้ายอื่น
+ *   • ตัวเลขข้างหัวข้อ: แคปซูลเทากลาง (ข้อมูล ไม่ใช่สัญญาณเตือน) */
+.dash-phone .dw-summary { background: #fff !important; border-bottom: 0 !important; padding-top: 2px !important; }
+.dash-phone .dw-pill--solid {
+  background: color-mix(in srgb, var(--pill-c) 12%, #fff) !important;
+  color: var(--pill-c) !important;
+}
+.dash-phone .dw-count {
+  background: #f2f4f7 !important;
+  color: #374151 !important;
+  font-weight: 700 !important;
+}
+
+
+/* 🎨 (1 พ.ย. 2569 ผู้ใช้เลือกแบบ C "infographic") ไอคอนในกรอบเมนูอยู่ในวงกลมสีอ่อนตามสีหมวด
+   🔁 ลองปุ่มแบบการ์ด (ชื่อบน·ไอคอนบนเนิน) แล้ว ผู้ใช้: "ใหญ่ กินพื้นที่ ใช้ยาก" → กลับมาแบบนี้
+   ("สีดูแข็ง") พื้นวงกลมอ่อน ไล่เฉดเบาๆ ไม่มีเงาใต้ไอคอน */
+.mh-quick .mh-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--mh-tone, #dc2626) 5%, #fff) 0%, color-mix(in srgb, var(--mh-tone, #dc2626) 11%, #fff) 100%);
+  display: grid;
+  place-items: center;
+}
+.mh .mh-quick .mh-icon { font-size: 21px; opacity: 0.92; filter: none; }
+.mh-quick .mh-icon-wrap .mh-badge { top: -4px; right: -6px; }

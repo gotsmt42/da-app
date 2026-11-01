@@ -9,7 +9,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, Alert,
   Switch, CircularProgress, useMediaQuery, InputAdornment, IconButton, ButtonBase,
 } from "@mui/material";
-import { Close, AddPhotoAlternate, DeleteOutline, CheckCircle, Category, Handyman } from "@mui/icons-material";
+import { CloseRounded as Close, AddPhotoAlternateRounded as AddPhotoAlternate, DeleteOutlineRounded as DeleteOutline, CheckCircleRounded as CheckCircle, CategoryRounded as Category, HandymanRounded as Handyman } from "@mui/icons-material";
 
 import { prepareUploadFile, ACCEPT_IMAGE } from "@/shared/utils/fileUpload";
 import StockService, { errorText } from "../services/StockService";

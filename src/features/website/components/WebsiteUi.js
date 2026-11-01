@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
   Snackbar, Stack, Typography,
 } from "@mui/material";
-import { OpenInNew } from "@mui/icons-material";
+import { OpenInNewRounded as OpenInNew } from "@mui/icons-material";
 
 import { WEBSITE_URL } from "../services/WebsiteService";
 
@@ -16,7 +16,7 @@ export const UI = {
   accent: "#dc2626",
   text: "#0f172a",
   sub: "#64748b",
-  border: "#e2e8f0",
+  border: "#e6e9ef",
   soft: "#f8fafc",
 };
 

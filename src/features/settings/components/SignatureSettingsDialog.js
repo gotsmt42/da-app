@@ -15,9 +15,7 @@ import {
   Dialog, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, CircularProgress,
   Checkbox, ButtonBase, useMediaQuery, Snackbar,
 } from "@mui/material";
-import {
-  Close, DeleteOutline, UploadFile, Draw, CheckCircle, HistoryEdu, Edit, LockOutlined, ArrowBack, ImageOutlined,
-} from "@mui/icons-material";
+import { CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, UploadFileRounded as UploadFile, DrawRounded as Draw, CheckCircleRounded as CheckCircle, HistoryEduRounded as HistoryEdu, EditRounded as Edit, LockRounded, ArrowBackRounded as ArrowBack, ImageRounded } from "@mui/icons-material";
 
 import SignaturePad from "@/shared/components/SignaturePad";
 import SignatureService from "@/shared/services/SignatureService";
@@ -178,7 +176,7 @@ export default function SignatureSettingsDialog({ open, onClose, onSaved }) {
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ px: 0.5 }}>
-              <LockOutlined sx={{ fontSize: 16, color: MUTED, mt: 0.2 }} />
+              <LockRounded sx={{ fontSize: 16, color: MUTED, mt: 0.2 }} />
               <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.55 }}>
                 เก็บแยกจากข้อมูลผู้ใช้ทั่วไป · ไม่มีใครดึงรูปลายเซ็นของคุณไปใช้ได้ · ระบบผนึกลงเอกสารเฉพาะตอนที่คุณกดออกใบหรืออนุมัติเอง
               </Typography>
@@ -203,7 +201,7 @@ export default function SignatureSettingsDialog({ open, onClose, onSaved }) {
 
             <Step n={1} title="เลือกวิธี" done={Boolean(image)}>
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                {[["draw", "เซ็นบนหน้าจอ", "ใช้นิ้วหรือเมาส์", <Draw key="i" />], ["upload", "อัปโหลดรูป", "เซ็นบนกระดาษแล้วถ่ายรูป", <ImageOutlined key="i" />]].map(([k, t, d, ic]) => {
+                {[["draw", "เซ็นบนหน้าจอ", "ใช้นิ้วหรือเมาส์", <Draw key="i" />], ["upload", "อัปโหลดรูป", "เซ็นบนกระดาษแล้วถ่ายรูป", <ImageRounded key="i" />]].map(([k, t, d, ic]) => {
                   const on = method === k;
                   return (
                     <ButtonBase key={k} onClick={() => { setMethod(k); setError(""); }} sx={{
@@ -263,7 +261,7 @@ export default function SignatureSettingsDialog({ open, onClose, onSaved }) {
                 </Typography>
               </ButtonBase>
               <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mt: 1, px: 0.5 }}>
-                <LockOutlined sx={{ fontSize: 15, color: MUTED, mt: 0.2 }} />
+                <LockRounded sx={{ fontSize: 15, color: MUTED, mt: 0.2 }} />
                 <Typography sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.5 }}>
                   เก็บแยกจากข้อมูลผู้ใช้ทั่วไป · ผนึกลงเอกสารเฉพาะตอนที่คุณกดออกใบหรืออนุมัติเอง
                 </Typography>

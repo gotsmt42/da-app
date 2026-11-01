@@ -17,7 +17,7 @@ import {
   Box, Stack, Typography, IconButton, Skeleton, Avatar, Tooltip, useMediaQuery,
   Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
-import { Refresh, Groups, ChevronRight } from "@mui/icons-material";
+import { RefreshRounded as Refresh, GroupsRounded as Groups, ChevronRightRounded as ChevronRight } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Swal from "@/shared/ui/swal";
 import { Button } from "react-bootstrap";
 import Google from "@mui/icons-material/Google";
-import Facebook from "@mui/icons-material/Facebook";
+import Facebook from "@mui/icons-material/FacebookRounded";
 
 import "./form.css";
 import API from "@/shared/api/axiosInstance";

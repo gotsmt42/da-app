@@ -18,10 +18,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
-import {
-  Payments, AddCircleOutline, DeleteOutline, InsertDriveFile, AutoAwesome,
-  AttachFile, Close, ReceiptLong,
-} from "@mui/icons-material";
+import { PaymentsRounded as Payments, AddCircleOutlineRounded as AddCircleOutline, DeleteOutlineRounded as DeleteOutline, InsertDriveFileRounded as InsertDriveFile, AutoAwesomeRounded as AutoAwesome, AttachFileRounded as AttachFile, CloseRounded as Close, ReceiptLongRounded as ReceiptLong } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
@@ -31,7 +28,7 @@ import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
-const BORDER_MAIN = "#e2e8f0";
+const BORDER_MAIN = "#e6e9ef";
 const SURFACE_SUBTLE = "#f8fafc";
 
 /**
@@ -587,7 +584,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                             </Button>
                             <Button
                               size="small" onClick={() => setConfirmDeleteFileId(null)}
-                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 700, color: "#e2e8f0", textTransform: "none" }}
+                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 700, color: "#e6e9ef", textTransform: "none" }}
                             >
                               ยกเลิก
                             </Button>

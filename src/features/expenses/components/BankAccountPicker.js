@@ -16,7 +16,7 @@ import {
   CircularProgress, Tooltip, Collapse, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AccountBalance, Add, Close, DeleteOutline, StarOutline, Star } from "@mui/icons-material";
+import { AccountBalanceRounded as AccountBalance, AddRounded as Add, CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, StarOutlineRounded as StarOutline, StarRounded as Star } from "@mui/icons-material";
 
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import BankLogo from "./BankLogo";
@@ -36,7 +36,7 @@ const blankForm = (accountName = "") => ({ bankCode: "", accountNo: "", accountN
  * @param {object} [snapshot]   payTo ที่บันทึกไว้ในใบ (ตอนแก้ไขใบเดิม) — ใช้บอกเมื่อบัญชีนั้นถูกลบไปแล้ว
  */
 export default function BankAccountPicker({
-  userId, ownerName = "", value, onChange, accent = "#7c3aed", canManage = true, disabled = false,
+  userId, ownerName = "", value, onChange, accent = "#0284c7", canManage = true, disabled = false,
   autoSelectDefault = false, snapshot = null,
 }) {
   const [accounts, setAccounts] = useState([]);

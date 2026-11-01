@@ -15,7 +15,7 @@ import {
   Button, Chip, useMediaQuery, TextField, MenuItem, LinearProgress, Alert,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { InsertDriveFile, FolderOpen, AttachFile } from "@mui/icons-material";
+import { InsertDriveFileRounded as InsertDriveFile, FolderOpenRounded as FolderOpen, AttachFileRounded as AttachFile } from "@mui/icons-material";
 import { roundDocs, isImageFile, JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import EventService from "@/shared/services/EventService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";

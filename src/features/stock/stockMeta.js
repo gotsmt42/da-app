@@ -6,7 +6,7 @@ export const STOCK_ACCENT = "#b45309";
 export const STOCK_DARK = "#92400e";
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
-export const BORDER_MAIN = "#e2e8f0";
+export const BORDER_MAIN = "#e6e9ef";
 
 /** วัสดุ = เบิกแล้วตัดยอดถาวร · ทรัพย์สิน = ยืมไปใช้แล้วต้องคืน */
 export const KINDS = {

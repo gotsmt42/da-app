@@ -50,7 +50,7 @@ export const BTN = {
     "&:hover": { bgcolor: `${color}0f`, borderColor: color },
   }),
   /** ปุ่มเทาอ่อน — แนบไฟล์/เครื่องมือ */
-  soft: { ...base, bgcolor: "#f1f5f9", color: "#0f172a", boxShadow: "none", "&:hover": { bgcolor: "#e2e8f0" } },
+  soft: { ...base, bgcolor: "#f1f5f9", color: "#0f172a", boxShadow: "none", "&:hover": { bgcolor: "#e6e9ef" } },
 };
 
 /** การ์ดขาวมาตรฐาน */

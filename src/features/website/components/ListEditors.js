@@ -1,5 +1,5 @@
 import { Box, Button, IconButton, Stack, TextField, Tooltip } from "@mui/material";
-import { Add, ArrowDownward, ArrowUpward, Close } from "@mui/icons-material";
+import { AddRounded as Add, ArrowDownwardRounded as ArrowDownward, ArrowUpwardRounded as ArrowUpward, CloseRounded as Close } from "@mui/icons-material";
 
 import { UI } from "./WebsiteUi";
 

@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import PageLoader from "@/shared/ui/PageLoader";
 import { alpha } from "@mui/material/styles";
-import { AdminPanelSettings, Lock, InfoOutlined, Edit, Badge as BadgeIcon, Save, CheckCircle, RemoveCircleOutline } from "@mui/icons-material";
+import { AdminPanelSettingsRounded as AdminPanelSettings, LockRounded as Lock, InfoRounded, EditRounded as Edit, BadgeRounded as BadgeIcon, SaveRounded as Save, CheckCircleRounded as CheckCircle, RemoveCircleOutlineRounded as RemoveCircleOutline } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -34,7 +34,7 @@ import { PAGE_SX } from "@/shared/ui/PageKit";
 const ACCENT = "#2563eb"; // ✅ น้ำเงินตามธีมแอป (ผู้ใช้: "ไม่เอาสีม่วง")
 const SYS_ACCENT = "#0f766e";
 const TEXT_SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 
 /**
  * คำอธิบายสิทธิ์ของ Rank — [คีย์, ติ๊กแล้วทำอะไรได้, ไม่ติ๊กแล้วเกิดอะไรขึ้น]
@@ -433,7 +433,7 @@ export default function RolePermissions() {
         <>
           {/* ── คำอธิบายสั้น ── */}
           <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1.5, px: 1.75, py: 1.25, borderRadius: 3, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
-            <InfoOutlined sx={{ fontSize: 18, color: ACCENT, mt: 0.1 }} />
+            <InfoRounded sx={{ fontSize: 18, color: ACCENT, mt: 0.1 }} />
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", lineHeight: 1.55 }}>
               เปิด/ปิดแล้ว <b>บันทึกทันที</b> และมีผลกับ <b>ทุกคนในตำแหน่งนั้น</b> ภายในไม่กี่วินาที (เมนูของเขาเปลี่ยนเอง ไม่ต้องออกจากระบบ) ·
               สิทธิ์ “แก้ไข” จะเปิดเมนูที่ต้องใช้คู่กันให้อัตโนมัติ · {ranks.find((r) => r.locked)?.label || "กรรมการผู้จัดการ"}มีสิทธิ์เต็มเสมอ

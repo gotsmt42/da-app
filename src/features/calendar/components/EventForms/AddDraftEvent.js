@@ -50,11 +50,11 @@ function injectAddDraftStyles() {
       font-size: 18px; display: flex; align-items: center; justify-content: center;
       transition: background .2s;
     }
-    .swal-add-draft .swal2-close:hover { background: #e2e8f0 !important; }
+    .swal-add-draft .swal2-close:hover { background: #e6e9ef !important; }
 
     #ade-header {
       padding: 20px 24px 18px; display: flex; align-items: center; gap: 14px;
-      background: #fff; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+      background: #fff; border-bottom: 1px solid #e6e9ef; flex-shrink: 0;
     }
     #ade-header-icon { width: 42px; height: 42px; border-radius: 12px; background: #eff6ff; display: grid; place-items: center; font-size: 22px; line-height: 1; flex-shrink: 0; }
     #ade-header-info { flex: 1; }
@@ -79,7 +79,7 @@ function injectAddDraftStyles() {
     .ade-field label .req { color: #ef4444; font-size: 13px; }
     .ade-field select, .ade-field input, .ade-field textarea {
       width: 100%; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      border: 1.5px solid #e6e9ef; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b;
       background: #fff; transition: border-color .2s, box-shadow .2s;
       font-family: inherit;
@@ -89,18 +89,18 @@ function injectAddDraftStyles() {
       box-shadow: 0 0 0 3px rgba(37,99,235,.12);
     }
 
-    .ade-divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+    .ade-divider { border: none; border-top: 1px solid #e6e9ef; margin: 16px 0; }
 
     /* ✅ (15 ต.ค. 2569) การ์ด "ที่มาของงาน" + ตัวเลือกแบบเม็ดยา — โทนเดียวกับการ์ดประเภทงาน (ขาว · ขอบเทา · เลือกแล้วน้ำเงิน) */
-    .ade-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 18px; }
+    .ade-card { background: #fff; border: 1px solid #e6e9ef; border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 18px; }
     .ade-hint { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
       display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px;
-      border: 1.5px solid #e2e8f0; background: #fff; color: #334155; font-size: 13px; font-weight: 600;
+      border: 1.5px solid #e6e9ef; background: #fff; color: #334155; font-size: 13px; font-weight: 600;
       transition: border-color .15s, background .15s, color .15s;
     }
     .ade-mode-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     /* แถบเลือกแบบ segmented — กรอบเดียว พื้นเทาอ่อน ช่องที่เลือกเป็นการ์ดขาวตัวหนังสือน้ำเงิน */
-    .ade-seg { display: grid; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; }
+    .ade-seg { display: grid; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; border: 1px solid #e6e9ef; }
     .ade-seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ade-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ade-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -174,7 +174,7 @@ function injectAddDraftStyles() {
     .ade-jobtype-option input { position: absolute; opacity: 0; width: 0; height: 0; }
     .ade-jobtype-card {
       display: flex; align-items: center; gap: 10px;
-      border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;
+      border: 1.5px solid #e6e9ef; border-radius: 10px; padding: 12px 14px;
       background: #fff; transition: border-color .15s, background .15s;
     }
     .ade-jobtype-icon { font-size: 22px; line-height: 1; }
@@ -223,7 +223,7 @@ function injectAddDraftStyles() {
        ① ข้อมูลงาน ② ลูกค้า/โครงการ ③ รายละเอียดงาน ④ แผนเข้างาน · ตัดอีโมจิออกจากป้ายทั้งหมด (ดูเป็นทางการ) */
     #ade-modal-inner.ade-intake { counter-reset: adesec; }
     .ade-intake #ade-generalSection, .ade-intake #ade-intakeSection, .ade-intake #ade-monthBlock {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px 4px; margin-bottom: 18px;
+      background: #fff; border: 1px solid #e6e9ef; border-radius: 12px; padding: 14px 16px 4px; margin-bottom: 18px;
     }
     .ade-intake #ade-monthBlock { padding-bottom: 0; }
     .ade-intake .ade-divider { display: none; }
@@ -266,7 +266,7 @@ function injectAddDraftStyles() {
 
     #ade-action-bar {
       display: flex; gap: 10px; flex-wrap: wrap;
-      padding: 14px 24px 16px; background: #fff; border-top: 1px solid #e2e8f0;
+      padding: 14px 24px 16px; background: #fff; border-top: 1px solid #e6e9ef;
       justify-content: flex-end; flex-shrink: 0; position: sticky; bottom: 0; z-index: 10;
     }
     .ade-btn {
@@ -279,13 +279,13 @@ function injectAddDraftStyles() {
     .ade-btn:active { transform: translateY(0); }
     .ade-btn-success { background: #2563eb; color: #fff; }
     .ade-btn-success:hover { background: #1d4ed8; opacity: 1; }
-    .ade-btn-ghost   { background: #e2e8f0; color: #475569; }
+    .ade-btn-ghost   { background: #e6e9ef; color: #475569; }
     .ade-btn-spacer  { flex: 1; }
     @media(max-width:520px) { .ade-btn-spacer { display:none; } #ade-action-bar { justify-content:center; } }
 
     .swal-add-draft .ts-wrapper { width: 100%; }
     .swal-add-draft .ts-wrapper .ts-control {
-      border: 1.5px solid #e2e8f0 !important; border-radius: 8px !important;
+      border: 1.5px solid #e6e9ef !important; border-radius: 8px !important;
       padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
     }
     .swal-add-draft .ts-wrapper.focus .ts-control { border-color: #2563eb !important; }

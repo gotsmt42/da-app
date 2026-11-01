@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
   CircularProgress, Skeleton, useMediaQuery, Avatar,
 } from "@mui/material";
-import { Close, TaskAlt, DoNotDisturbAlt, PictureAsPdf, Check, WarningAmber, AssignmentReturn, InsertDriveFile } from "@mui/icons-material";
+import { CloseRounded as Close, TaskAltRounded as TaskAlt, DoNotDisturbAltRounded as DoNotDisturbAlt, PictureAsPdfRounded as PictureAsPdf, CheckRounded as Check, WarningAmberRounded as WarningAmber, AssignmentReturnRounded as AssignmentReturn, InsertDriveFileRounded as InsertDriveFile } from "@mui/icons-material";
 
 import useRealtime from "@/shared/realtime/useRealtime";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
@@ -22,7 +22,7 @@ import { KindTag, Thumb, FIELD_SX, Label } from "./StockBits";
 export const RT_TONE = "#0f766e";
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap" };
 const CARD = { bgcolor: "#fff", borderRadius: 3, border: `1px solid ${BORDER_MAIN}` };
-const PDF_SX = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e2e8f0", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } };
+const PDF_SX = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e6e9ef", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } };
 
 export const RtBadge = ({ status }) => {
   const m = rtStatus(status);
@@ -107,7 +107,7 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
                         <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB, maxWidth: "100%" }}>{s.done ? s.who || "-" : "รอผู้ดูแลคลัง"}</Typography>
                         {s.done && s.at && <Typography sx={{ fontSize: "0.68rem", color: "#94a3b8" }}>{thaiDate(s.at)}</Typography>}
                       </Stack>
-                      {i < steps.length - 1 && <Box sx={{ flex: 1, height: 2, mt: "13px", mx: -3, bgcolor: steps[i + 1].done ? (steps[i + 1].bad ? "#fecaca" : "#bbf7d0") : "#e2e8f0" }} />}
+                      {i < steps.length - 1 && <Box sx={{ flex: 1, height: 2, mt: "13px", mx: -3, bgcolor: steps[i + 1].done ? (steps[i + 1].bad ? "#fecaca" : "#bbf7d0") : "#e6e9ef" }} />}
                     </Stack>
                   );
                 })}
@@ -184,7 +184,7 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
                   <Stack key={i} direction="row" spacing={1.25}>
                     <Stack alignItems="center" sx={{ width: 12 }}>
                       <Box sx={{ width: 10, height: 10, borderRadius: "50%", mt: 0.6, bgcolor: i ? "#cbd5e1" : RT_TONE }} />
-                      {i < arr.length - 1 && <Box sx={{ flex: 1, width: 2, bgcolor: "#e2e8f0", my: 0.25 }} />}
+                      {i < arr.length - 1 && <Box sx={{ flex: 1, width: 2, bgcolor: "#e6e9ef", my: 0.25 }} />}
                     </Stack>
                     <Box sx={{ pb: i < arr.length - 1 ? 1.25 : 0, minWidth: 0 }}>
                       <Typography sx={{ fontSize: "0.86rem", fontWeight: 600 }}>{a.detail}</Typography>

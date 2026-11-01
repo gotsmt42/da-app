@@ -23,7 +23,7 @@ import {
   Alert, CircularProgress, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, EditNote, MailOutline } from "@mui/icons-material";
+import { CloseRounded as Close, PrintRounded as Print, ShareRounded as Share, DownloadRounded as Download, OpenInNewRounded as OpenInNew, PictureAsPdfRounded as PictureAsPdf, EditNoteRounded as EditNote, MailOutlineRounded as MailOutline } from "@mui/icons-material";
 
 import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";

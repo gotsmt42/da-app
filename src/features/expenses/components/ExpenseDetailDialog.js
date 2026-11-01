@@ -15,11 +15,7 @@ import {
   Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
-  DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll, Engineering, CalendarMonth, Build,
-} from "@mui/icons-material";
+import { CloseRounded as Close, PrintRounded as Print, EditRounded as Edit, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, AttachFileRounded as AttachFile, OpenInNewRounded as OpenInNew, DeleteOutlineRounded as DeleteOutline, LinkRounded as LinkIcon, HistoryRounded as History, TaskAltRounded as TaskAlt, WarningAmberRounded as WarningAmber, ImageRounded as ImageIcon, DescriptionRounded as Description, ExpandMoreRounded as ExpandMore, AccountBalanceWalletRounded as AccountBalanceWallet, ContentCopyRounded as ContentCopy, CheckRounded as Check, HistoryEduRounded as HistoryEdu, FactCheckRounded as FactCheck, DoneAllRounded as DoneAll, EngineeringRounded as Engineering, CalendarMonthRounded as CalendarMonth, BuildRounded as Build } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL } from "@/shared/utils/fileUpload";
@@ -230,7 +226,7 @@ const FooterProgress = ({ steps, status, color }) => {
               <Box key={i} sx={{
                 // ✅ ขั้นที่กำลังรอ = วงโหลดหมุน (ผู้ใช้ขอ "วงๆโหลด แบบแอพมืออาชีพ") · ขั้นอื่นเป็นจุดนิ่ง
                 width: isCurrent ? 12 : 7, height: isCurrent ? 12 : 7, borderRadius: "50%", boxSizing: "border-box",
-                bgcolor: isCurrent ? "transparent" : rejected && st.danger ? tone : filled ? tone : "#e2e8f0",
+                bgcolor: isCurrent ? "transparent" : rejected && st.danger ? tone : filled ? tone : "#e6e9ef",
                 border: isCurrent ? `2px solid ${alpha(tone, 0.2)}` : "none",
                 borderTopColor: isCurrent ? tone : undefined,
                 transition: "background-color .3s",
@@ -260,7 +256,7 @@ const Steps = ({ steps, color }) => (
       return (
         <Box key={s.label} sx={{ flex: 1, minWidth: 0, position: "relative", textAlign: "center" }}>
           {i > 0 && (
-            <Box sx={{ position: "absolute", top: 11, right: "50%", width: "100%", height: 2, bgcolor: done || current ? alpha(color, 0.5) : "#e2e8f0", zIndex: 0 }} />
+            <Box sx={{ position: "absolute", top: 11, right: "50%", width: "100%", height: 2, bgcolor: done || current ? alpha(color, 0.5) : "#e6e9ef", zIndex: 0 }} />
           )}
           <Box sx={{
             width: 24, height: 24, mx: "auto", borderRadius: "50%", position: "relative", zIndex: 1,
@@ -996,7 +992,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   </Box>
                 </Stack>
                 {nextStep && <Alert severity={nextStep.severity} sx={{ mt: 1.5, borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.84rem", fontWeight: 600 },
-                  ...(nextStep.severity === "info" ? { bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155", "& .MuiAlert-icon": { color: "#2563eb" } } : {}) }}>{nextStep.text}</Alert>}
+                  ...(nextStep.severity === "info" ? { bgcolor: "#f8fafc", border: "1px solid #e6e9ef", color: "#334155", "& .MuiAlert-icon": { color: "#2563eb" } } : {}) }}>{nextStep.text}</Alert>}
                 {e.status !== "cancelled" && <Steps steps={steps} color={meta.color} />}
               </Card>
 

@@ -8,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, Skeleton,
   useMediaQuery, TextField, CircularProgress, Tooltip, Avatar,
 } from "@mui/material";
-import { Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, AccessTime, Check, CalendarMonth, PictureAsPdf } from "@mui/icons-material";
+import { CloseRounded as Close, EditRounded as Edit, UndoRounded as Undo, BlockRounded as Block, FactCheckRounded as FactCheck, CheckCircleRounded as CheckCircle, DoneAllRounded as DoneAll, AccessTimeRounded as AccessTime, CheckRounded as Check, CalendarMonthRounded as CalendarMonth, PictureAsPdfRounded as PictureAsPdf } from "@mui/icons-material";
 import PdfPrintDialog from "@/shared/components/PdfPrintDialog";
 import moment from "moment";
 
@@ -75,7 +75,7 @@ const Steps = ({ e }) => {
               <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB, maxWidth: "100%" }}>{s.done ? s.who || "-" : "รอดำเนินการ"}</Typography>
               {s.at && s.done && <Typography sx={{ fontSize: "0.68rem", color: "#94a3b8" }}>{thaiDate(s.at)}</Typography>}
             </Stack>
-            {i < steps.length - 1 && <Box sx={{ flex: 1, height: 2, mt: "13px", mx: { xs: -2.5, sm: -3 }, bgcolor: nextDone ? (steps[i + 1].bad ? "#fecaca" : "#bbf7d0") : "#e2e8f0" }} />}
+            {i < steps.length - 1 && <Box sx={{ flex: 1, height: 2, mt: "13px", mx: { xs: -2.5, sm: -3 }, bgcolor: nextDone ? (steps[i + 1].bad ? "#fecaca" : "#bbf7d0") : "#e6e9ef" }} />}
           </Stack>
         );
       })}
@@ -321,7 +321,7 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
                   <Stack key={a._id || i} direction="row" spacing={1.25}>
                     <Stack alignItems="center" sx={{ width: 12 }}>
                       <Box sx={{ width: 10, height: 10, borderRadius: "50%", mt: 0.6, bgcolor: i ? "#cbd5e1" : OT_ACCENT }} />
-                      {i < arr.length - 1 && <Box sx={{ flex: 1, width: 2, bgcolor: "#e2e8f0", my: 0.25 }} />}
+                      {i < arr.length - 1 && <Box sx={{ flex: 1, width: 2, bgcolor: "#e6e9ef", my: 0.25 }} />}
                     </Stack>
                     <Box sx={{ pb: i < arr.length - 1 ? 1.25 : 0, minWidth: 0 }}>
                       <Typography sx={{ fontSize: "0.86rem", fontWeight: 600 }}>{prettyLog(a.detail)}</Typography>
@@ -338,7 +338,7 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
           <DialogActions sx={{ px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 0.75, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {canCancel && <Button onClick={() => setAction("cancel")} startIcon={<Block />} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ยกเลิก</Button>}
             {/* ✅ (27 ต.ค. 2569 ผู้ใช้: "ปริ้น PDF เอามาไว้ข้างล่างให้ชัดเจน ทำให้เป็นสีแดง") */}
-            <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)} sx={{ mr: "auto", textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e2e8f0", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } }}>พิมพ์ PDF</Button>
+            <Button variant="outlined" startIcon={<PictureAsPdf />} onClick={() => setPdfOpen(true)} sx={{ mr: "auto", textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", color: "#dc2626", borderColor: "#e6e9ef", bgcolor: "#fff", "&:hover": { bgcolor: "#fff", borderColor: "#dc2626" } }}>พิมพ์ PDF</Button>
             {canEdit && <Button onClick={() => onEdit?.(e)} startIcon={<Edit />} sx={{ textTransform: "none", fontWeight: 700 }}>{e.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}</Button>}
             {canReject && <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>ตีกลับ</Button>}
             {chain && e.status === "pending" && (

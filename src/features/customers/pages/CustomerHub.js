@@ -13,7 +13,7 @@
  */
 
 import { Navigate } from "react-router-dom";
-import { Dashboard as DashboardIcon, ListAlt } from "@mui/icons-material";
+import { DashboardRounded as DashboardIcon, ListAltRounded as ListAlt } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";

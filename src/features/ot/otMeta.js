@@ -10,7 +10,7 @@ export const OT_ACCENT = "#0891b2";
 export const OT_DARK = "#0e7490";
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
-export const BORDER_MAIN = "#e2e8f0";
+export const BORDER_MAIN = "#e6e9ef";
 
 /** ประเภท OT — สีใช้เฉพาะจุดเล็ก/ป้ายอ่อน (ผู้ใช้แจ้งว่าสีเยอะแล้วรกตา) */
 export const OT_TYPES = [

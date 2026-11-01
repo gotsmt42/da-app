@@ -31,7 +31,7 @@ export function PageBar({ page, pageCount, total, size, setPage, unit = "รา�
   return (
     <Stack
       direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" spacing={1}
-      sx={{ mt: 1.25, pt: 1.25, borderTop: "1px solid #e2e8f0", ...sx }}
+      sx={{ mt: 1.25, pt: 1.25, borderTop: "1px solid #e6e9ef", ...sx }}
     >
       <Typography sx={{ fontSize: "0.76rem", color: "#64748b", fontWeight: 600 }}>
         แสดง {from.toLocaleString()}–{to.toLocaleString()} จาก {total.toLocaleString()} {unit}

@@ -13,9 +13,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase, Pagination } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Add, FileDownloadOutlined, ViewAgendaOutlined, CalendarMonthOutlined, PhotoCameraOutlined, ChevronRight, EventAvailableOutlined,
-} from "@mui/icons-material";
+import { AddRounded as Add, FileDownloadRounded, ViewAgendaRounded, CalendarMonthRounded, PhotoCameraRounded, ChevronRightRounded as ChevronRight, EventAvailableRounded } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { SALES_TYPE_META, salesStatusMeta, toSalesStatus } from "../salesAppointmentTypes";
@@ -74,7 +72,7 @@ export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, ti
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
       <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: { xs: 1, sm: 1.25 } }}>
         <Box sx={{ width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 }, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
-          <EventAvailableOutlined />
+          <EventAvailableRounded />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: { xs: "1rem", sm: "1.15rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
@@ -84,7 +82,7 @@ export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, ti
           // ✅ (24 ต.ค. 2569 ผู้ใช้: "ทำไมไม่มีปุ่ม export excel ในมือถือ") มือถือ = ปุ่มไอคอน (ไม่กินที่) · จอใหญ่ = ไอคอน + คำว่า Excel
           <Button variant="outlined" onClick={onExport} disabled={exportDisabled} aria-label="ส่งออก Excel"
             sx={{ flexShrink: 0, minWidth: { xs: 38, sm: 64 }, height: { xs: 36, sm: "auto" }, px: { xs: 0, sm: 1.5 }, gap: 0.6, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
-            <FileDownloadOutlined sx={{ fontSize: 20 }} />
+            <FileDownloadRounded sx={{ fontSize: 20 }} />
             <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
           </Button>
         )}
@@ -146,8 +144,8 @@ export function SalesViewToggle({ view, onView, accent = ACCENT }) {
   return (
     <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#eef2f7", flexShrink: 0 }}>
       {[
-        { k: "list", label: "รายการ", icon: <ViewAgendaOutlined sx={{ fontSize: 18 }} /> },
-        { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthOutlined sx={{ fontSize: 18 }} /> },
+        { k: "list", label: "รายการ", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
+        { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
       ].map((o) => (
         <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.label} aria-label={o.label} aria-pressed={view === o.k}
           sx={{
@@ -200,7 +198,7 @@ function Row({ r, onOpen, showOwner, note }) {
         <ChevronRight sx={{ color: FAINT, fontSize: 20 }} />
         {r.photos > 0 && (
           <Stack direction="row" spacing={0.3} alignItems="center" sx={{ color: MUTED }}>
-            <PhotoCameraOutlined sx={{ fontSize: 14 }} />
+            <PhotoCameraRounded sx={{ fontSize: 14 }} />
             <Typography sx={{ fontSize: "0.7rem", fontWeight: 700 }}>{r.photos}</Typography>
           </Stack>
         )}
@@ -302,7 +300,7 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
 
       {list.length === 0 ? (
         <Box sx={{ py: 5, px: 2, textAlign: "center", bgcolor: "#fff", border: `1px dashed ${LINE}`, borderRadius: 3 }}>
-          <EventAvailableOutlined sx={{ fontSize: 34, color: FAINT }} />
+          <EventAvailableRounded sx={{ fontSize: 34, color: FAINT }} />
           <Typography sx={{ mt: 0.75, fontWeight: 800, color: INK_2 }}>
             {tab === "follow" ? "ไม่มีนัดที่ต้องติดตาม" : tab === "history" ? "ยังไม่มีนัดที่ปิดงานหรือยกเลิก" : "ไม่มีนัดที่จะถึง"}
           </Typography>

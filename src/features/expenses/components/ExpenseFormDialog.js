@@ -25,10 +25,7 @@ import {
   Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel, createFilterOptions,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
-  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline, AccountBalance, HistoryEdu,
-} from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, LinkRounded as LinkIcon, ReceiptLongRounded as ReceiptLong, PaymentsRounded as Payments, ExpandMoreRounded as ExpandMore, PrintRounded as Print, EditNoteRounded as EditNote, AccountBalanceWalletRounded as AccountBalanceWallet, GroupsRounded as Groups, PersonOutlineRounded as PersonOutline, AccountBalanceRounded as AccountBalance, HistoryEduRounded as HistoryEdu } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
@@ -658,7 +655,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               renderOption={({ key, ...liProps }, o) => (
                 <li {...liProps} key={`${o.group}-${o.label}`}>
                   <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined}
-                    sx={{ width: 28, height: 28, mr: 1.25, fontSize: 13, bgcolor: o.position ? alpha(accent, 0.18) : "#e2e8f0", color: o.position ? accent : TEXT_SUB }}>
+                    sx={{ width: 28, height: 28, mr: 1.25, fontSize: 13, bgcolor: o.position ? alpha(accent, 0.18) : "#e6e9ef", color: o.position ? accent : TEXT_SUB }}>
                     {(o.label || "?").charAt(0)}
                   </Avatar>
                   <Box sx={{ minWidth: 0 }}>

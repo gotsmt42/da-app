@@ -10,17 +10,8 @@ import { can, seesOperationBoard, rankLabel, DEPARTMENT } from "@/shared/utils/r
 import { dest } from "./navConfig";
 // ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
-// ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
-// สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
-// sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง
-import {
-  FaTachometerAlt,
-  FaCalendarAlt,
-  FaCog,
-  // ⚠️ ไอคอนที่เหลือมาจากทะเบียนกลาง (navConfig) แล้ว — เหลือเฉพาะที่เมนูข้างใช้เองจริงๆ
-  // FaReceipt ยังต้องนำเข้าเพราะรายการ "ใบเคลม (Claim)" จงใจใช้คำต่างจากทะเบียน
-  FaReceipt,
-} from "react-icons/fa";
+// 🔁 (1 พ.ย. 2569) ไอคอนชุดกลาง Material Rounded (shared/ui/appIcons.js) — ชุดเดียวกับหน้าแรก/แถบล่าง/แถบบน
+import { AppIcon } from "@/shared/ui/appIcons";
 
 // ✅ Sidebar เป็น presentational ล้วนๆ ไม่จัดการ เปิด/ปิด บนมือถือเองอีกต่อไป
 // (เดิมมี state `isOpen` + ปุ่ม toggle + overlay ของตัวเอง ซ้ำซ้อนกับกลไกของ FullLayout.js
@@ -76,12 +67,12 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
    * ⚠️ URL เดิมทุกตัวยัง redirect เข้าหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้ (ดู Router.js) ลิงก์เก่าไม่พัง
    */
   const navigation = [
-    { title: "Dashboard", href: "/dashboard", icon: <FaTachometerAlt /> },
+    { title: "Dashboard", href: "/dashboard", icon: <AppIcon.Dashboard /> },
   ];
 
   // ✅ หมวด "งาน" — แผนงาน/ปฏิทินอยู่นี่เหมือนเดิม เพิ่มภาพรวมสัญญา (admin/manager) และงานของฉัน
   // (ช่าง) เข้ามาด้วย เพราะเป็นเรื่อง "งาน" ทั้งคู่ ไม่ใช่เรื่องทีม — ไอคอนตรงกับการ์ดทางลัดหน้า
-  // Dashboard.js ทุกตัว (FaCalendarAlt="แผนงานทั้งหมด", FaClipboardList="งานของฉัน" ฯลฯ)
+  // Dashboard.js ทุกตัว (AppIcon.Calendar="แผนงานทั้งหมด", FaClipboardList="งานของฉัน" ฯลฯ)
   // ⚠️ "การดำเนินงาน" เป็นหน้าของสายงานช่างล้วนๆ (เอกสาร 4 ชนิด/เช็คอิน/คำขอปิดงาน) — เซลไม่ต้องเห็น
   // ✅ เหลือรายการเดียวสำหรับเซล = ไม่ต้องมีเมนูย่อยเลย กดชื่อหมวดแล้วเข้าปฏิทินตรงๆ
   // (เมนูย่อยที่มีลูกเดียวคือชั้นที่ต้องกดเปิดก่อนโดยไม่ได้ให้ทางเลือกอะไร)
@@ -116,7 +107,7 @@ const side = (key, extra) => {
     ? [{
         title: "แผนงาน",
         href: "/event",
-        icon: <FaCalendarAlt />,
+        icon: <AppIcon.Calendar />,
         items: [
           { title: "ตารางงานช่าง", href: "/event" },
           { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales" },
@@ -130,13 +121,13 @@ const side = (key, extra) => {
           // (ดู isServiceObserver ที่ CalendarBoard และ readOnly ที่ EditEvent)
           title: "แผนงาน",
           href: "/event",
-          icon: <FaCalendarAlt />,
+          icon: <AppIcon.Calendar />,
           items: [
             { title: "แผนงานของฉัน", href: "/event" },
             { title: "ตารางงานช่าง (ดูอย่างเดียว)", href: `/event?dept=${DEPARTMENT.SERVICE}` },
           ],
         }]
-      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt /> }];
+      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <AppIcon.Calendar /> }];
 
   // ✅ "การดำเนินงาน" แยกออกมาเป็นเมนูระดับบนสุดตามที่ผู้ใช้สั่ง — เดิมซ่อนอยู่ในเมนูย่อยของ
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
@@ -194,7 +185,7 @@ const side = (key, extra) => {
   const expenseMenu = [
     side("advance"),
     // ⚠️ จงใจใช้คำต่างจากทะเบียนกลาง — เติม (Claim) กำกับไว้ให้กวาดตาหาเจอง่ายในรายการแนวตั้ง
-    { ...dest("claim"), title: "ใบเคลม (Claim)", icon: <FaReceipt /> },
+    { ...dest("claim"), title: "ใบเคลม (Claim)", icon: <AppIcon.Claim /> },
     side("contractorPay"),
     // ✅ คิวของหัวหน้า (อนุมัติ/จ่ายเงิน/ปิดส่วนต่าง) — เดิมมีแต่ในเมนูหลักหน้าแรก เมนูข้างเข้าไม่ถึง
     // ⚠️ เปิดให้ทุกคนที่มีขั้นของตัวเอง (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) — แต่ละคนมีคิวของตัวเองในหน้านี้
@@ -489,7 +480,7 @@ const side = (key, extra) => {
               className={`nav-link ${location.pathname === "/about" ? "active" : ""}`}
               onClick={handleItemClick}
             >
-              <span className="nav-icon"><FaCog /></span>
+              <span className="nav-icon"><AppIcon.Settings /></span>
               <span className="nav-text">ตั้งค่า</span>
             </Link>
           </NavItem>

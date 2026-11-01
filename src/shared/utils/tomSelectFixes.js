@@ -195,7 +195,7 @@ const injectDropdownStyles = () => {
     .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb:hover { background: #64748b; }
     .ts-dropdown .${MORE_HINT_CLASS} {
       padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: #64748b;
-      background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;
+      background: #f8fafc; border-top: 1px solid #e6e9ef; text-align: center;
     }
     .ts-dropdown .option {
       padding: 8px 12px !important;

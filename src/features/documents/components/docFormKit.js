@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { Box, Stack, Typography, Button, IconButton, CircularProgress } from "@mui/material";
-import { Close, History, TaskAlt, Visibility, OpenInNew, InfoOutlined } from "@mui/icons-material";
+import { CloseRounded as Close, HistoryRounded as History, TaskAltRounded as TaskAlt, VisibilityRounded as Visibility, OpenInNewRounded as OpenInNew, InfoRounded } from "@mui/icons-material";
 
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX, ACCENT, ACCENT_SOFT } from "@/shared/ui/PageKit";
@@ -234,7 +234,7 @@ export function SubHeader({ children, count, action }) {
 export const docFormSx = (accent) => ({
   "& .MuiOutlinedInput-root": {
     borderRadius: "10px", bgcolor: "#fff", transition: "box-shadow .15s, border-color .15s",
-    "& fieldset": { borderColor: "#e2e8f0" },
+    "& fieldset": { borderColor: "#e6e9ef" },
     "&:hover fieldset": { borderColor: "#cbd5e1" },
     "&.Mui-focused": { boxShadow: `0 0 0 3px ${accent}22` },
     "&.Mui-focused fieldset": { borderColor: accent, borderWidth: "1px" },
@@ -296,7 +296,7 @@ export function IssuedSummary({ doc, label, onView, viewing, onNavigate }) {
         ))}
       </Box>
       <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mx: { xs: 2, sm: 2.5 }, mb: 2, p: 1.25, borderRadius: 2, bgcolor: SURFACE }}>
-        <InfoOutlined sx={{ fontSize: 17, color: MUTED, mt: 0.15 }} />
+        <InfoRounded sx={{ fontSize: 17, color: MUTED, mt: 0.15 }} />
         <Typography sx={{ fontSize: "0.78rem", color: INK_2, lineHeight: 1.55 }}>
           หนึ่งงานออก{label}ได้ใบเดียว — ถ้าต้องออกใหม่ ให้เปลี่ยนสถานะใบเดิมเป็น "ยกเลิก" ในทะเบียนเอกสารก่อน
         </Typography>

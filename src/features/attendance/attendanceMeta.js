@@ -4,7 +4,7 @@
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { PlaceOutlined, PersonSearchOutlined, BadgeOutlined } from "@mui/icons-material";
+import { PlaceRounded, PersonSearchRounded, BadgeRounded } from "@mui/icons-material";
 
 /** อยู่ในรัศมีนี้ = ถือว่าอยู่ที่หน้างาน */
 export const ON_SITE_M = 300;
@@ -18,9 +18,9 @@ export const resultOf = (key) => RESULT_OPTIONS.find((r) => r.key === key);
 
 /** หมายเหตุสำเร็จรูปตอนเช็คอิน — ไอคอนสื่อความหมาย (ถึงแล้ว · รอคน · รอสิทธิ์เข้าพื้นที่) */
 export const NOTE_PRESETS = [
-  { text: "ถึงไซต์งานแล้ว", Icon: PlaceOutlined },
-  { text: "รอผู้ประสานงาน", Icon: PersonSearchOutlined },
-  { text: "รออนุญาตเข้าพื้นที่", Icon: BadgeOutlined },
+  { text: "ถึงไซต์งานแล้ว", Icon: PlaceRounded },
+  { text: "รอผู้ประสานงาน", Icon: PersonSearchRounded },
+  { text: "รออนุญาตเข้าพื้นที่", Icon: BadgeRounded },
 ];
 
 export const fmtDuration = (min) => {

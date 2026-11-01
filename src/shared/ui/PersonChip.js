@@ -144,7 +144,7 @@ export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value
       open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={() => { setQ(""); onClose(); }}
       onClick={(e) => e.stopPropagation()}
       anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}
-      slotProps={{ paper: { sx: { borderRadius: 2.5, width: 260, mt: 0.5, border: "1px solid #e2e8f0", boxShadow: "0 12px 32px rgba(15,23,42,.14)" } } }}
+      slotProps={{ paper: { sx: { borderRadius: 2.5, width: 260, mt: 0.5, border: "1px solid #e6e9ef", boxShadow: "0 12px 32px rgba(15,23,42,.14)" } } }}
       MenuListProps={{ dense: true, sx: { py: 0.5 } }}
     >
       <Box sx={{ px: 1.5, pt: 0.75, pb: 0.5 }} onKeyDown={(e) => e.stopPropagation()}>

@@ -6,7 +6,7 @@
  */
 import { Suspense, useState } from "react";
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
-import { AutoAwesome, ChevronRight } from "@mui/icons-material";
+import { AutoAwesomeRounded as AutoAwesome, ChevronRightRounded as ChevronRight } from "@mui/icons-material";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import { ACCENT, ACCENT_SOFT, MUTED } from "@/shared/ui/PageKit";
 

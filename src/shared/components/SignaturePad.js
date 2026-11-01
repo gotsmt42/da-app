@@ -11,7 +11,7 @@
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
-import { Undo, DeleteOutline } from "@mui/icons-material";
+import { UndoRounded as Undo, DeleteOutlineRounded as DeleteOutline } from "@mui/icons-material";
 
 import { canvasToSignaturePng } from "@/shared/utils/signatureImage";
 
@@ -184,7 +184,7 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 190, onChange, 
         ref={wrapRef}
         sx={{
           position: "relative", height, borderRadius: 2, overflow: "hidden",
-          border: "1px solid #e2e8f0", bgcolor: "#fff", boxShadow: "inset 0 1px 3px rgba(15,23,42,.05)",
+          border: "1px solid #e6e9ef", bgcolor: "#fff", boxShadow: "inset 0 1px 3px rgba(15,23,42,.05)",
           // เส้นบรรทัดให้เซ็นตรงแนว เหมือนช่องเซ็นบนกระดาษ
           backgroundImage: "linear-gradient(to bottom, transparent calc(72% - 1px), #cbd5e1 72%, transparent calc(72% + 1px))",
           backgroundSize: "calc(100% - 48px) 100%", backgroundPosition: "24px 0", backgroundRepeat: "no-repeat",

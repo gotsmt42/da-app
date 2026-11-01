@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { refreshInbox, markInboxRead } from "@/shared/hooks/useInbox";
 import { Box, ButtonBase, IconButton, Slide, Typography } from "@mui/material";
-import { Close } from "@mui/icons-material";
+import { CloseRounded as Close } from "@mui/icons-material";
 import { isNativeApp, takePendingOpen } from "@/native/nativePush";
 
 /**
@@ -165,7 +165,7 @@ export default function InAppPushBanner() {
           sx={{
             pointerEvents: "auto", display: "flex", alignItems: "flex-start", gap: 1.25, p: 1.25, pr: 0.5,
             borderRadius: 3.5, bgcolor: "rgba(255,255,255,.98)", backdropFilter: "blur(10px)",
-            border: "1px solid #e2e8f0", borderLeft: `5px solid ${toneOf(msg.title)}`,
+            border: "1px solid #e6e9ef", borderLeft: `5px solid ${toneOf(msg.title)}`,
             boxShadow: "0 12px 32px -8px rgba(15,23,42,.35)",
           }}
         >

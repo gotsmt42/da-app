@@ -16,10 +16,7 @@ import {
   CircularProgress, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Close, LoginRounded, MyLocationRounded, LocationOffRounded, AddAPhotoOutlined, AccessTimeRounded,
-  CheckCircleRounded, RefreshRounded, LockClockOutlined, CheckRounded, DescriptionOutlined, ExpandMoreRounded,
-} from "@mui/icons-material";
+import { CloseRounded as Close, LoginRounded, MyLocationRounded, LocationOffRounded, AddAPhotoRounded, AccessTimeRounded, CheckCircleRounded, RefreshRounded, LockClockRounded, CheckRounded, DescriptionRounded, ExpandMoreRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import AttendanceService from "@/shared/services/AttendanceService";
@@ -152,7 +149,7 @@ function FileGrid({ items, uploading = 0, onRemove, onAdd, addLabel, highlight }
             <Box component="img" src={thumbUrl(p.fileUrl)} decoding="async" alt={p.fileName} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <Stack alignItems="center" justifyContent="center" spacing={0.5} sx={{ position: "absolute", inset: 0, p: 1 }}>
-              <DescriptionOutlined sx={{ fontSize: 26, color: /\.pdf$/i.test(p.fileName || "") ? "#dc2626" : MUTED }} />
+              <DescriptionRounded sx={{ fontSize: 26, color: /\.pdf$/i.test(p.fileName || "") ? "#dc2626" : MUTED }} />
               <Typography sx={{ fontSize: "0.66rem", fontWeight: 700, color: INK, textAlign: "center", wordBreak: "break-all", lineHeight: 1.25,
                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.fileName}</Typography>
             </Stack>
@@ -173,7 +170,7 @@ function FileGrid({ items, uploading = 0, onRemove, onAdd, addLabel, highlight }
           sx={{ position: "relative", pt: "100%", borderRadius: 2, border: `1.5px dashed ${highlight ? ACCENT : ACCENT_LINE}`, bgcolor: ACCENT_SOFT, color: ACCENT,
             boxShadow: highlight ? `0 0 0 3px ${alpha(ACCENT, 0.15)}` : "none" }}>
           <Stack alignItems="center" justifyContent="center" spacing={0.25} sx={{ position: "absolute", inset: 0 }}>
-            <AddAPhotoOutlined />
+            <AddAPhotoRounded />
             <Typography sx={{ fontSize: "0.72rem", fontWeight: 800 }}>{addLabel}</Typography>
           </Stack>
         </ButtonBase>
@@ -389,7 +386,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
             </Box>
           </Stack>
           <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 1.25, pt: 1, borderTop: `1px dashed ${LINE}` }}>
-            <LockClockOutlined sx={{ fontSize: 15, color: FAINT }} />
+            <LockClockRounded sx={{ fontSize: 15, color: FAINT }} />
             <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>บันทึกเวลาจากเซิร์ฟเวอร์ แก้จากเครื่องไม่ได้ · ต้องการแก้ ขอผ่านแอดมิน</Typography>
           </Stack>
         </Box>

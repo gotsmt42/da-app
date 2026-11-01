@@ -23,9 +23,7 @@ import {
   useMediaQuery, Table, TableBody, TableCell, TableHead, TableRow, TableSortLabel, Pagination,
   MenuItem, Dialog, DialogContent, DialogActions,
 } from "@mui/material";
-import {
-  Add, Edit, DeleteOutline, Close, Badge as BadgeIcon, Phone, Email, ContentCopy, VpnKey, WarningAmber,
-} from "@mui/icons-material";
+import { AddRounded as Add, EditRounded as Edit, DeleteOutlineRounded as DeleteOutline, CloseRounded as Close, BadgeRounded as BadgeIcon, PhoneRounded as Phone, EmailRounded as Email, ContentCopyRounded as ContentCopy, VpnKeyRounded as VpnKey, WarningAmberRounded as WarningAmber } from "@mui/icons-material";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import {

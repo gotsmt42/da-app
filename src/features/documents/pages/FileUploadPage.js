@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Box, Stack, Typography, IconButton, Tooltip } from "@mui/material";
-import ArrowBack from "@mui/icons-material/ArrowBack";
+import ArrowBack from "@mui/icons-material/ArrowBackRounded";
 
 import FileUploadComponent from "../components/FileUpload";
 

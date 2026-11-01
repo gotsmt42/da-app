@@ -11,7 +11,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
   CircularProgress, useMediaQuery, ButtonBase, Checkbox, FormControlLabel,
 } from "@mui/material";
-import { Close, Add, Remove, AttachFile, AssignmentReturn, InsertDriveFile } from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, RemoveRounded as Remove, AttachFileRounded as AttachFile, AssignmentReturnRounded as AssignmentReturn, InsertDriveFileRounded as InsertDriveFile } from "@mui/icons-material";
 
 import { prepareUploadFile, ACCEPT_ALL } from "@/shared/utils/fileUpload";
 import StockService, { errorText } from "../services/StockService";

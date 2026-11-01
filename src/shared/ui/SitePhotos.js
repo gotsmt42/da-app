@@ -12,13 +12,13 @@ import moment from "moment";
 import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, IconButton, CircularProgress } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AddAPhotoOutlined, PhotoLibraryOutlined, Close, InsertDriveFileOutlined, PictureAsPdfOutlined } from "@mui/icons-material";
+import { AddAPhotoRounded, PhotoLibraryRounded, CloseRounded as Close, InsertDriveFileRounded, PictureAsPdfRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const BLUE = "#2563eb";
-const LINE = "#e2e8f0";
+const LINE = "#e6e9ef";
 const MUTED = "#64748b";
 const INK = "#0f172a";
 
@@ -95,13 +95,13 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
   return (
     <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", ...sx }} onClick={(e) => e.stopPropagation()}>
       <Stack direction="row" alignItems="center" spacing={1}>
-        <PhotoLibraryOutlined sx={{ fontSize: 18, color: MUTED }} />
+        <PhotoLibraryRounded sx={{ fontSize: 18, color: MUTED }} />
         <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: INK }}>
           ไฟล์แนบ{files.length ? ` · ${files.length}` : ""}
         </Typography>
         {canEdit && (
           <Button size="small" disabled={Boolean(uploading)} onClick={() => inputRef.current?.click()}
-            startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoOutlined sx={{ fontSize: 17 }} />}
+            startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoRounded sx={{ fontSize: 17 }} />}
             sx={{ textTransform: "none", fontWeight: 800, color: BLUE, py: 0.2, borderRadius: 2 }}>
             {uploading ? `กำลังอัปโหลด ${uploading}` : "แนบไฟล์"}
           </Button>
@@ -116,7 +116,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
           color: MUTED, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
           "&:hover": { borderColor: alpha(BLUE, 0.5), color: BLUE },
         }}>
-          <AddAPhotoOutlined sx={{ fontSize: 19 }} /> ยังไม่มีไฟล์แนบ · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
+          <AddAPhotoRounded sx={{ fontSize: 19 }} /> ยังไม่มีไฟล์แนบ · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
         </Box>
       ) : (
         <>
@@ -144,7 +144,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
             <Stack spacing={0.5} sx={{ mt: 1 }}>
               {others.map((f) => (
                 <Stack key={f._id} direction="row" alignItems="center" spacing={1} sx={{ px: 1, py: 0.6, borderRadius: 1.5, border: `1px solid ${LINE}` }}>
-                  {/\.pdf$/i.test(f.fileName || "") ? <PictureAsPdfOutlined sx={{ fontSize: 18, color: "#dc2626" }} /> : <InsertDriveFileOutlined sx={{ fontSize: 18, color: MUTED }} />}
+                  {/\.pdf$/i.test(f.fileName || "") ? <PictureAsPdfRounded sx={{ fontSize: 18, color: "#dc2626" }} /> : <InsertDriveFileRounded sx={{ fontSize: 18, color: MUTED }} />}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography noWrap onClick={() => open(f)} sx={{ fontSize: "0.8rem", fontWeight: 600, color: BLUE, cursor: "pointer" }}>{f.fileName}</Typography>
                     <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>

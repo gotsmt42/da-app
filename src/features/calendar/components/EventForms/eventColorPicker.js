@@ -175,7 +175,7 @@ function injectColorPickerStyles() {
     .ecp-trigger {
       display: flex; align-items: center; gap: 10px; width: 100%;
       padding: 8px 10px; border-radius: 10px; cursor: pointer;
-      border: 1.5px solid #e2e8f0; background: #fff; font-family: inherit; text-align: left;
+      border: 1.5px solid #e6e9ef; background: #fff; font-family: inherit; text-align: left;
       transition: border-color .15s, box-shadow .15s;
     }
     .ecp-trigger:hover { border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(15, 23, 42, .06); }
@@ -223,19 +223,19 @@ function injectColorPickerStyles() {
     @keyframes ecp-rise { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
     .ecp-sheet-head {
       flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-      padding: 13px 16px; border-bottom: 1.5px solid #e2e8f0;
+      padding: 13px 16px; border-bottom: 1.5px solid #e6e9ef;
     }
     .ecp-sheet-title { font-size: 14px; font-weight: 800; color: #0f172a; }
     .ecp-x {
       border: 0; background: #f1f5f9; color: #475569; cursor: pointer; font-family: inherit;
       width: 32px; height: 32px; border-radius: 50%; font-size: 15px; font-weight: 800; line-height: 1;
     }
-    .ecp-x:hover { background: #e2e8f0; }
+    .ecp-x:hover { background: #e6e9ef; }
     /* ⚠️ overscroll-behavior: contain — กันการเลื่อนในแผงไป "ทะลุ" ไปเลื่อนฟอร์มที่อยู่ข้างหลัง */
     .ecp-sheet-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; }
     .ecp-sheet-foot {
       flex: 0 0 auto; display: flex; gap: 8px; justify-content: flex-end;
-      padding: 11px 16px; border-top: 1.5px solid #e2e8f0; background: #f8fafc;
+      padding: 11px 16px; border-top: 1.5px solid #e6e9ef; background: #f8fafc;
       border-radius: 0 0 0 0;
       /* เผื่อแถบบาร์ล่างของมือถือ (iPhone home indicator) ไม่ให้ทับปุ่ม */
       padding-bottom: calc(11px + env(safe-area-inset-bottom, 0px));
@@ -244,7 +244,7 @@ function injectColorPickerStyles() {
       border-radius: 9px; cursor: pointer; font-family: inherit;
       font-size: 13px; font-weight: 800; padding: 9px 18px;
     }
-    .ecp-btn--ghost { border: 1.5px solid #e2e8f0; background: #fff; color: #475569; }
+    .ecp-btn--ghost { border: 1.5px solid #e6e9ef; background: #fff; color: #475569; }
     .ecp-btn--ghost:hover { background: #f1f5f9; }
     .ecp-btn--primary { border: 0; background: #2563eb; color: #fff; }
     .ecp-btn--primary:hover { background: #1d4ed8; }
@@ -254,7 +254,7 @@ function injectColorPickerStyles() {
     .ecp-preview {
       flex: 1 1 190px; min-width: 0;
       display: flex; align-items: center; justify-content: center;
-      padding: 10px; border-radius: 10px; border: 1.5px solid #e2e8f0;
+      padding: 10px; border-radius: 10px; border: 1.5px solid #e6e9ef;
       /* ลายตารางหมากรุกอ่อนๆ ให้เห็นว่าสีอ่อนมากๆ ยังเป็นสีทึบอยู่ ไม่ใช่โปร่งใส */
       background:
         linear-gradient(45deg, #f1f5f9 25%, transparent 25%) -6px 0/12px 12px,
@@ -276,7 +276,7 @@ function injectColorPickerStyles() {
     .ecp-chan {
       display: flex; align-items: center; gap: 9px; width: 100%;
       padding: 7px 10px; border-radius: 9px; cursor: pointer;
-      border: 1.5px solid #e2e8f0; background: #fff;
+      border: 1.5px solid #e6e9ef; background: #fff;
       font-family: inherit; text-align: left;
       transition: border-color .15s, box-shadow .15s;
     }
@@ -336,7 +336,7 @@ function injectColorPickerStyles() {
     /* ── ส่วนปรับเอง ── */
     .ecp-more {
       display: inline-flex; align-items: center; gap: 6px;
-      border: 1.5px solid #e2e8f0; background: #fff; border-radius: 9px;
+      border: 1.5px solid #e6e9ef; background: #fff; border-radius: 9px;
       padding: 8px 14px; cursor: pointer; font-family: inherit;
       font-size: 12px; font-weight: 700; color: #334155;
     }
@@ -346,7 +346,7 @@ function injectColorPickerStyles() {
 
     .ecp-fine {
       margin-top: 10px; padding: 12px; border-radius: 10px;
-      background: #f8fafc; border: 1.5px solid #e2e8f0;
+      background: #f8fafc; border: 1.5px solid #e6e9ef;
     }
     .ecp-fine-head { margin: 0 0 10px; font-size: 11.5px; font-weight: 700; color: #475569; }
     .ecp-fine-head b { color: #1e293b; }
@@ -368,7 +368,7 @@ function injectColorPickerStyles() {
     }
     .ecp-range:focus { outline: none; }
     .ecp-range::-webkit-slider-runnable-track {
-      height: 14px; border-radius: 999px; background: var(--ecp-track, #e2e8f0);
+      height: 14px; border-radius: 999px; background: var(--ecp-track, #e6e9ef);
       box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .14);
     }
     .ecp-range::-webkit-slider-thumb {
@@ -377,7 +377,7 @@ function injectColorPickerStyles() {
       box-shadow: 0 0 0 1.5px rgba(15, 23, 42, .3), 0 2px 6px rgba(15, 23, 42, .32);
     }
     .ecp-range::-moz-range-track {
-      height: 14px; border-radius: 999px; background: var(--ecp-track, #e2e8f0);
+      height: 14px; border-radius: 999px; background: var(--ecp-track, #e6e9ef);
       box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .14);
     }
     .ecp-range::-moz-range-thumb {
@@ -388,7 +388,7 @@ function injectColorPickerStyles() {
     /* ── แถบน้ำหนักสี (เฉดเดิม ไล่อ่อน → เข้ม) ── */
     .ecp-ramp {
       display: flex; border-radius: 8px; overflow: hidden;
-      margin-bottom: 10px; border: 1.5px solid #e2e8f0;
+      margin-bottom: 10px; border: 1.5px solid #e6e9ef;
     }
     .ecp-ramp button {
       position: relative; flex: 1; height: 30px; border: 0; padding: 0;
@@ -402,7 +402,7 @@ function injectColorPickerStyles() {
     .ecp-row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
     .ecp-hex-wrap {
       display: flex; align-items: center; gap: 5px; flex: 1 1 140px; min-width: 130px;
-      border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; padding: 0 9px;
+      border: 1.5px solid #e6e9ef; border-radius: 8px; background: #fff; padding: 0 9px;
     }
     .ecp-hex-wrap:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
     .ecp-hex-hash { font-size: 13px; font-weight: 800; color: #94a3b8; }
@@ -415,7 +415,7 @@ function injectColorPickerStyles() {
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     }
     .ecp-mini {
-      border: 1.5px solid #e2e8f0; background: #fff; border-radius: 8px; cursor: pointer;
+      border: 1.5px solid #e6e9ef; background: #fff; border-radius: 8px; cursor: pointer;
       font-family: inherit; font-size: 11.5px; font-weight: 700; color: #334155;
       padding: 8px 11px; white-space: nowrap;
     }

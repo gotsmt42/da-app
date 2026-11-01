@@ -9,12 +9,13 @@
  *       เสร็จสิ้น     = ดำเนินการเสร็จสิ้น (ล่าสุดก่อน)
  *   ⚠️ ข้อมูลชุดเดียวกับปฏิทิน (filteredCalendarEvents) ตัวกรอง/ค้นหาด้านบนจึงมีผลกับทั้งสองมุมมอง
  */
+import { AppIcon } from "@/shared/ui/appIcons";
 import { useMemo, useState } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Add, FileDownloadOutlined, ChevronRight, EngineeringOutlined, Groups2Outlined, EventOutlined } from "@mui/icons-material";
+import { AddRounded as Add, FileDownloadRounded, ChevronRightRounded as ChevronRight, EngineeringRounded, Groups2Rounded, EventRounded } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { Kpi, usePaged, ListPager } from "./SalesAgenda";
@@ -148,7 +149,8 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
       <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: { xs: 1, sm: 1.25 } }}>
         <Box sx={{ width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 }, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(RED, 0.1), color: RED }}>
-          <EngineeringOutlined />
+          {/* ไอคอนเดียวกับเมนู "ตารางงานช่าง" (navConfig → appIcons) */}
+          <AppIcon.Calendar />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: { xs: "1rem", sm: "1.15rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
@@ -158,7 +160,7 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
           // ✅ (24 ต.ค. 2569 ผู้ใช้: "ทำไมไม่มีปุ่ม export excel ในมือถือ") มือถือ = ปุ่มไอคอน (ไม่กินที่) · จอใหญ่ = ไอคอน + คำว่า Excel
           <Button variant="outlined" onClick={onExport} disabled={exportDisabled} aria-label="ส่งออก Excel"
             sx={{ flexShrink: 0, minWidth: { xs: 38, sm: 64 }, height: { xs: 36, sm: "auto" }, px: { xs: 0, sm: 1.5 }, gap: 0.6, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
-            <FileDownloadOutlined sx={{ fontSize: 20 }} />
+            <FileDownloadRounded sx={{ fontSize: 20 }} />
             <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
           </Button>
         )}
@@ -240,13 +242,13 @@ function Row({ r, onOpen, showDate }) {
         </Typography>
         {r.team.length > 0 && (
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: INK_2 }}>
-            <Groups2Outlined sx={{ fontSize: 15, color: FAINT }} />
+            <Groups2Rounded sx={{ fontSize: 15, color: FAINT }} />
             <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 600 }}>{r.team.join(", ")}</Typography>
           </Stack>
         )}
         {dateLine && (
           <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.3, color: INK_2 }}>
-            <EventOutlined sx={{ fontSize: 15, color: FAINT, mt: "1px" }} />
+            <EventRounded sx={{ fontSize: 15, color: FAINT, mt: "1px" }} />
             <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, lineHeight: 1.4 }}>{dateLine}</Typography>
           </Stack>
         )}
@@ -367,7 +369,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
 
       {list.length === 0 ? (
         <Box sx={{ py: 5, px: 2, textAlign: "center", bgcolor: "#fff", border: `1px dashed ${LINE}`, borderRadius: 3 }}>
-          <EngineeringOutlined sx={{ fontSize: 34, color: FAINT }} />
+          <EngineeringRounded sx={{ fontSize: 34, color: FAINT }} />
           <Typography sx={{ mt: 0.75, fontWeight: 800, color: INK_2 }}>
             {cur.k === "follow" ? "ไม่มีงานที่ต้องติดตาม" : cur.k === "done" ? "ยังไม่มีงานที่เสร็จสิ้น" : "ไม่มีงานที่จะถึง"}
           </Typography>

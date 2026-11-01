@@ -15,7 +15,7 @@ import { alpha } from "@mui/material/styles";
  * @param onChange (value) => void
  */
 const TEXT_SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 
 function Tile({ item, selected, onClick, isMobile }) {
   const { color } = item;

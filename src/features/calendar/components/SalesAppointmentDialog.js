@@ -17,11 +17,7 @@ import {
   ListItemIcon, ListItemText, useMediaQuery, Alert, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Close, AddAPhotoOutlined, DeleteOutline, EditOutlined, MoreHoriz, CheckCircle, FlagOutlined, EventRepeat,
-  EventBusy, Replay, PlaceOutlined, BusinessOutlined, AccessTime, NotesOutlined, PhotoCameraOutlined,
-  LockOutlined, PhoneOutlined, PaidOutlined, EventNote,
-} from "@mui/icons-material";
+import { CloseRounded as Close, AddAPhotoRounded, DeleteOutlineRounded as DeleteOutline, EditRounded, MoreHorizRounded as MoreHoriz, CheckCircleRounded as CheckCircle, FlagRounded, EventRepeatRounded as EventRepeat, EventBusyRounded as EventBusy, ReplayRounded as Replay, PlaceRounded, BusinessRounded, AccessTimeRounded as AccessTime, NotesRounded, PhotoCameraRounded, LockRounded, PhoneRounded, PaidRounded, EventNoteRounded as EventNote } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
@@ -227,7 +223,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
     }
     if (status === "เข้าพบแล้ว") {
       return {
-        label: "ปิดงาน", next: "ปิดงานแล้ว", color: GREEN, icon: <FlagOutlined />,
+        label: "ปิดงาน", next: "ปิดงานแล้ว", color: GREEN, icon: <FlagRounded />,
         blocked: needPhoto ? "แนบรูปหน้างานอย่างน้อย 1 รูปก่อน" : needResult ? "สรุปผลการเข้าพบก่อนปิดงาน" : "",
       };
     }
@@ -294,9 +290,9 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 ซ้าย = ข้อมูลนัด · ขวา = รูปหน้างาน · ผลการเข้าพบอยู่ล่างเต็มความกว้าง */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" }, columnGap: 3, alignItems: "stretch" }}>
             <Box sx={{ minWidth: 0 }}>
-            <Section fill icon={<NotesOutlined />} title="ข้อมูลนัดหมาย"
+            <Section fill icon={<NotesRounded />} title="ข้อมูลนัดหมาย"
               right={canAct && !locked && onEdit ? (
-                <Button size="small" startIcon={<EditOutlined sx={{ fontSize: 16 }} />} onClick={() => onEdit(ev)}
+                <Button size="small" startIcon={<EditRounded sx={{ fontSize: 16 }} />} onClick={() => onEdit(ev)}
                   sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, py: 0.2 }}>แก้ไข</Button>
               ) : null}>
               <Box sx={{ flex: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
@@ -314,10 +310,10 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 </Stack>
                 <Box sx={{ px: 1.5 }}>
                 <InfoRow icon={<AccessTime />} label="วัน-เวลา">{dateText}</InfoRow>
-                <InfoRow icon={<PlaceOutlined />} label="สถานที่">{ev.site || "-"}</InfoRow>
-                <InfoRow icon={<BusinessOutlined />} label="ลูกค้า">{ev.company || <Box component="span" sx={{ color: FAINT }}>ไม่ระบุ</Box>}</InfoRow>
+                <InfoRow icon={<PlaceRounded />} label="สถานที่">{ev.site || "-"}</InfoRow>
+                <InfoRow icon={<BusinessRounded />} label="ลูกค้า">{ev.company || <Box component="span" sx={{ color: FAINT }}>ไม่ระบุ</Box>}</InfoRow>
                 {(ev.contactName || ev.contactTel) && (
-                  <InfoRow icon={<PhoneOutlined />} label="ผู้ติดต่อ">
+                  <InfoRow icon={<PhoneRounded />} label="ผู้ติดต่อ">
                     {ev.contactName || ""}
                     {ev.contactTel && (
                       <Box component="a" href={`tel:${String(ev.contactTel).replace(/[^\d+]/g, "")}`}
@@ -328,7 +324,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   </InfoRow>
                 )}
                 {Number(ev.jobValue) > 0 && (
-                  <InfoRow icon={<PaidOutlined />} label="มูลค่า">
+                  <InfoRow icon={<PaidRounded />} label="มูลค่า">
                     ฿{Number(ev.jobValue).toLocaleString("th-TH")}
                     <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>โอกาสการขาย</Box>
                   </InfoRow>
@@ -340,14 +336,14 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   </InfoRow>
                 )}
                 {ev.salesClosedAt && (
-                  <InfoRow icon={<FlagOutlined />} tone={GREEN} label="ปิดงานเมื่อ">
+                  <InfoRow icon={<FlagRounded />} tone={GREEN} label="ปิดงานเมื่อ">
                     {fmtDateTime(ev.salesClosedAt)}
                     {ev.salesClosedBy && <Box component="span" sx={{ ml: 0.75, fontWeight: 500, color: MUTED, fontSize: "0.8rem" }}>โดย {ev.salesClosedBy}</Box>}
                   </InfoRow>
                 )}
                 </Box>
                 {ev.description && (
-                  <InfoRow icon={<NotesOutlined />} label="รายละเอียด">
+                  <InfoRow icon={<NotesRounded />} label="รายละเอียด">
                     <Box component="span" sx={{ whiteSpace: "pre-wrap", fontWeight: 500, color: INK_2 }}>{ev.description}</Box>
                   </InfoRow>
                 )}
@@ -358,9 +354,9 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
 
             <Box sx={{ minWidth: 0 }}>
             {/* ── รูปหน้างาน ── */}
-            <Section fill icon={<PhotoCameraOutlined />} title={`รูปหน้างาน${photos.length ? ` · ${photos.length} รูป` : ""}`}
+            <Section fill icon={<PhotoCameraRounded />} title={`รูปหน้างาน${photos.length ? ` · ${photos.length} รูป` : ""}`}
               right={canAct && !locked && !cancelled ? (
-                <Button size="small" startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoOutlined sx={{ fontSize: 17 }} />}
+                <Button size="small" startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoRounded sx={{ fontSize: 17 }} />}
                   disabled={Boolean(uploading)} onClick={() => fileRef.current?.click()}
                   sx={{ textTransform: "none", fontWeight: 800, color: ACCENT, py: 0.2 }}>
                   {uploading ? `กำลังอัปโหลด ${uploading}` : "เพิ่มรูป"}
@@ -379,7 +375,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                     cursor: canAct && !locked && !cancelled ? "pointer" : "default",
                     "&:hover": canAct && !locked && !cancelled ? { borderColor: ACCENT, bgcolor: "#f8fbff" } : undefined,
                   }}>
-                  {uploading ? <CircularProgress size={24} /> : <AddAPhotoOutlined sx={{ fontSize: 30, color: FAINT }} />}
+                  {uploading ? <CircularProgress size={24} /> : <AddAPhotoRounded sx={{ fontSize: 30, color: FAINT }} />}
                   <Typography sx={{ mt: 0.75, fontSize: "0.86rem", fontWeight: 700, color: INK_2 }}>
                     {canAct && !cancelled ? "แตะเพื่อถ่าย/เลือกรูปหน้างาน" : "ยังไม่มีรูปหน้างาน"}
                   </Typography>
@@ -394,7 +390,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   return { xs: `repeat(${Math.min(c, 3)}, minmax(0,1fr))`, sm: `repeat(${c}, minmax(0,1fr))` };
                 })() }}>
                   {photos.map((p) => (
-                    <Box key={p._id} sx={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 2, overflow: "hidden", bgcolor: "#e2e8f0", border: `1px solid ${LINE}`, "&:hover img": { transform: "scale(1.03)" } }}>
+                    <Box key={p._id} sx={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 2, overflow: "hidden", bgcolor: "#e6e9ef", border: `1px solid ${LINE}`, "&:hover img": { transform: "scale(1.03)" } }}>
                       <Box component="img" src={getOptimizedImageUrl(p.fileUrl, { width: 320 })} alt={p.fileName} loading="lazy"
                         onClick={() => setViewer(p)}
                         sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in", transition: "transform .2s" }} />
@@ -410,7 +406,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                     <Box role="button" onClick={() => !uploading && fileRef.current?.click()}
                       sx={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: SURFACE, cursor: "pointer", "&:hover": { borderColor: ACCENT, bgcolor: "#f8fbff" } }}>
                       <Stack alignItems="center" justifyContent="center" sx={{ position: "absolute", inset: 0, color: MUTED }}>
-                        {uploading ? <CircularProgress size={20} /> : <AddAPhotoOutlined />}
+                        {uploading ? <CircularProgress size={20} /> : <AddAPhotoRounded />}
                         <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, mt: 0.4 }}>เพิ่มรูป</Typography>
                       </Stack>
                     </Box>
@@ -431,7 +427,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
 
             {/* ── ผลการเข้าพบ — เต็มความกว้างใต้ 2 คอลัมน์ (8 ต.ค. 2569 "ให้ขยายให้เต็มช่อง") ── */}
             {!cancelled && ((status !== "นัดหมายแล้ว" && status !== "เลื่อนนัด") || result) && (
-              <Section icon={<FlagOutlined />} title="ผลการเข้าพบ"
+              <Section icon={<FlagRounded />} title="ผลการเข้าพบ"
                 hint={status === "เข้าพบแล้ว" ? "สรุปสิ่งที่คุยกับลูกค้า ความต้องการ และขั้นตอนต่อไป — จำเป็นก่อนปิดงาน" : null}>
                 {locked || !canAct ? (
                   <Box sx={{ p: 1.75, minHeight: 150, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, fontSize: "0.92rem", lineHeight: 1.7, color: INK_2, whiteSpace: "pre-wrap" }}>
@@ -460,7 +456,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
 
             {!canAct && (
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 2, color: MUTED }}>
-                <LockOutlined sx={{ fontSize: 16 }} />
+                <LockRounded sx={{ fontSize: 16 }} />
                 <Typography sx={{ fontSize: "0.76rem" }}>ดูได้อย่างเดียว — แก้ไขได้เฉพาะฝ่ายขายเจ้าของนัดและแอดมิน</Typography>
               </Stack>
             )}
@@ -534,7 +530,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
             )}
             {!locked && onEdit && (
               <MenuItem onClick={() => { setMenuEl(null); onEdit(ev); }}>
-                <ListItemIcon><EditOutlined fontSize="small" /></ListItemIcon><ListItemText>แก้ไขวัน/เวลา/สถานที่</ListItemText>
+                <ListItemIcon><EditRounded fontSize="small" /></ListItemIcon><ListItemText>แก้ไขวัน/เวลา/สถานที่</ListItemText>
               </MenuItem>
             )}
             {!closed && !cancelled && status !== "เลื่อนนัด" && (

@@ -32,7 +32,7 @@ export const SALES_FORM_CSS = `
   .swal-sales-appt .swal2-validation-message { margin: 0 !important; border-radius: 0; font-size: 13px; }
 
   /* ── หัวกล่อง ── */
-  #sa-header { padding: 16px 56px 14px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  #sa-header { padding: 16px 56px 14px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; background: #fff; border-bottom: 1px solid #e6e9ef; }
   #sa-header-icon { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 21px; }
   #sa-header-info { flex: 1; min-width: 0; }
   #sa-header-info h3 { margin: 0; font-size: 17px; font-weight: 800; color: #0f172a; line-height: 1.3; }
@@ -40,7 +40,7 @@ export const SALES_FORM_CSS = `
 
   /* ── เนื้อหา ── */
   #sa-body { padding: 14px 16px 18px; background: #f8fafc; overflow-y: auto; flex: 1; min-height: 0; }
-  .sa-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .sa-card { background: #fff; border: 1px solid #e6e9ef; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
   .sa-card-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
   .sa-card-title small { font-weight: 600; color: #94a3b8; font-size: 11.5px; }
   .sa-label { font-size: 12px; font-weight: 700; color: #475569; margin: 12px 0 6px; }
@@ -64,7 +64,7 @@ export const SALES_FORM_CSS = `
   .sa-type-group:first-child { margin-top: 0; }
   .sa-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   @media (max-width: 560px) { .sa-types { grid-template-columns: repeat(2, 1fr); } .sa-type-hint { display: none !important; } }
-  .sa-type { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid #e2e8f0; border-radius: 11px; cursor: pointer; background: #fff; transition: border-color .15s, background .15s, box-shadow .15s; min-width: 0; }
+  .sa-type { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid #e6e9ef; border-radius: 11px; cursor: pointer; background: #fff; transition: border-color .15s, background .15s, box-shadow .15s; min-width: 0; }
   .sa-type input { position: absolute; opacity: 0; pointer-events: none; }
   .sa-type-icon { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; background: color-mix(in srgb, var(--sa-c) 10%, white); }
   .sa-type-text { min-width: 0; }
@@ -75,14 +75,14 @@ export const SALES_FORM_CSS = `
 
   /* สถานะ — ป้ายพื้นอ่อน+จุด */
   .sa-stats { display: flex; flex-wrap: wrap; gap: 8px; }
-  .sa-stat { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid #e2e8f0; border-radius: 999px; cursor: pointer; background: #fff; font-size: 13px; font-weight: 700; color: #475569; transition: border-color .15s, background .15s, color .15s; }
+  .sa-stat { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid #e6e9ef; border-radius: 999px; cursor: pointer; background: #fff; font-size: 13px; font-weight: 700; color: #475569; transition: border-color .15s, background .15s, color .15s; }
   .sa-stat input { position: absolute; opacity: 0; pointer-events: none; }
   .sa-stat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sa-s); }
   .sa-stat:has(input:checked) { border-color: var(--sa-s); background: color-mix(in srgb, var(--sa-s) 10%, white); color: var(--sa-s); }
   .sa-locked { font-size: 12.5px; color: #475569; background: #f1f5f9; border-radius: 10px; padding: 10px 12px; }
 
   /* หลายวัน */
-  .sa-checkbox-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 12px; cursor: pointer; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .sa-checkbox-row { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 12px; cursor: pointer; padding: 10px 12px; border-radius: 10px; background: #f8fafc; border: 1px solid #e6e9ef; }
   .sa-checkbox-row input { width: 18px !important; height: 18px; margin: 1px 0 0; flex-shrink: 0; accent-color: #2563eb; cursor: pointer; }
   .sa-checkbox-row span small { display: block; font-weight: 500; color: #64748b; font-size: 11.5px; }
   .sa-checkbox-hint { font-size: 11.5px; color: #64748b; margin: -6px 0 10px; }
@@ -95,12 +95,12 @@ export const SALES_FORM_CSS = `
   .sa-row-confirm-actions .sa-btn { padding: 6px 12px; font-size: 12px; }
 
   /* ── ปุ่มล่าง ── */
-  #sa-action-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #fff; border-top: 1px solid #e2e8f0; flex-shrink: 0; }
+  #sa-action-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #fff; border-top: 1px solid #e6e9ef; flex-shrink: 0; }
   .sa-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid transparent; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, opacity .15s; font-family: inherit; }
   .sa-btn:disabled { opacity: .6 !important; cursor: not-allowed; }
   .sa-btn-primary { background: #2563eb; color: #fff; }
   .sa-btn-primary:hover { background: #1d4ed8; }
-  .sa-btn-ghost { background: #fff; color: #475569; border-color: #e2e8f0; }
+  .sa-btn-ghost { background: #fff; color: #475569; border-color: #e6e9ef; }
   .sa-btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; }
   .sa-btn-danger { background: #fff; color: #dc2626; border-color: #fecaca; }
   .sa-btn-danger:hover { background: #fef2f2; }

@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Stack, Typography, Button } from "@mui/material";
-import { History } from "@mui/icons-material";
+import { HistoryRounded as History } from "@mui/icons-material";
 import { saveDraft, loadDraft, clearDraft, draftAgoText, userActedWithin } from "@/shared/utils/formDraft";
 
 const diffKeys = (a = {}, b = {}) => [...new Set([...Object.keys(a || {}), ...Object.keys(b || {})])]

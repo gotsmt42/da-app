@@ -13,7 +13,7 @@ import {
   useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, Add, DeleteOutline, AttachFile, Send, Save, ShoppingCart, HistoryEdu } from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, ShoppingCartRounded as ShoppingCart, HistoryEduRounded as HistoryEdu } from "@mui/icons-material";
 import SignatureService from "@/shared/services/SignatureService";
 import { useAuth } from "@/features/auth/AuthContext";
 

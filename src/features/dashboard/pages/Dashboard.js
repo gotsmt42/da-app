@@ -39,8 +39,9 @@ import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHe
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
+import MobileHome from "../components/MobileHome";
 import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
-import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
+import { ExpandMoreRounded as ExpandMore, TodayRounded as Today, EventRounded, EngineeringRounded, RequestQuoteRounded, EventRepeatRounded, EditCalendarRounded, ApartmentRounded, GroupsRounded, ScheduleRounded, NotificationsActiveRounded, ErrorOutlineRounded as ErrorOutline } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
 import { Widget, Row, Empty, Loading, Pager, Pill, DateTile, IconTile } from "../components/DashWidgets";
@@ -57,7 +58,7 @@ const STATUS_META = {
   ดำเนินการเสร็จสิ้น: { color: "#16a34a", bg: "#dcfce7", Icon: FaCheckDouble },
 };
 const STATUS_SHORT = { กำลังรอยืนยัน: "รอยืนยัน", ยืนยันแล้ว: "ยืนยันแล้ว", กำลังดำเนินการ: "กำลังทำ", ดำเนินการเสร็จสิ้น: "เสร็จแล้ว" };
-const ROUND_ICON = { due_soon: ScheduleOutlined, due_now: NotificationsActiveOutlined, overdue: ErrorOutline };
+const ROUND_ICON = { due_soon: ScheduleRounded, due_now: NotificationsActiveRounded, overdue: ErrorOutline };
 const getStatusMeta = (status) =>
   STATUS_META[status] || { color: "#64748b", bg: "#f1f5f9", Icon: FaClock };
 
@@ -111,6 +112,8 @@ const Dashboard = () => {
   const showMyJobsHero = !isSale;
   // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
   const canViewQuotations = can(userData, "viewFinance");
+  // จอมือถือ (< 600px) ใช้หน้าแรกแบบแอป (MobileHome)
+  const isPhone = useMediaQuery("(max-width:599.95px)");
 
 
   /**
@@ -269,6 +272,13 @@ const Dashboard = () => {
   );
   // ✅ เพิ่มจำนวนงานที่เสร็จสิ้นแล้วเข้าไปในสรุปด้วย (เดิมมีแค่ ต้องทำ/รออนุมัติ/ค้างเกินกำหนด)
   const myClosedCount = countDistinctJobs(myEvents, (e) => e.status === "ดำเนินการเสร็จสิ้น");
+  // สรุปบรรทัดเดียวบนการ์ดทักทายของจอมือถือ (MobileHome)
+  const phoneSummary = loading ? [{ text: "กำลังโหลด..." }] : [
+    ...(showMyJobsHero ? [] : [{ text: `วันนี้ ${todayJobs.length} งาน` }]),
+    ...(showMyJobsHero ? [{ text: myActiveJobsCount > 0 ? `ต้องทำ ${myActiveJobsCount}` : "ไม่มีงานค้าง" }] : []),
+    ...(myOverdueCount > 0 ? [{ text: `ค้าง ${myOverdueCount}`, tone: "#dc2626" }] : []),
+    ...(myPendingApprovalCount > 0 ? [{ text: `รอตรวจ ${myPendingApprovalCount}` }] : []),
+  ];
   const myJobsSummary = (() => {
     const parts = [];
     if (myActiveJobsCount > 0) parts.push(`${myActiveJobsCount} งานที่ต้องทำ`);
@@ -425,14 +435,14 @@ const Dashboard = () => {
   const overdueContractsBlock =
     canViewContracts && overdueContracts.length > 0 ? (
       <Widget
-        title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length} icon={EventRepeatOutlined}
+        title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length} icon={EventRepeatRounded}
         tone={roundCounts.overdue || roundCounts.due_now ? DANGER : "#d97706"}
         hint="สัญญาที่ยังไม่ได้ลงแผนรอบถัดไป"
         // ✅ (8 ต.ค. 2569) 3 ระดับเดียวกับหน้าภาพรวมงาน — แยกจำนวนให้เห็นก่อนว่าเร่งแค่ไหน
         summary={[
           roundCounts.overdue && <Pill key="o" color="#991b1b" icon={<ErrorOutline sx={{ fontSize: 14 }} />}>เลยกำหนด {roundCounts.overdue}</Pill>,
-          roundCounts.due_now && <Pill key="n" color="#dc2626" icon={<NotificationsActiveOutlined sx={{ fontSize: 14 }} />}>เดือนนี้ {roundCounts.due_now}</Pill>,
-          roundCounts.due_soon && <Pill key="s" color="#d97706" icon={<ScheduleOutlined sx={{ fontSize: 14 }} />}>เดือนหน้า {roundCounts.due_soon}</Pill>,
+          roundCounts.due_now && <Pill key="n" color="#dc2626" icon={<NotificationsActiveRounded sx={{ fontSize: 14 }} />}>เดือนนี้ {roundCounts.due_now}</Pill>,
+          roundCounts.due_soon && <Pill key="s" color="#d97706" icon={<ScheduleRounded sx={{ fontSize: 14 }} />}>เดือนหน้า {roundCounts.due_soon}</Pill>,
         ].filter(Boolean)}
         to={overdueContracts.length > 5 ? "/contracts?view=overdue" : undefined}>
         {overdueContracts.slice(0, 5).map((c) => {
@@ -550,7 +560,7 @@ const Dashboard = () => {
 
       {/* ✅ (9 ต.ค. 2569) ขั้นตอนทำงาน ขั้น 5 — ช่างแจ้ง "งานไม่เสร็จ" รอแอดมินลงนัดใหม่ (โชว์เฉพาะตอนมีจริง) */}
       {followUpJobs.length > 0 && (
-        <Widget title="งานไม่เสร็จ · รอนัดใหม่" icon={EventRepeatOutlined} tone="#d97706" count={followUpJobs.length}
+        <Widget title="งานไม่เสร็จ · รอนัดใหม่" icon={EventRepeatRounded} tone="#d97706" count={followUpJobs.length}
           hint="ช่างแจ้งสาเหตุแล้ว — ลงวันนัดใหม่ แล้วกด “จัดการแล้ว”">
           {followUpJobs.slice(0, 5).map(({ job, fu }) => (
             <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
@@ -562,7 +572,7 @@ const Dashboard = () => {
       )}
 
       {/* งานค้างของช่างแยกรายคน — กดชื่อเพื่อดูรายการงานค้างของคนนั้น */}
-      <Widget title="งานค้างของช่าง" icon={EngineeringOutlined} tone={DANGER} count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
+      <Widget title="งานค้างของช่าง" icon={EngineeringRounded} tone={DANGER} count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
         {loading ? <Loading rows={3} /> : overdueByTechnician.length === 0 ? <Empty text="ไม่มีงานค้างของช่างตอนนี้" /> : overdueByTechnician.map(({ tech, count, severeCount, jobs }) => {
           const isExpanded = expandedOverdueTechIds.has(tech._id);
           const name = [tech.fname, tech.lname].filter(Boolean).join(" ") || tech.username;
@@ -590,7 +600,7 @@ const Dashboard = () => {
 
       {/* ใบเสนอราคาที่ต้องติดตาม — โชว์เฉพาะตอนมีจริง · กดแล้วเปิดใบนั้นในหน้าติดตามใบเสนอราคา */}
       {staleQuotations.length > 0 && (
-        <Widget title="ใบเสนอราคาที่ต้องติดตาม" icon={RequestQuoteOutlined} tone="#d97706" count={staleQuotations.length} hint="ลูกค้าเงียบเกินกำหนดติดตาม" to="/finance?tab=quotations">
+        <Widget title="ใบเสนอราคาที่ต้องติดตาม" icon={RequestQuoteRounded} tone="#d97706" count={staleQuotations.length} hint="ลูกค้าเงียบเกินกำหนดติดตาม" to="/finance?tab=quotations">
           {staleQuotations.slice(0, 5).map((q) => (
             <Row key={q.id} to={`/finance?tab=quotations&jobId=${q.id}`}
               title={q.title || "งาน"}
@@ -605,7 +615,7 @@ const Dashboard = () => {
 
       {/* งานใหม่ที่ยังไม่ลงตาราง (ไม่รวมฉบับร่างของสัญญา)
           🔁 (17 ต.ค. 2569) เปลี่ยนชื่อจาก "งานวางแผนล่วงหน้า" ให้ตรงกับเมนู/หน้า "งานใหม่" (เดิมเรียกของชุดเดียวกันคนละชื่อ) */}
-      <Widget title="งานเข้า · รอส่งลงตาราง" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันเข้างาน" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานเข้า"
+      <Widget title="งานเข้า · รอส่งลงตาราง" icon={EditCalendarRounded} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันเข้างาน" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานเข้า"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
         {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ไม่มีงานใหม่ค้างส่งลงตาราง" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/jobs/intake" title={d.title || "งาน"}
@@ -618,7 +628,7 @@ const Dashboard = () => {
           🔁 (17 ต.ค. 2569 ผู้ใช้: "วิเคราะห์การจัดวางหน้าแรก จุดไหนไม่มืออาชีพ") — ย้ายลงท้าย (ข้อมูลล่วงหน้า ไม่ใช่สิ่งที่ต้องทำตอนนี้)
           และซ่อนตอนไม่มีงาน (กล่องว่างใหญ่ๆ ไม่ได้บอกอะไร) */}
       {(loading || upcomingJobs.length > 0) && (
-      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/event" : undefined} toLabel="เปิดตารางงาน">
+      <Widget title="งานที่กำลังจะถึง" icon={EventRounded} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/event" : undefined} toLabel="เปิดตารางงาน">
         {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
           const jobStart = moment(job.start || job.date).startOf("day");
           const diffDays = jobStart.diff(today, "days");
@@ -642,7 +652,7 @@ const Dashboard = () => {
   if (isSale) return <SalesDashboard />;
 
   return (
-    <Container fluid style={styles.container}>
+    <Container fluid style={isPhone ? { ...styles.container, backgroundColor: "#fff" } : styles.container} className={isPhone ? "dash-phone" : undefined}>
       {/* ─── LAYOUT: จอกว้างพอ (≥960px) แบ่ง 2 คอลัมน์ เนื้อหาหลัก + แถบข้าง "งานค้างของช่าง"
         (เดิมจำกัด maxWidth ของ container ไว้แล้วเหลือพื้นที่ว่างข้างขวาเยอะบนจอกว้าง เอามาใช้ตรงนี้
         แทนที่จะปล่อยว่าง) — DOM แบ่งเนื้อหาหลักเป็น 2 ท่อน (บน/ล่าง) คั่นด้วยแถบข้างตรงกลาง เพื่อให้
@@ -661,6 +671,19 @@ const Dashboard = () => {
                 เดิมป้ายตำแหน่งสีแดงขอบแดงลอยมุมขวา แย่งสายตาจากเมนู · ตอนนี้ตำแหน่งเป็นข้อความรองสีเทา */}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "จัดวางไว้ในแถบเดียวกับชื่อ เอาไว้ด้านขวา ให้สังเกตได้ง่าย ชัดเจน รวมถึงของช่างด้วยรูปแบบเดียวกัน")
                 แถบทักทาย: ชื่อ + ตำแหน่ง (ซ้าย) · ปุ่ม "งานของฉัน" พร้อมตัวเลข (ขวา) — มือถือปุ่มลงไปเต็มแถวล่าง */}
+            {/* ✅ (1 พ.ย. 2569 ผู้ใช้ส่งภาพตัวอย่าง "อยากได้แบบคล้ายๆในรูป") จอมือถือ = หน้าแรกแบบแอป
+                (การ์ดทักทาย · ปุ่มใหญ่ 4 ใบ · เมนูด่วน) ดู MobileHome.js — จอคอม/แท็บเล็ตใช้ชุดเดิมด้านล่าง */}
+            {isPhone ? (
+              <MobileHome
+                userData={userData}
+                rankText={rankLabel(role)}
+                dateText={formatThai(moment().locale("th"), "D MMMM YYYY")}
+                summary={phoneSummary}
+                showMyJobs={showMyJobsHero}
+                badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
+              />
+            ) : (
+            <>
             <Box sx={{ display: "flex", alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" }, gap: 1.5, mb: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
               <Avatar sx={{ width: 42, height: 42, fontWeight: 800, bgcolor: personColor(userData?.fname || "ผู้ใช้") }}>{personInitial(userData?.fname || "ผู้ใช้")}</Avatar>
               <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -733,6 +756,8 @@ const Dashboard = () => {
               hideMyJobs={showMyJobsHero}
               hideSalesJobs={isSale}
             />
+            </>
+            )}
 
           </div>
 
@@ -767,7 +792,7 @@ const Dashboard = () => {
             {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
           เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
             {isAdminOrManager && (
-              <Widget title="โครงการที่มีงานมากที่สุด" icon={ApartmentOutlined} count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
+              <Widget title="โครงการที่มีงานมากที่สุด" icon={ApartmentRounded} count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
                 footer={<Pager page={projectPage} pages={totalProjectPages} onChange={setProjectPage} />}>
                 {loading ? <Loading rows={5} /> : topProjects.length === 0 ? <Empty text="ยังไม่มีข้อมูลงานของโครงการ" /> : pagedProjects.map((p, i) => {
                   const rank = (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
@@ -788,7 +813,7 @@ const Dashboard = () => {
             {/* ✅ ภาพรวมทีมงาน — 🐛 เดิมนับจาก role (ซึ่งตอนนี้คือ "ตำแหน่งในระบบ") จึงขึ้น "ผู้ดูแลระบบ 0" ผิดความจริง
                 ตอนนี้นับตาม Rank (ตำแหน่งในองค์กร) ด้วย isRole ตัวเดียวกับทั้งแอป และแสดงครบทุก Rank ที่มีคน */}
             {isAdmin && (
-              <Widget title="ภาพรวมทีมงาน" icon={GroupsOutlined} tone="#0f766e" count={loading ? undefined : `${users.length} คน`} to="/staff?tab=registry" toLabel="ทะเบียนพนักงาน">
+              <Widget title="ภาพรวมทีมงาน" icon={GroupsRounded} tone="#0f766e" count={loading ? undefined : `${users.length} คน`} to="/staff?tab=registry" toLabel="ทะเบียนพนักงาน">
                 {loading ? <Loading rows={1} /> : (
                   <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: `repeat(${Math.max(teamItems.length, 1)}, 1fr)` }, py: 1 }}>
                     {teamItems.map((t, i) => (
@@ -979,7 +1004,7 @@ const baseStyles = {
     borderRadius: "12px",
     fontSize: "11px",
     fontWeight: "600",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     textTransform: "uppercase",
     boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
   },
@@ -1058,7 +1083,7 @@ const baseStyles = {
     width: "100%",
     background: "#ffffff",
     color: "#0f172a",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     borderLeft: "4px solid #0891b2",
     borderRadius: "14px",
     padding: "12px 14px",
@@ -1129,7 +1154,7 @@ const baseStyles = {
     gap: "3px",
     backgroundColor: "#ffffff",
     borderRadius: "10px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     padding: "7px 3px",
     textDecoration: "none",
     boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
@@ -1165,10 +1190,10 @@ const baseStyles = {
     width: "18px",
     height: "13px",
     borderRadius: "3px",
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#e6e9ef",
   },
   skeletonPulseBg: {
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#e6e9ef",
     border: "none",
   },
 
@@ -1186,7 +1211,7 @@ const baseStyles = {
     maxWidth: "240px",
     backgroundColor: "#ffffff",
     borderRadius: "14px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     padding: "12px 14px",
     boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
     flexShrink: 0,
@@ -1255,7 +1280,7 @@ const baseStyles = {
     justifyContent: "center",
     gap: "6px",
     backgroundColor: "#ffffff",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     borderRadius: "10px",
     padding: "8px 12px",
     flexShrink: 0,
@@ -1277,7 +1302,7 @@ const baseStyles = {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "8px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     backgroundColor: "#ffffff",
     color: "#475569",
     cursor: "pointer",
@@ -1312,7 +1337,7 @@ const baseStyles = {
   notiCard: {
     backgroundColor: "#ffffff",
     borderRadius: "14px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
     marginBottom: "18px",
     overflow: "hidden",
@@ -1447,7 +1472,7 @@ const baseStyles = {
     width: "28px",
     height: "28px",
     borderRadius: "50%",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     backgroundColor: "#ffffff",
     color: "#475569",
     display: "flex",

@@ -34,15 +34,7 @@ import {
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { alpha } from "@mui/material/styles";
-import {
-  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, FlagOutlined,
-  NotesOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, BuildOutlined, CallReceivedRounded, DescriptionOutlined, PhoneOutlined, HourglassTopRounded, ReportProblemOutlined,
-  BlockRounded, RestoreRounded, PersonOffOutlined,
-  LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
-  ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined, ExpandMoreRounded,
-  VerifiedOutlined, SendOutlined, NotificationsActiveOutlined, EditNoteOutlined, CheckCircleRounded, CancelRounded, DoNotDisturbOnOutlined,
-  LinkRounded,
-} from "@mui/icons-material";
+import { PostAddRounded, AddRounded, EditRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close, EventAvailableRounded, FlagRounded, NotesRounded, CalendarMonthRounded, GroupsRounded, PersonOutlineRounded, BuildRounded, CallReceivedRounded, DescriptionRounded, PhoneRounded, HourglassTopRounded, ReportProblemRounded, BlockRounded, RestoreRounded, PersonOffRounded, LocalShippingRounded, ReceiptLongRounded, TaskAltRounded, UploadFileRounded, AttachFileRounded, SearchRounded as Search, ViewAgendaRounded, TableRowsRounded, RequestQuoteRounded, ExpandMoreRounded, VerifiedRounded, SendRounded, NotificationsActiveRounded, EditNoteRounded, CheckCircleRounded, CancelRounded, DoNotDisturbOnRounded, LinkRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
 import JobTypeService from "@/shared/services/JobTypeService";
@@ -194,10 +186,10 @@ const outcomeOf = (job, st, sessions) => {
  *    ใช้ชิ้นเดียวกันทั้งตารางและการ์ด · สถานะที่ไม่ต้องทำอะไร (ยังไม่มี / ไม่ต้องเสนอราคา) เป็นสีเทา ไม่แย่งสายตา
  */
 const QUOTE_ICON = {
-  none: DescriptionOutlined, na: DoNotDisturbOnOutlined, po: VerifiedOutlined,
-  waiting_file: RequestQuoteOutlined, not_sent: RequestQuoteOutlined, sent: SendOutlined, follow_up: NotificationsActiveOutlined,
-  revising: EditNoteOutlined, approved: CheckCircleRounded, rejected: CancelRounded,
-  ref_qt: RequestQuoteOutlined, ref_doc: DescriptionOutlined,
+  none: DescriptionRounded, na: DoNotDisturbOnRounded, po: VerifiedRounded,
+  waiting_file: RequestQuoteRounded, not_sent: RequestQuoteRounded, sent: SendRounded, follow_up: NotificationsActiveRounded,
+  revising: EditNoteRounded, approved: CheckCircleRounded, rejected: CancelRounded,
+  ref_qt: RequestQuoteRounded, ref_doc: DescriptionRounded,
 };
 const QUOTE_STEP = { none: 0, waiting_file: 0, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 };
 const QUOTE_STEPS = ["แนบ", "ติดตาม", "ผลลัพธ์"];
@@ -209,7 +201,7 @@ function QuoteSteps({ oc, labels = true }) {
     <Stack direction="row" gap={0.4} sx={{ mt: 0.6, maxWidth: 170 }} title={QUOTE_STEPS.map((x, i) => `${i < n ? "✓" : "○"} ${x}`).join("  ")}>
       {QUOTE_STEPS.map((x, i) => (
         <Box key={x} sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ height: 4, borderRadius: 99, bgcolor: i < n ? oc.color : "#e2e8f0" }} />
+          <Box sx={{ height: 4, borderRadius: 99, bgcolor: i < n ? oc.color : "#e6e9ef" }} />
           {labels && <Typography noWrap sx={{ fontSize: "0.62rem", fontWeight: i < n ? 800 : 600, color: i < n ? "#475569" : "#94a3b8", mt: 0.2 }}>{x}</Typography>}
         </Box>
       ))}
@@ -219,7 +211,7 @@ function QuoteSteps({ oc, labels = true }) {
 
 /** @param compact ใช้ในตาราง — บรรทัดเดียวไม่ตัดคำ · แถบขั้นไม่มีป้าย */
 function QuoteCell({ oc, compact = false, caption = false }) {
-  const Icon = QUOTE_ICON[oc.key] || RequestQuoteOutlined;
+  const Icon = QUOTE_ICON[oc.key] || RequestQuoteRounded;
   const tone = oc.quiet ? "#94a3b8" : oc.color;
   const box = compact ? 26 : 30;
   const file = oc.files?.length ? oc.files[oc.files.length - 1] : null;
@@ -457,7 +449,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                       {j.contactTel && (
                         <Box component="a" href={`tel:${j.contactTel}`} onClick={(e) => e.stopPropagation()}
                           sx={{ mt: 0.3, display: "inline-flex", alignItems: "center", gap: 0.4, fontSize: "0.78rem", color: ACCENT, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
-                          <PhoneOutlined sx={{ fontSize: 15 }} />{j.contactTel}
+                          <PhoneRounded sx={{ fontSize: 15 }} />{j.contactTel}
                         </Box>
                       )}
                     </>
@@ -481,7 +473,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                   {j.responsiblePerson ? (
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
                       <Avatar src={hasValidAvatar(owner?.imageUrl) ? owner.imageUrl : undefined}
-                        sx={{ width: 32, height: 32, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(j.responsiblePerson), boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e2e8f0" }}>
+                        sx={{ width: 32, height: 32, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(j.responsiblePerson), boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e6e9ef" }}>
                         {personInitial(j.responsiblePerson)}
                       </Avatar>
                       <Box sx={{ minWidth: 0 }}>
@@ -760,7 +752,7 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
     <Dialog open onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
         <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
-          <EventAvailableOutlined sx={{ fontSize: 20 }} />
+          <EventAvailableRounded sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Typography>
@@ -773,7 +765,7 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
         <Section n={1} title="ผู้รับผิดชอบงาน" hint={canAssignResponsible ? "ดูแลงานนี้ทั้งงาน ตั้งแต่ลงตารางจนปิดงาน" : "มอบหมายได้เฉพาะแอดมิน/ผู้จัดการ"}>
           <PersonSelectField
             label="" title="เลือกผู้รับผิดชอบงาน" value={resp} onChange={setResp}
-            allValue="" allLabel="ยังไม่ได้มอบหมาย" allIcon={PersonOffOutlined}
+            allValue="" allLabel="ยังไม่ได้มอบหมาย" allIcon={PersonOffRounded}
             options={optionsWith(resp)} disabled={!canAssignResponsible} sx={PICK}
           />
         </Section>
@@ -786,7 +778,7 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
         <Section n={3} title="หัวหน้าทีมที่เข้างาน" hint="นำทีมเข้าหน้างานรอบนี้ · ไม่บังคับ มอบหมายทีหลังได้" last>
           <PersonSelectField
             label="" title="เลือกหัวหน้าทีม" value={team} onChange={setTeam}
-            allValue="" allLabel="ยังไม่ระบุ" allIcon={PersonOffOutlined}
+            allValue="" allLabel="ยังไม่ระบุ" allIcon={PersonOffRounded}
             options={optionsWith(team)} sx={PICK}
           />
         </Section>
@@ -839,7 +831,7 @@ function DeliverDialog({ job, onClose, onDone }) {
     <Dialog open onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
         <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
-          <LocalShippingOutlined sx={{ fontSize: 20 }} />
+          <LocalShippingRounded sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งของแล้ว</Typography>
@@ -864,7 +856,7 @@ function DeliverDialog({ job, onClose, onDone }) {
         </Section>
         {billing === "need" && (
         <Section n={3} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่แถว/การ์ดงาน" last>
-          <Button component="label" variant="outlined" startIcon={<UploadFileOutlined />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
+          <Button component="label" variant="outlined" startIcon={<UploadFileRounded />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
             {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "เลือกไฟล์ใบวางบิล"}
             <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFiles([...(e.target.files || [])])} />
           </Button>
@@ -924,7 +916,7 @@ const FileLinks = ({ files, label = "เอกสารรับงาน" }) =>
  * ✅ (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดแสดงให้ครบ แนบไฟล์ไปไม่ขึ้น · ใบเสนอราคาให้เข้าไปดำเนินการได้")
  *    ไฟล์ตอนบันทึก · ไฟล์ที่แนบเพิ่ม · ใบเสนอราคา (+ สถานะติดตาม กดอัปเดตผลได้) · แนบเพิ่มได้ · เลื่อนดูไฟล์ต่อกันได้
  */
-const NOTE_FILE_TYPES = [["quotation", "ใบเสนอราคา", RequestQuoteOutlined], ["sitePhoto", "ไฟล์อื่น", AttachFileRounded]];
+const NOTE_FILE_TYPES = [["quotation", "ใบเสนอราคา", RequestQuoteRounded], ["sitePhoto", "ไฟล์อื่น", AttachFileRounded]];
 function NoteFiles({ job, outcome, readOnly, onChanged }) {
   const gal = useFileGallery();
   const inputRef = useRef(null);
@@ -1019,7 +1011,7 @@ function NoteDoneDialog({ job, onClose, onDone }) {
           <Stack spacing={0.5}>
             {list.map((it, i) => (
               <Stack key={i} direction="row" alignItems="center" gap={1} sx={{ px: 1, py: 0.6, borderRadius: 1.5, border: `1px solid ${LINE}` }}>
-                {it.type === "quotation" ? <RequestQuoteOutlined sx={{ fontSize: 17, color: ACCENT }} /> : <AttachFileRounded sx={{ fontSize: 17, color: MUTED }} />}
+                {it.type === "quotation" ? <RequestQuoteRounded sx={{ fontSize: 17, color: ACCENT }} /> : <AttachFileRounded sx={{ fontSize: 17, color: MUTED }} />}
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600 }}>{it.file.name}</Typography>
                 <Box component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color: it.type === "quotation" ? ACCENT : MUTED }}>{it.type === "quotation" ? "ใบเสนอราคา" : "ไฟล์อื่น"}</Box>
                 <IconButton size="small" disabled={saving} onClick={() => setList((p) => p.filter((_, k) => k !== i))} aria-label="เอาออก"><Close sx={{ fontSize: 16 }} /></IconButton>
@@ -1080,7 +1072,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   ) : st.note ? (
     st.i === 0 ? (
       <>
-        <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
+        <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
         <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
@@ -1093,18 +1085,18 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     )
   ) : st.nv && st.i === 0 ? (
     <>
-      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
-      <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งของแล้ว</Button>
     </>
   ) : st.nv ? (
     <>
-      <Button component={Link} to={`/finance?tab=billing&jobId=${job._id}`} variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button component={Link} to={`/finance?tab=billing&jobId=${job._id}`} variant="outlined" startIcon={<ReceiptLongRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ติดตามวางบิล</Button>
-      <Button component="label" variant={st.i === 2 ? "contained" : "outlined"} disabled={uploading} startIcon={<UploadFileOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button component="label" variant={st.i === 2 ? "contained" : "outlined"} disabled={uploading} startIcon={<UploadFileRounded sx={{ fontSize: "17px !important" }} />}
         sx={st.i === 2 ? { ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } } : { ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>
         {uploading ? "กำลังอัปโหลด..." : st.i === 2 ? "อัปโหลดใบวางบิล" : "แนบบิลเพิ่ม"}
         <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={async (e) => {
@@ -1119,12 +1111,12 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </>
   ) : st.i === 0 ? (
     <>
-      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <LinkButton job={job} card />
-      <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
     </>
   ) : (
@@ -1149,7 +1141,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const schedule = job.intakeNote
     ? (job.noteDoneAt ? `ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY")}${job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}` : `บันทึก ${formatThai(moment(job.intakeAt), "D MMM YYYY")}`)
     : job.noVisit && job.unscheduled ? "ยังไม่ส่งของ" : when;
-  const ModeIcon = job.intakeNote ? NotesOutlined : job.noVisit ? LocalShippingOutlined : BuildOutlined;
+  const ModeIcon = job.intakeNote ? NotesRounded : job.noVisit ? LocalShippingRounded : BuildRounded;
   const modeLabel = job.intakeNote ? "บันทึก" : job.noVisit ? "ส่งของ" : "เข้าหน้างาน";
   const tone = st.i === -1 ? MUTED : ACCENT;
 
@@ -1247,15 +1239,15 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               })()}
               {due && st.i < 4 && (() => {
                 const late = moment(job.dueDate).isBefore(moment(), "day");
-                return <Tag icon={FlagOutlined} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
+                return <Tag icon={FlagRounded} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
               })()}
               {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{sourceText(job)}</Tag>}
             </Stack>
             <Stack direction="row" sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9, "&:empty": { display: "none !important" } }}>
-              {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
-              {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
+              {job.responsiblePerson && <Fact icon={PersonOutlineRounded}>{job.responsiblePerson}</Fact>}
+              {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsRounded}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
               {(job.contactName || job.contactTel) && (
-                <Fact icon={PhoneOutlined}>
+                <Fact icon={PhoneRounded}>
                   {job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
                   {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box>}
                 </Fact>
@@ -1289,7 +1281,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                     </Stack>
                   ) : (
                     <Stack direction="row" alignItems="center" gap={0.6} sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ width: 30, height: 30, borderRadius: 99, display: "grid", placeItems: "center", border: `1px dashed #cbd5e1`, color: "#94a3b8", flexShrink: 0 }}><PersonOutlineOutlined sx={{ fontSize: 17 }} /></Box>
+                      <Box sx={{ width: 30, height: 30, borderRadius: 99, display: "grid", placeItems: "center", border: `1px dashed #cbd5e1`, color: "#94a3b8", flexShrink: 0 }}><PersonOutlineRounded sx={{ fontSize: 17 }} /></Box>
                       <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: MUTED }}>{who || "ยังไม่มีผู้รับผิดชอบ"}</Typography>
                     </Stack>
                   )}
@@ -1345,17 +1337,17 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const people = [
                 {
                   k: "resp", label: "ผู้รับผิดชอบ",
-                  pic: job.responsiblePerson ? <PersonPic name={job.responsiblePerson} owner={owner} size={34} /> : null, icon: PersonOutlineOutlined,
+                  pic: job.responsiblePerson ? <PersonPic name={job.responsiblePerson} owner={owner} size={34} /> : null, icon: PersonOutlineRounded,
                   value: job.responsiblePerson || <Box component="span" sx={{ color: AMBER }}>ยังไม่ระบุ</Box>,
                   sub: owner ? (owner.position || rankLabel(owner)) : "",
                 },
                 !job.unscheduled && !job.noVisit ? {
-                  k: "team", label: "หัวหน้าทีม", icon: GroupsOutlined,
+                  k: "team", label: "หัวหน้าทีม", icon: GroupsRounded,
                   value: job.team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>,
                   sub: members.length ? `ลูกทีม ${members.join(", ")}` : "",
                 } : null,
                 job.contactName || job.contactTel ? {
-                  k: "contact", label: "ผู้ติดต่อหน้างาน", icon: PhoneOutlined,
+                  k: "contact", label: "ผู้ติดต่อหน้างาน", icon: PhoneRounded,
                   value: job.contactName || job.contactTel, sub: job.contactName ? job.contactTel : "", tel: job.contactTel,
                 } : null,
               ].filter(Boolean);
@@ -1415,7 +1407,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                         {x.tel && (
                           <IconButton component="a" href={`tel:${x.tel}`} aria-label={`โทร ${x.tel}`}
                             sx={{ flexShrink: 0, width: 36, height: 36, color: GREEN, bgcolor: alpha(GREEN, 0.1), "&:hover": { bgcolor: alpha(GREEN, 0.18) } }}>
-                            <PhoneOutlined sx={{ fontSize: 18 }} />
+                            <PhoneRounded sx={{ fontSize: 18 }} />
                           </IconButton>
                         )}
                       </Stack>
@@ -1503,7 +1495,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {(job.infoPending && job.infoPendingNote) || (fu && st.i === 2) || st.i === -1 ? (
               <Stack spacing={0.4} sx={{ mt: 0.9 }}>
                 {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
-                {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
+                {fu && st.i === 2 && <Line icon={ReportProblemRounded} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
                 {st.i === -1 && (
                   <Line icon={BlockRounded} color={RED} strong>
                     เหตุผล: {job.cancelReason || "-"} · ยกเลิกโดย {job.cancelledBy || "-"} {formatThai(moment(job.cancelledAt), "D MMM YYYY HH:mm")}
@@ -1568,7 +1560,7 @@ const DateTile = ({ head, big, foot, color = "#475569", footColor = null, dashed
 /** รูปผู้รับผิดชอบ (ไม่มีรูป = ตัวอักษรแรกบนสีประจำตัว) */
 const PersonPic = ({ name, owner, size = 30 }) => (
   <Avatar src={hasValidAvatar(owner?.imageUrl) ? owner.imageUrl : undefined}
-    sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0, boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e2e8f0" }}>
+    sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0, boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e6e9ef" }}>
     {personInitial(name)}
   </Avatar>
 );
@@ -1599,12 +1591,12 @@ const Tag = ({ icon: Icon, accent, dashed, children }) => (
 /** ป้ายกำหนดเวลา: เดือนที่ตั้งใจเข้างาน (+ อีกกี่เดือน) · วันเข้างาน · ส่งมอบ · บันทึก — accent เฉพาะเดือนนี้/เลยกำหนด */
 const scheduleTagOf = (job, text) => {
   if (job.intakeNote || job.noVisit || !job.unscheduled) {
-    return { icon: job.noVisit ? LocalShippingOutlined : job.unscheduled || job.intakeNote ? CalendarMonthOutlined : EventAvailableOutlined, text };
+    return { icon: job.noVisit ? LocalShippingRounded : job.unscheduled || job.intakeNote ? CalendarMonthRounded : EventAvailableRounded, text };
   }
-  if (!job.plannedMonth) return { icon: CalendarMonthOutlined, text: "ยังไม่กำหนดเดือนเข้างาน", dashed: true };
+  if (!job.plannedMonth) return { icon: CalendarMonthRounded, text: "ยังไม่กำหนดเดือนเข้างาน", dashed: true };
   const diff = moment(job.plannedMonth, "YYYY-MM").diff(moment().startOf("month"), "months");
   return {
-    icon: CalendarMonthOutlined,
+    icon: CalendarMonthRounded,
     accent: diff < 0 ? RED : diff === 0 ? AMBER : null,
     text: `แผนเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
     rel: diff > 0 ? `อีก ${diff} เดือน` : diff === 0 ? "เดือนนี้" : `เลยมา ${-diff} เดือน`,
@@ -1891,7 +1883,7 @@ export default function JobIntake() {
     <LinkCtx.Provider value={linkCtx}>
     {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500) */}
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
-      <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
+      <PageHeader icon={<PostAddRounded />} title="งานเข้า · รับงาน"
         subtitle="รับงาน → ลงตารางเข้าหน้างาน หรือ ส่งของ → วางบิล · กดช่องใบเสนอราคาเพื่ออัปเดตได้ทันที"
         actions={canCreate
           ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
@@ -1972,7 +1964,7 @@ export default function JobIntake() {
           </span>
         </Tooltip>
         <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
-          {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+          {[["card", ViewAgendaRounded, "การ์ด"], ["table", TableRowsRounded, "ตาราง"]].map(([k, Ico, label]) => (
             <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
               sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
                 color: view === k ? "#fff" : "#475569", bgcolor: view === k ? ACCENT : "transparent" }}>
@@ -1987,7 +1979,7 @@ export default function JobIntake() {
       {canQueue && (
         <Box sx={{ display: tab === "requests" ? "block" : "none" }}>
           {reqReady && reqTotal === 0 && (
-            <EmptyState icon={<PostAddOutlined />} title={q ? "ไม่พบคำขอที่ค้นหา" : "ไม่มีคำขอรออนุมัติ"}
+            <EmptyState icon={<PostAddRounded />} title={q ? "ไม่พบคำขอที่ค้นหา" : "ไม่มีคำขอรออนุมัติ"}
               hint="แผนงานที่ช่างลงเอง และใบแจ้งงานจากฝ่ายอื่น จะมารอตัดสินใจที่นี่" />
           )}
           <Box sx={{ display: approveN > 0 ? "block" : "none", mb: 2 }}>
@@ -2025,7 +2017,7 @@ export default function JobIntake() {
           </>
         )
       ) : (
-        <EmptyState icon={<PostAddOutlined />}
+        <EmptyState icon={<PostAddRounded />}
           title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
@@ -2084,7 +2076,7 @@ function BillingSlot({ job }) {
     <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0 }}>
       <Stack direction="row" spacing={0.75} alignItems="center">
         <Box sx={{ width: 26, height: 26, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.12), color }}>
-          <ReceiptLongOutlined sx={{ fontSize: 16 }} />
+          <ReceiptLongRounded sx={{ fontSize: 16 }} />
         </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 800, color, lineHeight: 1.3 }}>{st.label}</Typography>

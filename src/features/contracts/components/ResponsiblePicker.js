@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Autocomplete, Avatar, Box, Stack, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { PersonOutline, ManageAccounts } from "@mui/icons-material";
+import { PersonOutlineRounded as PersonOutline, ManageAccountsRounded as ManageAccounts } from "@mui/icons-material";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 

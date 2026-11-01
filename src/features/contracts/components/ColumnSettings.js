@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Box, Button, Checkbox, Divider, IconButton, Popover, Stack, Tooltip, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ArrowDownward, ArrowUpward, DragIndicator, Lock, RestartAlt, ViewColumn } from "@mui/icons-material";
+import { ArrowDownwardRounded as ArrowDownward, ArrowUpwardRounded as ArrowUpward, DragIndicatorRounded as DragIndicator, LockRounded as Lock, RestartAltRounded as RestartAlt, ViewColumnRounded as ViewColumn } from "@mui/icons-material";
 import { OVERVIEW_COLUMNS } from "@/features/contracts/hooks/useColumnLayout";
 
 /**
@@ -34,7 +34,7 @@ export default function ColumnSettings({ layout, unavailable = new Set(), compac
           sx={{
             textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0,
             color: layout.isCustomized ? ACCENT : "text.secondary",
-            border: "1px solid", borderColor: layout.isCustomized ? alpha(ACCENT, 0.45) : "#e2e8f0",
+            border: "1px solid", borderColor: layout.isCustomized ? alpha(ACCENT, 0.45) : "#e6e9ef",
             bgcolor: layout.isCustomized ? alpha(ACCENT, 0.05) : "background.paper", px: 1.25,
             "&:hover": { bgcolor: alpha(ACCENT, 0.06), borderColor: alpha(ACCENT, 0.45) },
           }}

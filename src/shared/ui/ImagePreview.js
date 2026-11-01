@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Stack, Typography, CircularProgress, IconButton, Tooltip } from "@mui/material";
-import { Add, Remove, FitScreen, SwapHoriz } from "@mui/icons-material";
+import { AddRounded as Add, RemoveRounded as Remove, FitScreenRounded as FitScreen, SwapHorizRounded as SwapHoriz } from "@mui/icons-material";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 
 const MIN = 0.5;

@@ -6,7 +6,7 @@
  */
 import { useState } from "react";
 import { Avatar, Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
-import { Check, Groups, Person, ExpandLess } from "@mui/icons-material";
+import { CheckRounded as Check, GroupsRounded as Groups, PersonRounded as Person, ExpandLessRounded as ExpandLess } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 
@@ -56,7 +56,7 @@ export default function FloatPersonPicker({ value, onChange, options = [], allLa
         open={Boolean(anchor)} anchorEl={anchor} onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         transformOrigin={{ vertical: "bottom", horizontal: "right" }}
-        slotProps={{ paper: { sx: { mt: -1, width: 280, maxWidth: "calc(100vw - 24px)", borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 18px 40px rgba(15,23,42,.18)" } } }}
+        slotProps={{ paper: { sx: { mt: -1, width: 280, maxWidth: "calc(100vw - 24px)", borderRadius: 3, border: "1px solid #e6e9ef", boxShadow: "0 18px 40px rgba(15,23,42,.18)" } } }}
       >
         <Box sx={{ px: 1.75, pt: 1.25, pb: 0.5 }}>
           <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", letterSpacing: ".02em" }}>{title}</Typography>

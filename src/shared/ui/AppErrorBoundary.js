@@ -12,7 +12,7 @@ import { isChunkLoadError, reloadForFreshBuild, hardReload } from "@/shared/util
 
 const box = {
   maxWidth: 420, margin: "12vh auto 0", padding: "28px 24px", textAlign: "center",
-  background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, boxShadow: "0 1px 2px rgba(15,23,42,.05)",
+  background: "#fff", border: "1px solid #e6e9ef", borderRadius: 16, boxShadow: "0 1px 2px rgba(15,23,42,.05)",
   fontFamily: "inherit", color: "#0f172a",
 };
 const btn = {

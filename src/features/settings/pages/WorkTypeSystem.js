@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Container } from "reactstrap";
 import { Tabs, Tab, Box } from "@mui/material";
-import { Build, Memory } from "@mui/icons-material";
+import { BuildRounded as Build, MemoryRounded as Memory } from "@mui/icons-material";
 import LookupManager from "../components/LookupManager";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
@@ -70,7 +70,7 @@ const styles = {
   card: {
     backgroundColor: "#ffffff",
     borderRadius: "14px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e6e9ef",
     padding: "16px",
     boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
   },

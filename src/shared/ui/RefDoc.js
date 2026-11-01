@@ -4,12 +4,12 @@
  *    ตารางการดำเนินงาน / งานของฉัน แยกเป็นคอลัมน์ "เอกสารอ้างอิง" กับ "เอกสารที่แนบ" (รายงาน · ใบเสนอราคา · ใบส่งมอบ · ใบวางบิล)
  */
 import { Box, Stack, Typography } from "@mui/material";
-import { DescriptionOutlined, RequestQuoteOutlined, VerifiedOutlined, AttachFileRounded } from "@mui/icons-material";
+import { DescriptionRounded, RequestQuoteRounded, VerifiedRounded, AttachFileRounded } from "@mui/icons-material";
 
 const KIND = {
-  po: { label: "ใบสั่งซื้อ (PO)", icon: VerifiedOutlined, color: "#16a34a" },
-  quotation: { label: "ใบเสนอราคา", icon: RequestQuoteOutlined, color: "#2563eb" },
-  other: { label: "เอกสารอื่น", icon: DescriptionOutlined, color: "#475569" },
+  po: { label: "ใบสั่งซื้อ (PO)", icon: VerifiedRounded, color: "#16a34a" },
+  quotation: { label: "ใบเสนอราคา", icon: RequestQuoteRounded, color: "#2563eb" },
+  other: { label: "เอกสารอื่น", icon: DescriptionRounded, color: "#475569" },
 };
 
 // 🔁 (21 ต.ค. 2569) ไฟล์ที่แนบมากับใบแจ้งงาน (QT/PO) ก็เป็นเอกสารอ้างอิงตอนรับงานเหมือนกัน

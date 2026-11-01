@@ -4,7 +4,7 @@
  *    แยกออกมาเป็นแท็บของตัวเอง หัวหน้าแบบเดียวกับแท็บอื่น
  */
 import { Box } from "@mui/material";
-import { Description } from "@mui/icons-material";
+import { DescriptionRounded as Description } from "@mui/icons-material";
 import { PageHeader, PAGE_SX } from "@/shared/ui/PageKit";
 import ServiceReportFiles from "../components/ServiceReportFiles";
 

@@ -107,7 +107,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  color: #e6e9ef;
   cursor: pointer;
   text-decoration: none;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -259,7 +259,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   padding: 4px 10px;
-  color: #e2e8f0 !important;
+  color: #e6e9ef !important;
   font-size: 10.5px;
   font-weight: 600;
   text-decoration: none !important;
@@ -314,4 +314,33 @@
   line-height: 17px;
   text-align: center;
   vertical-align: middle;
+}
+
+/* ==========================================================================
+   🎨 (1 พ.ย. 2569 ผู้ใช้เลือกแบบ A "ชมพูอ่อนไล่ขาว") — กลมกลืนกับเนื้อหาโทนสว่างของหน้าแรก
+   ขาว → ชมพูอ่อนทางขวา (โทนเดียวกับแถว "งานของฉัน") · เส้นล่างชมพูบาง · ปุ่มไอคอนขาวขอบชมพู ไอคอนแดงเข้ม
+   (ลองแล้ว: ขาวล้วน = "ดูยาก" · กรมท่า→แดง = "ไม่เข้ากับส่วนอื่น")
+   ⚠️ สีซ้าย (#ffffff) ต้องตรงกับแถบสถานะในแอป (MainActivity.java · nativeBridge.js · capacitor.config.json)
+   ========================================================================== */
+.fix-header {
+  /* 🔁 (1 พ.ย. 2569 ผู้ใช้: "แบบ Agoda พื้นขาว") ขาวล้วน เส้นล่างบาง (เลิกไล่ชมพู) */
+  background: #ffffff !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid #eceef2 !important;
+}
+.logo { filter: none !important; }
+.fix-header .nav-link { color: #4b5563 !important; }
+.fix-header .nav-link:hover { color: #111827 !important; background-color: rgba(220, 38, 38, 0.06) !important; }
+.fix-header .nav-link.active { color: #dc2626 !important; background: #fdecec !important; box-shadow: none !important; }
+.header-icon-btn { width: 34px; height: 34px; background: #f5f6f8; border: 1px solid #f5f6f8; color: #374151; }
+.header-icon-btn:hover, .header-icon-btn:focus { background: #eceef2; border-color: #eceef2; color: #111827; }
+.header-avatar-fallback { border-color: #fff; box-shadow: 0 0 0 1px #f1d9d9; }
+.header-shortcut-pill { background: #fff; border: 1px solid #f1d9d9; color: #374151 !important; }
+.header-shortcut-pill:hover { background: #fff5f5; color: #111827 !important; }
+
+/* 🔁 (1 พ.ย. 2569 ผู้ใช้: "ระยะห่างขอบโลโก้ให้เท่ากันกับเมนูอื่นๆ") มือถือ: ขอบซ้ายขวา 12px เท่าเนื้อหาหน้า
+   เดิม padding แถบ 10px + container-fluid ของ bootstrap อีก 12px → โลโก้ห่างขอบ 22px ไม่ตรงแนวเนื้อหา (12px) */
+@media (max-width: 767.98px) {
+  .fix-header { padding: 0 12px !important; }
+  .fix-header > .container-fluid { padding-left: 0 !important; padding-right: 0 !important; }
 }

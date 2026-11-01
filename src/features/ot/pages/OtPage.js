@@ -11,6 +11,7 @@
  * ✅ โทนเรียบแบบเดียวกับระบบเบิก (ผู้ใช้เคยแจ้งว่าสีเยอะแล้วรกตา) — สีเหลือแค่ปุ่มหลักกับป้ายสถานะ
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { alpha } from "@mui/material/styles";
 import { Link as RouterLink, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Button, Chip, TextField, InputAdornment, Skeleton, Alert, Pagination, IconButton,
@@ -18,7 +19,7 @@ import {
   useMediaQuery, ButtonBase, Avatar,
 } from "@mui/material";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
-import { Add, AccessTime, Search, Close, ChevronLeft, ChevronRight, FileDownload, TaskAlt, Inbox, Apps, CalendarMonth } from "@mui/icons-material";
+import { AddRounded as Add, AccessTimeRounded as AccessTime, SearchRounded as Search, CloseRounded as Close, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, FileDownloadRounded as FileDownload, TaskAltRounded as TaskAlt, InboxRounded as Inbox, AppsRounded as Apps, CalendarMonthRounded as CalendarMonth } from "@mui/icons-material";
 import moment from "moment";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -382,7 +383,7 @@ export default function OtPage({ view = "mine" }) {
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
           <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }} sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, borderRadius: 2.25, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: OT_ACCENT, color: "#fff", "& svg": { fontSize: { xs: 20, sm: 24 } } }}>
+            <Box sx={{ width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(OT_ACCENT, 0.12), color: OT_ACCENT, "& svg": { fontSize: { xs: 20, sm: 22 }, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
               <AccessTime />
             </Box>
             <Box sx={{ minWidth: 0 }}>
@@ -403,7 +404,7 @@ export default function OtPage({ view = "mine" }) {
           )}
           {view !== "report" && (
             <Button variant="outlined" startIcon={<FileDownload />} onClick={exportExcel} disabled={exporting || loading || !visible.length}
-              sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e2e8f0", bgcolor: "#fff",
+              sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e6e9ef", bgcolor: "#fff",
                 "& .MuiButton-startIcon": { color: "#16a34a" }, "&:hover": { borderColor: "#16a34a", bgcolor: "#fff" } }}>
               {exporting ? "กำลังส่งออก…" : "Excel"}
             </Button>

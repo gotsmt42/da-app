@@ -23,10 +23,7 @@ import {
   TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar, IconButton, Tooltip, Skeleton, useMediaQuery,
   Pagination, Dialog, DialogContent, DialogActions, Table, TableHead, TableBody, TableRow, TableCell, Collapse,
 } from "@mui/material";
-import {
-  Apartment, Add, Edit, DeleteOutline, Close, Download, ContentCopy, ChevronRight, Phone, Email, Person, Place, Receipt,
-  FilterAlt, WorkHistory,
-} from "@mui/icons-material";
+import { ApartmentRounded as Apartment, AddRounded as Add, EditRounded as Edit, DeleteOutlineRounded as DeleteOutline, CloseRounded as Close, DownloadRounded as Download, ContentCopyRounded as ContentCopy, ChevronRightRounded as ChevronRight, PhoneRounded as Phone, EmailRounded as Email, PersonRounded as Person, PlaceRounded as Place, ReceiptRounded as Receipt, FilterAltRounded as FilterAlt, WorkHistoryRounded as WorkHistory } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import SelectField from "@/shared/ui/SelectField";

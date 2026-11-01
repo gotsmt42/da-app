@@ -17,11 +17,7 @@ import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, Avatar, Switch, CircularProgress, Snackbar, Alert, Button, Collapse,
 } from "@mui/material";
-import {
-  ChevronRight, DrawOutlined, NotificationsActiveOutlined, NotificationsOffOutlined, BusinessOutlined,
-  GroupOutlined, LocalOfferOutlined, ImageOutlined, AdminPanelSettingsOutlined, InfoOutlined, Logout,
-  DevicesOther, PersonOutline, SendToMobileOutlined, TuneOutlined, ExpandMore,
-} from "@mui/icons-material";
+import { ChevronRightRounded as ChevronRight, DrawRounded, NotificationsActiveRounded, NotificationsOffRounded, BusinessRounded, GroupRounded, LocalOfferRounded, ImageRounded, AdminPanelSettingsRounded, InfoRounded, LogoutRounded as Logout, DevicesOtherRounded as DevicesOther, PersonOutlineRounded as PersonOutline, SendToMobileRounded, TuneRounded, ExpandMoreRounded as ExpandMore } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
 import SessionService from "@/shared/services/SessionService";
@@ -107,7 +103,7 @@ const Group = ({ title, hint, right, children }) => (
       </Box>
       {right}
     </Stack>
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none" }}>
       {children}
     </Box>
   </Box>
@@ -238,7 +234,7 @@ export default function Settings() {
 
       {/* ── โปรไฟล์ ── */}
       <Box onClick={() => navigate("/account")} role="button" tabIndex={0}
-        sx={{ mb: 2.5, p: 2, display: "flex", alignItems: "center", gap: 2, cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:hover": { borderColor: ACCENT_LINE } }}>
+        sx={{ mb: 2.5, p: 2, display: "flex", alignItems: "center", gap: 2, cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: "none", "&:hover": { borderColor: ACCENT_LINE } }}>
         <Avatar src={hasValidAvatar(userData?.imageUrl) ? getOptimizedImageUrl(userData.imageUrl, { width: 128 }) : undefined}
           sx={{ width: 56, height: 56, fontSize: 22, fontWeight: 800, bgcolor: personColor(nameKey) }}>
           {personInitial(nameKey)}
@@ -259,7 +255,7 @@ export default function Settings() {
       <Group title="บัญชีและความปลอดภัย">
         <Row icon={<PersonOutline />} title="บัญชีของฉัน" desc="รูปโปรไฟล์ · ชื่อ · เบอร์โทร · ตำแหน่งที่พิมพ์ในเอกสาร" onClick={() => navigate("/account")} />
         <Row
-          icon={<DrawOutlined />} tone={hasSignature ? GREEN : MUTED} title="ลายเซ็นอิเล็กทรอนิกส์" onClick={() => setSignOpen(true)}
+          icon={<DrawRounded />} tone={hasSignature ? GREEN : MUTED} title="ลายเซ็นอิเล็กทรอนิกส์" onClick={() => setSignOpen(true)}
           desc={hasSignature === null ? "กำลังตรวจสอบ..." : hasSignature
             ? <Box component="span" sx={{ color: GREEN, fontWeight: 600 }}>ตั้งไว้แล้ว — ใช้กับใบเบิก/ใบเคลม/ใบส่งมอบงานที่คุณออกหรืออนุมัติ</Box>
             : "ยังไม่ได้ตั้ง — เอกสารจะเว้นช่องให้เซ็นด้วยมือ"}
@@ -286,7 +282,7 @@ export default function Settings() {
       {/* ── การแจ้งเตือน ── */}
       <Group title="การแจ้งเตือน">
         <Row
-          icon={pushSubscribed ? <NotificationsActiveOutlined /> : <NotificationsOffOutlined />} tone={pushSubscribed ? ACCENT : MUTED}
+          icon={pushSubscribed ? <NotificationsActiveRounded /> : <NotificationsOffRounded />} tone={pushSubscribed ? ACCENT : MUTED}
           title="การแจ้งเตือนบนอุปกรณ์นี้"
           desc={pushState
             ? <Box component="span" sx={{ color: pushState.tone }}>{pushState.text}</Box>
@@ -307,7 +303,7 @@ export default function Settings() {
         />
         {pushSubscribed && (
           <Row
-            icon={<SendToMobileOutlined />} tone={GREEN}
+            icon={<SendToMobileRounded />} tone={GREEN}
             title="ทดสอบแจ้งเตือน"
             desc={testCountdown > 0
               ? <Box component="span" sx={{ color: GREEN, fontWeight: 700 }}>กดปุ่มโฮมได้เลย (ไม่ต้องล็อกจอ) — เด้งใน {testCountdown} วินาที</Box>
@@ -321,7 +317,7 @@ export default function Settings() {
           />
         )}
         <Row
-          icon={<TuneOutlined />}
+          icon={<TuneRounded />}
           title="วิธีตั้งค่าให้แจ้งเตือนเด้งทับหน้าจอ"
           desc="ตั้งค่าเครื่องครั้งเดียว — ให้แจ้งเตือนขึ้นแบนเนอร์บนจอพร้อมเสียง แม้กำลังใช้แอปอื่นอยู่"
           onClick={() => setGuideOpen((o) => !o)}
@@ -363,23 +359,23 @@ export default function Settings() {
           บัญชีผู้ใช้ = สิทธิ์ระบบ (Role) · ลูกค้า/ประเภทงาน = สิทธิ์ทำงาน “จัดการข้อมูลหลัก” (Rank) */}
       {(isAdmin || canMasterData) && (
         <Group title="ข้อมูลหลัก" hint="ทะเบียนที่ทั้งระบบหยิบไปใช้">
-          {canMasterData && <Row icon={<BusinessOutlined />} title={dest("customers").title} desc="ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร" onClick={() => navigate(dest("customers").href)} />}
-          <Row icon={<GroupOutlined />} title={isAdmin ? "พนักงานและบัญชีผู้ใช้" : "ภาระงานทีมช่าง"} desc={isAdmin ? "ทะเบียนพนักงาน · เพิ่ม/แก้บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน" : "งานที่ช่างแต่ละคนถืออยู่"} onClick={() => navigate(isAdmin ? "/staff?tab=registry" : dest("staff").href)} />
-          {canMasterData && <Row icon={<LocalOfferOutlined />} title={dest("worktype").title} desc={DEST.worktype.sub} onClick={() => navigate(dest("worktype").href)} />}
+          {canMasterData && <Row icon={<BusinessRounded />} title={dest("customers").title} desc="ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร" onClick={() => navigate(dest("customers").href)} />}
+          <Row icon={<GroupRounded />} title={isAdmin ? "พนักงานและบัญชีผู้ใช้" : "ภาระงานทีมช่าง"} desc={isAdmin ? "ทะเบียนพนักงาน · เพิ่ม/แก้บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน" : "งานที่ช่างแต่ละคนถืออยู่"} onClick={() => navigate(isAdmin ? "/staff?tab=registry" : dest("staff").href)} />
+          {canMasterData && <Row icon={<LocalOfferRounded />} title={dest("worktype").title} desc={DEST.worktype.sub} onClick={() => navigate(dest("worktype").href)} />}
         </Group>
       )}
 
       {/* ── ตั้งค่าระบบ ── */}
       {isSuperAdmin && (
         <Group title="ตั้งค่าระบบ" hint="เฉพาะ Super Admin">
-          <Row icon={<ImageOutlined />} title={dest("orgSettings").title} desc={DEST.orgSettings.sub} onClick={() => navigate(dest("orgSettings").href)} />
-          <Row icon={<AdminPanelSettingsOutlined />} title={dest("permissions").title} desc={DEST.permissions.sub} onClick={() => navigate(dest("permissions").href)} />
+          <Row icon={<ImageRounded />} title={dest("orgSettings").title} desc={DEST.orgSettings.sub} onClick={() => navigate(dest("orgSettings").href)} />
+          <Row icon={<AdminPanelSettingsRounded />} title={dest("permissions").title} desc={DEST.permissions.sub} onClick={() => navigate(dest("permissions").href)} />
         </Group>
       )}
 
       {/* ── เกี่ยวกับแอป + ออกจากระบบ ── */}
       <Group title="เกี่ยวกับ">
-        <Row icon={<InfoOutlined />} tone={MUTED} title={`${APP_NAME} · เวอร์ชัน ${APP_VERSION_LABEL || "-"}`} desc={`ใช้งานในนาม ${org?.nameTh || ORG_FALLBACK.nameTh}`} right={null} />
+        <Row icon={<InfoRounded />} tone={MUTED} title={`${APP_NAME} · เวอร์ชัน ${APP_VERSION_LABEL || "-"}`} desc={`ใช้งานในนาม ${org?.nameTh || ORG_FALLBACK.nameTh}`} right={null} />
         <Row icon={<Logout />} tone={RED} title="ออกจากระบบ" desc="ออกจากระบบบนอุปกรณ์นี้" danger onClick={handleLogout} right={null} />
       </Group>
 

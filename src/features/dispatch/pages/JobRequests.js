@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Box, Stack, Typography, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Add, Engineering } from "@mui/icons-material";
+import { AddRounded as Add, EngineeringRounded as Engineering } from "@mui/icons-material";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";

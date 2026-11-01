@@ -8,7 +8,7 @@
 import { Suspense, useState } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircleRounded, RadioButtonUncheckedRounded, RemoveCircleOutlineRounded, LocalShippingOutlined, ReceiptLongOutlined } from "@mui/icons-material";
+import { CheckCircleRounded, RadioButtonUncheckedRounded, RemoveCircleOutlineRounded, LocalShippingRounded, ReceiptLongRounded } from "@mui/icons-material";
 import moment from "moment";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";
@@ -47,8 +47,8 @@ export default function JobDocsCell({ event }) {
           งานส่งของ · {delivered && noBill ? "เสร็จสิ้น" : delivered && billed ? "ครบแล้ว" : delivered ? "รอวางบิล" : "รอส่งของ"}
         </Typography>
         <Stack spacing={0.25}>
-          <Row ok={delivered} icon={LocalShippingOutlined}>{delivered ? `ส่งของแล้ว${event.deliveredAt ? ` ${formatThai(moment(event.deliveredAt), "D MMM")}` : ""}` : "ยังไม่ส่งของ"}</Row>
-          <Row ok={billed} icon={ReceiptLongOutlined}>{noBill ? "ไม่ต้องวางบิล" : billed ? `วางบิลแล้ว${inv ? ` · ${inv} ไฟล์` : ""}` : "ยังไม่วางบิล"}</Row>
+          <Row ok={delivered} icon={LocalShippingRounded}>{delivered ? `ส่งของแล้ว${event.deliveredAt ? ` ${formatThai(moment(event.deliveredAt), "D MMM")}` : ""}` : "ยังไม่ส่งของ"}</Row>
+          <Row ok={billed} icon={ReceiptLongRounded}>{noBill ? "ไม่ต้องวางบิล" : billed ? `วางบิลแล้ว${inv ? ` · ${inv} ไฟล์` : ""}` : "ยังไม่วางบิล"}</Row>
           {inv > 0 && (
             <Box component="a" href={event.invoiceFiles[inv - 1].fileUrl} target="_blank" rel="noreferrer"
               sx={{ ml: 2.4, fontSize: "0.7rem", fontWeight: 800, color: "#2563eb", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>เปิดใบวางบิล ›</Box>

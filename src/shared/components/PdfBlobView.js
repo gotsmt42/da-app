@@ -14,7 +14,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Stack, Button, Typography } from "@mui/material";
-import { OpenInNew } from "@mui/icons-material";
+import { OpenInNewRounded as OpenInNew } from "@mui/icons-material";
 import PageLoader from "@/shared/ui/PageLoader";
 import PdfPagesView from "@/shared/components/PdfPagesView";
 import { renderPdfToImages, revokePageImages, prefersImagePrint } from "@/shared/utils/pdfRaster";

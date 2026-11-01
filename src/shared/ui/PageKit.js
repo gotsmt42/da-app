@@ -7,21 +7,26 @@
  *   โครงเดียวกับหน้าใบเบิก / ใบขอซื้อ / ติดตามใบเสนอราคา: หัวเพจกล่องขาว → ตัวเลขสรุป → แถบค้นหา → รายการ
  * ⚠️ สีหลักเป็นเทา-น้ำเงินเข้ม (slate) · สีอื่นใช้แค่ "จุด" เล็กๆ หรือเมื่อเป็นเรื่องที่ต้องจัดการด่วน (แดง)
  */
+import { useLocation } from "react-router-dom";
+import { navIconForPath } from "@/layouts/navConfig";
 import { Box, Stack, Typography, TextField, InputAdornment, IconButton } from "@mui/material";
-import { Search, Close } from "@mui/icons-material";
+import { SearchRounded as Search, CloseRounded as Close } from "@mui/icons-material";
 
 export const INK = "#0f172a";
 export const INK_2 = "#334155";
 export const MUTED = "#64748b";
 export const FAINT = "#94a3b8";
-export const LINE = "#e2e8f0";
+// 🎨 (1 พ.ย. 2569 "ธีมสะอาดตาแบบ Agoda ทุกหน้า") เส้นขอบบางสีเดียวกับหน้าแรก · การ์ดไม่มีเงา
+export const LINE = "#e6e9ef";
 export const SURFACE = "#f8fafc";
 export const DANGER = "#dc2626";
-export const CARD_SHADOW = "0 1px 2px rgba(15,23,42,.04)";
+export const CARD_SHADOW = "none";
 /**
  * ✅ สีหลักของการกระทำ (ผู้ใช้สั่ง 3 ต.ค. 2569: "ปุ่ม/ธีมไม่อยากให้เป็นสีดำ ดูอึมครึม ใช้ตามสถานะได้แต่ไม่มากไป")
  *    ปุ่มหลัก/รายการที่เลือก = น้ำเงิน · สำเร็จ = เขียว · อันตราย = แดง · ที่เหลือเป็นเทาอ่อน
  */
+// 🎨 (1 พ.ย. 2569 ผู้ใช้: "ปุ่มบันทึกควรเป็นสีน้ำเงินฟ้าทั้งหมด") หลักสีทั้งแอป:
+//    ฟ้า = ปุ่มบันทึก/ยืนยัน/สร้าง · ลิงก์   |   แดงแบรนด์ = แถบบน · เมนูข้าง · แท็บ/เมนูที่เลือก · ป้ายงานค้าง
 export const ACCENT = "#2563eb";
 export const ACCENT_DARK = "#1d4ed8";
 export const ACCENT_SOFT = "#eff6ff";
@@ -46,17 +51,22 @@ export function PageShell({ narrow, sx, children }) {
   return <Box sx={{ ...(narrow ? PAGE_NARROW_SX : PAGE_SX), ...sx }}>{children}</Box>;
 }
 
-/** หัวเพจ: ไอคอนกล่องฟ้าอ่อน · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข */
+/** หัวเพจ: ไอคอนกล่องฟ้าอ่อน · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข
+ *  ✅ (1 พ.ย. 2569 ผู้ใช้: "icon ด้านในยังไม่เหมือนเลย") ไอคอนหัวเพจ = ไอคอนเมนูของหน้านั้น (navConfig) อัตโนมัติ
+ *     — หน้าเดียวกันเห็นไอคอนเดียวกันทั้งในเมนูและบนหัวเพจ · หน้าที่ไม่อยู่ในเมนูใช้ icon ที่ส่งมา */
 export function PageHeader({ icon, title, subtitle, actions }) {
+  const { pathname } = useLocation();
+  const NavIcon = navIconForPath(pathname);
   return (
     // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ด้านบนหน้าจอมือถือดูรก กินพื้นที่") มือถือ: ไอคอนเล็ก · ไม่มีคำอธิบายรอง · ขอบบนล่างน้อยลง
-    <Box sx={{ borderRadius: 3, border: `1px solid ${LINE}`, bgcolor: "#fff", px: { xs: 1.25, sm: 2 }, py: { xs: 0.9, sm: 1.5 }, mb: { xs: 1.25, sm: 1.5 }, boxShadow: CARD_SHADOW }}>
+    // 🎨 (1 พ.ย. 2569 "ธีมสะอาดตาแบบ Agoda ทุกหน้า") หัวเพจไม่มีกรอบ — ชื่อตัวหนาใหญ่วางบนพื้นหน้าตรงๆ
+    <Box sx={{ px: { xs: 0.25, sm: 0.5 }, py: { xs: 0.5, sm: 0.75 }, mb: { xs: 1.25, sm: 1.5 } }}>
       <Stack direction="row" alignItems="center" spacing={{ xs: 1.1, sm: 1.5 }}>
         <Box sx={{ width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT, "& svg": { fontSize: { xs: 18, sm: 22 } } }}>
-          {icon}
+          {NavIcon ? <NavIcon /> : icon}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
+          <Typography noWrap sx={{ fontWeight: 700, fontSize: { xs: "1.2rem", sm: "1.35rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
           {subtitle && <Typography noWrap sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.76rem", color: MUTED }}>{subtitle}</Typography>}
         </Box>
         {actions && <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>{actions}</Stack>}

@@ -6,7 +6,7 @@
  */
 import { useState } from "react";
 import { Box, Stack, Typography, Button, IconButton, Drawer, Chip, Badge, useMediaQuery } from "@mui/material";
-import { Close, Tune } from "@mui/icons-material";
+import { CloseRounded as Close, TuneRounded as Tune } from "@mui/icons-material";
 import { INK, INK_2, MUTED, LINE } from "./PageKit";
 
 /** ปุ่มเปิดแผ่นตัวกรอง — ใส่ไว้ที่หัวเพจ/แถวเครื่องมือ */

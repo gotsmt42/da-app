@@ -15,14 +15,17 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock, FaTools, FaBoxes,
+  FaChevronRight,
 } from "react-icons/fa";
 
+// 🔁 (1 พ.ย. 2569) ไอคอนหัวหมวดชุดกลาง Material Rounded — ชุดเดียวกับเมนูทั้งแอป (shared/ui/appIcons.js)
+import { AppIcon } from "@/shared/ui/appIcons";
 import { can, seesOperationBoard } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
 // แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
 import { dest } from "@/layouts/navConfig";
+import IconGradients, { gradFill } from "@/shared/ui/IconGradients";
 import "./HomeMenu.css";
 
 /**
@@ -164,17 +167,17 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   work.length = 0;
 
   return [
-    { key: "work", title: "รับงาน · วางแผน", icon: FaCalendarAlt, tone: TONE.work, items: work },
-    { key: "do", title: "งาน", icon: FaTools, tone: TONE.work, items: doWork },
-    { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
+    { key: "work", title: "รับงาน · วางแผน", icon: AppIcon.Calendar, tone: TONE.work, items: work },
+    { key: "do", title: "งาน", icon: AppIcon.Tools, tone: TONE.work, items: doWork },
+    { key: "expense", title: "เบิกค่าใช้จ่าย", icon: AppIcon.Wallet, tone: TONE.expense, items: expense },
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าการเงิน ไม่ได้เน้น และสลับจุดแสดงกับจัดซื้อ")
     // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าแรกสลับหมวดตำแหน่งเอกสาร และจัดซื้อ")
-    { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
-    { key: "stock", title: "คลังแผนก", icon: FaBoxes, tone: TONE.stock, items: stock },
-    { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
-    { key: "docs", title: "เอกสาร", icon: FaFolderOpen, tone: TONE.docs, items: docs },
-    { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },
-    { key: "website", title: "เว็บไซต์บริษัท", icon: FaGlobeAsia, tone: TONE.website, items: website },
+    { key: "purchase", title: "จัดซื้อ", icon: AppIcon.Purchase, tone: TONE.purchase, items: purchase },
+    { key: "stock", title: "คลังแผนก", icon: AppIcon.Stock, tone: TONE.stock, items: stock },
+    { key: "people", title: "บุคคล", icon: AppIcon.People, tone: TONE.people, items: people },
+    { key: "docs", title: "เอกสาร", icon: AppIcon.Documents, tone: TONE.docs, items: docs },
+    { key: "master", title: "ข้อมูลหลัก", icon: AppIcon.Database, tone: TONE.master, items: master },
+    { key: "website", title: "เว็บไซต์บริษัท", icon: AppIcon.Website, tone: TONE.website, items: website },
   ].filter((cat) => cat.items.length);
 };
 
@@ -193,7 +196,8 @@ const badgeText = (n) => (n > 99 ? "99+" : String(n));
  * @param {object} [props.badges]   ตัวเลขที่หน้าแม่คำนวณไว้แล้ว เช่น { quotations: 3 }
  */
 export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hideSalesJobs = false }) {
-  const cats = buildHomeMenu(userData, { hideMyJobs, hideSalesJobs });
+  // ⚠️ (1 พ.ย. 2569 ผู้ใช้: "เมนูจากเว็บให้ซ่อนไว้ก่อน") หมวดเว็บไซต์ไม่แสดงบนหน้าแรก — ยังเข้าได้จากเมนูข้าง
+  const cats = buildHomeMenu(userData, { hideMyJobs, hideSalesJobs }).filter((c) => c.key !== "website");
   // ⚠️ ทุกเมนูอ่านตัวเลขจาก store เดียวกัน (useAppBadges) — ห้ามคำนวณเองที่นี่ ไม่งั้นเลขบนเมนูหลัก
   // กับแถบล่าง/แถบบนจะไม่ตรงกันเวลาเงื่อนไขเปลี่ยน
   const { badges: shared } = useAppBadges(userData);
@@ -217,6 +221,8 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
 
   return (
     <nav className="hm" aria-label="เมนูหลัก">
+      {/* ไอคอนไล่สี + เงานุ่ม ชุดเดียวกับหน้าแรกมือถือ (shared/ui/IconGradients.js) */}
+      <IconGradients tones={cards.flatMap((c) => c.items.map((it) => it.tone))} />
       {todo.length > 0 && (
         <section className="hm-todo" aria-labelledby="hm-todo-title">
           <h6 className="hm-sec-title" id="hm-todo-title">ต้องดำเนินการ</h6>
@@ -229,7 +235,7 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
                 <li key={it.key}>
                   <Link to={it.href} className="hm-todo-item" style={{ "--hm-tone": it.tone }} title={BADGE_LABEL[it.badgeKey]}
                     aria-label={`${it.title} (${BADGE_LABEL[it.badgeKey]} ${n})`}>
-                    <span className="hm-todo-icon" aria-hidden="true"><Icon /></span>
+                    <span className="hm-todo-icon" aria-hidden="true"><Icon style={gradFill(it.tone)} /></span>
                     <span className="hm-todo-text">
                       <span className="hm-todo-name">{it.title}</span>
                       <span className="hm-todo-sub">{BADGE_LABEL[it.badgeKey] || it.sub}</span>
@@ -263,7 +269,7 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
                       <li key={it.key}>
                         <Link to={it.href} className="hm-link" style={{ "--hm-tone": it.tone }} title={it.sub || undefined}
                           aria-label={n ? `${it.title} (${BADGE_LABEL[it.badgeKey]} ${n})` : it.title}>
-                          <span className="hm-link-icon" aria-hidden="true"><Icon /></span>
+                          <span className="hm-link-icon" aria-hidden="true"><Icon style={gradFill(it.tone)} /></span>
                           <span className="hm-link-text hm-title-full">{it.title}</span>
                           <span className="hm-link-text hm-title-short">{it.short || it.title}</span>
                           {n > 0

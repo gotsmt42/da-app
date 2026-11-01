@@ -11,7 +11,7 @@
 import { memo } from "react";
 import { Box, Stack, Tooltip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AttachFile } from "@mui/icons-material";
+import { AttachFileRounded as AttachFile } from "@mui/icons-material";
 import { roundDocs } from "@/shared/utils/jobDocTypes";
 
 /**

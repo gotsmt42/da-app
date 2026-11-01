@@ -15,7 +15,7 @@ import {
   TextField, MenuItem, Alert, Stack, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircle, Cancel } from "@mui/icons-material";
+import { CheckCircleRounded as CheckCircle, CancelRounded as Cancel } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import DispatchService from "../services/DispatchService";

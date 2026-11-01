@@ -12,7 +12,7 @@ import {
   TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Pagination, Avatar,
   ToggleButtonGroup, ToggleButton, Drawer,
 } from "@mui/material";
-import { Search, Add, WarningAmber, ChevronRight, Inbox, Close, Apps } from "@mui/icons-material";
+import { SearchRounded as Search, AddRounded as Add, WarningAmberRounded as WarningAmber, ChevronRightRounded as ChevronRight, InboxRounded as Inbox, CloseRounded as Close, AppsRounded as Apps } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -166,7 +166,7 @@ const ContractorCard = ({ e, onOpen }) => {
   return (
     <Box onClick={() => onOpen(e._id)} role="button" sx={{
       p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer",
-      boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" },
+      boxShadow: "none", "&:active": { bgcolor: "#f8fafc" },
     }}>
       <Stack direction="row" spacing={1.25} alignItems="center">
         <Avatar sx={{ width: 38, height: 38, fontSize: "1rem", fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
@@ -199,7 +199,7 @@ const ContractorCard = ({ e, onOpen }) => {
 const MobileCard = ({ e, onOpen, avatars }) => (slipKind(e) === "contractor" ? <ContractorCard e={e} onOpen={onOpen} /> : (
   <Box onClick={() => onOpen(e._id)} role="button" sx={{
     p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer",
-    boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" },
+    boxShadow: "none", "&:active": { bgcolor: "#f8fafc" },
   }}>
     <Stack direction="row" spacing={1} alignItems="center">
       <Box sx={{ flex: 1, minWidth: 0 }}><Requester e={e} avatars={avatars} size={32} /></Box>
@@ -223,7 +223,7 @@ const MobileCard = ({ e, onOpen, avatars }) => (slipKind(e) === "contractor" ? <
 ));
 
 const DesktopTable = ({ rows, onOpen, avatars }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
     <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
       <TableHead>
         <TableRow>
@@ -415,7 +415,7 @@ export default function ExpenseList({
     <Stack
       direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
       sx={isDesktop
-        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }
+        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "none" }
         : { "& > *": { width: "100%" } }}
     >
       <TextField

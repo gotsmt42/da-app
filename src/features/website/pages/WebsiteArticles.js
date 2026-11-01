@@ -4,7 +4,7 @@ import {
   Skeleton, Stack, TextField, Tooltip, Typography, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Add, Close, DeleteOutline, Edit } from "@mui/icons-material";
+import { AddRounded as Add, CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, EditRounded as Edit } from "@mui/icons-material";
 
 import ArticleBlockEditor from "../components/ArticleBlockEditor";
 import ImageManager from "../components/ImageManager";

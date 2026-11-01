@@ -37,14 +37,7 @@ import {
  Drawer,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Search, FolderOpen, Add, Close,
-  PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
-  AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess, 
-  CalendarMonth, Category, Assignment, Description, HourglassEmpty, DeviceHub,
-  SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew, History, Apartment, Timelapse, Tune,
-} from "@mui/icons-material";
+import { SearchRounded as Search, FolderOpenRounded as FolderOpen, AddRounded as Add, CloseRounded as Close, PlaylistAddRounded as PlaylistAdd, MergeTypeRounded as MergeType, GroupWorkRounded as GroupWork, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded as WarningAmber, AddLinkRounded as AddLink, LinkOffRounded as LinkOff, BuildRounded as Build, EngineeringRounded as Engineering, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, CalendarMonthRounded as CalendarMonth, CategoryRounded as Category, AssignmentRounded as Assignment, DescriptionRounded as Description, HourglassEmptyRounded as HourglassEmpty, DeviceHubRounded as DeviceHub, SwapHorizRounded as SwapHoriz, TableChartRounded as TableChart, FilterListRounded as FilterList, ViewAgendaRounded as ViewAgenda, TableRowsRounded as TableRows, SwipeLeftRounded as SwipeLeft, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, AddCircleOutlineRounded as AddCircleOutline, CheckRounded as Check, AutorenewRounded as Autorenew, HistoryRounded as History, ApartmentRounded as Apartment, TimelapseRounded as Timelapse, TuneRounded as Tune } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -75,16 +68,16 @@ import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import useColumnLayout from "@/features/contracts/hooks/useColumnLayout";
-import DragIndicator from "@mui/icons-material/DragIndicator";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
-import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
-import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
-import FirstPage from "@mui/icons-material/FirstPage";
-import LastPage from "@mui/icons-material/LastPage";
-import RestartAlt from "@mui/icons-material/RestartAlt";
+import DragIndicator from "@mui/icons-material/DragIndicatorRounded";
+import EditOutlinedIcon from "@mui/icons-material/EditRounded";
+import MoreVertIcon from "@mui/icons-material/MoreVertRounded";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlineRounded";
+import PhoneOutlinedIcon from "@mui/icons-material/PhoneRounded";
+import VisibilityOffRounded from "@mui/icons-material/VisibilityOffRounded";
+import VisibilityRounded from "@mui/icons-material/VisibilityRounded";
+import FirstPage from "@mui/icons-material/FirstPageRounded";
+import LastPage from "@mui/icons-material/LastPageRounded";
+import RestartAlt from "@mui/icons-material/RestartAltRounded";
 import { OVERVIEW_COLUMNS, isLockedColumn } from "@/features/contracts/hooks/useColumnLayout";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -116,7 +109,7 @@ const VISIT_CELL_PREVIEW = 3;
 // เท่านั้น — ปุ่มหลัก, แท็บที่เลือกอยู่, ตัวกรองที่ทำงานอยู่, คำเตือน, ยอดรวม
 const SURFACE_SUBTLE = "#f8fafc";   // slate-50  — พื้นหัวตาราง/แถบเครื่องมือ
 const SURFACE_STRIPE = "#fbfcfd";   // แถบสลับสีของแถว (ทึบ ไม่ใช่สีโปร่งแสง — คอลัมน์ที่ตรึงไว้ต้องใช้)
-const BORDER_MAIN = "#e2e8f0";      // slate-200 — เส้นขอบนอก/เส้นใต้หัวตาราง
+const BORDER_MAIN = "#e6e9ef";      // slate-200 — เส้นขอบนอก/เส้นใต้หัวตาราง
 const BORDER_SOFT = "#eef2f7";      // เส้นคั่นระหว่างแถว
 const BORDER_HAIR = "#f4f6fa";      // เส้นคั่นระหว่างคอลัมน์ — จางมากจนเกือบไม่เห็น แค่พอเป็นแนวสายตา
 const TEXT_SUB = "#64748b";         // slate-500 — ตัวหนังสือรอง/หัวคอลัมน์
@@ -6113,7 +6106,7 @@ export default function ContractOverview() {
           ✅ จอใหญ่: เหมือนเดิมทุกประการ (ช่องค้นหา + ทุก dropdown เรียงแถวเดียวกัน ไม่มีปุ่มพับ) */}
       {/* จอใหญ่: แถบค้นหา + ตัวกรองแถวเดียว (มือถือย้ายไปอยู่ในแผ่นล่าง) */}
       {!isMobile && (
-      <Box sx={{ mb: 2, ...(isMobile ? {} : { p: 1.5, border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, bgcolor: "background.paper", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }) }}>
+      <Box sx={{ mb: 2, ...(isMobile ? {} : { p: 1.5, border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, bgcolor: "background.paper", boxShadow: "none" }) }}>
         {/* 🐛 BUG ที่แก้ (ตัวกรองล้นออกนอกจอ): แถวนี้ไม่เคยตั้ง flexWrap ไว้ พอตัวกรองเพิ่มขึ้นเรื่อยๆ
             (แผนก/สถานะ/อายุสัญญา/ช่วงวันที่) ช่องท้ายๆ จะดันทะลุขอบขวาออกไปนอกจอจนกดไม่ได้เลย
             ✅ ให้ห่อลงบรรทัดใหม่แทนเมื่อพื้นที่ไม่พอ — ช่องค้นหายังกินพื้นที่ที่เหลือของบรรทัดแรกเหมือนเดิม
@@ -6413,7 +6406,7 @@ export default function ContractOverview() {
             <Stack direction="row" alignItems="center" gap={0.75} sx={{ mr: 0.75 }}>
               {columnLayout.hidden.length > 0 && (
                 <Chip
-                  size="small" icon={<VisibilityOffOutlined sx={{ fontSize: 14 }} />} label={`ซ่อน ${columnLayout.hidden.length}`}
+                  size="small" icon={<VisibilityOffRounded sx={{ fontSize: 14 }} />} label={`ซ่อน ${columnLayout.hidden.length}`}
                   onClick={columnLayout.showAll}
                   sx={{ height: 26, fontSize: "0.72rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.12), color: "#b45309", "& .MuiChip-icon": { color: "#b45309" } }}
                 />
@@ -6543,7 +6536,7 @@ export default function ContractOverview() {
             {/* ✅ บอกให้รู้เสมอว่ามีคอลัมน์ถูกซ่อนอยู่ — กันเข้าใจผิดว่าข้อมูลหาย */}
             {columnLayout.hidden.length > 0 && (
               <Chip
-                size="small" icon={<VisibilityOffOutlined sx={{ fontSize: 15 }} />}
+                size="small" icon={<VisibilityOffRounded sx={{ fontSize: 15 }} />}
                 label={isMobile ? `ซ่อน ${columnLayout.hidden.length}` : `ซ่อนอยู่ ${columnLayout.hidden.length} คอลัมน์ · แสดงทั้งหมด`}
                 onClick={columnLayout.showAll}
                 sx={{ height: 26, fontSize: "0.72rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.12), color: "#b45309", "& .MuiChip-icon": { color: "#b45309" }, "&:hover": { bgcolor: alpha("#f59e0b", 0.2) } }}
@@ -6564,7 +6557,7 @@ export default function ContractOverview() {
               คอลัมน์ “{OVERVIEW_COLUMNS.find((c) => c.key === headerMenu.key)?.label}”
             </Typography>,
             <MenuItem key="hide" disabled={isLockedColumn(headerMenu.key)} onClick={() => { columnLayout.toggleHidden(headerMenu.key); setHeaderMenu(null); }}>
-              <ListItemIcon><VisibilityOffOutlined fontSize="small" /></ListItemIcon>
+              <ListItemIcon><VisibilityOffRounded fontSize="small" /></ListItemIcon>
               <ListItemText primary={isLockedColumn(headerMenu.key) ? "ซ่อนคอลัมน์นี้ไม่ได้" : "ซ่อนคอลัมน์นี้"} />
             </MenuItem>,
             <MenuItem key="start" disabled={visibleCols[0] === headerMenu.key} onClick={() => { columnLayout.moveToEdge(headerMenu.key, "start"); setHeaderMenu(null); }}>
@@ -6577,7 +6570,7 @@ export default function ContractOverview() {
             </MenuItem>,
             <Divider key="d" />,
             <MenuItem key="all" disabled={columnLayout.hidden.length === 0} onClick={() => { columnLayout.showAll(); setHeaderMenu(null); }}>
-              <ListItemIcon><VisibilityOutlined fontSize="small" /></ListItemIcon>
+              <ListItemIcon><VisibilityRounded fontSize="small" /></ListItemIcon>
               <ListItemText primary={columnLayout.hidden.length ? `แสดงทุกคอลัมน์ (ซ่อนอยู่ ${columnLayout.hidden.length})` : "แสดงทุกคอลัมน์"} />
             </MenuItem>,
             <MenuItem key="reset" disabled={!columnLayout.isCustomized} onClick={() => { columnLayout.reset(); setHeaderMenu(null); }}>

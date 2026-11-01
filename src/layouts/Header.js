@@ -27,11 +27,10 @@ import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
 import { appLogoFor } from "@/shared/services/OrgSettingService";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
-// 🔁 (27 ต.ค. 2569 ผู้ใช้: "แก้ไข icon header ให้ตรงกัน") ไอคอนชุดเดียวกับเมนูข้าง/หน้าแรก (navConfig) — (FaTasks="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
-import {
-  FaBars, FaUserCircle, FaTasks, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
-  FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaClipboardCheck, FaChartBar, FaWallet,
-} from "react-icons/fa";
+// 🔁 (27 ต.ค. 2569 ผู้ใช้: "แก้ไข icon header ให้ตรงกัน") ไอคอนชุดเดียวกับเมนูข้าง/หน้าแรก (navConfig) — (AppIcon.Operation="การดำเนินงาน", AppIcon.Contract="ภาพรวมสัญญา", AppIcon.Quotation="ติดตามใบเสนอราคา")
+import { FaChevronDown, FaCheck } from "react-icons/fa";
+// 🔁 (1 พ.ย. 2569 ผู้ใช้: "icon หน้าอื่นๆ ให้สอดคล้องกับหน้าแรก") — ไอคอนเมนูชุดกลาง Material Rounded
+import { AppIcon } from "@/shared/ui/appIcons";
 import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
 
 /**
@@ -49,13 +48,13 @@ import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/r
 const scheduleOptionsFor = (isAdminOrManagerRole) =>
   isAdminOrManagerRole
     ? {
-        primary: { label: "ตารางงานช่าง", href: "/event", icon: FaCalendarAlt },
-        secondary: { label: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase, dept: "sales" },
+        primary: { label: "ตารางงานช่าง", href: "/event", icon: AppIcon.Calendar },
+        secondary: { label: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: AppIcon.Sales, dept: "sales" },
       }
     : {
-        primary: { label: "แผนงานของฉัน", href: "/event", icon: FaCalendarAlt },
+        primary: { label: "แผนงานของฉัน", href: "/event", icon: AppIcon.Calendar },
         secondary: {
-          label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt,
+          label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: AppIcon.Calendar,
           dept: DEPARTMENT.SERVICE,
         },
       };
@@ -167,11 +166,11 @@ const Header = ({ toggleMobileSidebar }) => {
   // ✅ เมนูเบิกค่าใช้จ่าย (ปุ่มเลือกเดียว) — สิทธิ์ตรงกับเมนูข้าง (Sidebar.js expenseMenu)
   const canExpenseInbox = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
   const expenseItems = [
-    { href: "/expenses/advances", label: "ใบ Advance", icon: FaMoneyCheckAlt, badge: badges.advance },
-    { href: "/expenses/claims", label: "ใบเคลม (Claim)", icon: FaReceipt, badge: badges.claim },
-    { href: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", icon: FaHardHat, badge: badges.contractorPay },
-    ...(canExpenseInbox ? [{ href: "/expenses/approvals", label: "รออนุมัติเบิก", icon: FaClipboardCheck, badge: badges.expenseInbox }] : []),
-    { href: "/expenses/report", label: "รายงานการเบิก", icon: FaChartBar, badge: 0 },
+    { href: "/expenses/advances", label: "ใบ Advance", icon: AppIcon.Advance, badge: badges.advance },
+    { href: "/expenses/claims", label: "ใบเคลม (Claim)", icon: AppIcon.Claim, badge: badges.claim },
+    { href: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", icon: AppIcon.Contractor, badge: badges.contractorPay },
+    ...(canExpenseInbox ? [{ href: "/expenses/approvals", label: "รออนุมัติเบิก", icon: AppIcon.Approve, badge: badges.expenseInbox }] : []),
+    { href: "/expenses/report", label: "รายงานการเบิก", icon: AppIcon.Report, badge: 0 },
   ];
   const activeExpense = expenseItems.find((it) => location.pathname.startsWith(it.href));
   const expenseBadge = expenseItems.reduce((n, it) => n + (Number(it.badge) || 0), 0);
@@ -213,7 +212,7 @@ const Header = ({ toggleMobileSidebar }) => {
   const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
 
   return (
-    <Navbar dark expand="md" className="fix-header">
+    <Navbar light expand="md" className="fix-header">
       <div className="d-flex align-items-center justify-content-between w-100">
 
         {/* ฝั่งซ้าย: โลโก้แบรนด์ */}
@@ -223,7 +222,8 @@ const Header = ({ toggleMobileSidebar }) => {
             {/* ⚠️ ใช้ชุดเต็ม (เครื่องหมาย + ชื่อแอป + บรรทัดไทย) ทุกขนาดจอ — ผู้ใช้ยืนยันว่าเอาแบบนี้
                 เคยลองย่อเหลือเฉพาะเครื่องหมายบนมือถือแล้วจำไม่ได้ว่าแอปอะไร
                 ที่ให้พอดีจอมือถือคุมด้วย CSS (.logo ใน Header.css) ไม่ใช่สลับไฟล์ */}
-            <img src={appLogoFor({ on: "dark" }, org)} alt="Logo" className="logo" />
+            {/* แถบบนโทนสว่าง (แบบ A) → โลโก้ชุดสำหรับพื้นสว่าง */}
+            <img src={appLogoFor({ on: "light" }, org)} alt="Logo" className="logo" />
           </div>
         </NavbarBrand>
 
@@ -245,7 +245,7 @@ const Header = ({ toggleMobileSidebar }) => {
                 className={`nav-link d-flex align-items-center gap-2 ${isOnEventPage ? "active" : ""}`}
                 style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
               >
-                <FaCalendarAlt size={13} />
+                <AppIcon.Calendar size={13} />
                 <span>{scheduleLabel}</span>
                 <HeaderCount n={badges.pendingApproval} />
                 <FaChevronDown
@@ -265,7 +265,7 @@ const Header = ({ toggleMobileSidebar }) => {
               to="/operation"
               className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/operation") ? "active" : ""}`}
             >
-              <FaTasks size={13} /> การดำเนินงาน
+              <AppIcon.Operation size={13} /> การดำเนินงาน
               <HeaderCount n={badges.closeRequests} />
             </Link>
           </NavItem>
@@ -276,7 +276,7 @@ const Header = ({ toggleMobileSidebar }) => {
                 to="/contracts"
                 className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
               >
-                <FaFileContract size={13} /> ภาพรวมงาน
+                <AppIcon.Contract size={13} /> ภาพรวมงาน
                 <HeaderCount n={overdueContractCount} />
               </Link>
             </NavItem>
@@ -287,7 +287,7 @@ const Header = ({ toggleMobileSidebar }) => {
               to="/quotations"
               className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/quotations") ? "active" : ""}`}
             >
-              <FaFileInvoiceDollar size={13} /> ติดตามใบเสนอราคา
+              <AppIcon.Quotation size={13} /> ติดตามใบเสนอราคา
               <HeaderCount n={badges.quotations} />
             </Link>
           </NavItem>
@@ -301,7 +301,7 @@ const Header = ({ toggleMobileSidebar }) => {
                   className={`nav-link d-flex align-items-center gap-2 ${activeExpense ? "active" : ""}`}
                   style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
                 >
-                  {activeExpense ? <activeExpense.icon size={13} /> : <FaWallet size={13} />}
+                  {activeExpense ? <activeExpense.icon size={13} /> : <AppIcon.Wallet size={13} />}
                   <span>{activeExpense ? activeExpense.label : "เบิกค่าใช้จ่าย"}</span>
                   <HeaderCount n={expenseBadge} />
                   <FaChevronDown size={9} className={`schedule-toggle-caret ${expenseMenuOpen ? "schedule-toggle-caret--open" : ""}`} />
@@ -334,7 +334,7 @@ const Header = ({ toggleMobileSidebar }) => {
               aria-label={scheduleLabel}
               style={{ fontFamily: "inherit", cursor: "pointer" }}
             >
-              <FaCalendarAlt size={12} />
+              <AppIcon.Calendar size={12} />
               <span>{scheduleLabel}</span>
               <FaChevronDown
                 size={8}
@@ -363,7 +363,7 @@ const Header = ({ toggleMobileSidebar }) => {
           {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ทำเป็นรูปแบบแจ้งเตือนตรง header แยกเมนูแจ้งเตือนออกมา") งานที่ต้องทำตอนนี้ (กันลืม) */}
           <HeaderTaskBell />
 
-          <InboxBell dark />
+          <InboxBell />
 
           <div className="profile-img d-none d-lg-block">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
@@ -399,7 +399,7 @@ const Header = ({ toggleMobileSidebar }) => {
                     ตามที่ผู้ใช้สั่งว่าให้เหลือจุดออกจากระบบแค่จุดเดียว */}
                 <Link to={"/account"} style={{ textDecoration: "none" }}>
                   <DropdownItem className="dropdown-item-icon">
-                    <FaUserCircle size={14} /> บัญชีของฉัน
+                    <AppIcon.Account size={14} /> บัญชีของฉัน
                   </DropdownItem>
                 </Link>
               </DropdownMenu>
@@ -410,7 +410,7 @@ const Header = ({ toggleMobileSidebar }) => {
             className="d-lg-none toggle-sidebar-btn"
             onClick={toggleMobileSidebar}
           >
-            <FaBars style={{ fontSize: "22px", color: "#ffffff" }} />
+            <AppIcon.Menu style={{ fontSize: "24px", color: "#374151" }} />
           </Button>
         </div>
 

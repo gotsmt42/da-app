@@ -2,7 +2,7 @@
  * OtStatusBadge — ป้ายสถานะใบ OT (ไอคอน + คำ บนพื้นสีอ่อน) หน้าตาเดียวกับป้ายของระบบเบิก (StatusBadge)
  */
 import { Box } from "@mui/material";
-import { HourglassTop, FactCheck, TaskAlt, CheckCircle, Undo, Block, HelpOutline } from "@mui/icons-material";
+import { HourglassTopRounded as HourglassTop, FactCheckRounded as FactCheck, TaskAltRounded as TaskAlt, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, HelpOutlineRounded as HelpOutline } from "@mui/icons-material";
 import { otStatus } from "../otMeta";
 
 const ICON = { pending: HourglassTop, reviewed: FactCheck, approved: TaskAlt, paid: CheckCircle, rejected: Undo, cancelled: Block };

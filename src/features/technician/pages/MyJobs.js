@@ -17,7 +17,7 @@ import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } 
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useSearchParams } from "react-router-dom";
-import { History } from "@mui/icons-material";
+import { HistoryRounded as History } from "@mui/icons-material";
 import { isRespOrHead, isResponsibleOf, ackTracked, isClosedJob } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
@@ -42,10 +42,7 @@ import {
   Tooltip, Button, Snackbar, Alert, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined,
-  Close, Today,
-} from "@mui/icons-material";
+import { SearchRounded as Search, ClearRounded as Clear, RefreshRounded as Refresh, WorkOutlineRounded as WorkOutline, HourglassTopRounded as HourglassTop, TaskAltRounded as TaskAlt, WarningRounded as Warning, ViewAgendaRounded, TableRowsRounded, CloseRounded as Close, TodayRounded as Today } from "@mui/icons-material";
 
 // 🔁 (21 ต.ค. 2569) กล่องดูไฟล์ตัวกลาง — เลื่อนดูไฟล์อื่นในช่องเดียวกัน (← → · ปัด · แถบรูปย่อ)
 const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
@@ -101,7 +98,7 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "งานของฉัน กับ การดำเนินงาน แสดงผลคล้ายกัน ยกเว้นไม่ต้องมีช่องผู้รับผิดชอบ")
   const COLS = ["วันที่เข้างาน", "งาน", "โครงการ / บริษัท", "ทีมเข้างาน", "ผู้ติดต่อ", "เอกสารอ้างอิง", "เอกสารที่แนบ", "สถานะ", ""];
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1360, borderCollapse: "collapse" }}>
         <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
         <tbody>
@@ -282,7 +279,7 @@ function TodaySummary({ s }) {
     { n: s.requested, t: "ขอปิดงานแล้ว", c: "#0891b2" },
   ];
   return (
-    <Box sx={{ mb: 1.25, p: { xs: 1.25, md: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0" }}>
+    <Box sx={{ mb: 1.25, p: { xs: 1.25, md: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e6e9ef" }}>
       <Stack direction="row" alignItems="baseline" gap={1} sx={{ mb: 1 }}>
         <Typography sx={{ fontWeight: 900, fontSize: { xs: "0.95rem", md: "1.02rem" }, color: "#0f172a" }}>
           วัน{now.format("dddd")}ที่ {now.format("D MMMM")} {now.year() + 543}
@@ -700,8 +697,8 @@ export default function MyJobs() {
         ].filter(Boolean).join(" · ")}
         actions={(
           <>
-            <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
-              {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+            <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e6e9ef", bgcolor: "#fff" }}>
+              {[["card", ViewAgendaRounded, "การ์ด"], ["table", TableRowsRounded, "ตาราง"]].map(([k, Ico, label]) => (
                 <Box key={k} component="button" type="button" onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
                   sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 30, px: 1.1, border: 0, borderRadius: 2, cursor: "pointer", font: "inherit", fontSize: "0.78rem", fontWeight: 800,
                     color: view === k ? "#fff" : "#475569", bgcolor: view === k ? "#2563eb" : "transparent" }}>
@@ -752,7 +749,7 @@ export default function MyJobs() {
               <Box key={x.key} component="button" type="button" onClick={() => setSub(x.key)}
                 sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.5, height: { xs: 28, md: 32 }, px: 1.1, borderRadius: 99, font: "inherit", cursor: "pointer",
                   fontSize: { xs: "0.74rem", md: "0.78rem" }, fontWeight: on ? 800 : 600, color: on ? x.color : "#475569",
-                  bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : "#e2e8f0"}` }}>
+                  bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : "#e6e9ef"}` }}>
                 {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
                 {x.label}
                 <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 800,
@@ -799,7 +796,7 @@ export default function MyJobs() {
           return (
             <Box sx={{
               textAlign: "center", py: 5, px: 2, borderRadius: 3,
-              border: "1px dashed #e2e8f0", bgcolor: "#fff",
+              border: "1px dashed #e6e9ef", bgcolor: "#fff",
             }}>
               {activeGroup?.icon && (
                 <Box sx={{ opacity: 0.3, mb: 1, color: "text.disabled" }}>
@@ -873,7 +870,7 @@ export default function MyJobs() {
                       <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: SEC[cur].c }} />
                       <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: "#0f172a" }}>{SEC[cur].t}</Typography>
                       <Box component="span" sx={{ px: 0.8, borderRadius: 99, bgcolor: alpha(SEC[cur].c, 0.1), color: SEC[cur].c, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
-                      <Box sx={{ flex: 1, height: 1, bgcolor: "#e2e8f0" }} />
+                      <Box sx={{ flex: 1, height: 1, bgcolor: "#e6e9ef" }} />
                     </Stack>
                   )}
                   {renderGroup(sessions)}

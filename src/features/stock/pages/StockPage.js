@@ -9,14 +9,13 @@
  *   ประวัติ  — ทุกการเปลี่ยนยอด (รับเข้า · เบิกจ่าย · ยืม · คืน · ตรวจนับ)
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { alpha } from "@mui/material/styles";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Button, TextField, InputAdornment, Skeleton, Alert, IconButton, ButtonBase, Avatar, Menu, MenuItem, ListItemIcon,
   useMediaQuery, Snackbar, Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
-import {
-  Add, Search, Close, Inventory2, AddBox, FactCheck, Edit, Apps, WarningAmber, Handyman, Category, Outbox, MoreHoriz, FileDownload, Build, AssignmentReturn,
-} from "@mui/icons-material";
+import { AddRounded as Add, SearchRounded as Search, CloseRounded as Close, Inventory2Rounded as Inventory2, AddBoxRounded as AddBox, FactCheckRounded as FactCheck, EditRounded as Edit, AppsRounded as Apps, WarningAmberRounded as WarningAmber, HandymanRounded as Handyman, CategoryRounded as Category, OutboxRounded as Outbox, MoreHorizRounded as MoreHoriz, FileDownloadRounded as FileDownload, BuildRounded as Build, AssignmentReturnRounded as AssignmentReturn } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -55,7 +54,7 @@ const Empty = ({ icon, text }) => (
  * ปุ่มจัดการมีชื่อกำกับทุกปุ่ม (เดิมเป็นไอคอนสีล้วน เดาไม่ออกว่าปุ่มไหนทำอะไร) · พื้นสีอ่อนตามความหมาย
  */
 /** ปุ่มรองในแถว — โทนเทาเรียบเหมือนกันหมด (ผู้ใช้: "สีสันปุ่มดูเยอะ และรกเกินไป ไม่มืออาชีพ") */
-const QUIET = { textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e2e8f0", bgcolor: "#fff",
+const QUIET = { textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e6e9ef", bgcolor: "#fff",
   "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" } };
 
 /**
@@ -594,7 +593,7 @@ export default function StockPage() {
       <Box sx={{ ...CARD, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
           <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }} sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, borderRadius: 2.25, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: STOCK_ACCENT, color: "#fff", "& svg": { fontSize: { xs: 20, sm: 24 } } }}>
+            <Box sx={{ width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(STOCK_ACCENT, 0.12), color: STOCK_ACCENT, "& svg": { fontSize: { xs: 20, sm: 22 }, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
               <Inventory2 />
             </Box>
             <Box sx={{ minWidth: 0 }}>

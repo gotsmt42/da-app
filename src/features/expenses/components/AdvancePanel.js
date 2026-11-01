@@ -6,7 +6,7 @@
  * ✅ พื้นสีเขียวอมฟ้าของ Advance ตลอดทั้งแผง — วางข้างใบเคลม (ม่วง) แล้วแยกออกทันทีว่าฝั่งไหนคือใบไหน
  */
 import { Box, Stack, Typography, Chip, Button, Divider, Tooltip } from "@mui/material";
-import { OpenInNew, AddCircleOutline, AttachFile } from "@mui/icons-material";
+import { OpenInNewRounded as OpenInNew, AddCircleOutlineRounded as AddCircleOutline, AttachFileRounded as AttachFile } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import KindBadge from "./KindBadge";
@@ -39,7 +39,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
   return (
     <Box sx={{
       // 🔁 (24 ต.ค. 2569 ผู้ใช้: "สีสันรกเกินไป") การ์ดขาวขอบเทา · สีประจำ Advance เหลือแค่ป้าย/เส้นบนบางๆ
-      borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0",
+      borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e6e9ef",
       borderTop: `3px solid ${M.color}`, p: 1.5, ...sx,
     }}>
       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
@@ -64,7 +64,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
       {advance.dueClearAt && <Row label="กำหนดเคลียร์">{thaiDate(advance.dueClearAt)}</Row>}
       {advance.approvedBy?.name && <Row label="อนุมัติโดย">{personFullName(advance.approvedBy)}</Row>}
 
-      <Divider sx={{ my: 1, borderColor: "#e2e8f0" }} />
+      <Divider sx={{ my: 1, borderColor: "#e6e9ef" }} />
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: M.dark, mb: 0.5 }}>รายการที่ตั้งเบิก ({advance.items?.length || 0})</Typography>
       <Stack spacing={0.6}>
         {(advance.items || []).map((it, i) => {
@@ -94,7 +94,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
           );
         })}
       </Stack>
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 1, pt: 1, borderTop: "1px solid #e2e8f0" }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 1, pt: 1, borderTop: "1px solid #e6e9ef" }}>
         <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: M.dark }}>ยอดเบิก Advance</Typography>
         <Typography sx={{ fontSize: "1.1rem", fontWeight: 900, color: M.dark }}>{baht(advance.total)}</Typography>
       </Stack>

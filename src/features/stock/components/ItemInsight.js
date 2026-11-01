@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Drawer, Box, Stack, Typography, IconButton, ButtonBase, Avatar, Skeleton, useMediaQuery } from "@mui/material";
-import { Close, ChevronRight } from "@mui/icons-material";
+import { CloseRounded as Close, ChevronRightRounded as ChevronRight } from "@mui/icons-material";
 
 import JobTypeChip from "@/shared/ui/JobTypeChip";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";

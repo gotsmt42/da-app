@@ -1,6 +1,6 @@
 /** PrStatusBadge — ป้ายสถานะใบขอซื้อ (ไอคอน + คำ บนพื้นสีอ่อน) หน้าตาเดียวกับป้ายระบบเบิก/OT */
 import { Box } from "@mui/material";
-import { HourglassTop, FactCheck, ShoppingCart, LocalShipping, Inventory2, CheckCircle, Undo, Block, HelpOutline } from "@mui/icons-material";
+import { HourglassTopRounded as HourglassTop, FactCheckRounded as FactCheck, ShoppingCartRounded as ShoppingCart, LocalShippingRounded as LocalShipping, Inventory2Rounded as Inventory2, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, HelpOutlineRounded as HelpOutline } from "@mui/icons-material";
 import { prStatus } from "../prMeta";
 
 const ICON = {

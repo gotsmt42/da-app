@@ -18,14 +18,13 @@
  * ⚠️ การสลับไปอีกหน้าใช้เมนู (แถบล่างมือถือ/เมนูข้าง) เป็นหลัก — ในหน้ามีแค่ลิงก์ข้อความเล็กๆ ไว้
  * เผื่อคนที่เข้ามาจากแจ้งเตือน ไม่เอาแถบแท็บกลับมาอีกเพราะนั่นคือสิ่งที่ทำให้หน้ารกตั้งแต่แรก
  */
+import IconGradients, { gradFill } from "@/shared/ui/IconGradients";
 import { useCallback, useEffect, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Box, Stack, Typography, Button, IconButton, Badge, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Add, Payments, ReceiptLong, FactCheck, Insights, WarningAmber, AccountBalanceWallet, Engineering, Tune,
-} from "@mui/icons-material";
+import { AddRounded as Add, PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, FactCheckRounded as FactCheck, InsightsRounded as Insights, WarningAmberRounded as WarningAmber, AccountBalanceWalletRounded as AccountBalanceWallet, EngineeringRounded as Engineering, TuneRounded as Tune } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
@@ -323,13 +322,16 @@ export default function ExpensesPage({ view: viewProp }) {
               </IconButton>
             )}
             <Box sx={{
-              width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, borderRadius: 2.25, ml: "0 !important", // ⚠️ ปุ่มตัวกรอง (absolute) เป็นลูกตัวแรกของ Stack — ไม่งั้นไอคอนโดนเว้นซ้าย "& svg": { fontSize: { xs: 20, sm: 24 } }, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              bgcolor: meta.color, color: "#fff",
+              // 🎨 (1 พ.ย. 2569 "ทุกหน้าให้เข้าธีมหน้าแรก") วงกลมสีอ่อน + ไอคอนไล่สี แบบปุ่มหน้าแรก (เดิมสี่เหลี่ยมสีทึบ)
+              width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: "50%", ml: "0 !important", // ⚠️ ปุ่มตัวกรอง (absolute) เป็นลูกตัวแรกของ Stack — ไม่งั้นไอคอนโดนเว้นซ้าย
+              "& svg": { fontSize: { xs: 20, sm: 22 }, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" }, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              bgcolor: alpha(meta.color, 0.12), color: meta.color,
             }}>
-              <Icon />
+              <IconGradients tones={[meta.color]} />
+              <Icon style={gradFill(meta.color)} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.08rem", sm: "1.2rem" }, color: TEXT_MAIN, lineHeight: 1.3 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: { xs: "1.2rem", sm: "1.35rem" }, color: TEXT_MAIN, lineHeight: 1.3 }}>
                 {meta.title}
               </Typography>
               {/* ✅ มือถือ: ซ่อนคำอธิบาย (ยาว ตัดเป็น 2–3 บรรทัด ดันเนื้อหาลง) — ชื่อหน้าบอกอยู่แล้ว */}
@@ -396,9 +398,10 @@ export default function ExpensesPage({ view: viewProp }) {
                 key={n.key} component={RouterLink} to={n.to} aria-current={on ? "page" : undefined}
                 sx={{
                   flexShrink: 0, px: { xs: 1.25, sm: 1.5 }, py: 1.1, fontFamily: "inherit", whiteSpace: "nowrap",
-                  fontSize: "0.84rem", fontWeight: on ? 800 : 600, color: on ? n.color : TEXT_SUB,
-                  borderBottom: `2px solid ${on ? n.color : "transparent"}`, mb: "-1px",
-                  "&:hover": { color: on ? n.color : TEXT_MAIN },
+                  // 🎨 หน้าที่เลือก = แดงแบรนด์ + เส้นใต้แดง (ชุดเดียวกับแท็บทั้งแอป)
+                  fontSize: "0.84rem", fontWeight: on ? 700 : 500, color: on ? "#dc2626" : TEXT_SUB,
+                  borderBottom: `3px solid ${on ? "#dc2626" : "transparent"}`, mb: "-1px",
+                  "&:hover": { color: on ? "#dc2626" : TEXT_MAIN },
                 }}
               >
                 {n.label}

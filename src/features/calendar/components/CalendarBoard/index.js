@@ -3587,7 +3587,7 @@ function EventCalendar() {
   flex-wrap: wrap;
   gap: 18px 0;
   background: #fff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e6e9ef;
   border-radius: 12px;
   padding: 14px 4px;
   box-shadow: 0 1px 3px rgba(0,0,0,.03);

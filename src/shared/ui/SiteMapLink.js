@@ -18,12 +18,12 @@
  */
 import { useEffect, useState } from "react";
 import { Box, Stack, Button, IconButton, TextField, Tooltip, Typography, Popover } from "@mui/material";
-import { OpenInNew, Edit } from "@mui/icons-material";
+import { OpenInNewRounded as OpenInNew, EditRounded as Edit } from "@mui/icons-material";
 
 import CustomerService from "@/shared/services/CustomerService";
 
 const SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 
 /* ══════════ หมุด Google Maps — ใช้ตัวเดียวกันทั้งแอป ══════════
  * ⚠️ เดิมแต่ละหน้าใช้ไอคอนคนละอย่าง: ฟอร์มแก้ไขงานใช้อีโมจิ 🗺️ (แผนที่กระดาษพับ — สื่อว่า "แผนที่"

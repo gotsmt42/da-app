@@ -12,7 +12,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
   Autocomplete, CircularProgress, useMediaQuery, ButtonBase,
 } from "@mui/material";
-import { Close, DeleteOutline, Send, Add, Remove } from "@mui/icons-material";
+import { CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, SendRounded as Send, AddRounded as Add, RemoveRounded as Remove } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import ExpenseService from "@/features/expenses/services/ExpenseService";

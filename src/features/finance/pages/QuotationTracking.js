@@ -25,10 +25,7 @@ import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, Pagination, Checkbox, FormControlLabel,
   Collapse, Drawer, Badge,
 } from "@mui/material";
-import {
-  Search, Close, Refresh, RequestQuote, Send, CheckCircle, Cancel, Autorenew, HourglassTop, WarningAmber, ChevronRight,
-  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore, Tune, Check,
-} from "@mui/icons-material";
+import { SearchRounded as Search, CloseRounded as Close, RefreshRounded as Refresh, RequestQuoteRounded as RequestQuote, SendRounded as Send, CheckCircleRounded as CheckCircle, CancelRounded as Cancel, AutorenewRounded as Autorenew, HourglassTopRounded as HourglassTop, WarningAmberRounded as WarningAmber, ChevronRightRounded as ChevronRight, AttachFileRounded as AttachFile, ChatRounded as Chat, OpenInNewRounded as OpenInNew, HistoryRounded as History, AppsRounded as Apps, DescriptionRounded as Description, EditRounded as Edit, PhoneRounded as Phone, EmailRounded as Email, EventRepeatRounded as EventRepeat, UndoRounded as Undo, SaveRounded as Save, InsightsRounded as Insights, ExpandMoreRounded as ExpandMore, TuneRounded as Tune, CheckRounded as Check } from "@mui/icons-material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
@@ -54,7 +51,7 @@ import { confirmDelete } from "@/shared/ui/swal";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 const PAGE_SIZE = 15;
 
 /** สถานะย่อยของใบ — ลำดับ = ลำดับขั้นตอนจริง (ใช้ทั้งการ์ดสถานะและการเรียง) */
@@ -192,7 +189,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.2, borderBottom: `1px solid ${BORDER}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: TEXT_SUB, lineHeight: 1.45 };
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1280, borderCollapse: "collapse" }}>
         <thead>
           <tr>{["วันที่งาน", "งาน", "ลูกค้า / โครงการ", "ใบเสนอราคา", "มูลค่า", "การติดตาม", "ผู้รับผิดชอบ", "สถานะ", ""].map((h, i) => (
@@ -506,7 +503,7 @@ const ReviseDialog = ({ a, open, onClose, onConfirm }) => {
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
         <Button variant="contained" disabled={!ok} onClick={submit} startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <Autorenew />}
-          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
+          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
           {busy ? "กำลังบันทึก..." : `ออกฉบับ ${revLabel(rev + 1)} · เริ่มนับใหม่`}
         </Button>
       </DialogActions>
@@ -663,7 +660,7 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
           </Typography>
           {canEdit && !editing && missingInfo(a)
             ? <Button size="small" variant="contained" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start}
-                sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", borderRadius: 2, bgcolor: "#d97706", "&:hover": { bgcolor: "#b45309", boxShadow: "none" } }}>กรอกให้ครบ</Button>
+                sx={{ textTransform: "none", fontWeight: 700, boxShadow: "none", borderRadius: 2, bgcolor: "#fff7ed", color: "#c2410c", backgroundImage: "none", border: "1px solid #fed7aa", "&:hover": { bgcolor: "#ffedd5", boxShadow: "none" } }}>กรอกให้ครบ</Button>
             : editBtn}
         </Stack>
         {body}
@@ -719,7 +716,7 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
                 return (
                   <Box key={c.value} component="button" type="button" onClick={() => setChannel(c.value)}
                     sx={{ height: 28, px: 1.25, border: 0, borderRadius: 1.5, cursor: "pointer", font: "inherit", fontSize: "0.78rem", fontWeight: on ? 800 : 600,
-                      bgcolor: on ? "#fff" : "transparent", color: on ? "#1d4ed8" : "#475569", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
+                      bgcolor: on ? "#fff" : "transparent", color: on ? "#dc2626" : "#475569", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
                     {c.label}
                   </Box>
                 );
@@ -759,9 +756,9 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
           <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: TEXT_SUB, mb: 1 }}>ประวัติการติดตาม (ล่าสุดอยู่บน)</Typography>
           <Stack spacing={1}>
             {followUps.slice().reverse().map((x, i) => (
-              <Box key={x._id || i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: i === 0 ? "#fff" : "#fcfdfe", boxShadow: i === 0 ? "inset 3px 0 0 #2563eb" : "none" }}>
+              <Box key={x._id || i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: i === 0 ? "#fff" : "#fcfdfe", boxShadow: i === 0 ? "inset 3px 0 0 #dc2626" : "none" }}>
                 <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
-                  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#2563eb" : "#e2e8f0", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
+                  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#dc2626" : "#e6e9ef", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
                     ครั้งที่ {x.attemptNumber}
                   </Box>
                   {rev > 0 && (
@@ -1115,7 +1112,7 @@ const DetailDialog = ({
             const cur = i === step && !final;
             const color = final ? m.color : done ? "#16a34a" : cur ? m.color : "#cbd5e1";
             const FinalIcon = k === "approved" ? CheckCircle : Cancel;
-            const lineColor = i <= step ? (i < step || final ? "#16a34a" : color) : "#e2e8f0";
+            const lineColor = i <= step ? (i < step || final ? "#16a34a" : color) : "#e6e9ef";
             return (
               <Box key={s.key} sx={{ position: "relative", textAlign: "center", px: 0.5 }}>
                 {/* เส้นเชื่อมอยู่ "ใต้" วงกลม (zIndex 0) และเริ่ม-จบที่ขอบวง ไม่ลากทับตัวเลข */}
@@ -1263,14 +1260,15 @@ const DetailDialog = ({
               uploading={upload.busy && upload.eventId === a._id && upload.type === "quotation"} progress={upload.progress} currentUser={currentUser}
             />
             <QuoteScanBox a={a} />
-            {/* ✅ (26 ต.ค. 2569) ลูกค้าให้แก้ → ออกฉบับใหม่ (ฉบับเดิมที่ส่งไปแล้วล็อกไว้เป็นประวัติ) */}
+            {/* ✅ (26 ต.ค. 2569) ลูกค้าให้แก้ → ออกฉบับใหม่ (ฉบับเดิมที่ส่งไปแล้วล็อกไว้เป็นประวัติ)
+                🎨 (1 พ.ย. 2569) กล่องเทาอ่อน + ปุ่มรองเส้นขอบ — ไม่แย่งสายตาปุ่มหลัก "บันทึกการติดตาม" (เดิมม่วงทึบ) */}
             {onRevise && !req && (["sent", "follow_up", "rejected"].includes(k) || (k === "approved" && isFinance)) && (
-              <Box sx={{ mt: 1, p: 1.25, borderRadius: 2, bgcolor: "#faf5ff", border: "1px dashed #c4b5fd", display: "flex", alignItems: { sm: "center" }, flexDirection: { xs: "column", sm: "row" }, gap: 1 }}>
-                <Typography sx={{ flex: 1, fontSize: "0.8rem", color: "#5b21b6" }}>
+              <Box sx={{ mt: 1, p: 1.25, borderRadius: 2, bgcolor: "#f7f8fa", border: "1px dashed #d6dae1", display: "flex", alignItems: { sm: "center" }, flexDirection: { xs: "column", sm: "row" }, gap: 1 }}>
+                <Typography sx={{ flex: 1, fontSize: "0.8rem", color: "#4b5563" }}>
                   ลูกค้าขอแก้รายละเอียด? ไฟล์ที่ส่งไปแล้วแก้ไม่ได้ — ออกฉบับใหม่ ({revLabel(quoteRevOf(a) + 1)}) แล้วระบบเริ่มนับติดตามใหม่
                 </Typography>
-                <Button size="small" variant="contained" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setRevising(true)}
-                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
+                <Button size="small" variant="outlined" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setRevising(true)}
+                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: "#2563eb", borderColor: "#bfdbfe", "&:hover": { borderColor: "#2563eb", bgcolor: "#eff6ff" } }}>
                   แก้ไขใบเสนอราคา · ออกฉบับใหม่
                 </Button>
               </Box>
@@ -1688,7 +1686,7 @@ export default function QuotationTracking() {
 
   const filterBar = (
       <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
-        sx={isDesktop ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" } : {}}>
+        sx={isDesktop ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: "none" } : {}}>
         <TextField size="small" placeholder="ค้นหาลูกค้า / โครงการ / เลขที่ใบเสนอราคา / PO / ผู้ติดต่อ" value={search} onChange={(e) => setSearch(e.target.value)}
           sx={{ flex: 1, minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#f8fafc", height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: BORDER }, "&.Mui-focused": { bgcolor: "#fff" } } }}
           InputProps={{
@@ -1722,11 +1720,11 @@ export default function QuotationTracking() {
       {/* ── หัวเพจ ── */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#fdecec", color: "#dc2626", "& svg": { fontSize: 22, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
             <RequestQuote />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: { xs: "1.2rem", sm: "1.35rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
               แนบใบเสนอราคา → เริ่มนับติดตามอัตโนมัติทันที → ติดตามลูกค้า (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → ได้งาน / ไม่ได้งาน
               {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
@@ -1831,7 +1829,7 @@ export default function QuotationTracking() {
             {pageCount > 1 && (
               <Pagination count={pageCount} page={cur} shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
                 onChange={(_, n) => { setPage(n); topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#fef2f2 !important", color: "#b91c1c", borderColor: "#fecaca" } }} />
             )}
           </Stack>
         </>

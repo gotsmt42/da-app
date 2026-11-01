@@ -7,7 +7,7 @@ export const PR_ACCENT = "#4338ca";
 export const PR_DARK = "#3730a3";
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
-export const BORDER_MAIN = "#e2e8f0";
+export const BORDER_MAIN = "#e6e9ef";
 export const DARK = "#334155";
 
 /** สถานะ — โทนเดียวกับระบบเบิก/OT ทั้งแอป (อ่านแบบเดียวกัน) */

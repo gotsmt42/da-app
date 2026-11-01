@@ -6,7 +6,7 @@
  * พื้นทึบ + ไอคอนคนละรูป + คำภาษาอังกฤษตัวใหญ่ที่คนในบริษัทเรียกกันจริง
  */
 import { Box } from "@mui/material";
-import { Payments, ReceiptLong, AccountBalanceWallet, Engineering } from "@mui/icons-material";
+import { PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, AccountBalanceWalletRounded as AccountBalanceWallet, EngineeringRounded as Engineering } from "@mui/icons-material";
 import { KIND_META } from "../expenseMeta";
 
 /**

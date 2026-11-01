@@ -12,12 +12,10 @@
  */
 import { Link, useLocation } from "react-router-dom";
 import { Box, Stack } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can, seesOperationBoard } from "@/shared/utils/roles";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 
-const ACCENT = "#2563eb";
 
 const GROUPS = {
   intake: [
@@ -42,9 +40,14 @@ const GROUPS = {
  *    ทำให้ดูเหมือนคนละระบบ → ใช้ตัวนี้ตัวเดียว
  * @param items [{ key, label, icon?, badge?, on, to? | onClick? }]
  */
+/**
+ * 🎨 (1 พ.ย. 2569) แท็บแบบเส้นใต้ (หลักการจัดวางจาก Agoda) — แท็บที่เลือก = ตัวแดงแบรนด์ + เส้นใต้แดง
+ *    ผู้ใช้: "ใช้ธีมสีแดงหลักแบบเดิม ให้มีเอกลักษณ์"
+ *    (เดิมแคปซูลน้ำเงินทึบ → รางเทา → ตอนนี้เส้นใต้)
+ */
 export function TabStrip({ items }) {
   return (
-    <Stack direction="row" role="tablist" sx={{ mb: { xs: 1.25, sm: 1.5 }, p: { xs: 0.4, sm: 0.5 }, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+    <Stack direction="row" role="tablist" sx={{ mb: { xs: 1.25, sm: 1.5 }, gap: { xs: 0, sm: 0.5 }, bgcolor: "#fff", borderBottom: "1px solid #e6e9ef",
       overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
       {items.map((t) => {
         const on = t.on;
@@ -54,17 +57,18 @@ export function TabStrip({ items }) {
           <Box key={t.key} {...linkProps} role="tab" aria-selected={on} aria-current={on ? "page" : undefined}
             sx={{
               flex: { xs: "1 0 auto", sm: "0 0 auto" }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.75,
-              height: { xs: 34, sm: 38 }, px: { xs: 1.25, sm: 1.75 }, borderRadius: 2.5, border: 0, cursor: "pointer", font: "inherit", textDecoration: "none", whiteSpace: "nowrap",
-              fontSize: { xs: "0.8rem", sm: "0.86rem" }, fontWeight: on ? 800 : 600,
-              color: on ? "#fff" : "#334155", bgcolor: on ? ACCENT : "transparent",
+              height: { xs: 42, sm: 44 }, px: { xs: 1.25, sm: 1.75 }, border: 0, borderRadius: 0, cursor: "pointer", font: "inherit", textDecoration: "none", whiteSpace: "nowrap",
+              fontSize: { xs: "0.84rem", sm: "0.88rem" }, fontWeight: on ? 700 : 500, bgcolor: "transparent",
+              color: on ? "#dc2626" : "#4b5563",
+              boxShadow: on ? "inset 0 -3px 0 #dc2626" : "none",
               "& svg": { fontSize: 18, display: { xs: "none", sm: "inline-block" } },
-              "&:hover": { bgcolor: on ? ACCENT : alpha(ACCENT, 0.06), color: on ? "#fff" : ACCENT },
+              "&:hover": { color: on ? "#dc2626" : "#111827" },
             }}>
             {t.icon}
             {t.label}
             {n > 0 && (
               <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center",
-                fontSize: "0.72rem", fontWeight: 800, bgcolor: on ? "#fff" : "#dc2626", color: on ? ACCENT : "#fff" }}>{n > 99 ? "99+" : n}</Box>
+                fontSize: "0.72rem", fontWeight: 700, bgcolor: "#dc2626", color: "#fff" }}>{n > 99 ? "99+" : n}</Box>
             )}
           </Box>
         );

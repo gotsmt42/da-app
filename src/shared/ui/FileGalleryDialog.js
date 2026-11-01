@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Dialog, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, Stack, Tooltip, Typography } from "@mui/material";
-import { Close, Download, ChevronLeftRounded, ChevronRightRounded, Image as ImageIcon, PictureAsPdf, Article, InsertDriveFile, AttachFile, FolderOpen } from "@mui/icons-material";
+import { CloseRounded as Close, DownloadRounded as Download, ChevronLeftRounded, ChevronRightRounded, ImageRounded as ImageIcon, PictureAsPdfRounded as PictureAsPdf, ArticleRounded as Article, InsertDriveFileRounded as InsertDriveFile, AttachFileRounded as AttachFile, FolderOpenRounded as FolderOpen } from "@mui/icons-material";
 import ImagePreview from "@/shared/ui/ImagePreview";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import { thumbUrl, getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";

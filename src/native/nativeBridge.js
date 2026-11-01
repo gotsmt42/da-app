@@ -120,8 +120,9 @@ async function setupBackButton() {
 async function setupChrome() {
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    await StatusBar.setStyle({ style: Style.Dark });
-    if (Capacitor.getPlatform() === "android") await StatusBar.setBackgroundColor({ color: "#182031" });
+    // แถบบนแบบ A (ขาว → ชมพูอ่อน) → แถบสถานะขาว ไอคอนเข้ม (Style.Light = ตัวอักษรเข้ม)
+    await StatusBar.setStyle({ style: Style.Light });
+    if (Capacitor.getPlatform() === "android") await StatusBar.setBackgroundColor({ color: "#ffffff" });
   } catch { /* เครื่องบางรุ่นไม่รองรับ */ }
 }
 

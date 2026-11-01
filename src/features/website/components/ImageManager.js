@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Box, Button, IconButton, LinearProgress, Stack, TextField, Tooltip, Typography } from "@mui/material";
-import { AddPhotoAlternate, ArrowBack, ArrowForward, DeleteOutline, Star } from "@mui/icons-material";
+import { AddPhotoAlternateRounded as AddPhotoAlternate, ArrowBackRounded as ArrowBack, ArrowForwardRounded as ArrowForward, DeleteOutlineRounded as DeleteOutline, StarRounded as Star } from "@mui/icons-material";
 
 import WebsiteService, { errorText } from "../services/WebsiteService";
 import { UI } from "./WebsiteUi";

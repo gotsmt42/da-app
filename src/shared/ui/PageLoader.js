@@ -47,7 +47,7 @@ export function BrandSpinner({ width = 132 }) {
         className="tt-spin"
         style={{
           display: "block", width: ring, height: ring, boxSizing: "border-box", borderRadius: "50%",
-          border: `${ring > 22 ? 3 : 2.5}px solid #e2e8f0`, borderTopColor: "#2563eb",
+          border: `${ring > 22 ? 3 : 2.5}px solid #e6e9ef`, borderTopColor: "#2563eb",
           animation: "tt-spin .8s linear infinite",
         }}
       />

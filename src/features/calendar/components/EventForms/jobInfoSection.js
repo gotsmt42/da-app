@@ -21,7 +21,7 @@ const CSS = `
   .ji-prio input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
   .ji-prio label {
     display: flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 10px;
-    border: 1.5px solid #e2e8f0; background: #fff; font-size: 13.5px; font-weight: 700; color: #334155; cursor: pointer;
+    border: 1.5px solid #e6e9ef; background: #fff; font-size: 13.5px; font-weight: 700; color: #334155; cursor: pointer;
     transition: all .12s; margin: 0 !important;
   }
   .ji-prio input:checked + label { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
@@ -29,7 +29,7 @@ const CSS = `
   .ji-pending { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; margin: 0; }
   .ji-pending input { width: auto !important; cursor: pointer; }
   .ji-note { margin-top: 8px; }
-  .ji-jobno { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px 10px; font-weight: 700; }
+  .ji-jobno { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; background: #f8fafc; border: 1px solid #e6e9ef; border-radius: 999px; padding: 3px 10px; font-weight: 700; }
 </style>`;
 
 /**

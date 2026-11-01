@@ -17,7 +17,7 @@ import { formatRoundLabel } from "@/shared/utils/contractRounds";
 
 const INK = "#0f172a";
 const MUTED = "#64748b";
-const LINE = "#e2e8f0";
+const LINE = "#e6e9ef";
 const SURFACE = "#f8fafc";
 const ACCENT = "#2563eb";
 
@@ -50,7 +50,7 @@ export const EventDateTile = ({ event }) => {
 /** รูปคน (ไม่มีรูป = ตัวอักษรแรกบนสีประจำตัว) */
 export const PersonPic = ({ name, src, size = 30 }) => (
   <Avatar src={hasValidAvatar(src) ? src : undefined}
-    sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0, boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e2e8f0" }}>
+    sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0, boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e6e9ef" }}>
     {personInitial(name)}
   </Avatar>
 );

@@ -8,9 +8,7 @@ import {
   List, ListItem, ListItemAvatar, ListItemText, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Notifications, NotificationsActive, HourglassTop, CheckCircle, Cancel, Chat, Assignment,
-} from "@mui/icons-material";
+import { NotificationsRounded as Notifications, NotificationsActiveRounded as NotificationsActive, HourglassTopRounded as HourglassTop, CheckCircleRounded as CheckCircle, CancelRounded as Cancel, ChatRounded as Chat, AssignmentRounded as Assignment } from "@mui/icons-material";
 
 const NOTI_META = {
   new_job: { icon: <Assignment sx={{ fontSize: 16 }} />, color: "#6366f1" },

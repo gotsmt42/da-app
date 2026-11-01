@@ -20,11 +20,11 @@ import com.getcapacitor.BridgeActivity;
 /**
  * Android 15+ บังคับแอปวาดเต็มจอ (edge-to-edge) → หัวแอปไปทับนาฬิกา/แบตเตอรี่ และแถบล่างทับปุ่มนำทาง
  * แก้ที่นี่: ดันหน้าเว็บลงมาใต้แถบสถานะ / เหนือแถบนำทาง / เหนือคีย์บอร์ด
- * แล้วระบายพื้นหลังแถบสถานะเป็นสีเดียวกับหัวแอป (#182031 — src/layouts/Header.css) ให้ดูเป็นชิ้นเดียว
+ * แล้วระบายพื้นหลังแถบสถานะเป็นสีเดียวกับหัวแอป (#ffffff — สีซ้ายของแถบบน src/layouts/Header.css) ให้ดูเป็นชิ้นเดียว
  * ⚠️ ใช้ได้ทุกรุ่น Android (รุ่นเก่าที่ไม่ได้วาดเต็มจอ ค่า inset = 0 ก็ไม่มีอะไรเปลี่ยน)
  */
 public class MainActivity extends BridgeActivity {
-    private static final int HEADER_COLOR = Color.parseColor("#182031");
+    private static final int HEADER_COLOR = Color.parseColor("#ffffff");
     private static final int PAGE_COLOR = Color.parseColor("#ffffff");
 
     @Override
@@ -33,7 +33,7 @@ public class MainActivity extends BridgeActivity {
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         WindowInsetsControllerCompat bars = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        bars.setAppearanceLightStatusBars(false);     // ไอคอนสีขาวบนหัวสีเข้ม
+        bars.setAppearanceLightStatusBars(true);      // ไอคอนสีเข้มบนแถบบนสีขาว (แบบ A)
         bars.setAppearanceLightNavigationBars(true);  // ปุ่มนำทางสีเข้มบนพื้นขาว
 
         FrameLayout root = findViewById(android.R.id.content);

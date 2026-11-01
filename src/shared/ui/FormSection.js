@@ -17,7 +17,7 @@ import { alpha } from "@mui/material/styles";
  */
 export default function FormSection({ step, icon, title, hint, optional, action, accent = "#dc2626", children, sx }) {
   return (
-    <Box sx={{ border: "1px solid #e2e8f0", borderRadius: 3, bgcolor: "background.paper", overflow: "hidden", ...sx }}>
+    <Box sx={{ border: "1px solid #e6e9ef", borderRadius: 3, bgcolor: "background.paper", overflow: "hidden", ...sx }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2, py: 1.25, bgcolor: "#f8fafc", borderBottom: "1px solid #eef2f7" }}>
         <Box sx={{
           width: 26, height: 26, borderRadius: "50%", flexShrink: 0,

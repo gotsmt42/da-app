@@ -16,7 +16,7 @@ import {
   useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, Avatar, ButtonBase,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, DeleteOutline, Send, Save, AccessTime, ContentCopy, Add } from "@mui/icons-material";
+import { CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, SendRounded as Send, SaveRounded as Save, AccessTimeRounded as AccessTime, ContentCopyRounded as ContentCopy, AddRounded as Add } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { thaiDate } from "@/shared/utils/thaiDate";
@@ -347,7 +347,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
             const jobDays = daysOfJob(it.job);
             const outOfRange = jobDays.length > 0 && !jobDays.includes(it.date);
             return (
-              <Box key={it.key} sx={{ bgcolor: "#fff", border: `1px solid ${bad ? "#fca5a5" : BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", overflow: "hidden" }}>
+              <Box key={it.key} sx={{ bgcolor: "#fff", border: `1px solid ${bad ? "#fca5a5" : BORDER_MAIN}`, borderRadius: 3, boxShadow: "none", overflow: "hidden" }}>
                 {/* หัวรายการ: เลขที่ · ประเภท · ชั่วโมง · คัดลอก/ลบ */}
                 <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${BORDER_MAIN}` }}>
                   <Box sx={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: OT_ACCENT, color: "#fff", fontWeight: 900, fontSize: "0.86rem" }}>{i + 1}</Box>

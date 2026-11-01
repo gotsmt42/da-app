@@ -2,16 +2,18 @@
    Sidebar.css - Premium Modern Minimalist UI & Responsive Layout
    ========================================================================== */
 
+/* 🎨 (1 พ.ย. 2569 ผู้ใช้: "แบบ Agoda พื้นขาว · รวมถึง header sidebar") เมนูข้างขาวล้วน คู่กับแถบบนขาว
+   เมนูที่เลือก = ตัวแดง + พื้นแดงอ่อน · ไอคอนในช่องเทาอ่อน */
 :root {
-  --bg-primary: #0f172a;      /* Slate 900 */
-  --bg-secondary: #1e293b;    /* Slate 800 */
-  --bg-hover: #334155;        /* Slate 700 */
-  --text-main: #f8fafc;       /* Slate 50 */
-  --text-muted: #94a3b8;      /* Slate 400 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f2f4f7;
+  --bg-hover: #eceef2;
+  --text-main: #111827;
+  --text-muted: #6b7280;
   /* ✅ อิงสีธีมจากโลโก้บริษัท (เฟือง+ตัวอักษรสีแดง) แทนฟ้าเดิม ให้ทั้งแอปเป็นแบรนด์เดียวกัน */
   --accent-color: #dc2626;    /* Red 600 (สีแดงจากโลโก้) */
   --accent-color-dark: #7f1d1d; /* Red 900 สำหรับไล่เฉด */
-  --danger-color: #f87171;    /* Red 400 */
+  --danger-color: #dc2626;
   --sidebar-width: 260px;
   --transition-speed: 0.3s;
 }
@@ -437,3 +439,22 @@
   .sidebar-container .nav-link,
   .sidebar-container button.menu-dropdown-btn { font-size: 14px; margin-bottom: 2px; }
 }
+
+
+/* ── แบบ A: แก้จุดที่เดิมฝังสีสำหรับพื้นเข้ม ── */
+.sidebar-container { border-right: 1px solid #eceef2 !important; }
+.sidebar-container .profilebg { background: #f7f8fa !important; border: 1px solid #f0f1f4 !important; }
+.sidebar-container .nav-link,
+.sidebar-container button.menu-dropdown-btn { color: #374151 !important; }
+.sidebar-container .nav-link:hover,
+.sidebar-container button.menu-dropdown-btn:hover { color: #111827 !important; background-color: #f2f4f7 !important; }
+.sidebar-container .nav-link.active {
+  color: #dc2626 !important;
+  background: #fef2f2 !important;
+  font-weight: 700;
+}
+.sidebar-container .nav-icon { background: #f2f4f7; color: #4b5563; }
+.sidebar-container .nav-link:hover .nav-icon { background: #e9ecf1; }
+.sidebar-container .submenu-wrapper { border-left-color: #eceef2 !important; }
+.sidebar-container .submenu-link.active { background: #fdecec !important; }
+.sidebar-fixed-bottom { border-top: 1px solid #eceef2 !important; background-color: #fff !important; }

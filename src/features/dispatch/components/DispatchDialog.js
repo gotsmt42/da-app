@@ -21,16 +21,7 @@ import {
   TextField, Tooltip, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  AttachFile, InsertDriveFile, Bolt, Schedule, LocationOn, Phone,
-  Close, GroupAdd, FactCheck,
-  OpenInNew,
-  NoteAlt,
-  EventAvailable,
-  Undo,
-  Assignment,
-  Inventory2,
-} from "@mui/icons-material";
+import { AttachFileRounded as AttachFile, InsertDriveFileRounded as InsertDriveFile, BoltRounded as Bolt, ScheduleRounded as Schedule, LocationOnRounded as LocationOn, PhoneRounded as Phone, CloseRounded as Close, GroupAddRounded as GroupAdd, FactCheckRounded as FactCheck, OpenInNewRounded as OpenInNew, NoteAltRounded as NoteAlt, EventAvailableRounded as EventAvailable, UndoRounded as Undo, AssignmentRounded as Assignment, Inventory2Rounded as Inventory2 } from "@mui/icons-material";
 
 import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog";
 import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";

@@ -18,10 +18,7 @@ import {
   Checkbox, FormControlLabel, InputAdornment, LinearProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Close, Add, DeleteOutline, AttachFile, Send, Save, Engineering, AccountBalance, Payments, HistoryEdu, CheckBox, CheckBoxOutlineBlank,
-  Business, Person, Receipt, Work,
-} from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, EngineeringRounded as Engineering, AccountBalanceRounded as AccountBalance, PaymentsRounded as Payments, HistoryEduRounded as HistoryEdu, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, BusinessRounded as Business, PersonRounded as Person, ReceiptRounded as Receipt, WorkRounded as Work } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";

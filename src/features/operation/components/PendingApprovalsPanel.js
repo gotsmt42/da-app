@@ -23,10 +23,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  HourglassTop, Cancel, EventNote, CalendarMonth,
-  ArrowForwardIos, TaskAlt,
-} from "@mui/icons-material";
+import { HourglassTopRounded as HourglassTop, CancelRounded as Cancel, EventNoteRounded as EventNote, CalendarMonthRounded as CalendarMonth, ArrowForwardIosRounded as ArrowForwardIos, TaskAltRounded as TaskAlt } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";

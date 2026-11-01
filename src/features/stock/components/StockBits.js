@@ -1,6 +1,6 @@
 /** ชิ้นส่วนที่ใช้ซ้ำในระบบสต๊อก — ป้าย · รูปสินค้า · กล่องหัวข้อฟอร์ม */
 import { Box, Stack, Typography } from "@mui/material";
-import { Category, Handyman } from "@mui/icons-material";
+import { CategoryRounded as Category, HandymanRounded as Handyman } from "@mui/icons-material";
 import { kindMeta, reqStatus, reqView, REQ_VIEW, outstanding, fmt, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STOCK_ACCENT } from "../stockMeta";
 
 const pill = { display: "inline-flex", alignItems: "center", px: 0.9, height: 22, borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 };

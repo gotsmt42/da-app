@@ -15,10 +15,7 @@ import Swal from "@/shared/ui/swal";
 import { Link } from "react-router-dom";
 import { Box, Stack, Typography, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  BoltRounded, EventBusyOutlined, HourglassTopRounded, ReportProblemOutlined, HandymanOutlined,
-  CheckCircleRounded, ThumbUpAltOutlined, TagRounded, ArrowForwardRounded,
-} from "@mui/icons-material";
+import { BoltRounded, EventBusyRounded, HourglassTopRounded, ReportProblemRounded, HandymanRounded, CheckCircleRounded, ThumbUpAltRounded, TagRounded, ArrowForwardRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import { formatThai } from "@/shared/utils/thaiDate";
 import {
@@ -68,20 +65,20 @@ export function JobFlowChips({ event, showAck = false, sx }) {
   if (isUrgent(event) && !closed) items.push(<Chip key="u" color={RED} solid icon={<BoltRounded />}>ด่วน</Chip>);
   if (due && !closed) {
     items.push(
-      <Chip key="d" color={due.overdue ? RED : due.daysLeft <= 2 ? AMBER : MUTED} icon={<EventBusyOutlined />}>
+      <Chip key="d" color={due.overdue ? RED : due.daysLeft <= 2 ? AMBER : MUTED} icon={<EventBusyRounded />}>
         {due.overdue ? `เลยกำหนด ${-due.daysLeft} วัน` : `ครบกำหนด ${formatThai(due.due, "D MMM")}`}
       </Chip>,
     );
   }
   if (event.infoPending && !closed) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
-  if (fu && !closed) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>งานไม่เสร็จ · {fu.reason}</Chip>);
+  if (fu && !closed) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemRounded />}>งานไม่เสร็จ · {fu.reason}</Chip>);
   // ✅ (11 ต.ค. 2569) ช่างปฏิเสธงาน — ป้ายแดงพร้อมเหตุผล (ชี้ดูได้) แทนป้ายรับทราบ
   if (showAck && !closed && event.ackDeclined?.userId) {
-    items.push(<Chip key="a" color={RED} icon={<ReportProblemOutlined />} title={`เหตุผล: ${event.ackDeclined.reason || "-"}`}>{event.ackDeclined.name} ปฏิเสธงาน</Chip>);
+    items.push(<Chip key="a" color={RED} icon={<ReportProblemRounded />} title={`เหตุผล: ${event.ackDeclined.reason || "-"}`}>{event.ackDeclined.name} ปฏิเสธงาน</Chip>);
   } else if (showAck && !closed && !event.unscheduled && (acks.length || (ackTracked(event) && (event.resPerson || event.team)))) {
     items.push(acks.length
       ? <Chip key="a" color={GREEN} icon={<CheckCircleRounded />} title={acks.map((a) => a.name).join(", ")}>รับทราบแล้ว</Chip>
-      : <Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
+      : <Chip key="a" color={MUTED} icon={<ThumbUpAltRounded />}>ยังไม่รับทราบ</Chip>);
   }
   if (!items.length) return null;
   return <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.5, ...sx }}>{items}</Stack>;
@@ -100,15 +97,15 @@ export function JobFlowFlags({ event }) {
   const fu = openFollowUp(event);
   // fix = วิธีทำให้ข้อนี้หายไป (ผู้ใช้: "แล้วสถานะจะแก้ไขยังไง") — ชี้เมาส์/แตะค้างเห็น · ลิงก์ "แก้ไขข้อมูลงาน" ด้านล่างพาไปฟอร์ม
   if (isUrgent(event)) items.push({ k: "u", color: RED, icon: <BoltRounded />, text: "งานด่วน", fix: "ไม่ด่วนแล้ว: แก้ไขข้อมูลงาน › ความเร่งด่วน = ปกติ" });
-  if (due?.overdue) items.push({ k: "d", color: RED, icon: <EventBusyOutlined />, text: `เลยกำหนดเสร็จ${event.dueDate ? ` (${formatThai(moment(event.dueDate), "D MMM")})` : ""}`, fix: "ทำงานให้เสร็จแล้วขอปิดงาน · หรือเลื่อนกำหนด: แก้ไขข้อมูลงาน › เสร็จภายใน" });
-  if (fu) items.push({ k: "f", color: AMBER, icon: <ReportProblemOutlined />, text: `แจ้งงานไม่เสร็จ${fu.reason ? ` — ${fu.reason}` : ""}`, fix: "แอดมินลงวันนัดใหม่ แล้วกด “จัดการแล้ว” ในการ์ดงาน" });
+  if (due?.overdue) items.push({ k: "d", color: RED, icon: <EventBusyRounded />, text: `เลยกำหนดเสร็จ${event.dueDate ? ` (${formatThai(moment(event.dueDate), "D MMM")})` : ""}`, fix: "ทำงานให้เสร็จแล้วขอปิดงาน · หรือเลื่อนกำหนด: แก้ไขข้อมูลงาน › เสร็จภายใน" });
+  if (fu) items.push({ k: "f", color: AMBER, icon: <ReportProblemRounded />, text: `แจ้งงานไม่เสร็จ${fu.reason ? ` — ${fu.reason}` : ""}`, fix: "แอดมินลงวันนัดใหม่ แล้วกด “จัดการแล้ว” ในการ์ดงาน" });
   if (event.infoPending) items.push({ k: "i", color: AMBER, icon: <HourglassTopRounded />, text: `รอข้อมูลเพิ่ม${event.infoPendingNote ? `: ${event.infoPendingNote}` : ""}`, fix: "ได้ข้อมูลแล้ว: แก้ไขข้อมูลงาน › เอาติ๊ก “ยังรอข้อมูล” ออก" });
-  if (event.ackDeclined?.userId) items.push({ k: "x", color: RED, icon: <ReportProblemOutlined />, text: `${event.ackDeclined.name || "ช่าง"} ปฏิเสธงาน`, fix: "มอบหมายผู้รับผิดชอบ/หัวหน้าทีมคนใหม่ในการ์ดงาน" });
+  if (event.ackDeclined?.userId) items.push({ k: "x", color: RED, icon: <ReportProblemRounded />, text: `${event.ackDeclined.name || "ช่าง"} ปฏิเสธงาน`, fix: "มอบหมายผู้รับผิดชอบ/หัวหน้าทีมคนใหม่ในการ์ดงาน" });
   else if (ackTracked(event) && !event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
-    items.push({ k: "a", color: MUTED, icon: <ThumbUpAltOutlined />, text: "ผู้รับผิดชอบยังไม่รับทราบงาน", fix: "ผู้รับผิดชอบกด “รับทราบงาน” ในหน้างานของฉัน" });
+    items.push({ k: "a", color: MUTED, icon: <ThumbUpAltRounded />, text: "ผู้รับผิดชอบยังไม่รับทราบงาน", fix: "ผู้รับผิดชอบกด “รับทราบงาน” ในหน้างานของฉัน" });
   if (!items.length) return null;
   return (
-    <Box sx={{ mt: 0.75, pt: 0.6, borderTop: "1px dashed #e2e8f0", maxWidth: 220 }}>
+    <Box sx={{ mt: 0.75, pt: 0.6, borderTop: "1px dashed #e6e9ef", maxWidth: 220 }}>
       <Typography sx={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3, mb: 0.2 }}>ต้องระวัง</Typography>
       {items.map((x) => (
         <Stack key={x.k} direction="row" spacing={0.5} alignItems="flex-start" title={`${x.text}
@@ -204,7 +201,7 @@ function NextStepBox({ step, onConfirm, busy }) {
   return (
     // ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน มองยาก แก้ไขให้มืออาชีพ") — พื้นเทาอ่อนกล่องเดียว ไม่มีพื้น/ขอบสีตามสถานะ
     //    สีของสถานะเหลือแค่จุดเล็กหน้าชื่อขั้นตอน · ปุ่มยังเป็นน้ำเงินสีเดียวทั้งแอป
-    <Box sx={{ p: 1.25, pl: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+    <Box sx={{ p: 1.25, pl: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e6e9ef" }}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "คำว่าต่อไปให้ใช้คำใหม่ ดูแล้วงง" → เลือก "ไม่ต้องมีคำนำหน้า") — ตัดหัว "ขั้นตอนถัดไป" ออก เหลือจุดสี + ข้อความ */}
@@ -232,7 +229,7 @@ function NextStepBox({ step, onConfirm, busy }) {
  *    สีเหลือแค่ไอคอนเล็กหน้าหัวข้อ (เดิมพื้นส้ม/ฟ้า/ส้มเรียงกัน ตัดกันจนอ่านยาก)
  */
 const Block = ({ color, icon, title, children, action }) => (
-  <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+  <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e6e9ef" }}>
     <Stack direction="row" alignItems="flex-start" gap={1}>
       <Box sx={{ color, display: "flex", mt: 0.1, "& svg": { fontSize: 18 } }}>{icon}</Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -288,7 +285,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
   // ── ขั้น 3: อุปกรณ์ที่ต้องเตรียม ──
   if (equipment.length) {
     blocks.push(
-      <Block key="eq" color={BLUE} icon={<HandymanOutlined />} title={`อุปกรณ์ที่ต้องเตรียม (${equipment.length})`}>
+      <Block key="eq" color={BLUE} icon={<HandymanRounded />} title={`อุปกรณ์ที่ต้องเตรียม (${equipment.length})`}>
         <Box component="ul" sx={{ m: 0, mt: 0.4, pl: 2.25, "& li": { fontSize: "0.8rem", color: "#334155", lineHeight: 1.55 } }}>
           {equipment.map((x, i) => <li key={i}>{x}</li>)}
         </Box>
@@ -302,7 +299,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
   if (!closed && !pendingApproval && !event.unscheduled) {
     if (mode === "tech" && mine && !ackedByMe) {
       ackArea = (
-        <Button fullWidth variant="contained" disableElevation disabled={busy} startIcon={<ThumbUpAltOutlined />}
+        <Button fullWidth variant="contained" disableElevation disabled={busy} startIcon={<ThumbUpAltRounded />}
           onClick={() => run(() => EventService.AckJob(event._id), "รับทราบงานแล้ว")}
           sx={{ bgcolor: BLUE, "&:hover": { bgcolor: "#1d4ed8" }, textTransform: "none", fontWeight: 800, borderRadius: 2, py: 1, fontSize: "0.9rem" }}>
           รับทราบงาน

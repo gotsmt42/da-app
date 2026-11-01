@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Avatar, Box, ButtonBase, Stack, Tooltip, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandLess, ExpandMore, PersonOff, Groups } from "@mui/icons-material";
+import { ExpandLessRounded as ExpandLess, ExpandMoreRounded as ExpandMore, PersonOffRounded as PersonOff, GroupsRounded as Groups } from "@mui/icons-material";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 
@@ -27,7 +27,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 
 const ACCENT = "#dc2626";
 const AMBER = "#d97706";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 const TEXT_SUB = "#64748b";
 const colorOf = personColor;
 const initialOf = personInitial;

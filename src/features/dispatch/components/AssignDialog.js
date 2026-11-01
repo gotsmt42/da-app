@@ -12,7 +12,7 @@ import {
   Checkbox, Avatar, Alert, CircularProgress, TextField, InputAdornment, Chip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search } from "@mui/icons-material";
+import { SearchRounded as Search } from "@mui/icons-material";
 
 import DispatchService from "../services/DispatchService";
 import { DISPATCH_ACCENT, TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";

@@ -17,7 +17,7 @@ import {
   Box, Stack, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, Tooltip,
   Table, TableBody, TableCell, TableHead, TableRow, LinearProgress,
 } from "@mui/material";
-import { AssessmentOutlined } from "@mui/icons-material";
+import { AssessmentRounded } from "@mui/icons-material";
 import moment from "moment";
 
 import EventService from "@/shared/services/EventService";
@@ -27,7 +27,7 @@ import { buildJobReport } from "../utils/jobReport";
 import { PAGE_SX, PageHeader, KpiRow, Kpi as PkKpi } from "@/shared/ui/PageKit";
 
 const ACCENT = "#8b5cf6";        // สีประจำหมวด "งาน" เดียวกับการ์ดเมนูหน้าแรก
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 const TEXT_SUB = "#64748b";
 
 /** ช่วงเวลาชุดเดียวกับรายงานการเบิก — คนใช้สองหน้านี้สลับกันจะได้ไม่ต้องจำคนละชุด */
@@ -46,7 +46,7 @@ const monthLabel = (key) => {
 };
 
 const Panel = ({ title, hint, children }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, p: { xs: 1.5, sm: 2 }, mb: 1.5, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, p: { xs: 1.5, sm: 2 }, mb: 1.5, boxShadow: "none" }}>
     <Typography sx={{ fontWeight: 900, fontSize: "0.95rem" }}>{title}</Typography>
     {hint && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mb: 1.25 }}>{hint}</Typography>}
     {children}
@@ -159,7 +159,7 @@ export default function JobReport() {
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader
-        icon={<AssessmentOutlined />}
+        icon={<AssessmentRounded />}
         title="รายงานงาน"
         subtitle="นับเป็น “งาน” — งานที่เข้าหลายวันไม่ติดกันนับเป็นงานเดียว ตรงกับการ์ดในหน้าการดำเนินงาน"
       />

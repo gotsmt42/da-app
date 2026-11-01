@@ -87,7 +87,7 @@ export function AttendanceDayStrip({ entries, onOpen, hasJobs = true }) {
         <Stack direction="row" gap={0.4} sx={{ flexShrink: 0 }}>
           {photos.slice(0, 3).map((p, i) => (
             <ButtonBase key={p.fileUrl} onClick={() => onOpen?.(p.fileUrl, p.fileName || `รูป ${i + 1}`, photos)}
-              sx={{ position: "relative", width: 34, height: 34, borderRadius: 1, overflow: "hidden", border: "1px solid #e2e8f0" }}>
+              sx={{ position: "relative", width: 34, height: 34, borderRadius: 1, overflow: "hidden", border: "1px solid #e6e9ef" }}>
               <Box component="img" src={thumbUrl(p.fileUrl, 80)} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
               {i === 2 && photos.length > 3 && (
                 <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", bgcolor: "rgba(15,23,42,.55)", color: "#fff", fontSize: "0.7rem", fontWeight: 800 }}>+{photos.length - 3}</Box>

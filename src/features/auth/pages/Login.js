@@ -17,13 +17,13 @@ import {
   CircularProgress,
   Stack,
 } from "@mui/material";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import Visibility from "@mui/icons-material/Visibility";
-import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
-import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
-import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlineRounded";
+import LockOutlinedIcon from "@mui/icons-material/LockRounded";
+import Visibility from "@mui/icons-material/VisibilityRounded";
+import VisibilityOff from "@mui/icons-material/VisibilityOffRounded";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserRounded";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableRounded";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionRounded";
 
 import { useAuth } from "../AuthContext";
 // ✅ โลโก้บนหน้าเข้าสู่ระบบมาจากตั้งค่าองค์กร (GET /settings เปิดอ่านได้โดยไม่ต้องล็อกอิน)

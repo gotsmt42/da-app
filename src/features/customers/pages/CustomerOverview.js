@@ -25,9 +25,7 @@ import {
   Box, Stack, Typography, IconButton, Skeleton, Dialog, DialogContent, Button, Tooltip, useMediaQuery, Pagination, Avatar,
   Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
-import {
-  Refresh, Business, Close, OpenInNew, ChevronRight, Phone, Email, Place, Person, Receipt,
-} from "@mui/icons-material";
+import { RefreshRounded as Refresh, BusinessRounded as Business, CloseRounded as Close, OpenInNewRounded as OpenInNew, ChevronRightRounded as ChevronRight, PhoneRounded as Phone, EmailRounded as Email, PlaceRounded as Place, PersonRounded as Person, ReceiptRounded as Receipt } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";

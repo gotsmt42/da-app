@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef } from "react";
 import { Box, Stack, Typography, ButtonBase, IconButton, CircularProgress } from "@mui/material";
-import { AttachFile, Close, InsertDriveFile } from "@mui/icons-material";
+import { AttachFileRounded as AttachFile, CloseRounded as Close, InsertDriveFileRounded as InsertDriveFile } from "@mui/icons-material";
 import { prepareUploadFile, ACCEPT_ALL } from "@/shared/utils/fileUpload";
 import { TEXT_MAIN, TEXT_SUB, BORDER_MAIN } from "../otMeta";
 

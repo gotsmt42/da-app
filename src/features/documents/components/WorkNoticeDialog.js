@@ -19,9 +19,7 @@ import {
   TextField, Button, IconButton, Alert, useMediaQuery, CircularProgress, Autocomplete,
   Switch, FormControlLabel, Menu, MenuItem, ListItemIcon,
 } from "@mui/material";
-import {
-  Visibility, EventAvailable, Refresh, Search, Add, DeleteOutline, ContentPaste, AutoFixHigh,
-} from "@mui/icons-material";
+import { VisibilityRounded as Visibility, EventAvailableRounded as EventAvailable, RefreshRounded as Refresh, SearchRounded as Search, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, ContentPasteRounded as ContentPaste, AutoFixHighRounded as AutoFixHigh } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import DocNumberService from "@/shared/services/DocNumberService";

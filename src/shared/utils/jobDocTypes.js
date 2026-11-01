@@ -8,7 +8,7 @@
  * ⚠️ ลำดับในอาร์เรย์นี้คือลำดับที่แสดงผลทุกที่ในระบบ — เรียงตามลำดับที่เกิดขึ้นจริงในสายงาน
  * (รายงานผลงาน → เสนอราคา → วางบิล → ส่งมอบ) ไม่ใช่เรียงตามตัวอักษร
  */
-import { Description, RequestQuote, ReceiptLong, AssignmentTurnedIn } from "@mui/icons-material";
+import { DescriptionRounded as Description, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn } from "@mui/icons-material";
 
 // ✅ (3 ต.ค. 2569) สีชุดเดียวกับหน้าแนบเอกสารของช่าง — ไม่ใช้แดง/ม่วง (ผู้ใช้: "สีแดงๆ ดูรก", "ไม่เอาสีม่วง")
 //    desc = คำอธิบายสั้นว่าเอกสารนี้คืออะไร ใช้ทำอะไรต่อ (แสดงในหน้าแอดมิน)

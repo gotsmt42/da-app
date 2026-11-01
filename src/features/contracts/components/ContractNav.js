@@ -12,11 +12,11 @@
  */
 import { Box, Stack, Typography, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Description, Build, Engineering, HourglassEmpty, Apps, PlayCircleOutline, Inventory2, EventBusy } from "@mui/icons-material";
+import { DescriptionRounded as Description, BuildRounded as Build, EngineeringRounded as Engineering, HourglassEmptyRounded as HourglassEmpty, AppsRounded as Apps, PlayCircleOutlineRounded as PlayCircleOutline, Inventory2Rounded as Inventory2, EventBusyRounded as EventBusy } from "@mui/icons-material";
 
 const INK = "#0f172a";
 const MUTED = "#64748b";
-const LINE = "#e2e8f0";
+const LINE = "#e6e9ef";
 const BLUE = "#2563eb";
 
 export const CATEGORY_META = {
@@ -92,7 +92,7 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
   const showStageRow = (!closed && stages.length > 1) || closed;
 
   return (
-    <Box sx={{ mb: { xs: 1.5, sm: 2 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ mb: { xs: 1.5, sm: 2 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none" }}>
       {isMobile && <Box sx={{ px: 1, pt: 1 }}>{scopeSwitch}</Box>}
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 0.5, md: 1.25 }, borderBottom: showStageRow ? `1px solid ${LINE}` : 0 }}>
         {/* หมวดงาน */}

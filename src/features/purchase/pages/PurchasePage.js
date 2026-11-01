@@ -17,10 +17,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, useMediaQuery, Drawer, Badge,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Add, ShoppingCart, Search, Close, WarningAmber, ChevronRight, Apps, Inbox, Tune, HourglassTop, FactCheck, LocalShipping,
-  Inventory2, CheckCircle, Undo, Block,
-} from "@mui/icons-material";
+import { AddRounded as Add, ShoppingCartRounded as ShoppingCart, SearchRounded as Search, CloseRounded as Close, WarningAmberRounded as WarningAmber, ChevronRightRounded as ChevronRight, AppsRounded as Apps, InboxRounded as Inbox, TuneRounded as Tune, HourglassTopRounded as HourglassTop, FactCheckRounded as FactCheck, LocalShippingRounded as LocalShipping, Inventory2Rounded as Inventory2, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block } from "@mui/icons-material";
 import moment from "moment";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -117,7 +114,7 @@ const AmountCell = ({ r }) => (
 );
 
 const MobileCard = ({ r, onOpen, avatars }) => (
-  <Box onClick={() => onOpen(r._id)} role="button" sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer", boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" } }}>
+  <Box onClick={() => onOpen(r._id)} role="button" sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer", boxShadow: "none", "&:active": { bgcolor: "#f8fafc" } }}>
     <Stack direction="row" spacing={1} alignItems="center">
       <Box sx={{ flex: 1, minWidth: 0 }}><Requester r={r} avatars={avatars} size={32} /></Box>
       <AmountCell r={r} />
@@ -135,7 +132,7 @@ const MobileCard = ({ r, onOpen, avatars }) => (
 );
 
 const DesktopTable = ({ rows, onOpen, avatars }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
     <Table size="small" sx={{ minWidth: 900, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
       <TableHead>
         <TableRow>
@@ -275,7 +272,7 @@ export default function PurchasePage({ view = "mine" }) {
 
   const filterBar = (
     <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
-      sx={isDesktop ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" } : { "& > *": { width: "100%" } }}>
+      sx={isDesktop ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "none" } : { "& > *": { width: "100%" } }}>
       <TextField size="small" placeholder="ค้นหาเลขที่ / เรื่อง / สินค้า / ร้านค้า / PO" value={q} onChange={(e) => setQ(e.target.value)}
         sx={{ flex: 1, minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#f8fafc", height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: BORDER_MAIN }, "&.Mui-focused": { bgcolor: "#fff" } } }}
         InputProps={{
@@ -339,7 +336,7 @@ export default function PurchasePage({ view = "mine" }) {
               sx={{ display: { xs: "inline-flex", md: "none" }, position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}`, bgcolor: activeFilters ? alpha(PR_ACCENT, 0.08) : "#fff", color: activeFilters ? PR_ACCENT : TEXT_MAIN }}>
               <Badge badgeContent={activeFilters} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.62rem", height: 16, minWidth: 16 } }}><Tune sx={{ fontSize: 21 }} /></Badge>
             </IconButton>
-            <Box sx={{ width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: 2.5, ml: "0 !important", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: PR_ACCENT, color: "#fff" }}>
+            <Box sx={{ width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, ml: "0 !important", borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(PR_ACCENT, 0.12), color: PR_ACCENT, "& svg": { fontSize: { xs: 20, sm: 22 }, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
               <ShoppingCart />
             </Box>
             <Box sx={{ minWidth: 0 }}>

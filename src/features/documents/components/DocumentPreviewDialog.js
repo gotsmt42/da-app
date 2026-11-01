@@ -20,9 +20,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Stack, Typography,
   Button, IconButton, Alert, useMediaQuery, CircularProgress,
 } from "@mui/material";
-import {
-  Close, ArrowBack, Download, Share, OpenInNew, TaskAlt, MailOutline, Print, PictureAsPdf, InfoOutlined,
-} from "@mui/icons-material";
+import { CloseRounded as Close, ArrowBackRounded as ArrowBack, DownloadRounded as Download, ShareRounded as Share, OpenInNewRounded as OpenInNew, TaskAltRounded as TaskAlt, MailOutlineRounded as MailOutline, PrintRounded as Print, PictureAsPdfRounded as PictureAsPdf, InfoRounded } from "@mui/icons-material";
 
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import { renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser } from "@/shared/utils/pdfRaster";
@@ -181,7 +179,7 @@ const DocumentPreviewDialog = ({
         {error && <Alert severity="error" sx={{ borderRadius: 0 }}>{error}</Alert>}
         {!issued && (
           <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1, bgcolor: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
-            <InfoOutlined sx={{ fontSize: 18, color: "#b45309", flexShrink: 0 }} />
+            <InfoRounded sx={{ fontSize: 18, color: "#b45309", flexShrink: 0 }} />
             <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#92400e" }}>
               ตรวจให้ครบก่อนยืนยัน — ยืนยันแล้วเลขที่จะถูกใช้ และงานนี้จะออกใบนี้ซ้ำไม่ได้
             </Typography>

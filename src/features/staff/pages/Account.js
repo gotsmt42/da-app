@@ -16,11 +16,7 @@ import {
   DialogContent, DialogActions, TextField, Snackbar, Alert,
 } from "@mui/material";
 import PageLoader from "@/shared/ui/PageLoader";
-import {
-  PhotoCamera, Edit, EmailOutlined, PhoneOutlined, AlternateEmail, ContentCopy, Check, BadgeOutlined,
-  WorkOutline, ApartmentOutlined, AdminPanelSettingsOutlined, CheckCircle, RemoveCircleOutline,
-  DrawOutlined, NotificationsNoneOutlined, ChevronRight, EventOutlined, UpdateOutlined, Close,
-} from "@mui/icons-material";
+import { PhotoCameraRounded as PhotoCamera, EditRounded as Edit, EmailRounded, PhoneRounded, AlternateEmailRounded as AlternateEmail, ContentCopyRounded as ContentCopy, CheckRounded as Check, BadgeRounded, WorkOutlineRounded as WorkOutline, ApartmentRounded, AdminPanelSettingsRounded, CheckCircleRounded as CheckCircle, RemoveCircleOutlineRounded as RemoveCircleOutline, DrawRounded, NotificationsNoneRounded, ChevronRightRounded as ChevronRight, EventRounded, UpdateRounded, CloseRounded as Close } from "@mui/icons-material";
 import useRealtime from "@/shared/realtime/useRealtime";
 import AuthService from "@/shared/services/authService";
 import SignatureService from "@/shared/services/SignatureService";
@@ -63,7 +59,7 @@ const CAPS = [
 ];
 
 const Card = ({ title, icon, right, children, sx }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)", ...sx }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none", ...sx }}>
     <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.4, borderBottom: `1px solid ${LINE}` }}>
       <Box sx={{ color: ACCENT, display: "flex", "& svg": { fontSize: 19 } }}>{icon}</Box>
       <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "0.95rem", color: INK }}>{title}</Typography>
@@ -200,7 +196,7 @@ export default function Account() {
   return (
     <Box sx={PAGE_NARROW_SX}>
       {/* ── การ์ดตัวตน ── */}
-      <Box sx={{ mb: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Box sx={{ mb: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none" }}>
         <Box sx={{ height: { xs: 84, sm: 104 }, background: `linear-gradient(120deg, ${ACCENT_SOFT} 0%, #e0e7ff 55%, #f1f5f9 100%)`, borderBottom: `1px solid ${LINE}` }} />
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "center", sm: "flex-start" }} spacing={{ xs: 1.5, sm: 2.5 }}
           sx={{ px: { xs: 2, sm: 3 }, pb: 2.5, mt: { xs: "-52px", sm: "-56px" } }}>
@@ -251,28 +247,28 @@ export default function Account() {
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "repeat(2, minmax(0, 1fr))" }, gap: 2, alignItems: "start" }}>
         <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <Card title="ข้อมูลติดต่อ" icon={<PhoneOutlined />}>
-            <Field icon={<EmailOutlined />} label="อีเมล" value={user.email || "ยังไม่ระบุ"} muted={!user.email} action={copyBtn("email", user.email)} />
-            <Field icon={<PhoneOutlined />} label="เบอร์โทร" value={user.tel || "ยังไม่ระบุ"} muted={!user.tel} action={copyBtn("tel", user.tel)} />
+          <Card title="ข้อมูลติดต่อ" icon={<PhoneRounded />}>
+            <Field icon={<EmailRounded />} label="อีเมล" value={user.email || "ยังไม่ระบุ"} muted={!user.email} action={copyBtn("email", user.email)} />
+            <Field icon={<PhoneRounded />} label="เบอร์โทร" value={user.tel || "ยังไม่ระบุ"} muted={!user.tel} action={copyBtn("tel", user.tel)} />
             <Field icon={<AlternateEmail />} label="ชื่อผู้ใช้ (ใช้เข้าสู่ระบบ)" value={user.username} action={copyBtn("username", user.username)} />
           </Card>
 
           <Card title="ตำแหน่งในบริษัท" icon={<WorkOutline />}>
-            <Field icon={<BadgeOutlined />} label="ตำแหน่งในองค์กร (Rank)" value={rank || "-"} />
+            <Field icon={<BadgeRounded />} label="ตำแหน่งในองค์กร (Rank)" value={rank || "-"} />
             <Field icon={<WorkOutline />} label="ตำแหน่งที่พิมพ์ในเอกสาร" value={user.jobTitle || `${rank || "-"} (ใช้ชื่อตำแหน่งในองค์กร)`} muted={!user.jobTitle} />
-            <Field icon={<ApartmentOutlined />} label="แผนก" value={dept ? DEPARTMENT_LABEL[dept] : "ส่วนกลาง / บริหาร"} />
-            <Field icon={<AdminPanelSettingsOutlined />} label={`สิทธิ์ในระบบ (Role) · ${systemRoleLabel(user)}`} value={SYSTEM_ROLE_DESC[sysRole] || "-"} />
+            <Field icon={<ApartmentRounded />} label="แผนก" value={dept ? DEPARTMENT_LABEL[dept] : "ส่วนกลาง / บริหาร"} />
+            <Field icon={<AdminPanelSettingsRounded />} label={`สิทธิ์ในระบบ (Role) · ${systemRoleLabel(user)}`} value={SYSTEM_ROLE_DESC[sysRole] || "-"} />
           </Card>
 
-          <Card title="การตั้งค่าที่เกี่ยวข้อง" icon={<DrawOutlined />}>
+          <Card title="การตั้งค่าที่เกี่ยวข้อง" icon={<DrawRounded />}>
             {[
               {
-                icon: <DrawOutlined />, label: "ลายเซ็นอิเล็กทรอนิกส์",
+                icon: <DrawRounded />, label: "ลายเซ็นอิเล็กทรอนิกส์",
                 value: signature === undefined ? "กำลังตรวจสอบ..." : signature ? "ตั้งไว้แล้ว — ใช้กับเอกสารที่คุณออก/อนุมัติ" : "ยังไม่ได้ตั้ง",
                 ok: Boolean(signature),
               },
               {
-                icon: <NotificationsNoneOutlined />, label: "การแจ้งเตือนบนอุปกรณ์นี้",
+                icon: <NotificationsNoneRounded />, label: "การแจ้งเตือนบนอุปกรณ์นี้",
                 value: push === null ? "ตั้งค่าได้ที่หน้าการตั้งค่า" : push ? "เปิดรับอยู่" : "ยังไม่เปิด",
                 ok: push,
               },
@@ -291,7 +287,7 @@ export default function Account() {
         </Stack>
 
         <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <Card title="สิ่งที่คุณทำได้ในระบบ" icon={<AdminPanelSettingsOutlined />}
+          <Card title="สิ่งที่คุณทำได้ในระบบ" icon={<AdminPanelSettingsRounded />}
             right={<Typography sx={{ fontSize: "0.72rem", color: MUTED, fontWeight: 700 }}>ตามตำแหน่งของคุณ</Typography>}>
             {CAPS.map(([group, items]) => (
               <Box key={group} sx={{ px: 2, py: 1.25, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
@@ -314,9 +310,9 @@ export default function Account() {
             </Typography>
           </Card>
 
-          <Card title="ข้อมูลบัญชี" icon={<EventOutlined />}>
-            <Field icon={<EventOutlined />} label="สร้างบัญชีเมื่อ" value={user.createdAt ? `${formatThai(moment(user.createdAt), "D MMMM YYYY")} · ${moment(user.createdAt).locale("th").fromNow()}` : "-"} />
-            <Field icon={<UpdateOutlined />} label="แก้ไขข้อมูลล่าสุด" value={user.updatedAt ? `${formatThai(moment(user.updatedAt), "D MMM YYYY HH:mm")} น.` : "-"} />
+          <Card title="ข้อมูลบัญชี" icon={<EventRounded />}>
+            <Field icon={<EventRounded />} label="สร้างบัญชีเมื่อ" value={user.createdAt ? `${formatThai(moment(user.createdAt), "D MMMM YYYY")} · ${moment(user.createdAt).locale("th").fromNow()}` : "-"} />
+            <Field icon={<UpdateRounded />} label="แก้ไขข้อมูลล่าสุด" value={user.updatedAt ? `${formatThai(moment(user.updatedAt), "D MMM YYYY HH:mm")} น.` : "-"} />
           </Card>
         </Stack>
       </Box>

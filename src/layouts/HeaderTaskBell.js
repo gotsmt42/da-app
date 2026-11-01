@@ -12,15 +12,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Box, Button, ButtonBase, IconButton, Popover, Stack, SwipeableDrawer, Tooltip, Typography, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AssignmentLateOutlined, AssignmentTurnedInOutlined, WarningAmberRounded, ThumbUpAltOutlined, EventAvailableOutlined, LoginRounded, ChevronRight, Close } from "@mui/icons-material";
+import { AssignmentLateRounded, AssignmentTurnedInRounded, WarningAmberRounded, ThumbUpAltRounded, EventAvailableRounded, LoginRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close } from "@mui/icons-material";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import useMyAttention from "@/shared/hooks/useMyAttention";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import { ATTENTION_META, attentionDayText } from "@/shared/utils/myJobAttention";
 
-const ICON = { checkin: <LoginRounded />, ack: <ThumbUpAltOutlined />, confirm: <EventAvailableOutlined />, overdue: <WarningAmberRounded /> };
-const LINE = "#e2e8f0";
+const ICON = { checkin: <LoginRounded />, ack: <ThumbUpAltRounded />, confirm: <EventAvailableRounded />, overdue: <WarningAmberRounded /> };
+const LINE = "#e6e9ef";
 /** สิ่งที่ต้องกด (สั้น ชัด) */
 const ACTION = { checkin: "กดบันทึกเข้างาน", ack: "กดรับทราบงาน", confirm: "กดยืนยันนัดหมาย", overdue: "ค้างงาน · ส่งเอกสาร/ขอปิดงาน" };
 /** แยกตามบทบาทของฉันในงาน */
@@ -56,7 +56,7 @@ export default function HeaderTaskBell() {
       <Box sx={{ overflowY: "auto", overscrollBehavior: "contain" }}>
         {!att.total ? (
           <Stack alignItems="center" gap={0.75} sx={{ py: 4, px: 2, color: "#16a34a" }}>
-            <AssignmentTurnedInOutlined sx={{ fontSize: 40 }} />
+            <AssignmentTurnedInRounded sx={{ fontSize: 40 }} />
             <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>เรียบร้อยดี ไม่มีอะไรค้าง</Typography>
             <Typography sx={{ fontSize: "0.76rem", color: "#64748b", textAlign: "center" }}>รับทราบ · ยืนยันนัด · บันทึกเข้างานวันนี้ ครบ · ไม่มีงานค้าง</Typography>
           </Stack>
@@ -97,9 +97,9 @@ export default function HeaderTaskBell() {
     <>
       <Tooltip title={att.total ? `งานที่ต้องทำตอนนี้ ${att.total} งาน` : "งานที่ต้องทำ"}>
         <IconButton onClick={(e) => setAnchor(e.currentTarget)} size="small" aria-label={att.total ? `งานที่ต้องทำตอนนี้ ${att.total} งาน` : "งานที่ต้องทำ"}
-          sx={{ border: "1px solid rgba(255,255,255,0.18)", borderRadius: 2, color: att.total ? "#fecaca" : "#fff" }}>
+          sx={{ width: 34, height: 34, border: "1px solid #f5f6f8", borderRadius: "10px", bgcolor: "#f5f6f8", color: "#374151", "&:hover": { bgcolor: "#eceef2" } }}>
           <Badge badgeContent={att.total} color="error" max={99}>
-            {att.total ? <AssignmentLateOutlined fontSize="small" /> : <AssignmentTurnedInOutlined fontSize="small" />}
+            {att.total ? <AssignmentLateRounded fontSize="small" /> : <AssignmentTurnedInRounded fontSize="small" />}
           </Badge>
         </IconButton>
       </Tooltip>

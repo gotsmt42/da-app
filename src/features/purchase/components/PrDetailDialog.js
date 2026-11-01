@@ -9,10 +9,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, Skeleton,
   useMediaQuery, TextField, CircularProgress, Tooltip, Divider, LinearProgress, MenuItem, Chip, Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
-import {
-  Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, History, ShoppingCart, Inventory2, Print,
-  AttachFile, DeleteOutline, Description, Image as ImageIcon, TaskAlt, HistoryEdu, Check, CalendarMonth, Build, Storefront,
-} from "@mui/icons-material";
+import { CloseRounded as Close, EditRounded as Edit, UndoRounded as Undo, BlockRounded as Block, FactCheckRounded as FactCheck, CheckCircleRounded as CheckCircle, DoneAllRounded as DoneAll, HistoryRounded as History, ShoppingCartRounded as ShoppingCart, Inventory2Rounded as Inventory2, PrintRounded as Print, AttachFileRounded as AttachFile, DeleteOutlineRounded as DeleteOutline, DescriptionRounded as Description, ImageRounded as ImageIcon, TaskAltRounded as TaskAlt, HistoryEduRounded as HistoryEdu, CheckRounded as Check, CalendarMonthRounded as CalendarMonth, BuildRounded as Build, StorefrontRounded as Storefront } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import PdfPrintDialog from "@/shared/components/PdfPrintDialog";
@@ -109,7 +106,7 @@ const FooterProgress = ({ steps, status, color }) => {
             return (
               <Box key={st.label} sx={{
                 width: isCurrent ? 12 : 7, height: isCurrent ? 12 : 7, borderRadius: "50%", boxSizing: "border-box",
-                bgcolor: isCurrent ? "transparent" : st.done || complete ? tone : "#e2e8f0",
+                bgcolor: isCurrent ? "transparent" : st.done || complete ? tone : "#e6e9ef",
                 border: isCurrent ? `2px solid ${alpha(tone, 0.2)}` : "none", borderTopColor: isCurrent ? tone : undefined,
                 animation: isCurrent ? "prfSpin .8s linear infinite" : `prfIn .35s ease-out ${i * 0.08}s both`,
                 "@keyframes prfIn": { from: { transform: "scale(0)", opacity: 0 }, to: { transform: "scale(1)", opacity: 1 } },
@@ -315,7 +312,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
                       const c = r.status === "rejected" && i === 1 ? "#dc2626" : done ? PR_ACCENT : cur ? PR_ACCENT : "#cbd5e1";
                       return (
                         <Box key={s.label} sx={{ flex: 1, textAlign: "center", position: "relative" }}>
-                          {i > 0 && <Box sx={{ position: "absolute", top: 11, right: "50%", width: "100%", height: 2, bgcolor: done || cur ? "#c7d2fe" : "#e2e8f0" }} />}
+                          {i > 0 && <Box sx={{ position: "absolute", top: 11, right: "50%", width: "100%", height: 2, bgcolor: done || cur ? "#c7d2fe" : "#e6e9ef" }} />}
                           <Box sx={{ width: 24, height: 24, mx: "auto", borderRadius: "50%", position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, bgcolor: done ? c : "#fff", color: done ? "#fff" : c, border: `2px solid ${c}` }}>
                             {done ? <TaskAlt sx={{ fontSize: 15 }} /> : i + 1}
                           </Box>

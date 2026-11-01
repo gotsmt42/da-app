@@ -16,7 +16,7 @@
  */
 
 import { Navigate } from "react-router-dom";
-import { RequestQuote, AccountBalanceWallet } from "@mui/icons-material";
+import { RequestQuoteRounded as RequestQuote, AccountBalanceWalletRounded as AccountBalanceWallet } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";

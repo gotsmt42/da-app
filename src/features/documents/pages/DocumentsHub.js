@@ -15,7 +15,7 @@
  */
 
 import { Navigate } from "react-router-dom";
-import { FolderOpen, Description, Outbox } from "@mui/icons-material";
+import { FolderOpenRounded as FolderOpen, DescriptionRounded as Description, OutboxRounded as Outbox } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";

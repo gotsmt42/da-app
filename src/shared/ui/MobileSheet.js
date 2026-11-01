@@ -17,7 +17,7 @@
  */
 import { startTransition, useEffect, useState } from "react";
 import { Box, Dialog, IconButton, Stack, SwipeableDrawer, Typography, useMediaQuery } from "@mui/material";
-import { Close } from "@mui/icons-material";
+import { CloseRounded as Close } from "@mui/icons-material";
 
 const iOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
@@ -114,7 +114,7 @@ export function useLinger(open, ms = SHEET_DURATION.exit + 60) {
 export const SheetPlaceholder = () => (
   <Box sx={{ p: 2, display: "grid", gap: 1.25 }}>
     {[72, 120, 96].map((h, i) => (
-      <Box key={i} sx={{ height: h, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0", opacity: 0.7 }} />
+      <Box key={i} sx={{ height: h, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e6e9ef", opacity: 0.7 }} />
     ))}
   </Box>
 );
@@ -135,7 +135,7 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
   const isMobile = useMediaQuery("(max-width:599.95px)");
   const stage = useStagedOpen(open && isMobile);
   const head = (
-    <Box sx={{ position: "sticky", top: 0, zIndex: 2, bgcolor: "#fff", borderBottom: "1px solid #e2e8f0", pt: isMobile ? "env(safe-area-inset-top)" : 0 }}>
+    <Box sx={{ position: "sticky", top: 0, zIndex: 2, bgcolor: "#fff", borderBottom: "1px solid #e6e9ef", pt: isMobile ? "env(safe-area-inset-top)" : 0 }}>
       {isMobile && <Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto", mt: 1 }} />}
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: isMobile ? 1 : 1.5 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>

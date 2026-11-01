@@ -17,10 +17,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Skeleton,
   Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert,
 } from "@mui/material";
-import {
-  Refresh, Tune, Description, EventAvailable, MoreVert,
-  EditNote, OpenInNew, Inventory2, Visibility,
-} from "@mui/icons-material";
+import { RefreshRounded as Refresh, TuneRounded as Tune, DescriptionRounded as Description, EventAvailableRounded as EventAvailable, MoreVertRounded as MoreVert, EditNoteRounded as EditNote, OpenInNewRounded as OpenInNew, Inventory2Rounded as Inventory2, VisibilityRounded as Visibility } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
 import MobileFilterSheet, { FilterSheetButton, ActiveFilterChips, SheetOptions, SheetSearch, SheetLabel } from "@/shared/ui/MobileFilterSheet";
 import {

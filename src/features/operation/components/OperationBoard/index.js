@@ -49,21 +49,7 @@ import {
 } from "@mui/material";
 
 // MUI Icons
-import {
-  Search, FilterList, Clear, TableChart, ChevronRight, ViewList,
-  Upload, Download, Delete, Visibility, Close, CheckCircle,
-  PendingActions, Build, Assignment, Notifications, MoreVert,
-  CalendarMonth, Warning, TrendingUp, Description, DateRange,
-  CloudUpload, InsertDriveFile, Image, PictureAsPdf, Article,
-  Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
-  ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
-  NoteAdd, History, Person, AccessTime, FiberManualRecord,
-  TaskAlt, HourglassTop, Cancel, Today,
-  Send, Chat, Link as LinkIcon,
-  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, AssignmentTurnedInOutlined, EventAvailable, Tune,
-  RemoveCircleOutline, NoteAlt,
-  Lock, Groups,
-} from "@mui/icons-material";
+import { SearchRounded as Search, FilterListRounded as FilterList, ClearRounded as Clear, TableChartRounded as TableChart, ChevronRightRounded as ChevronRight, ViewListRounded as ViewList, UploadRounded as Upload, DownloadRounded as Download, DeleteRounded as Delete, VisibilityRounded as Visibility, CloseRounded as Close, CheckCircleRounded as CheckCircle, PendingActionsRounded as PendingActions, BuildRounded as Build, AssignmentRounded as Assignment, NotificationsRounded as Notifications, MoreVertRounded as MoreVert, CalendarMonthRounded as CalendarMonth, WarningRounded as Warning, TrendingUpRounded as TrendingUp, DescriptionRounded as Description, DateRangeRounded as DateRange, CloudUploadRounded as CloudUpload, InsertDriveFileRounded as InsertDriveFile, ImageRounded as Image, PictureAsPdfRounded as PictureAsPdf, ArticleRounded as Article, RefreshRounded as Refresh, ArrowUpwardRounded as ArrowUpward, ArrowDownwardRounded as ArrowDownward, CircleRounded as Circle, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, FolderOpenRounded as FolderOpen, AttachFileRounded as AttachFile, LoginRounded as Login, LogoutRounded as Logout, EditRounded as Edit, NoteAddRounded as NoteAdd, HistoryRounded as History, PersonRounded as Person, AccessTimeRounded as AccessTime, FiberManualRecordRounded as FiberManualRecord, TaskAltRounded as TaskAlt, HourglassTopRounded as HourglassTop, CancelRounded as Cancel, TodayRounded as Today, SendRounded as Send, ChatRounded as Chat, LinkRounded as LinkIcon, PrintRounded as Print, ShareRounded as Share, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, AssignmentTurnedInRounded, EventAvailableRounded as EventAvailable, TuneRounded as Tune, RemoveCircleOutlineRounded as RemoveCircleOutline, NoteAltRounded as NoteAlt, LockRounded as Lock, GroupsRounded as Groups } from "@mui/icons-material";
 
 // MUI Date Picker
 // ✅ ปฏิทิน พ.ศ. ของแอป — มีหน้าจอเลือกปี→เดือน→วัน ครบ (ดู ThaiDatePickerInner)
@@ -97,8 +83,8 @@ import TodayBoard, { isTodayJob } from "@/features/operation/components/TodayBoa
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
-import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
-import Add from "@mui/icons-material/Add";
+import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUncheckedRounded";
+import Add from "@mui/icons-material/AddRounded";
 import InfoLine from "@/shared/ui/InfoLine";
 // ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับที่ระบบใบแจ้งงานใช้ (ดูหัวไฟล์ SiteMapLink.js)
 // ⚠️ หน้านี้ใช้แค่ hook ไม่ใช้ตัวคอมโพเนนต์ — ลิงก์แผนที่ผูกไว้กับ "ชื่อโครงการ" บนการ์ดเลย
@@ -110,7 +96,7 @@ import { ROLES, TECHNICIAN_ROLES, isRole, normalizeRole } from "@/shared/utils/r
 import { can } from "@/shared/utils/roles";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
-import AppsIcon from "@mui/icons-material/Apps";
+import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
@@ -200,7 +186,7 @@ const StatusBadge = styled(Box, { shouldForwardProp: (p) => p !== "color" })(({ 
   whiteSpace: "nowrap",
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "ปรับรูปแบบให้คล้ายงานของฉัน") — พื้นเทาอ่อน + จุดสีสถานะ (เดิมพื้น/ขอบ/ตัวหนังสือสีตามสถานะ)
   background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #e6e9ef",
   color: "#334155",
   "& .MuiSvgIcon-root": { color: color || "#94a3b8", fontSize: 8 },
 }));
@@ -325,7 +311,7 @@ function AiCloseCheckBox({ event }) {
   const neutral = !chk || chk.error || chk.skipped;
   const tone = neutral ? "#64748b" : chk.ok ? "#15803d" : "#b91c1c";
   return (
-    <Box sx={{ mb: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: neutral ? "#f8fafc" : chk.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${neutral ? "#e2e8f0" : chk.ok ? "#bbf7d0" : "#fecaca"}` }}>
+    <Box sx={{ mb: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: neutral ? "#f8fafc" : chk.ok ? "#f0fdf4" : "#fef2f2", border: `1px solid ${neutral ? "#e6e9ef" : chk.ok ? "#bbf7d0" : "#fecaca"}` }}>
       <Stack direction="row" alignItems="center" gap={1}>
         <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 900, color: tone }}>
           {busy ? "AI กำลังตรวจเอกสาร…" : !chk ? "ยังไม่ได้ให้ AI ตรวจเอกสาร" : chk.error ? chk.error : chk.skipped ? "ไม่ได้ตรวจด้วย AI (ยังไม่เปิดใช้งาน AI)" : chk.ok ? "AI ตรวจเอกสารแล้ว · ผ่าน" : `AI ตรวจเอกสารแล้ว · ไม่ผ่าน ${chk.problems?.length || 0} ข้อ`}
@@ -600,7 +586,7 @@ const SectionHeader = ({ section, count }) => {
       {m.hint && (
         <Typography noWrap sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.78rem", color: "#64748b", minWidth: 0 }}>{m.hint}</Typography>
       )}
-      <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0", ml: 0.5, minWidth: 16 }} />
+      <Box sx={{ flex: 1, height: "1px", bgcolor: "#e6e9ef", ml: 0.5, minWidth: 16 }} />
     </Stack>
   );
 };
@@ -790,7 +776,7 @@ export const FileUploadSection = ({
       sx={card ? {
         borderRadius: "14px", bgcolor: dragging ? ACCENT_SOFT : "#fff",
         border: `1px solid ${dragging ? ACCENT : hasFiles && !reportUnconfirmed ? "#bbf7d0" : "#e8edf3"}`,
-        boxShadow: "0 1px 2px rgba(15,23,42,.04)", px: 1.5, py: 1.15,
+        boxShadow: "none", px: 1.5, py: 1.15,
       } : undefined}>
       {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "รูปแบบยังไม่สวย ดูล้าสมัย ปุ่มใหญ่เกินไป จัดวางให้พอดี")
           หัวแถวเดียว: ไอคอน · ชื่อ + สถานะ/บังคับเป็นบรรทัดเล็กใต้ชื่อ · ปุ่ม "แนบ" เล็กชิดขวา
@@ -1401,7 +1387,7 @@ const EventRowCard = ({
                   return (
                     <Chip size="small" label={meta.label}
                       icon={<Circle sx={{ fontSize: "8px !important", color: `${meta.color} !important` }} />}
-                      sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155" }} />
+                      sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: "#f8fafc", border: "1px solid #e6e9ef", color: "#334155" }} />
                   );
                 })()}
                 {isRejected(event) && (
@@ -1994,14 +1980,14 @@ const EventRowCard = ({
 // ✅ (17 ต.ค. 2569) เส้นคั่นกลุ่ม: ทั้งหมด | ลำดับงาน (รอยืนยัน → … → คำขอปิดงาน) | ค้างงาน (ข้อยกเว้น) | เสร็จสิ้น (คลัง)
 const STRIP_SEP_BEFORE = new Set(["today", "waiting", "overdue", "closed"]);
 const StatusStrip = ({ items, value, onChange }) => (
-  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto",
+  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: "1px solid #e6e9ef", borderRadius: 3, overflowX: "auto",
     scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
     {items.map((it) => {
       const on = value === it.value;
       const hot = it.alert && it.count > 0;
       return (
         <React.Fragment key={it.value}>
-        {STRIP_SEP_BEFORE.has(it.value) && <Box sx={{ width: "1px", alignSelf: "stretch", my: 1, bgcolor: "#e2e8f0", flexShrink: 0 }} />}
+        {STRIP_SEP_BEFORE.has(it.value) && <Box sx={{ width: "1px", alignSelf: "stretch", my: 1, bgcolor: "#e6e9ef", flexShrink: 0 }} />}
         <ButtonBase onClick={() => onChange(it.value)}
           sx={{
             flex: "1 0 auto", minWidth: 0, height: 44, px: 1.5, gap: 0.9, borderRadius: 2.5, fontFamily: "inherit", whiteSpace: "nowrap",
@@ -2254,7 +2240,7 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 };
   const dash = <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   return (
-  <TableContainer sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+  <TableContainer sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
     <Table size="small" sx={{ minWidth: 1500, width: "100%", "& td": { borderColor: LINE, verticalAlign: "top", py: 1.25, px: 1.25 }, "& th": { px: 1.25 } }}>
       <TableHead>
         <TableRow sx={{ "& th": th }}>
@@ -2422,7 +2408,7 @@ const JobDetailDrawer = React.forwardRef(({ jobGroups, events, isMobile, navigat
           <>
             {isMobile && <Box sx={{ bgcolor: "background.paper", pt: 1 }}><Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto" }} /></Box>}
             <Stack direction="row" alignItems="center" gap={1.25}
-              sx={{ px: 2, py: isMobile ? 1 : 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
+              sx={{ px: 2, py: isMobile ? 1 : 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e6e9ef", position: "sticky", top: 0, zIndex: 2 }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography noWrap sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>
                   {head.site || head.company || "รายละเอียดงาน"}
@@ -3553,7 +3539,7 @@ const Operation = () => {
           ✅ บังคับบรรทัดเดียวบนจอแคบ + ย่อปุ่มกลมเหลือ 34px ให้พอดีจอ 393px */}
       {/* ✅ (19 ต.ค. 2569 "ขนาด กรอบ ระยะให้เท่ากันทุกหน้า") หัวเพจกล่องขาวชุดเดียวกับหน้าอื่นในกลุ่ม (PageKit.PageHeader) */}
       <PageHeader
-        icon={<AssignmentTurnedInOutlined />}
+        icon={<AssignmentTurnedInRounded />}
         title="การดำเนินงาน"
         subtitle={loading
                 ? "กำลังโหลด..."
@@ -3655,7 +3641,7 @@ const Operation = () => {
           ⚠️ ยังกรองเหลืองานเดียวเหมือนเดิม — ลิงก์ /operation/:id มาจากหลายที่ ถ้าไม่กรองงานอาจไม่อยู่ในหน้านี้ */}
       {selectedEvent && (
         <Stack direction="row" alignItems="center" gap={1.25}
-          sx={{ mb: 2, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderLeft: "4px solid #2563eb" }}>
+          sx={{ mb: 2, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e6e9ef", borderLeft: "4px solid #2563eb" }}>
           <Box flex={1} minWidth={0}>
             <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b" }}>กำลังดูเฉพาะงานนี้</Typography>
             <Typography title={focusedJob.name} noWrap sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a" }}>{focusedJob.name}</Typography>
@@ -3668,7 +3654,7 @@ const Operation = () => {
               // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
               if (selectedEvent.unscheduled) { navigate("/jobs/intake"); return; }
               navigate(`/event?event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
-            }} sx={{ width: 38, height: 38, border: "1px solid #e2e8f0", borderRadius: 2, color: "#334155" }}>
+            }} sx={{ width: 38, height: 38, border: "1px solid #e6e9ef", borderRadius: 2, color: "#334155" }}>
               <CalendarMonth sx={{ fontSize: 19 }} />
             </IconButton>
           </Tooltip>
@@ -3732,7 +3718,7 @@ const Operation = () => {
                         sx={{
                           flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.75, height: 36, px: 1.5, borderRadius: 999, cursor: "pointer",
                           font: "inherit", fontSize: "0.84rem", fontWeight: 800, whiteSpace: "nowrap",
-                          border: `1px solid ${on ? (hot ? "#fecaca" : "#bfdbfe") : "#e2e8f0"}`,
+                          border: `1px solid ${on ? (hot ? "#fecaca" : "#bfdbfe") : "#e6e9ef"}`,
                           bgcolor: on ? (hot ? "#fef2f2" : "#eff6ff") : "#fff",
                           color: on ? (hot ? "#b91c1c" : "#1d4ed8") : "#334155",
                         }}>
@@ -3752,7 +3738,7 @@ const Operation = () => {
                 <Box sx={{ mb: 1, display: "flex", "& > *": { flex: 1 } }}>{personSelect}</Box>
               )}
               <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
-                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e2e8f0", color: "#334155" }} />
+                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e6e9ef", color: "#334155" }} />
                 {search.trim() && <Chip size="small" label={`ค้นหา: ${search.trim()}`} onDelete={() => setSearch("")} sx={{ fontWeight: 700 }} />}
                 {filterOP && <Chip size="small" label={`สถานะ: ${filterOP}`} onDelete={() => setFilterOP("")} sx={{ fontWeight: 700 }} />}
                 {filterType && <Chip size="small" label={`ประเภท: ${filterType}`} onDelete={() => setFilterType("")} sx={{ fontWeight: 700 }} />}

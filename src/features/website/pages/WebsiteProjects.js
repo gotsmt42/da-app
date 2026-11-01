@@ -4,7 +4,7 @@ import {
   IconButton, InputAdornment, Skeleton, Stack, Switch, TextField, Tooltip, Typography, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Add, Close, DeleteOutline, Edit, Search, Star } from "@mui/icons-material";
+import { AddRounded as Add, CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, EditRounded as Edit, SearchRounded as Search, StarRounded as Star } from "@mui/icons-material";
 
 import ImageManager from "../components/ImageManager";
 import { StringListEditor, cleanList } from "../components/ListEditors";

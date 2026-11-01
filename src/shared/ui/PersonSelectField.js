@@ -15,7 +15,7 @@
  */
 import { useState } from "react";
 import { Avatar, Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
-import { Check, Groups, ExpandMore, PersonOff } from "@mui/icons-material";
+import { CheckRounded as Check, GroupsRounded as Groups, ExpandMoreRounded as ExpandMore, PersonOffRounded as PersonOff } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 
@@ -107,7 +107,7 @@ export default function PersonSelectField({
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         slotProps={{ paper: { sx: {
           mt: 0.75, width: Math.max(280, anchor?.offsetWidth || 0), maxWidth: "calc(100vw - 24px)",
-          borderRadius: 3, border: "1px solid #e2e8f0", boxShadow: "0 18px 40px rgba(15,23,42,.18)",
+          borderRadius: 3, border: "1px solid #e6e9ef", boxShadow: "0 18px 40px rgba(15,23,42,.18)",
         } } }}
       >
         <Box sx={{ px: 1.75, pt: 1.25, pb: 0.5 }}>

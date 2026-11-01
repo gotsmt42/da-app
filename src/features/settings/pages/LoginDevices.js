@@ -15,10 +15,7 @@ import {
   Box, Stack, Typography, Button, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions,
   Snackbar, Alert, Skeleton,
 } from "@mui/material";
-import {
-  LaptopMac, PhoneIphone, TabletMac, DevicesOther, PlaceOutlined, Refresh, CheckCircle,
-  ShieldOutlined, InstallMobile, Logout, Language, AccessTime, LoginOutlined,
-} from "@mui/icons-material";
+import { LaptopMacRounded as LaptopMac, PhoneIphoneRounded as PhoneIphone, TabletMacRounded as TabletMac, DevicesOtherRounded as DevicesOther, PlaceRounded, RefreshRounded as Refresh, CheckCircleRounded as CheckCircle, ShieldRounded, InstallMobileRounded as InstallMobile, LogoutRounded as Logout, LanguageRounded as Language, AccessTimeRounded as AccessTime, LoginRounded } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import SessionService from "@/shared/services/SessionService";
 import { formatThai } from "@/shared/utils/thaiDate";
@@ -60,7 +57,7 @@ const Section = ({ title, hint, right, children }) => (
       </Box>
       {right}
     </Stack>
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none" }}>
       {children}
     </Box>
   </Box>
@@ -102,14 +99,14 @@ const DeviceRow = ({ s, onRevoke }) => {
           {s.standalone && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.3, px: 0.8, py: 0.1, borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, bgcolor: SURFACE, color: INK_2, border: `1px solid ${LINE}` }}><InstallMobile sx={{ fontSize: 12 }} />แอปบนหน้าจอโฮม</Box>}
         </Stack>
         <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.2 }}>{sub}</Typography>
-        <Meta icon={<PlaceOutlined />}>{place || "ไม่ทราบตำแหน่ง"}{s.location?.isp ? ` · ${s.location.isp}` : ""}</Meta>
+        <Meta icon={<PlaceRounded />}>{place || "ไม่ทราบตำแหน่ง"}{s.location?.isp ? ` · ${s.location.isp}` : ""}</Meta>
         {s.ip && <Meta icon={<Language />}>IP {s.ip}</Meta>}
         <Meta icon={<AccessTime />}>
           {active
             ? <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>กำลังใช้งาน</Box>
             : `ใช้งานล่าสุด ${moment(s.lastSeenAt).locale("th").fromNow()}`}
         </Meta>
-        {s.createdAt && <Meta icon={<LoginOutlined />}>เข้าสู่ระบบเมื่อ {formatThai(moment(s.createdAt), "D MMM YY HH:mm")} น.</Meta>}
+        {s.createdAt && <Meta icon={<LoginRounded />}>เข้าสู่ระบบเมื่อ {formatThai(moment(s.createdAt), "D MMM YY HH:mm")} น.</Meta>}
         {revokeBtn && <Box sx={{ display: { xs: "block", sm: "none" }, mt: 1.1 }}>{revokeBtn}</Box>}
       </Box>
       {revokeBtn && <Box sx={{ display: { xs: "none", sm: "block" } }}>{revokeBtn}</Box>}
@@ -181,7 +178,7 @@ export default function LoginDevices() {
       </Stack>
 
       {/* สรุป */}
-      <Stack direction="row" sx={{ mb: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Stack direction="row" sx={{ mb: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: "none" }}>
         <Stat label="ทั้งหมด" value={sessions ? sessions.length : "–"} />
         <Stat label="กำลังใช้งาน" value={sessions ? activeCount : "–"} tone={activeCount ? SUCCESS : INK} />
         <Stat label="เครื่องอื่น" value={sessions ? others.length : "–"} />
@@ -234,7 +231,7 @@ export default function LoginDevices() {
 
       {/* คำแนะนำความปลอดภัย */}
       <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ p: 1.75, borderRadius: 3, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
-        <ShieldOutlined sx={{ fontSize: 20, color: ACCENT, mt: 0.1 }} />
+        <ShieldRounded sx={{ fontSize: 20, color: ACCENT, mt: 0.1 }} />
         <Box>
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK }}>ข้อแนะนำด้านความปลอดภัย</Typography>
           <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.25, "& li": { fontSize: "0.78rem", color: MUTED, lineHeight: 1.6 } }}>

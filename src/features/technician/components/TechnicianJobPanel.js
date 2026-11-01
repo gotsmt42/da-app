@@ -27,17 +27,7 @@ import {
   Dialog, DialogContent, useMediaQuery, ButtonBase,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
-import {
-  Build, Assignment, Visibility, Warning, Description,
-  Edit, CloudUpload, CheckCircle,
-  ExpandMore, ExpandLess, ChevronRight, History,
-  PictureAsPdf, Image, Article, InsertDriveFile,
-  AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
-  RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
-  Send, Chat, Link as LinkIcon, MoreVert, Print, Share, CalendarMonth, Lock,
-  RemoveCircleOutline, CheckBox, CheckBoxOutlineBlank,
-  RadioButtonUnchecked,
-} from "@mui/icons-material";
+import { BuildRounded as Build, AssignmentRounded as Assignment, VisibilityRounded as Visibility, WarningRounded as Warning, DescriptionRounded as Description, EditRounded as Edit, CloudUploadRounded as CloudUpload, CheckCircleRounded as CheckCircle, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, ChevronRightRounded as ChevronRight, HistoryRounded as History, PictureAsPdfRounded as PictureAsPdf, ImageRounded as Image, ArticleRounded as Article, InsertDriveFileRounded as InsertDriveFile, AttachFileRounded as AttachFile, DeleteRounded as Delete, DownloadRounded as Download, TaskAltRounded as TaskAlt, HourglassTopRounded as HourglassTop, NoteAddRounded as NoteAdd, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, CloseRounded as Close, CancelRounded as Cancel, SendRounded as Send, ChatRounded as Chat, LinkRounded as LinkIcon, MoreVertRounded as MoreVert, PrintRounded as Print, ShareRounded as Share, CalendarMonthRounded as CalendarMonth, LockRounded as Lock, RemoveCircleOutlineRounded as RemoveCircleOutline, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, RadioButtonUncheckedRounded as RadioButtonUnchecked } from "@mui/icons-material";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
@@ -1044,7 +1034,7 @@ const TechnicianJobCard = ({
                 {/* ✅ ป้ายสถานะแบบเรียบ — พื้นเทาอ่อน จุดสีตามสถานะ (ชุดเดียวกับหน้าการดำเนินงาน) */}
                 <Box component="span" sx={{
                   display: "inline-flex", alignItems: "center", gap: 0.6, height: 24, px: 1, borderRadius: 999,
-                  bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155", fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap",
+                  bgcolor: "#f8fafc", border: "1px solid #e6e9ef", color: "#334155", fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap",
                 }}>
                   <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: statusColor }} />
                   {event.status || "ไม่ระบุ"}

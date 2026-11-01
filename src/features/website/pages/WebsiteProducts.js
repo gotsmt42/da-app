@@ -4,7 +4,7 @@ import {
   IconButton, InputAdornment, MenuItem, Skeleton, Stack, Switch, TextField, Tooltip, Typography, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Add, Close, DeleteOutline, Edit, ImageNotSupported, PictureAsPdf, Search, Star, UploadFile } from "@mui/icons-material";
+import { AddRounded as Add, CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, EditRounded as Edit, ImageNotSupportedRounded as ImageNotSupported, PictureAsPdfRounded as PictureAsPdf, SearchRounded as Search, StarRounded as Star, UploadFileRounded as UploadFile } from "@mui/icons-material";
 
 import ImageManager from "../components/ImageManager";
 import { SpecsEditor, cleanSpecs } from "../components/ListEditors";

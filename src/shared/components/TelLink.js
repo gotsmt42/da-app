@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Box, Tooltip, IconButton } from "@mui/material";
-import PhoneIphone from "@mui/icons-material/PhoneIphone";
-import ContentCopy from "@mui/icons-material/ContentCopy";
-import Check from "@mui/icons-material/Check";
+import PhoneIphone from "@mui/icons-material/PhoneIphoneRounded";
+import ContentCopy from "@mui/icons-material/ContentCopyRounded";
+import Check from "@mui/icons-material/CheckRounded";
 
 /**
  * ☎️ เบอร์โทรที่ "กดโทรออกได้ + คัดลอกได้" — ของกลางที่ทุกหน้าที่แสดงเบอร์ผู้ติดต่อใช้ร่วมกัน

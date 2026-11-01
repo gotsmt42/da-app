@@ -17,10 +17,7 @@ import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, IconButton, LinearProgress,
   MenuItem, Stack, TextField, Typography, useMediaQuery,
 } from "@mui/material";
-import {
-  AutoAwesome, Close, EditOutlined, PictureAsPdf, Refresh, TaskAlt, AddRounded, DeleteOutline, WarningAmberRounded,
-  Description, CheckCircleRounded, GridOnRounded,
-} from "@mui/icons-material";
+import { AutoAwesomeRounded as AutoAwesome, CloseRounded as Close, EditRounded, PictureAsPdfRounded as PictureAsPdf, RefreshRounded as Refresh, TaskAltRounded as TaskAlt, AddRounded, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded, DescriptionRounded as Description, CheckCircleRounded, GridOnRounded } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
@@ -348,7 +345,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                     showCancelButton: true, confirmButtonText: "อ่านใหม่", cancelButtonText: "ยกเลิก" });
                   if (ok.isConfirmed) scan(false);
                 }} disabled={!state.enabled || rescanLeft <= 0} sx={{ ...BTN, color: MUTED }}>{rescanLeft <= 0 ? "อ่านใหม่ (ครบวันนี้)" : `อ่านใหม่ (${rescanLeft})`}</Button>}
-                {state.canEdit && <Button startIcon={<EditOutlined />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
+                {state.canEdit && <Button startIcon={<EditRounded />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
                 <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy || badFiles.length > 0} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
                 {/* มือถือ: ปุ่มรองแถวบน · ยืนยัน/สร้าง PDF แถวล่างเต็มกว้าง */}
                 <Box sx={isMobile ? { flexBasis: "100%", height: 0 } : { flex: 1 }} />

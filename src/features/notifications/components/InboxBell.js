@@ -14,10 +14,7 @@ import {
   Box, IconButton, Badge, Tooltip, Popover, Typography, Stack, Button, Drawer, useMediaQuery, ButtonBase, CircularProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Notifications, NotificationsNone, Close, DoneAll, Build, AccountBalanceWallet, ShoppingCart, AccessTime,
-  AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep, Storefront, Description,
-} from "@mui/icons-material";
+import { NotificationsRounded as Notifications, NotificationsNoneRounded as NotificationsNone, CloseRounded as Close, DoneAllRounded as DoneAll, BuildRounded as Build, AccountBalanceWalletRounded as AccountBalanceWallet, ShoppingCartRounded as ShoppingCart, AccessTimeRounded as AccessTime, AssignmentIndRounded as AssignmentInd, MarkEmailUnreadRounded as MarkEmailUnread, CalendarMonthRounded as CalendarMonth, DeleteSweepRounded as DeleteSweep, StorefrontRounded as Storefront, DescriptionRounded as Description } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import { departmentOf } from "@/shared/utils/roles";
 import useInbox, { markInboxRead, markAllInboxRead, clearReadInbox, loadMoreInbox } from "@/shared/hooks/useInbox";
@@ -25,7 +22,7 @@ import { SHEET_DURATION, SHEET_EASING } from "@/shared/ui/MobileSheet";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 
 /** ไอคอน/สีตามปลายทางของแจ้งเตือน — อ่านจาก url ไม่ต้องให้ทุก route ส่งชนิดมาเอง */
 const KINDS = [
@@ -217,7 +214,7 @@ export default function InboxBell({ dark = false }) {
     <>
       <Tooltip title="การแจ้งเตือน">
         <IconButton onClick={(e) => { const ps = sectionOfPage(location, myDept); setPageSection(ps); setSection(ps); setAnchor(e.currentTarget); }} size="small" aria-label={unread ? `การแจ้งเตือน (ยังไม่อ่าน ${unread})` : "การแจ้งเตือน"}
-          sx={{ border: "1px solid", borderColor: dark ? "rgba(255,255,255,0.18)" : "divider", borderRadius: 2, color: dark ? "#fff" : "inherit" }}>
+          sx={dark ? { width: 34, height: 34, border: "1px solid rgba(255,255,255,0.14)", borderRadius: "10px", bgcolor: "rgba(255,255,255,0.06)", color: "#fff", "&:hover": { bgcolor: "rgba(255,255,255,0.14)" } } : { width: 34, height: 34, border: "1px solid #f5f6f8", borderRadius: "10px", bgcolor: "#f5f6f8", color: "#374151", "&:hover": { bgcolor: "#eceef2" } }}>
           <Badge badgeContent={unread} color="error" max={99}>
             <Notifications fontSize="small" />
           </Badge>

@@ -14,9 +14,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, Avatar } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Add, Today, EventOutlined, ReportProblemOutlined, SendOutlined, LockOutlined, ChevronRight, CalendarMonthOutlined,
-} from "@mui/icons-material";
+import { AddRounded as Add, TodayRounded as Today, EventRounded, ReportProblemRounded, SendRounded, LockRounded, ChevronRightRounded as ChevronRight, CalendarMonthRounded } from "@mui/icons-material";
 
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -154,7 +152,7 @@ export default function SalesDashboard() {
             <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
               <Button variant="contained" startIcon={<Add />} onClick={() => navigate("/event")} sx={{ ...PRIMARY_BTN_SX, flex: { xs: 1, sm: "0 0 auto" }, height: 40 }}>เพิ่มนัดหมาย</Button>
               {canRequestDispatch && (
-                <Button variant="outlined" startIcon={<SendOutlined />} onClick={() => navigate("/sales")}
+                <Button variant="outlined" startIcon={<SendRounded />} onClick={() => navigate("/sales")}
                   sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 40, flex: { xs: 1, sm: "0 0 auto" }, color: ACCENT, borderColor: alpha(ACCENT, 0.4), "&:hover": { borderColor: ACCENT, bgcolor: alpha(ACCENT, 0.04) } }}>
                   แจ้งงานให้ช่าง
                 </Button>
@@ -175,14 +173,14 @@ export default function SalesDashboard() {
 
           {/* ต้องติดตาม — โชว์เฉพาะตอนมีจริง */}
           {!loading && follow.length > 0 && (
-            <Widget title="ต้องติดตาม" count={follow.length} icon={ReportProblemOutlined} tone={AMBER}
+            <Widget title="ต้องติดตาม" count={follow.length} icon={ReportProblemRounded} tone={AMBER}
               hint="เลยวันนัดยังไม่บันทึกเข้าพบ · เข้าพบแล้วรอปิดงาน" to="/event" toLabel="จัดการ">
               {follow.slice(0, 5).map((e) => <ApptRow key={e._id} e={e} showDate />)}
             </Widget>
           )}
 
           {/* นัดหมายที่จะถึง */}
-          <Widget title="นัดหมายที่จะถึง" count={upcoming.length || undefined} icon={EventOutlined} hint="14 วันข้างหน้า" to={upcoming.length > 6 ? "/event" : undefined}>
+          <Widget title="นัดหมายที่จะถึง" count={upcoming.length || undefined} icon={EventRounded} hint="14 วันข้างหน้า" to={upcoming.length > 6 ? "/event" : undefined}>
             {loading ? <Loading rows={3} /> : upcoming.length ? upcoming.slice(0, 6).map((e) => <ApptRow key={e._id} e={e} showDate />) : (
               <Empty text="ยังไม่มีนัดหมายใน 14 วันข้างหน้า" />
             )}
@@ -192,7 +190,7 @@ export default function SalesDashboard() {
         {/* ── ขวา: งานที่เกี่ยวกับช่าง ── */}
         <Box sx={{ minWidth: 0, position: { lg: "sticky" }, top: { lg: 16 } }}>
           {canRequestDispatch && (
-            <Widget title="งานที่แจ้งให้ช่าง" count={activeDispatches.length || undefined} icon={SendOutlined} tone={SERVICE}
+            <Widget title="งานที่แจ้งให้ช่าง" count={activeDispatches.length || undefined} icon={SendRounded} tone={SERVICE}
               to="/sales" toLabel="ดูทั้งหมด"
               summary={[
                 dispatchStats.rejected > 0 && <Pill key="r" color={RED}>ถูกตีกลับ {dispatchStats.rejected}</Pill>,
@@ -222,12 +220,12 @@ export default function SalesDashboard() {
               bgcolor: "#fff", border: `1px solid ${LINE}`, boxShadow: CARD_SHADOW, "&:hover": { borderColor: alpha(SERVICE, 0.5) },
             }}>
               <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(SERVICE, 0.1), color: SERVICE, flexShrink: 0 }}>
-                <CalendarMonthOutlined sx={{ fontSize: 20 }} />
+                <CalendarMonthRounded sx={{ fontSize: 20 }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Stack direction="row" spacing={0.6} alignItems="center">
                   <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK }}>ตารางงานช่าง</Typography>
-                  <Pill color={SERVICE} icon={<LockOutlined sx={{ fontSize: 12 }} />} sx={{ height: 20, fontSize: "0.64rem" }}>ดูอย่างเดียว</Pill>
+                  <Pill color={SERVICE} icon={<LockRounded sx={{ fontSize: 12 }} />} sx={{ height: 20, fontSize: "0.64rem" }}>ดูอย่างเดียว</Pill>
                 </Stack>
                 <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
                   {serviceToday ? `วันนี้ช่างมีงาน ${serviceToday} งาน · ` : ""}เช็ควันว่างของช่างก่อนนัดลูกค้า

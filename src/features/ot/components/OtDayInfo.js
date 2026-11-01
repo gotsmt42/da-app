@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import moment from "moment";
 import { Box, Stack, Typography } from "@mui/material";
 import { thaiDate } from "@/shared/utils/thaiDate";
-import { Celebration, Weekend, WorkOutline } from "@mui/icons-material";
+import { CelebrationRounded as Celebration, WeekendRounded as Weekend, WorkOutlineRounded as WorkOutline } from "@mui/icons-material";
 import API from "@/shared/api/axiosInstance";
 import { TEXT_MAIN, TEXT_SUB, restDaysOf } from "../otMeta";
 
@@ -57,7 +57,7 @@ export const dayKind = (date, holidays, cfg) => {
 const TONE = {
   public: { icon: <Celebration />, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca", tag: "วันหยุดนักขัตฤกษ์" },
   rest: { icon: <Weekend />, color: "#b45309", bg: "#fffbeb", border: "#fde68a", tag: "วันหยุดประจำสัปดาห์" },
-  work: { icon: <WorkOutline />, color: "#475569", bg: "#f8fafc", border: "#e2e8f0", tag: "วันทำงาน" },
+  work: { icon: <WorkOutline />, color: "#475569", bg: "#f8fafc", border: "#e6e9ef", tag: "วันทำงาน" },
 };
 const RULE = {
   work: "OT วันทำงาน เริ่มหลังเลิกงาน 17:30",

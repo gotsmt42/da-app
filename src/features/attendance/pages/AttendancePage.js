@@ -11,7 +11,7 @@ import SectionTabs from "@/shared/ui/SectionTabs";
 import { Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip } from "@mui/material";
-import { PlaceOutlined, RefreshRounded, TaskAltRounded, ChevronRightRounded, ViewAgendaOutlined, TableRowsOutlined } from "@mui/icons-material";
+import { PlaceRounded, RefreshRounded, TaskAltRounded, ChevronRightRounded, ViewAgendaRounded, TableRowsRounded } from "@mui/icons-material";
 import AttendanceService from "@/shared/services/AttendanceService";
 import AuthService from "@/shared/services/authService";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -154,14 +154,14 @@ export default function AttendancePage() {
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader
-        icon={<PlaceOutlined />}
+        icon={<PlaceRounded />}
         title={seeAll ? "ประวัติบันทึกการเข้างาน" : "ประวัติเข้างานของฉัน"}
         subtitle="เวลาเข้างานจากเซิร์ฟเวอร์ · ตำแหน่ง GPS · รูปหน้างาน"
         actions={(
           <>
             {tab === "list" && (
-              <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
-                {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+              <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e6e9ef", bgcolor: "#fff" }}>
+                {[["card", ViewAgendaRounded, "การ์ด"], ["table", TableRowsRounded, "ตาราง"]].map(([k, Ico, label]) => (
                   <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
                     sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
                       color: view === k ? "#fff" : "#475569", bgcolor: view === k ? "#2563eb" : "transparent" }}>
@@ -187,7 +187,7 @@ export default function AttendancePage() {
       {tab === "pending" ? (
         pendingRows === null ? <Skeleton variant="rounded" height={120} /> : (
           <AttendanceList rows={pendingRows} me={me} isApprover showJob onChanged={onChanged}
-            empty={<EmptyState icon={<PlaceOutlined />} title="ไม่มีคำขอแก้เวลาที่รออนุมัติ" />} />
+            empty={<EmptyState icon={<PlaceRounded />} title="ไม่มีคำขอแก้เวลาที่รออนุมัติ" />} />
         )
       ) : (
         <>
@@ -241,7 +241,7 @@ export default function AttendancePage() {
           {rows === null ? (
             <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={84} />)}</Stack>
           ) : !rows.length ? (
-            <EmptyState icon={<PlaceOutlined />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="หัวหน้าทีมกดเข้างานได้จากการ์ดงานในหน้า “งานของฉัน”" />
+            <EmptyState icon={<PlaceRounded />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="หัวหน้าทีมกดเข้างานได้จากการ์ดงานในหน้า “งานของฉัน”" />
           ) : isTable ? (
             <>
               <AttendanceTable rows={pg.rows} me={me} isApprover={isApprover} onChanged={onChanged} />

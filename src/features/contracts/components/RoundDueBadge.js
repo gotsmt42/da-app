@@ -10,20 +10,20 @@
  */
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, keyframes } from "@mui/material/styles";
-import { ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline, Add } from "@mui/icons-material";
+import { ScheduleRounded, NotificationsActiveRounded, ErrorOutlineRounded as ErrorOutline, AddRounded as Add } from "@mui/icons-material";
 
 const pulse = keyframes`
   0%, 100% { box-shadow: 0 0 0 0 rgba(153, 27, 27, .45); }
   50% { box-shadow: 0 0 0 5px rgba(153, 27, 27, 0); }
 `;
 
-const ICON = { due_soon: ScheduleOutlined, due_now: NotificationsActiveOutlined, overdue: ErrorOutline };
+const ICON = { due_soon: ScheduleRounded, due_now: NotificationsActiveRounded, overdue: ErrorOutline };
 const HEAD = { due_soon: "ใกล้ถึงรอบ", due_now: "ถึงรอบเดือนนี้" };
 
 /** ป้ายเล็ก (ในตาราง) — บรรทัดเดียว: สัญลักษณ์ + สถานะ · ครั้งที่ */
 export function RoundDueChip({ info, sx }) {
   if (!info) return null;
-  const Icon = ICON[info.state] || ScheduleOutlined;
+  const Icon = ICON[info.state] || ScheduleRounded;
   const solid = info.state === "overdue";
   return (
     <Box component="span" title={info.label}
@@ -46,7 +46,7 @@ export function RoundDueChip({ info, sx }) {
 /** แถบเต็มความกว้าง (การ์ดมือถือ) — สถานะ + ครั้งที่ + เดือนที่ต้องเข้า + ปุ่มลงครั้งถัดไป */
 export default function RoundDueBadge({ info, onAdd }) {
   if (!info) return null;
-  const Icon = ICON[info.state] || ScheduleOutlined;
+  const Icon = ICON[info.state] || ScheduleRounded;
   const solid = info.state === "overdue";
   const head = HEAD[info.state] || `เลยกำหนด ${info.monthsOverdue} เดือน`;
   return (

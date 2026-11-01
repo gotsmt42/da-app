@@ -16,9 +16,7 @@ import {
   TextField, Button, IconButton, Alert, useMediaQuery, CircularProgress, Autocomplete,
   Switch, FormControlLabel,
 } from "@mui/material";
-import {
-  Add, DeleteOutline, Visibility, Description, Search,
-} from "@mui/icons-material";
+import { AddRounded as Add, DeleteOutlineRounded as DeleteOutline, VisibilityRounded as Visibility, DescriptionRounded as Description, SearchRounded as Search } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import DocNumberService from "@/shared/services/DocNumberService";

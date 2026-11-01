@@ -17,8 +17,10 @@ import { thaiDate } from "@/shared/utils/thaiDate";
 
 export const EXPENSE_ACCENT = "#0d9488";
 export const EXPENSE_ACCENT_DARK = "#0f766e";
-export const CLAIM_ACCENT = "#7c3aed";
-export const CLAIM_ACCENT_DARK = "#6d28d9";
+// 🔁 (1 พ.ย. 2569 ผู้ใช้: "หน้าใบเคลมสีม่วงดูไม่ค่อยเข้า และเข้มเกินไป") ม่วงเข้ม #7c3aed → ฟ้าน้ำทะเล
+//    สว่างกว่า เข้าชุดสีหน้าแรก (แดง · กรมท่า · เขียวอมฟ้า · ส้ม) และยังแยกจาก Advance (เขียวอมฟ้า) / ผู้รับเหมา (กรมท่า) ชัด
+export const CLAIM_ACCENT = "#0284c7";
+export const CLAIM_ACCENT_DARK = "#0369a1";
 /**
  * ใบสำรองจ่าย (พนักงานออกเงินเองไปก่อน ไม่มี Advance) — ส้ม
  * ✅ ต้องแยกจากใบเคลมปกติให้เห็นตั้งแต่มองรายการ เพราะ "เงินยังไม่ออกจากบริษัท" กับ "เงินออกไปแล้ว
@@ -36,7 +38,7 @@ export const CONTRACTOR_ACCENT_DARK = "#1e3a8a";
 
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
-export const BORDER_MAIN = "#e2e8f0";
+export const BORDER_MAIN = "#e6e9ef";
 export const SURFACE_SUBTLE = "#f8fafc";
 
 export const KIND_META = {
@@ -57,7 +59,7 @@ export const KIND_META = {
     docTitle: "ใบเคลียร์ค่าใช้จ่าย (Claim)",
     color: CLAIM_ACCENT,
     dark: CLAIM_ACCENT_DARK,
-    soft: "#f5f3ff",
+    soft: "#f0f9ff",
     badge: "CLAIM",
     pdf: { main: [109, 40, 217], head: [237, 233, 254], fill: [245, 243, 255] },
   },
@@ -218,7 +220,7 @@ export const FILE_STAGES = [
   { value: "review", label: "แนบตอนตรวจสอบ", color: "#b45309" },
   { value: "approve", label: "แนบตอนอนุมัติ", color: "#059669" },
   { value: "pay", label: "แนบตอนจ่ายเงินให้พนักงาน", color: "#1d4ed8" },
-  { value: "settle", label: "แนบตอนเคลียร์ส่วนต่าง", color: "#7c3aed" },
+  { value: "settle", label: "แนบตอนเคลียร์ส่วนต่าง", color: CLAIM_ACCENT },
   { value: "added", label: "แนบเพิ่มภายหลัง", color: "#64748b" },
   { value: "", label: "ไฟล์แนบอื่นๆ", color: "#94a3b8" },
 ];

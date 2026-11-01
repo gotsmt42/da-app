@@ -16,12 +16,7 @@ import {
   Menu, MenuItem, ListItemIcon, ListItemText, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Download, Visibility,
-  InsertDriveFile, FolderOpen, OpenInNew, Refresh,
-  MoreVert, Print, Share,
-  Description, RequestQuote, ReceiptLong, AssignmentTurnedIn,
-} from "@mui/icons-material";
+import { DownloadRounded as Download, VisibilityRounded as Visibility, InsertDriveFileRounded as InsertDriveFile, FolderOpenRounded as FolderOpen, OpenInNewRounded as OpenInNew, RefreshRounded as Refresh, MoreVertRounded as MoreVert, PrintRounded as Print, ShareRounded as Share, DescriptionRounded as Description, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
 import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";

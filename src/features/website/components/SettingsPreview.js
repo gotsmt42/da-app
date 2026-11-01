@@ -1,7 +1,5 @@
 import { Box, Chip, Link, Stack, Typography } from "@mui/material";
-import {
-  CheckCircleOutline, EmailOutlined, LocationOnOutlined, OpenInNew, PhoneInTalkOutlined, PhoneOutlined, PlaceOutlined, VisibilityOffOutlined,
-} from "@mui/icons-material";
+import { CheckCircleOutlineRounded as CheckCircleOutline, EmailRounded, LocationOnRounded, OpenInNewRounded as OpenInNew, PhoneInTalkRounded, PhoneRounded, PlaceRounded, VisibilityOffRounded } from "@mui/icons-material";
 
 import { WEBSITE_URL } from "../services/WebsiteService";
 import { UI } from "./WebsiteUi";
@@ -26,7 +24,7 @@ export function WhereShown({ items }) {
   return (
     <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mb: 1.5 }}>
       <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: UI.sub, display: "inline-flex", alignItems: "center", gap: 0.4 }}>
-        <PlaceOutlined sx={{ fontSize: 16 }} /> แสดงที่
+        <PlaceRounded sx={{ fontSize: 16 }} /> แสดงที่
       </Typography>
       {items.map(({ label, path }) =>
         WEBSITE_URL && path !== undefined ? (
@@ -73,7 +71,7 @@ export function HomeOutlinePreview({ s }) {
         {rows.map((r) => (
           <Stack key={r.label} direction="row" alignItems="center" spacing={1}
             sx={{ px: 1.25, py: 0.9, borderRadius: 1, border: `1px solid ${r.on ? "#fecaca" : UI.border}`, bgcolor: r.on ? "#fef2f2" : "#f8fafc", opacity: r.on ? 1 : 0.6 }}>
-            {r.on ? <CheckCircleOutline sx={{ fontSize: 17, color: RED }} /> : <VisibilityOffOutlined sx={{ fontSize: 17, color: UI.sub }} />}
+            {r.on ? <CheckCircleOutline sx={{ fontSize: 17, color: RED }} /> : <VisibilityOffRounded sx={{ fontSize: 17, color: UI.sub }} />}
             <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, flex: 1, textDecoration: r.on ? "none" : "line-through" }}>{r.label}</Typography>
             <Typography sx={{ fontSize: "0.7rem", color: UI.sub }}>{r.fixed ? "แสดงเสมอ" : r.on ? (r.note || "แสดง") : "ซ่อน"}</Typography>
           </Stack>
@@ -132,8 +130,8 @@ export function HoursPreview({ s }) {
           </Box>
           <Box sx={{ bgcolor: NAVY, borderRadius: 1.5, p: 1.5 }}>
             <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#94a3b8", mb: 0.75 }}>ท้ายเว็บ (ทุกหน้า)</Typography>
-            <Typography sx={{ fontSize: "0.82rem", color: "#e2e8f0" }}>{s.businessHoursWeekdays}</Typography>
-            {s.businessHoursSaturday && <Typography sx={{ fontSize: "0.82rem", color: "#e2e8f0" }}>{s.businessHoursSaturday}</Typography>}
+            <Typography sx={{ fontSize: "0.82rem", color: "#e6e9ef" }}>{s.businessHoursWeekdays}</Typography>
+            {s.businessHoursSaturday && <Typography sx={{ fontSize: "0.82rem", color: "#e6e9ef" }}>{s.businessHoursSaturday}</Typography>}
             {s.businessHoursClosed && <Typography sx={{ fontSize: "0.82rem", color: "#94a3b8" }}>ปิด{s.businessHoursClosed}</Typography>}
           </Box>
         </Box>
@@ -153,7 +151,7 @@ export function AreasPreview({ areas }) {
         <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "repeat(2, minmax(0,1fr))", sm: "repeat(3, minmax(0,1fr))" } }}>
           {list.map((a) => (
             <Stack key={a} direction="row" alignItems="center" spacing={0.75} sx={{ border: `1px solid ${UI.border}`, borderRadius: 1.5, px: 1.25, py: 1 }}>
-              <LocationOnOutlined sx={{ fontSize: 16, color: RED }} />
+              <LocationOnRounded sx={{ fontSize: 16, color: RED }} />
               <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{a}</Typography>
             </Stack>
           ))}
@@ -249,9 +247,9 @@ const BrandSvg = ({ d, color }) => (
 
 /** ช่องทางที่จะแสดงบนเว็บ ตามลำดับจริงบนเว็บ (ช่องว่าง = ไม่แสดง) */
 export const webChannels = (s) => [
-  s.contactHotline && { key: "hotline", label: "สายด่วน (Hotline)", value: s.contactHotline, icon: <PhoneInTalkOutlined sx={{ fontSize: 18, color: RED }} /> },
-  s.contactTel && { key: "tel", label: "โทรศัพท์", value: s.contactTel, icon: <PhoneOutlined sx={{ fontSize: 18, color: "#64748b" }} /> },
-  s.contactEmail && { key: "email", label: "อีเมล", value: s.contactEmail, icon: <EmailOutlined sx={{ fontSize: 18, color: "#64748b" }} /> },
+  s.contactHotline && { key: "hotline", label: "สายด่วน (Hotline)", value: s.contactHotline, icon: <PhoneInTalkRounded sx={{ fontSize: 18, color: RED }} /> },
+  s.contactTel && { key: "tel", label: "โทรศัพท์", value: s.contactTel, icon: <PhoneRounded sx={{ fontSize: 18, color: "#64748b" }} /> },
+  s.contactEmail && { key: "email", label: "อีเมล", value: s.contactEmail, icon: <EmailRounded sx={{ fontSize: 18, color: "#64748b" }} /> },
   s.contactLine && { key: "line", label: "LINE", value: "แชทผ่าน LINE", icon: <BrandSvg d={LINE_D} color="#06C755" /> },
   s.contactFacebook && { key: "facebook", label: "Facebook", value: "Facebook Page", icon: <BrandSvg d={FB_D} color="#0866FF" /> },
 ].filter(Boolean);

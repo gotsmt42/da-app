@@ -153,7 +153,7 @@ function injectStyles() {
     /* ── Status bar (ใน body) ── */
     #ee-status-bar {
       display: flex; align-items: center; justify-content: space-between;
-      background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+      background: #fff; border: 1.5px solid #e6e9ef; border-radius: 10px;
       padding: 8px 14px; margin-bottom: 12px;
       box-shadow: 0 1px 4px rgba(0,0,0,.06);
     }
@@ -166,7 +166,7 @@ function injectStyles() {
     #ee-status-select-wrap select {
       appearance: none;
       background: #f1f5f9;
-      border: 1.5px solid #e2e8f0; color: #1e293b;
+      border: 1.5px solid #e6e9ef; color: #1e293b;
       border-radius: 8px; padding: 7px 30px 7px 12px;
       font-size: 12.5px; font-weight: 700; cursor: pointer;
       min-width: 160px;
@@ -199,7 +199,7 @@ function injectStyles() {
 
     /* ── การ์ดหมวดของฟอร์ม — แบ่งเรื่องให้ชัด (เดิมเป็นตัวหนังสือเทาเล็กๆ คั่นด้วยเส้นบาง อ่านไม่ออกว่าช่องไหนเป็นของเรื่องไหน) ── */
     .ee-card {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      background: #fff; border: 1px solid #e6e9ef; border-radius: 14px;
       margin: 0 0 12px; overflow: hidden; text-align: left;
       box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
@@ -210,7 +210,7 @@ function injectStyles() {
     .ee-card-ico {
       width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
-      background: #fff; border: 1px solid #e2e8f0; font-size: 15px; line-height: 1;
+      background: #fff; border: 1px solid #e6e9ef; font-size: 15px; line-height: 1;
     }
     .ee-card-titles { flex: 1; min-width: 0; }
     .ee-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
@@ -319,7 +319,7 @@ function injectStyles() {
     .ee-contract-box .ee-field label { color: #4c1d95; }
     /* ✅ ดูอย่างเดียวสำหรับช่าง — เทาจาง + cursor not-allowed ให้ดูออกชัดว่าแก้ไม่ได้ ไม่ใช่แค่ลืมกรอก */
     .ee-contract-box .ee-field input:disabled {
-      background: #f1f5f9; color: #64748b; border-color: #e2e8f0;
+      background: #f1f5f9; color: #64748b; border-color: #e6e9ef;
       cursor: not-allowed; opacity: 0.85;
     }
 
@@ -333,14 +333,14 @@ function injectStyles() {
     }
     .ee-log-toggle:hover { color: #1e293b; }
     .ee-log-list {
-      margin-top: 6px; padding-left: 10px; border-left: 2px solid #e2e8f0;
+      margin-top: 6px; padding-left: 10px; border-left: 2px solid #e6e9ef;
       display: flex; flex-direction: column; gap: 10px; max-height: 240px; overflow-y: auto;
     }
     .ee-log-item { position: relative; display: flex; gap: 8px; }
     .ee-log-dot {
       position: absolute; left: -15px; top: 4px;
       width: 8px; height: 8px; border-radius: 50%; border: 2px solid #fff;
-      box-shadow: 0 0 0 1px #e2e8f0;
+      box-shadow: 0 0 0 1px #e6e9ef;
     }
     .ee-log-body { flex: 1; min-width: 0; }
     .ee-log-head { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; }
@@ -384,7 +384,7 @@ function injectStyles() {
     .ee-field label .req { color: #ef4444; }
     .ee-field select, .ee-field input, .ee-field textarea {
       width: 100%; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      border: 1.5px solid #e6e9ef; border-radius: 7px;
       padding: 7px 10px; font-size: 13px; color: #1e293b;
       background: #fff; transition: border-color .15s, box-shadow .15s;
       font-family: inherit;
@@ -407,7 +407,7 @@ function injectStyles() {
     .ee-money-input input { padding-left: 24px !important; }
 
     /* ── Divider ── */
-    .ee-divider { border: none; border-top: 1px solid #e2e8f0; margin: 10px 0; }
+    .ee-divider { border: none; border-top: 1px solid #e6e9ef; margin: 10px 0; }
 
     /* ── งานหลายวัน (multi-date, เหมือนหน้า Add) ── */
     .ee-checkbox-row {
@@ -455,7 +455,7 @@ function injectStyles() {
     }
     .ee-multi-date-row input[type=date] {
       flex: 1 1 auto; min-width: 0; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      border: 1.5px solid #e6e9ef; border-radius: 7px;
       padding: 7px 10px; font-size: 13px; color: #1e293b;
       background: #fff; font-family: inherit;
     }
@@ -475,7 +475,7 @@ function injectStyles() {
     .ee-range-picker { padding: 4px 6px 6px 30px; display: flex; flex-direction: column; gap: 4px; }
     .ee-range-picker button {
       display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
-      border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; padding: 7px 10px;
+      border: 1px solid #e6e9ef; background: #fff; border-radius: 8px; padding: 7px 10px;
       font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; text-align: left;
     }
     .ee-range-picker button:hover:not(:disabled) { background: #f8fafc; }
@@ -483,13 +483,13 @@ function injectStyles() {
     .ee-range-picker .ee-range-picker-state { font-size: 11.5px; font-weight: 700; color: #1d4ed8; flex-shrink: 0; }
     .ee-range-actions { position: relative; flex-shrink: 0; }
     .ee-range-more {
-      border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 8px;
+      border: 1px solid #e6e9ef; background: #fff; color: #475569; border-radius: 8px;
       padding: 3px 9px; font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.4;
     }
     .ee-range-more:hover { background: #f8fafc; }
     .ee-range-menu {
       position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 208px;
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 5px;
+      background: #fff; border: 1px solid #e6e9ef; border-radius: 10px; padding: 5px;
       box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
     }
     .ee-range-menu button {
@@ -510,7 +510,7 @@ function injectStyles() {
     .ee-range-advance:disabled { opacity: .65; cursor: not-allowed; }
     /* ช่วงที่มีใบแล้ว — โทนน้ำเงินเพื่อบอกว่า "ไปดูใบเดิม" ไม่ใช่ "สร้างใหม่" */
     .ee-range-advance--exists { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
-    .ee-range-team { margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+    .ee-range-team { margin-top: 8px; border-top: 1px dashed #e6e9ef; padding-top: 8px; }
     /* ✅ สรุป "ใครเข้างานช่วงนี้" ให้เห็นทันทีโดยไม่ต้องกางฟอร์ม (ผู้ใช้สั่ง: แสดงให้สมบูรณ์) */
     /* ✅ ผู้ใช้สั่ง: "ถ้ามันยาวเกินให้ทำให้พับเปิดปิดได้ ไม่ให้กินพื้นที่ส่วนอื่นเกินไป"
        งานที่เข้าหลายช่วง (4-5 ช่วงขึ้นไป) ดันช่องเวลา/สถานะ/ปุ่มบันทึกตกไปไกลมาก ต้องพับเก็บได้ */
@@ -585,7 +585,7 @@ function injectStyles() {
     .ee-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ee-team-member-row select {
       flex: 1; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      border: 1.5px solid #e6e9ef; border-radius: 7px;
       padding: 7px 10px; font-size: 13px; color: #1e293b;
       background: #fff; font-family: inherit;
     }
@@ -612,7 +612,7 @@ function injectStyles() {
       gap: 8px;
       padding: 12px 20px 14px;
       background: #f1f5f9;
-      border-top: 1px solid #e2e8f0;
+      border-top: 1px solid #e6e9ef;
       flex-shrink: 0;
       position: sticky;
       bottom: 0;
@@ -650,7 +650,7 @@ function injectStyles() {
     .ee-btn-operation { background: linear-gradient(135deg,#7c3aed,#4f46e5); color: #fff; }
     .ee-btn-danger    { background: #ef4444; color: #fff; }
     .ee-btn-warning   { background: #f59e0b; color: #fff; }
-    .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
+    .ee-btn-ghost     { background: #e6e9ef; color: #475569; }
     .ee-btn-attach    { background: #dc2626; color: #fff; }
 
     /* ── ลำดับความสำคัญของปุ่มในแถบล่าง ─────────────────────────────────────
@@ -662,7 +662,7 @@ function injectStyles() {
        ⚠️ จำกัดขอบเขตด้วย #ee-action-bar เท่านั้น — คลาสเดียวกันนี้ถูกใช้กับปุ่มยืนยันในฟอร์มด้วย
        (อนุมัติงาน / ยืนยันไม่อนุมัติ / ลบช่วงนี้) ซึ่งเป็น "ปุ่มหลักของการตัดสินใจนั้นๆ" ต้องทึบต่อไป */
     #ee-action-bar .ee-btn {
-      background: #fff; border: 1px solid #e2e8f0;
+      background: #fff; border: 1px solid #e6e9ef;
       transition: background-color .15s, border-color .15s, color .15s, transform .1s;
     }
     /* hover เดิมใช้ opacity ซึ่งพอเป็นปุ่มพื้นขาวจะกลายเป็นซีดจางดูเหมือนปุ่มถูกปิดใช้งาน */
@@ -687,7 +687,7 @@ function injectStyles() {
     #ee-more-menu {
       position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
       max-width: 300px; z-index: 30;
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+      background: #fff; border: 1px solid #e6e9ef; border-radius: 12px;
       box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
       padding: 6px; display: flex; flex-direction: column; gap: 2px;
     }
@@ -723,7 +723,7 @@ function injectStyles() {
     /* ✅ แผนที่หน้างานบนสุดของฟอร์ม (ผู้ใช้สั่ง 28 ก.ย. 2569: "แสดงเป็นแผนที่ google map เลย ไว้แถวบนสุด
        ให้ชัดเจน และสวยงาม") — หน้าตาเดียวกับแผนที่ในหน้าติดต่อเราของเว็บบริษัท */
     .ee-map-card {
-      border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background: #fff;
+      border: 1px solid #e6e9ef; border-radius: 14px; overflow: hidden; background: #fff;
       margin-bottom: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
     .ee-map-frame { position: relative; height: 230px; background: #f1f5f9; }
@@ -750,7 +750,7 @@ function injectStyles() {
     .ee-map-go:hover { background: #1765cc; }
     .ee-map-edit {
       flex-shrink: 0; padding: 8px 10px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
-      color: #475569; background: #fff; border: 1px solid #e2e8f0;
+      color: #475569; background: #fff; border: 1px solid #e6e9ef;
     }
     #ee-mapEditor { padding: 0 12px 12px; }
 
@@ -811,7 +811,7 @@ function injectStyles() {
     /* ── TomSelect override ── */
     .swal-edit-event .ts-wrapper { width: 100%; }
     .swal-edit-event .ts-wrapper .ts-control {
-      border: 1.5px solid #e2e8f0 !important; border-radius: 7px !important;
+      border: 1.5px solid #e6e9ef !important; border-radius: 7px !important;
       padding: 6px 10px !important; font-size: 13px !important; min-height: 36px;
       box-shadow: none !important;
     }
@@ -834,11 +834,11 @@ function injectStyles() {
        ⚠️ วางท้ายสุดของสไตล์ชีตโดยตั้งใจ — ชนะกฎเดิมด้านบนด้วยลำดับ ══ */
     .swal-edit-event #ee-status-header {
       background: #fff !important; border-top: 4px solid var(--ee-status, #64748b);
-      border-bottom: 1px solid #e2e8f0; padding: 12px 16px 12px 20px; align-items: center; text-align: left;
+      border-bottom: 1px solid #e6e9ef; padding: 12px 16px 12px 20px; align-items: center; text-align: left;
     }
     .swal-edit-event #ee-status-icon {
       width: 40px; height: 40px; border-radius: 11px; box-shadow: none; backdrop-filter: none;
-      background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e2e8f0); font-size: 19px;
+      background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e6e9ef); font-size: 19px;
     }
     .swal-edit-event #ee-status-title { gap: 6px; }
     .swal-edit-event #ee-status-title h3 {
@@ -851,7 +851,7 @@ function injectStyles() {
        ⚠️ ซ่อนด้วย CSS ไม่ลบ element — โค้ดเปลี่ยนสถานะยังอ้าง #ee-status-icon อยู่ */
     .swal-edit-event #ee-head-status #ee-status-icon {
       display: flex; width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; font-size: 18px;
-      background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e2e8f0);
+      background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e6e9ef);
       color: var(--ee-status, #64748b); align-items: center; justify-content: center;
     }
     .swal-edit-event #ee-head-status > label { display: none; }
@@ -860,7 +860,7 @@ function injectStyles() {
        เลื่อนฟอร์มลง = ย่อเหลือแถวชื่องาน + ป้ายสถานะเล็ก · เลื่อนกลับบนสุด/กดปุ่ม ▾ = กางเต็ม ── */
     #ee-head-toggle {
       width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; cursor: pointer;
-      background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-size: 14px; line-height: 1;
+      background: #f1f5f9; border: 1px solid #e6e9ef; color: #475569; font-size: 14px; line-height: 1;
       display: flex; align-items: center; justify-content: center; transition: transform .2s;
     }
     #ee-head-toggle:focus { outline: none; }
@@ -868,7 +868,7 @@ function injectStyles() {
     #ee-head-mini {
       display: none; align-items: center; gap: 5px; flex-shrink: 0; max-width: 46%;
       padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
-      color: var(--ee-status, #64748b); background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e2e8f0);
+      color: var(--ee-status, #64748b); background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e6e9ef);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #ee-head-mini svg { flex-shrink: 0; }
@@ -964,14 +964,14 @@ function injectStyles() {
     .ee-pick-layer { position: absolute; inset: 0; z-index: 60; }
     .ee-pick-backdrop { position: absolute; inset: 0; }
     .ee-pick-menu {
-      position: absolute; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden;
+      position: absolute; background: #fff; border: 1px solid #e6e9ef; border-radius: 14px; overflow: hidden;
       box-shadow: 0 16px 40px rgba(15,23,42,.18); display: flex; flex-direction: column; max-height: 380px; text-align: left;
       animation: ee-pick-in .12s ease-out;
     }
     @keyframes ee-pick-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
     .ee-pick-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 4px; }
     .ee-pick-head b { font-size: 12.5px; font-weight: 800; color: #64748b; }
-    .ee-pick-x { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; cursor: pointer; }
+    .ee-pick-x { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #e6e9ef; background: #f8fafc; color: #475569; cursor: pointer; }
     .ee-pick-search { padding: 6px 12px 4px; }
     .ee-pick-search input {
       width: 100%; box-sizing: border-box; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1;
@@ -1013,25 +1013,25 @@ function injectStyles() {
     #ee-respMsg, .ee-hm-msg { font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; color: #94a3b8; }
     #ee-respMsg.ok, .ee-hm-msg.ok { color: #16a34a; } #ee-respMsg.pending, .ee-hm-msg.pending { color: #d97706; } #ee-respMsg.err, .ee-hm-msg.err { color: #dc2626; white-space: normal; }
     .swal-edit-event #ee-status-title .ee-tag {
-      background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
+      background: #f8fafc; border: 1px solid #e6e9ef; color: #334155; font-size: 11.5px; padding: 2px 9px;
     }
     .swal-edit-event #ee-status-title .ee-tag--muted { background: #fff; border-style: dashed; color: #94a3b8; }
     .swal-edit-event .ee-tag--link:hover { background: #eff6ff; border-color: #bfdbfe; }
     .swal-edit-event .ee-tag--link .ee-tag-go { color: #2563eb; }
     .swal-edit-event #ee-close-btn, .swal-edit-event #ee-copy-btn {
-      width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;
+      width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e6e9ef; color: #475569;
     }
-    .swal-edit-event #ee-close-btn:hover, .swal-edit-event #ee-copy-btn:hover { background: #e2e8f0; }
+    .swal-edit-event #ee-close-btn:hover, .swal-edit-event #ee-copy-btn:hover { background: #e6e9ef; }
     /* Swal โฟกัสปุ่มแรกให้เองตอนเปิด — ไม่ต้องโชว์กรอบดำถ้าไม่ได้ใช้คีย์บอร์ด */
     .swal-edit-event #ee-close-btn:focus, .swal-edit-event #ee-copy-btn:focus { outline: none; box-shadow: none; }
     .swal-edit-event #ee-body { text-align: left; padding: 16px 20px 12px; }
-    .swal-edit-event #ee-status-bar { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
+    .swal-edit-event #ee-status-bar { border: 1px solid #e6e9ef; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
 
     /* ── สถานะงานบนหัวกล่อง ── */
     .swal-edit-event #ee-status-header { flex-wrap: wrap; row-gap: 10px; }
     #ee-head-status {
       flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0;
-      margin-left: 0; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+      margin-left: 0; padding-top: 10px; border-top: 1px dashed #e6e9ef;
     }
     #ee-head-status > label { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; }
     .swal-edit-event #ee-status-select-wrap { position: relative; flex: 0 1 240px; min-width: 0; }
@@ -1045,7 +1045,7 @@ function injectStyles() {
     .swal-edit-event #ee-status-select-wrap::after { color: var(--ee-status, #64748b); right: 13px; font-size: 13px; }
     .swal-edit-event #ee-status-select-wrap select {
       width: 100%; min-width: 0; height: 38px; padding: 0 34px 0 14px; border-radius: 11px;
-      background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e2e8f0);
+      background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e6e9ef);
       color: #0f172a; font-size: 13.5px; font-weight: 800; font-family: inherit; text-overflow: ellipsis;
     }
     .swal-edit-event #ee-status-select-wrap select:hover:not(:disabled) { border-color: var(--ee-status, #64748b); }
@@ -1055,7 +1055,7 @@ function injectStyles() {
     .swal-edit-event .ee-pick-btn--status:disabled { opacity: 1; cursor: default; }
     .swal-edit-event .ee-pick-btn--status:disabled .ee-pick-caret { display: none; }
     /* 🔁 (24 ต.ค. 2569 ผู้ใช้: "แก้ไข UX/UI การกดแก้ไขสถานะ ให้สวยงาม ดูง่าย สื่อความหมาย") ปุ่มเส้นขอบ + หน้าต่างเลือกสถานะในกล่อง */
-    .swal-edit-event .ee-status-unlock { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; }
+    .swal-edit-event .ee-status-unlock { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 1px solid #e6e9ef; border-radius: 9px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; }
     .swal-edit-event .ee-status-unlock:hover { border-color: #2563eb; color: #2563eb; }
     .ee-st-overlay { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15,23,42,.45); animation: eeStFade .15s ease; }
     @keyframes eeStFade { from { opacity: 0 } to { opacity: 1 } }
@@ -1066,7 +1066,7 @@ function injectStyles() {
     .ee-st-flow { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; font-weight: 700; color: #475569; }
     .ee-st-flow span { padding: 2px 8px; border-radius: 99px; background: #f1f5f9; }
     .ee-st-list { padding: 4px 12px 8px; display: grid; gap: 6px; }
-    .ee-st-opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+    .ee-st-opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1.5px solid #e6e9ef; border-radius: 12px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
     .ee-st-opt:hover { border-color: var(--c); background: var(--soft); }
     .ee-st-opt.is-cur { border-color: var(--c); background: var(--soft); cursor: default; }
     .ee-st-ico { width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; display: grid; place-items: center; color: var(--c); background: var(--soft); }
@@ -1077,7 +1077,7 @@ function injectStyles() {
     .ee-st-badge { flex-shrink: 0; font-size: 11px; font-weight: 800; color: var(--c); padding: 2px 8px; border-radius: 99px; background: #fff; border: 1px solid var(--c); }
     .ee-st-foot { padding: 8px 18px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .ee-st-note { font-size: 11.5px; color: #94a3b8; }
-    .ee-st-cancel { height: 36px; padding: 0 16px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer; }
+    .ee-st-cancel { height: 36px; padding: 0 16px; border-radius: 10px; border: 1px solid #e6e9ef; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer; }
     .ee-st-changed { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #b45309; }
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
@@ -1092,9 +1092,9 @@ function injectStyles() {
     #ee-action-bar .ee-btn { border-radius: 10px; padding: 10px 16px; font-size: 13.5px; }
     #ee-action-bar .ee-btn-success { background: #2563eb; border-color: #2563eb; box-shadow: none; }
     #ee-action-bar .ee-btn-success:hover { background: #1d4ed8; border-color: #1d4ed8; }
-    #ee-action-bar .ee-btn-map { background: #fff; border-color: #e2e8f0; color: #334155; }
+    #ee-action-bar .ee-btn-map { background: #fff; border-color: #e6e9ef; color: #334155; }
     #ee-action-bar .ee-btn-map:hover { background: #f8fafc; }
-    #ee-action-bar .ee-btn-ghost { border-color: #e2e8f0; background: #fff; color: #475569; }
+    #ee-action-bar .ee-btn-ghost { border-color: #e6e9ef; background: #fff; color: #475569; }
 
     /* ── มือถือ: เต็มจอ + แถบปุ่มแถวเดียว ── */
     @media (max-width: 600px) {
@@ -1179,7 +1179,7 @@ function injectAttachStyles() {
     #eea-body { padding: 20px 22px; background: #f8fafc; }
     #eea-body label { font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px; }
     #eea-body select {
-      width: 100%; box-sizing: border-box; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      width: 100%; box-sizing: border-box; border: 1.5px solid #e6e9ef; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b; background: #fff; font-family: inherit;
     }
     .eea-round-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; margin: 18px 0 8px; }
@@ -1187,7 +1187,7 @@ function injectAttachStyles() {
     .eea-chip {
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 40px; height: 32px; padding: 0 10px; border-radius: 8px;
-      font-size: 12px; font-weight: 700; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-family: inherit;
+      font-size: 12px; font-weight: 700; border: 1.5px solid #e6e9ef; background: #fff; color: #64748b; font-family: inherit;
     }
     button.eea-chip { cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
     button.eea-chip:hover { border-color: #dc2626; }
@@ -1212,17 +1212,17 @@ function injectAttachStyles() {
     /* ⚠️ TomSelect z-index เริ่มต้น (10) ต่ำกว่า SweetAlert2 container (1060) มาก — พอ dropdown ย้ายไป
        แปะที่ <body> จะกลายเป็น sibling กับ popup ของ Swal เอง ต้องดันให้สูงกว่าเสมอไม่งั้นโดนซ่อนอยู่หลัง modal */
     .ts-dropdown { z-index: 100000 !important; }
-    #eea-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px 18px; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
+    #eea-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px 18px; background: #f1f5f9; border-top: 1px solid #e6e9ef; }
     .eea-btn {
       display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 9px;
       padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
       transition: opacity .15s, transform .1s; font-family: inherit;
     }
     .eea-btn:hover { opacity: .88; transform: translateY(-1px); }
-    .eea-btn-ghost   { background: #e2e8f0; color: #475569; }
+    .eea-btn-ghost   { background: #e6e9ef; color: #475569; }
     .eea-btn-success { background: #dc2626; color: #fff; }
     .swal-ee-attach .ts-wrapper .ts-control {
-      border: 1.5px solid #e2e8f0 !important; border-radius: 8px !important;
+      border: 1.5px solid #e6e9ef !important; border-radius: 8px !important;
       padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
     }
     .swal-ee-attach .ts-wrapper.focus .ts-control { border-color: #dc2626 !important; }
@@ -1499,14 +1499,14 @@ export const getEditEvent = async ({
     const cells = STEPS.map((st, i) => {
       const done = !rejected && (i < idx || (i === idx && i === STEPS.length - 1));
       const cur = !rejected && i === idx && !done;
-      const c = rejected ? "#dc2626" : done ? "#16a34a" : cur ? "#2563eb" : "#e2e8f0";
+      const c = rejected ? "#dc2626" : done ? "#16a34a" : cur ? "#2563eb" : "#e6e9ef";
       const date = done && st.at && moment(st.at).isValid() ? formatThai(moment(st.at), "D MMM YY") : "";
       const sub = i === STEPS.length - 1 && closeReq ? '<span class="ee-step-flag">ขอปิดงานแล้ว · รออนุมัติ</span>'
         : i === 0 && pending ? '<span class="ee-step-flag">รออนุมัติงาน</span>'
           : i === 0 && rejected ? '<span class="ee-step-flag ee-step-flag--red">ไม่อนุมัติ</span>' : (date || "&nbsp;");
       return `
         <div class="ee-step${done ? " is-done" : ""}${cur ? " is-cur" : ""}">
-          ${i > 0 ? `<span class="ee-step-line" style="background:${rejected ? "#dc2626" : i <= idx ? "#16a34a" : "#e2e8f0"}"></span>` : ""}
+          ${i > 0 ? `<span class="ee-step-line" style="background:${rejected ? "#dc2626" : i <= idx ? "#16a34a" : "#e6e9ef"}"></span>` : ""}
           <span class="ee-step-dot" style="${done || cur || rejected ? `background:${c};border-color:${c};` : ""}${cur ? `box-shadow:0 0 0 3px ${c}2e;` : ""}">${done ? tick : `<b${cur || rejected ? ' style="color:#fff"' : ""}>${i + 1}</b>`}</span>
           <span class="ee-step-label">${st.label}</span>
           <span class="ee-step-date">${sub}</span>
@@ -1514,7 +1514,7 @@ export const getEditEvent = async ({
     }).join("");
     return `
     <style>
-      .ee-stepper { display:flex; align-items:flex-start; margin: 0 0 12px; padding: 8px 6px 6px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+      .ee-stepper { display:flex; align-items:flex-start; margin: 0 0 12px; padding: 8px 6px 6px; background:#fff; border:1px solid #e6e9ef; border-radius:12px; }
       .ee-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; min-width:0; }
       .ee-step-line { position:absolute; top:7px; right:50%; width:100%; height:2px; z-index:0; }
       .ee-step-dot { position:relative; z-index:1; width:16px; height:16px; border-radius:50%; border:1.5px solid #cbd5e1; background:#fff; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
@@ -2075,7 +2075,7 @@ export const getEditEvent = async ({
         <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
           <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;min-width:180px;">เปิด Google Maps → ค้นหาหน้างาน → แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
-          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e2e8f0;cursor:pointer;">ยกเลิก</button>
+          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e6e9ef;cursor:pointer;">ยกเลิก</button>
           <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#0891b2;border:none;cursor:pointer;">บันทึก</button>
         </div>
       </div>` : ""}
@@ -2161,7 +2161,7 @@ export const getEditEvent = async ({
     ${/* ✅ (8 ต.ค. 2569 "ดูยาวและเยอะเกินไป ควรให้กดข้อมูลแก้ไขได้เลย") เลิกใช้กล่องสรุป + แผงพับ
           แสดงช่องข้อมูลให้แก้ได้ทันทีในแผงเดียวกะทัดรัด (หัวข้อย่อยบาง คั่นด้วยเส้น) */""}
     <style>
-      #ee-editGroup { border:1px solid #e2e8f0; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+      #ee-editGroup { border:1px solid #e6e9ef; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
       #ee-editGroup > .ee-eg-head { display:flex; align-items:baseline; gap:8px; padding:11px 14px; background:#f8fafc; border-bottom:1px solid #eef2f7; }
       #ee-editGroup > .ee-eg-head b { font-size:14px; font-weight:800; color:#0f172a; }
       #ee-editGroup > .ee-eg-head small { font-size:12px; font-weight:600; color:#64748b; }

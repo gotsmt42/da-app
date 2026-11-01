@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Box, ButtonBase, Collapse, IconButton, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { DateRange, CalendarMonth, Description, ExpandLess, ExpandMore, CheckRounded } from "@mui/icons-material";
+import { DateRangeRounded as DateRange, CalendarMonthRounded as CalendarMonth, DescriptionRounded as Description, ExpandLessRounded as ExpandLess, ExpandMoreRounded as ExpandMore, CheckRounded } from "@mui/icons-material";
 import AttendanceService from "@/shared/services/AttendanceService";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { formatThai } from "@/shared/utils/thaiDate";
@@ -25,8 +25,8 @@ const FOLLOWER = { primary: false };
 /** sx ของกรอบการ์ดกลุ่ม (ใส่ให้ Card/Box ภายนอก) */
 export const multiDayCardSx = (statusColor = "#94a3b8") => ({
   mb: 3, borderRadius: 4, bgcolor: "background.paper", overflow: "visible",
-  border: "1px solid #e2e8f0", borderLeft: `4px solid ${statusColor}`,
-  boxShadow: "0 5px 0 -1px #fff, 0 5px 0 0 #cbd5e1, 0 10px 0 -2px #fff, 0 10px 0 -1px #e2e8f0, 0 1px 3px rgba(15,23,42,.06)",
+  border: "1px solid #e6e9ef", borderLeft: `4px solid ${statusColor}`,
+  boxShadow: "0 5px 0 -1px #fff, 0 5px 0 0 #cbd5e1, 0 10px 0 -2px #fff, 0 10px 0 -1px #e6e9ef, 0 1px 3px rgba(15,23,42,.06)",
 });
 
 const bkk = (d) => moment(d).utcOffset(7);
@@ -122,7 +122,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
   const focus = now[0] || next[0];
 
   return (
-    <Box onClick={onToggle} sx={{ px: 2, py: 1.5, cursor: "pointer", bgcolor: "#f8fafc", borderRadius: "14px 14px 0 0", borderBottom: expanded ? "1px solid #e2e8f0" : "none" }}>
+    <Box onClick={onToggle} sx={{ px: 2, py: 1.5, cursor: "pointer", bgcolor: "#f8fafc", borderRadius: "14px 14px 0 0", borderBottom: expanded ? "1px solid #e6e9ef" : "none" }}>
       <Stack direction="row" alignItems="center" gap={1}>
         <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, pl: 0.75, pr: 1, borderRadius: 999, bgcolor: "#2563eb", color: "#fff", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap" }}>
           <DateRange sx={{ fontSize: 15 }} /> งานหลายช่วงวัน · {sessions.length} ช่วง
@@ -188,7 +188,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
 /** แถบหัวของแต่ละช่วง: ช่วงที่ k/N · วันที่ · สถานะ · (ถือเอกสาร) */
 export function SessionBar({ order, total, session, st, isAnchor }) {
   return (
-    <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 0.85, bgcolor: st.key === "today" ? alpha("#2563eb", 0.06) : "#f8fafc", borderBottom: "1px solid #e2e8f0", flexWrap: "wrap", rowGap: 0.5 }}>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 0.85, bgcolor: st.key === "today" ? alpha("#2563eb", 0.06) : "#f8fafc", borderBottom: "1px solid #e6e9ef", flexWrap: "wrap", rowGap: 0.5 }}>
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 900, color: "#0f172a", whiteSpace: "nowrap" }}>ช่วงที่ {order}/{total}</Typography>
       {/* 🐛 (21 ต.ค. 2569 ผู้ใช้: "ตัวหนังสือทับกัน") วันที่ไม่หดจนป้ายสถานะทับ — ที่ไม่พอ ป้ายลงบรรทัดใหม่แทน */}
       <Typography sx={{ flex: "1 0 auto", fontSize: "0.74rem", fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>{rangeLabel(session)} · {plannedDaysOf(session)} วัน</Typography>
@@ -218,7 +218,7 @@ export function SessionList({ sessions, anchorId, att, renderCard }) {
   const primaryId = (now[0] || next[0] || anchorPast || past[0])?.s._id;
   const frame = (x) => (
     <GroupSessionContext.Provider key={x.s._id} value={x.s._id === primaryId ? PRIMARY : FOLLOWER}>
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${x.st.key === "today" ? alpha("#2563eb", 0.4) : "#e2e8f0"}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.05)" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${x.st.key === "today" ? alpha("#2563eb", 0.4) : "#e6e9ef"}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.05)" }}>
       <SessionBar order={x.order} total={total} session={x.s} st={x.st} isAnchor={x.s._id === anchorId} />
       {renderCard(x.s)}
     </Box>
@@ -259,7 +259,7 @@ export function SessionList({ sessions, anchorId, att, renderCard }) {
 /** ช่วงถัดๆ ไปที่ยังไม่ถึง — แสดงเป็นรายการวันที่สั้นๆ (ไม่ต้องมีการ์ดเต็มทุกช่วง) */
 function NextMore({ list, total }) {
   return (
-    <Box sx={{ px: 1.5, py: 1, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
+    <Box sx={{ px: 1.5, py: 1, borderRadius: 2.5, border: "1px solid #e6e9ef", bgcolor: "#fff" }}>
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: "#475569", mb: 0.5 }}>ช่วงถัดไปอีก {list.length} ช่วง</Typography>
       <Stack direction="row" gap={0.5} flexWrap="wrap">
         {list.map((x) => (

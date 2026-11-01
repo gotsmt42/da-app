@@ -5,7 +5,7 @@ import {
   MenuItem, Pagination, Skeleton, Stack, TextField, Typography, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { AttachFile, Call, Close, DeleteOutline, Email, Search } from "@mui/icons-material";
+import { AttachFileRounded as AttachFile, CallRounded as Call, CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, EmailRounded as Email, SearchRounded as Search } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";

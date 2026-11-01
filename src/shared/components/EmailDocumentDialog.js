@@ -22,9 +22,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Stack, Typography, TextField, Button, IconButton,
   Alert, Chip, Autocomplete, Checkbox, FormControlLabel, CircularProgress, Collapse, useMediaQuery, Tooltip,
 } from "@mui/material";
-import {
-  Close, MailOutline, Send, PictureAsPdf, Visibility, RestartAlt, CheckCircle, History, ExpandMore, ErrorOutline,
-} from "@mui/icons-material";
+import { CloseRounded as Close, MailOutlineRounded as MailOutline, SendRounded as Send, PictureAsPdfRounded as PictureAsPdf, VisibilityRounded as Visibility, RestartAltRounded as RestartAlt, CheckCircleRounded as CheckCircle, HistoryRounded as History, ExpandMoreRounded as ExpandMore, ErrorOutlineRounded as ErrorOutline } from "@mui/icons-material";
 
 import MailService from "@/shared/services/MailService";
 import OrgSettingService from "@/shared/services/OrgSettingService";

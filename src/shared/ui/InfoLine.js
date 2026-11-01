@@ -1,8 +1,5 @@
 import { Stack, Typography } from "@mui/material";
-import {
-  Apartment, AssignmentInd, Groups, Category, Description,
-  CalendarMonth, Send, Numbers, AccessTime, Person,
-} from "@mui/icons-material";
+import { ApartmentRounded as Apartment, AssignmentIndRounded as AssignmentInd, GroupsRounded as Groups, CategoryRounded as Category, DescriptionRounded as Description, CalendarMonthRounded as CalendarMonth, SendRounded as Send, NumbersRounded as Numbers, AccessTimeRounded as AccessTime, PersonRounded as Person } from "@mui/icons-material";
 
 /**
  * InfoLine.js — บรรทัดข้อมูล "ไอคอน + ป้ายกำกับ + ค่า" ของการ์ดงาน

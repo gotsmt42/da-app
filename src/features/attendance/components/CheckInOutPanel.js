@@ -25,10 +25,7 @@ import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Collapse, Dialog, DialogContent, TextField } from "@mui/material";
 import { alpha, createTheme, ThemeProvider } from "@mui/material/styles";
 import appTheme from "@/app/theme";
-import {
-  LoginRounded, InfoOutlined, ThumbUpAltOutlined, CheckRounded, HourglassTopRounded,
-  ExpandMoreRounded, HistoryRounded, TaskAltRounded, BlockRounded,
-} from "@mui/icons-material";
+import { LoginRounded, InfoRounded, ThumbUpAltRounded, CheckRounded, HourglassTopRounded, ExpandMoreRounded, HistoryRounded, TaskAltRounded, BlockRounded } from "@mui/icons-material";
 import { BTN as MBTN, CARD, EYEBROW } from "@/shared/ui/modernUi";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import AttendanceService from "@/shared/services/AttendanceService";
@@ -79,8 +76,8 @@ export function MiniSteps({ current, labels = STEPS, dates }) {
       {labels.map((label, i) => {
         const done = i < current;
         const on = i === current;
-        const lineL = i > 0 ? (i <= current ? DONE_C : "#e2e8f0") : "transparent";
-        const lineR = i < labels.length - 1 ? (i < current ? DONE_C : "#e2e8f0") : "transparent";
+        const lineL = i > 0 ? (i <= current ? DONE_C : "#e6e9ef") : "transparent";
+        const lineR = i < labels.length - 1 ? (i < current ? DONE_C : "#e6e9ef") : "transparent";
         return (
           <Stack key={label} alignItems="center" sx={{ minWidth: 0 }}>
             <Box sx={{ position: "relative", width: "100%", height: 16, display: "grid", placeItems: "center" }}>
@@ -530,18 +527,18 @@ ${text}`);
   } else if (!acked) {
     action = (
       <Box>
-        <Button fullWidth variant="contained" disableElevation startIcon={<ThumbUpAltOutlined />} disabled={acking} onClick={ack} sx={MBTN.primary}>
+        <Button fullWidth variant="contained" disableElevation startIcon={<ThumbUpAltRounded />} disabled={acking} onClick={ack} sx={MBTN.primary}>
           {acking ? "กำลังบันทึก…" : "รับทราบงาน"}
         </Button>
         <Hint>ให้แอดมินรู้ว่าคุณรับงานแล้ว · เข้างาน {dayText}</Hint>
       </Box>
     );
   } else if (!hasHead) {
-    action = <Note icon={<InfoOutlined />} tone="#d97706">ยังไม่มีหัวหน้าทีมเข้างาน — รอแอดมินมอบหมายก่อนจึงกดเข้างานได้</Note>;
+    action = <Note icon={<InfoRounded />} tone="#d97706">ยังไม่มีหัวหน้าทีมเข้างาน — รอแอดมินมอบหมายก่อนจึงกดเข้างานได้</Note>;
   } else if (beforeDay) {
     action = <Note icon={<HourglassTopRounded />} tone={ACCENT}>รับทราบแล้ว · กดเข้างานได้ในวันที่ <b>{dayText}</b>{isHead ? "" : ` (หัวหน้าทีม ${head} เป็นคนกด)`}</Note>;
   } else if (!isHead) {
-    action = <Note icon={<InfoOutlined />} tone={ACCENT}>รอหัวหน้าทีม <b>{head}</b> กดเข้างานให้ทีม</Note>;
+    action = <Note icon={<InfoRounded />} tone={ACCENT}>รอหัวหน้าทีม <b>{head}</b> กดเข้างานให้ทีม</Note>;
   } else {
     action = (
       <Box>
@@ -568,7 +565,7 @@ ${text}`);
     let line;
     const day = formatThai(moment(event.start), "D MMM");
     if (closed) line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>ปิดงานแล้ว{event.closeApprovedBy ? ` · อนุมัติโดย ${event.closeApprovedBy}` : ""}</Line>;
-    else if (event.approvalStatus === "rejected") line = <Line icon={<InfoOutlined />} tone="#dc2626">ไม่อนุมัติงาน{event.approvalRejectReason ? ` — ${event.approvalRejectReason}` : ""}</Line>;
+    else if (event.approvalStatus === "rejected") line = <Line icon={<InfoRounded />} tone="#dc2626">ไม่อนุมัติงาน{event.approvalRejectReason ? ` — ${event.approvalRejectReason}` : ""}</Line>;
     else if (pendingApproval) {
       line = isApprover ? (
         <Box>
@@ -621,9 +618,9 @@ ${text}`);
       const lastDay = moment(event.end || event.start).subtract(event.allDay && event.end ? 1 : 0, "days").startOf("day");
       const pastDay = moment().startOf("day").isAfter(lastDay);
       const who = teamAcks.length ? `รับทราบแล้ว: ${teamAcks.map((x) => x.name).join(", ")}` : "";
-      line = !hasHead ? <Line icon={<InfoOutlined />} tone="#d97706">ยังไม่มีหัวหน้าทีม — รอแอดมินมอบหมาย</Line>
-        : !acked ? <Line icon={<InfoOutlined />} tone={pastDay ? "#d97706" : MUTED}>{pastDay ? `เลยวันเข้างาน (${day}) · ยังไม่รับทราบ/บันทึกเข้างาน` : `รอผู้รับผิดชอบ${respName ? ` ${respName}` : ""} กดรับทราบงาน · เข้างาน ${day}`}</Line>
-        : pastDay ? <Line icon={<InfoOutlined />} tone="#d97706">{[who, `เลยวันเข้างาน (${day}) · ${confirmed ? "ยังไม่บันทึกเข้างาน" : "ยังไม่ยืนยันนัดหมาย"}`].filter(Boolean).join(" · ")}</Line>
+      line = !hasHead ? <Line icon={<InfoRounded />} tone="#d97706">ยังไม่มีหัวหน้าทีม — รอแอดมินมอบหมาย</Line>
+        : !acked ? <Line icon={<InfoRounded />} tone={pastDay ? "#d97706" : MUTED}>{pastDay ? `เลยวันเข้างาน (${day}) · ยังไม่รับทราบ/บันทึกเข้างาน` : `รอผู้รับผิดชอบ${respName ? ` ${respName}` : ""} กดรับทราบงาน · เข้างาน ${day}`}</Line>
+        : pastDay ? <Line icon={<InfoRounded />} tone="#d97706">{[who, `เลยวันเข้างาน (${day}) · ${confirmed ? "ยังไม่บันทึกเข้างาน" : "ยังไม่ยืนยันนัดหมาย"}`].filter(Boolean).join(" · ")}</Line>
         : (
           <Line icon={<HourglassTopRounded />} tone={MUTED}>
             {[who, !confirmed ? "รอผู้รับผิดชอบยืนยันนัดหมาย" : beforeDay ? `ยืนยันนัดหมายแล้ว · เข้างาน ${day}`
@@ -632,14 +629,14 @@ ${text}`);
           </Line>
         );
     } else if (!acked && !canAck) {
-      line = <Line icon={<InfoOutlined />} tone={MUTED}>รอผู้รับผิดชอบ{respName ? ` ${respName}` : ""} กดรับทราบงาน · เข้างาน {day}</Line>;
+      line = <Line icon={<InfoRounded />} tone={MUTED}>รอผู้รับผิดชอบ{respName ? ` ${respName}` : ""} กดรับทราบงาน · เข้างาน {day}</Line>;
     } else if (!acked && !groupPrimary) {
-      line = <Line icon={<InfoOutlined />} tone={MUTED}>ยังไม่รับทราบ · กดรับทราบที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>;
+      line = <Line icon={<InfoRounded />} tone={MUTED}>ยังไม่รับทราบ · กดรับทราบที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>;
     } else if (!acked) {
       // ✅ รับทราบ (ปุ่มหลัก) + ปฏิเสธ (เส้นขอบแดง) คู่กัน — เฉพาะผู้รับผิดชอบ (ไม่มีผู้รับผิดชอบ → หัวหน้าทีม)
       line = (
         <Stack direction="row" gap={0.75}>
-          <Button variant="contained" disableElevation startIcon={<ThumbUpAltOutlined />} disabled={acking} onClick={ack} sx={{ ...MBTN.primary, minHeight: 40, flex: 2.2 }}>
+          <Button variant="contained" disableElevation startIcon={<ThumbUpAltRounded />} disabled={acking} onClick={ack} sx={{ ...MBTN.primary, minHeight: 40, flex: 2.2 }}>
             {acking ? "กำลังบันทึก…" : `รับทราบงาน · ${day}`}
           </Button>
           <Button variant="outlined" disabled={acking} onClick={() => setDeclineOpen(true)} sx={{ ...MBTN.outline("#dc2626"), minHeight: 40, flex: 1 }}>
@@ -649,7 +646,7 @@ ${text}`);
       );
     } else if (!confirmed) {
       // ✅ ขั้นถัดจากรับทราบ: ผู้รับผิดชอบยืนยันนัดหมาย (สถานะงาน → ยืนยันแล้ว)
-      line = canAck && !groupPrimary ? <Line icon={<InfoOutlined />} tone={MUTED}>รับทราบแล้ว · กดยืนยันนัดหมายที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>
+      line = canAck && !groupPrimary ? <Line icon={<InfoRounded />} tone={MUTED}>รับทราบแล้ว · กดยืนยันนัดหมายที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>
       : canAck ? (
         <Box>
           <Button fullWidth variant="contained" disableElevation startIcon={<TaskAltRounded />} disabled={acking} onClick={confirmJob} sx={{ ...MBTN.primary, minHeight: 40 }}>
@@ -658,10 +655,10 @@ ${text}`);
           <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.72rem", color: MUTED }}>ยืนยันวันเข้างานกับลูกค้าแล้ว จึงกด · หัวหน้าทีมจะได้รับแจ้ง</Typography>
         </Box>
       ) : <Line icon={<HourglassTopRounded />} tone={MUTED}>รับทราบแล้ว · รอผู้รับผิดชอบ{respName ? ` ${respName}` : ""} ยืนยันนัดหมาย</Line>;
-    } else if (!hasHead) line = <Line icon={<InfoOutlined />} tone="#d97706">ยืนยันนัดหมายแล้ว · ยังไม่มีหัวหน้าทีม — มอบหมายหัวหน้าทีมเข้างาน</Line>;
+    } else if (!hasHead) line = <Line icon={<InfoRounded />} tone="#d97706">ยืนยันนัดหมายแล้ว · ยังไม่มีหัวหน้าทีม — มอบหมายหัวหน้าทีมเข้างาน</Line>;
     else if (beforeDay) {
       line = <Line icon={<TaskAltRounded />} tone="#16a34a">ยืนยันนัดหมายแล้ว · {isHead ? `กดบันทึกเข้างานได้วันที่ ${day}` : `หัวหน้าทีม ${head} บันทึกเข้างานวันที่ ${day}`}</Line>;
-    } else if (!isHead) line = <Line icon={<InfoOutlined />} tone={MUTED}>ยืนยันนัดหมายแล้ว · รอหัวหน้าทีม <b style={{ fontWeight: 600 }}>{head}</b> บันทึกเข้างาน</Line>;
+    } else if (!isHead) line = <Line icon={<InfoRounded />} tone={MUTED}>ยืนยันนัดหมายแล้ว · รอหัวหน้าทีม <b style={{ fontWeight: 600 }}>{head}</b> บันทึกเข้างาน</Line>;
     else {
       line = (
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>

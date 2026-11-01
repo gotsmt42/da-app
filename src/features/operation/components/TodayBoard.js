@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Box, ButtonBase, Stack, Typography, Skeleton, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AccessTime, ChevronRight, Groups, PersonOff, LocalShippingOutlined } from "@mui/icons-material";
+import { AccessTimeRounded as AccessTime, ChevronRightRounded as ChevronRight, GroupsRounded as Groups, PersonOffRounded as PersonOff, LocalShippingRounded } from "@mui/icons-material";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
@@ -87,10 +87,10 @@ function stateOf(e, att, now) {
 const Avatar = ({ name, size = 40 }) => (
   <Box sx={{
     width: size, height: size, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center",
-    bgcolor: name === UNASSIGNED ? "#e2e8f0" : name === DELIVERY ? "#ecfeff" : personColor(name), color: name === UNASSIGNED ? "#64748b" : name === DELIVERY ? "#0891b2" : "#fff",
+    bgcolor: name === UNASSIGNED ? "#e6e9ef" : name === DELIVERY ? "#ecfeff" : personColor(name), color: name === UNASSIGNED ? "#64748b" : name === DELIVERY ? "#0891b2" : "#fff",
     fontWeight: 800, fontSize: size * 0.42,
   }}>
-    {name === UNASSIGNED ? <PersonOff sx={{ fontSize: size * 0.5 }} /> : name === DELIVERY ? <LocalShippingOutlined sx={{ fontSize: size * 0.5 }} /> : personInitial(name)}
+    {name === UNASSIGNED ? <PersonOff sx={{ fontSize: size * 0.5 }} /> : name === DELIVERY ? <LocalShippingRounded sx={{ fontSize: size * 0.5 }} /> : personInitial(name)}
   </Box>
 );
 
@@ -183,7 +183,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
     <Box>
       {/* ── สรุปวันนี้: แถบเดียว — วันที่ซ้าย · ตัวกรองแบบชิปขวา (🔁 17 ต.ค. 2569 ผู้ใช้: "ดูใหญ่กินพื้นที่ จัดวางให้สวยงาม") ── */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1}
-        sx={{ mb: 1.5, px: 1.5, py: 1, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3 }}>
+        sx={{ mb: 1.5, px: 1.5, py: 1, bgcolor: "#fff", border: "1px solid #e6e9ef", borderRadius: 3 }}>
         <Box sx={{ minWidth: 0, flexShrink: 0 }}>
           <Typography noWrap sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.3 }}>
             {now.locale("th").format("dddd D MMM")} {now.year() + 543}
@@ -202,7 +202,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
                     flexShrink: 0, height: 32, px: 1.25, gap: 0.75, borderRadius: 99, fontFamily: "inherit", whiteSpace: "nowrap",
                     fontSize: "0.8rem", fontWeight: on ? 800 : 600, color: on ? f.color : "#475569",
                     bgcolor: on ? alpha(f.color, 0.08) : "transparent",
-                    border: `1px solid ${on ? alpha(f.color, 0.5) : "#e2e8f0"}`,
+                    border: `1px solid ${on ? alpha(f.color, 0.5) : "#e6e9ef"}`,
                   }}>
                   {f.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: f.color }} />}
                   {f.label}
@@ -219,7 +219,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
 
       {techs.length === 0 ? (
         <Stack direction="row" alignItems="center" justifyContent="center" gap={1}
-          sx={{ py: 3, color: "#94a3b8", bgcolor: "#fff", border: "1px dashed #e2e8f0", borderRadius: 3 }}>
+          sx={{ py: 3, color: "#94a3b8", bgcolor: "#fff", border: "1px dashed #e6e9ef", borderRadius: 3 }}>
           <Groups sx={{ fontSize: 22 }} />
           <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }}>{rows.length === 0 ? "วันนี้ไม่มีงานที่ลงตารางไว้" : "ไม่มีงานในกลุ่มนี้"}</Typography>
         </Stack>
@@ -230,7 +230,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
         //    (ปฏิทิน · ชื่องาน · โครงการ · รูปผู้รับผิดชอบ + สถานะวันนี้) เรียงเลยเวลานัดก่อน → ตามเวลานัด · กดเปิดรายละเอียด
         <Stack spacing={1.25}>
           {flat.map(({ e, a, state }) => (
-            <Box key={e._id} sx={{ p: 2, bgcolor: "#fff", borderRadius: 3, border: "1px solid #e2e8f0", borderLeft: `4px solid ${STATE[state].color}`, boxShadow: "0 1px 3px rgba(15,23,42,.06)" }}>
+            <Box key={e._id} sx={{ p: 2, bgcolor: "#fff", borderRadius: 3, border: "1px solid #e6e9ef", borderLeft: `4px solid ${STATE[state].color}`, boxShadow: "0 1px 3px rgba(15,23,42,.06)" }}>
               <MobileJobSummary event={e}
                 statusLabel={state === "checkin" ? `เข้างาน ${fmtTime(a?.checkIn?.at)}` : STATE[state].short} statusColor={STATE[state].color}
                 next={{ title: `${hasTime(e) ? `นัด ${moment(e.start).format("HH:mm")} น. · ` : "ทั้งวัน · "}${STATE[state].label}`, tone: STATE[state].color }}
@@ -249,11 +249,11 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
             const lateCount = t.jobs.filter((j) => j.state === "late").length;
             return (
               <Box key={t.name} sx={{
-                bgcolor: "#fff", border: `1px solid ${lateCount ? alpha("#dc2626", 0.35) : "#e2e8f0"}`, borderRadius: 3, overflow: "hidden",
-                boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                bgcolor: "#fff", border: `1px solid ${lateCount ? alpha("#dc2626", 0.35) : "#e6e9ef"}`, borderRadius: 3, overflow: "hidden",
+                boxShadow: "none",
               }}>
                 {/* หัวการ์ด: ช่าง */}
-                <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 1.75, py: 1.25, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 1.75, py: 1.25, bgcolor: "#f8fafc", borderBottom: "1px solid #e6e9ef" }}>
                   <Avatar name={t.name} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 800, color: t.name === UNASSIGNED || t.name === DELIVERY ? "#64748b" : "#0f172a" }}>{t.name}</Typography>
@@ -307,10 +307,10 @@ export default function TodayBoard({ events, onOpenJob, view = "card", employees
 
 /** ตารางงานวันนี้ — ✅ (19 ต.ค. 2569) เลือกมุมมองตารางที่หัวเพจแล้ว แท็บนี้เป็นตารางด้วย (เดิมการ์ดเสมอ) */
 function TodayTable({ rows, onOpenJob }) {
-  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: "#64748b", px: 1.25, py: 1.1, borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap", bgcolor: "#f8fafc" };
-  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.15, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" };
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: "#64748b", px: 1.25, py: 1.1, borderBottom: "1px solid #e6e9ef", whiteSpace: "nowrap", bgcolor: "#f8fafc" };
+  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.15, borderBottom: "1px solid #e6e9ef", verticalAlign: "top" };
   return (
-    <Box sx={{ bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Box sx={{ bgcolor: "#fff", border: "1px solid #e6e9ef", borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
         <thead><tr>{["เวลานัด", "งาน", "โครงการ / บริษัท", "ช่าง / ทีม", "สถานะวันนี้", "เอกสาร / ขั้นตอน", ""].map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
         <tbody>

@@ -15,7 +15,7 @@ export const DISPATCH_ACCENT = "#f59e0b";
 export const SALES_ACCENT = ROLE_COLOR[ROLES.SALE];
 
 export const TEXT_SUB = "#64748b";
-export const BORDER_MAIN = "#e2e8f0";
+export const BORDER_MAIN = "#e6e9ef";
 export const SURFACE_SUBTLE = "#f8fafc";
 
 /** สถานะของ "ทั้งใบ" */

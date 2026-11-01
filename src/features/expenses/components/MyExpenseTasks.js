@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Stack, Typography, Button, Chip, Collapse, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ReceiptLong, Edit, AssignmentLate, ChevronRight, ExpandMore } from "@mui/icons-material";
+import { ReceiptLongRounded as ReceiptLong, EditRounded as Edit, AssignmentLateRounded as AssignmentLate, ChevronRightRounded as ChevronRight, ExpandMoreRounded as ExpandMore } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import ExpenseService from "../services/ExpenseService";

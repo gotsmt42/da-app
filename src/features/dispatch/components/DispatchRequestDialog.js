@@ -21,10 +21,7 @@ import {
   Tooltip, InputAdornment, Autocomplete,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  AttachFile, Close, Assignment, OpenInNew, NoteAlt, Send,
-  Lock, Description as DescriptionIcon,
-} from "@mui/icons-material";
+import { AttachFileRounded as AttachFile, CloseRounded as Close, AssignmentRounded as Assignment, OpenInNewRounded as OpenInNew, NoteAltRounded as NoteAlt, SendRounded as Send, LockRounded as Lock, DescriptionRounded as DescriptionIcon } from "@mui/icons-material";
 
 import { formatBytes } from "@/shared/utils/fileUpload";
 import CustomerService from "@/shared/services/CustomerService";

@@ -17,7 +17,7 @@ import {
   Box, Stack, Typography, TextField, Button, Alert, Snackbar, CircularProgress, Divider, Chip, Tooltip
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description, SupportAgent, History } from "@mui/icons-material";
+import { BusinessRounded as Business, ImageRounded as ImageIcon, SaveRounded as Save, RestartAltRounded as RestartAlt, UploadFileRounded as UploadFile, DescriptionRounded as Description, SupportAgentRounded as SupportAgent, HistoryRounded as History } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
@@ -27,7 +27,7 @@ import { PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
 const ACCENT = "#0f766e";
 const TEXT_SUB = "#64748b";
-const BORDER = "#e2e8f0";
+const BORDER = "#e6e9ef";
 
 /** ช่องรูป 3 ช่อง — บอกให้ชัดว่ารูปนี้ไปโผล่ตรงไหน ไม่งั้นอัปสลับช่องกันแน่นอน */
 const IMAGE_SLOTS = [

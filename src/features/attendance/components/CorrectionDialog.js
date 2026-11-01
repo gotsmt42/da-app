@@ -8,7 +8,7 @@ import moment from "moment";
 import {
   Box, Stack, Typography, Button, ButtonBase, Dialog, DialogContent, DialogActions, IconButton, TextField,
 } from "@mui/material";
-import { Close, EditCalendarOutlined } from "@mui/icons-material";
+import { CloseRounded as Close, EditCalendarRounded } from "@mui/icons-material";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, MUTED, LINE, ACCENT, ACCENT_SOFT } from "@/shared/ui/PageKit";
@@ -58,7 +58,7 @@ export default function CorrectionDialog({ open, row, isApprover, onClose, onDon
     <Dialog open={open} onClose={() => !saving && onClose()} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
         <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: ACCENT_SOFT, color: ACCENT }}>
-          <EditCalendarOutlined sx={{ fontSize: 20 }} />
+          <EditCalendarRounded sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>{isApprover ? "แก้เวลา" : "ขอแก้เวลา"}</Typography>

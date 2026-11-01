@@ -8,7 +8,7 @@
  * ⚠️ จำค่าที่ผู้ใช้เลือกไว้ข้ามการเปิดหน้า — แต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด
  */
 import { ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
-import { ViewAgenda, TableRows } from "@mui/icons-material";
+import { ViewAgendaRounded as ViewAgenda, TableRowsRounded as TableRows } from "@mui/icons-material";
 
 // ✅ กฎออกแบบ (สีไม่เยอะ): ปุ่มที่เลือกอยู่เป็นเทาเข้มเหมือนกันทุกหน้า — ไม่รับสีประจำหน้าแล้ว (เดิมส้ม/ฟ้าคนละหน้า)
 export default function ViewToggle({ value, onChange, accent: _accent }) {

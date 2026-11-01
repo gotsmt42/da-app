@@ -3,7 +3,7 @@ import Swal from "@/shared/ui/swal";
 import {
   Box, Stack, Typography, TextField, IconButton, Button, Skeleton,
 } from "@mui/material";
-import { Add, Edit, Delete, Check, Close, Search } from "@mui/icons-material";
+import { AddRounded as Add, EditRounded as Edit, DeleteRounded as Delete, CheckRounded as Check, CloseRounded as Close, SearchRounded as Search } from "@mui/icons-material";
 
 // ✅ ประเภทงาน/ระบบ มีรูปร่างข้อมูลเหมือนกันเป๊ะ (แค่ชื่อ) — คอมโพเนนต์เดียวใช้ซ้ำได้ทั้งคู่
 // แทนการสร้างตาราง MUI แยกกันสองชุดที่โค้ดจะซ้ำกันเกือบทั้งหมด
@@ -181,11 +181,11 @@ const styles = {
     backgroundColor: "rgba(220,38,38,0.08)", borderRadius: "8px", padding: "1px 7px",
   },
   row: {
-    padding: "8px 10px", borderRadius: "10px", border: "1px solid #e2e8f0", backgroundColor: "#ffffff",
+    padding: "8px 10px", borderRadius: "10px", border: "1px solid #e6e9ef", backgroundColor: "#ffffff",
   },
   empty: {
     padding: "24px 12px", textAlign: "center", fontSize: "12.5px", color: "#94a3b8",
-    border: "1px dashed #e2e8f0", borderRadius: "10px",
+    border: "1px dashed #e6e9ef", borderRadius: "10px",
   },
 };
 

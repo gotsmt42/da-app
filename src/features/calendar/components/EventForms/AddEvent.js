@@ -94,7 +94,7 @@ function injectAddStyles() {
     /* ── Section label ── */
     /* ── การ์ดหมวดของฟอร์ม — หน้าตาเดียวกับฟอร์มแก้ไขงาน (EditEvent.js .ee-card) ── */
     .ae-card {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      background: #fff; border: 1px solid #e6e9ef; border-radius: 14px;
       margin: 0 0 12px; overflow: hidden; text-align: left;
       box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
@@ -102,13 +102,13 @@ function injectAddStyles() {
     .ae-card-ico {
       width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
-      background: #fff; border: 1px solid #e2e8f0; font-size: 15px; line-height: 1;
+      background: #fff; border: 1px solid #e6e9ef; font-size: 15px; line-height: 1;
     }
     .ae-card-titles { flex: 1; min-width: 0; }
     .ae-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
     .ae-card-titles p { margin: 1px 0 0; font-size: 11.5px; color: #64748b; line-height: 1.35; }
     .ae-card-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-    .ae-card-badge--muted { color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; }
+    .ae-card-badge--muted { color: #64748b; background: #f1f5f9; border: 1px solid #e6e9ef; }
     .ae-card-body { padding: 12px 14px 4px; }
     .ae-card-body > .ae-field { margin-bottom: 10px; }
     .ae-card .ae-grid { gap: 10px 12px; margin-bottom: 10px; }
@@ -165,7 +165,7 @@ function injectAddStyles() {
     .ae-field label .req { color: #ef4444; font-size: 13px; }
     .ae-field select, .ae-field input, .ae-field textarea {
       width: 100%; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      border: 1.5px solid #e6e9ef; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b;
       background: #fff; transition: border-color .2s, box-shadow .2s;
       font-family: inherit;
@@ -179,7 +179,7 @@ function injectAddStyles() {
     .ae-char-count { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 2px; }
 
     /* ── Divider ── */
-    .ae-divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+    .ae-divider { border: none; border-top: 1px solid #e6e9ef; margin: 16px 0; }
 
     /* ── สัญญาแบบหลายครั้ง ── */
     .ae-contract-box {
@@ -196,7 +196,7 @@ function injectAddStyles() {
     .ae-jobtype-option input { position: absolute; opacity: 0; width: 0; height: 0; }
     .ae-jobtype-card {
       display: flex; align-items: center; gap: 10px;
-      border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;
+      border: 1.5px solid #e6e9ef; border-radius: 10px; padding: 12px 14px;
       background: #fff; transition: border-color .15s, background .15s;
     }
     .ae-jobtype-icon { font-size: 22px; line-height: 1; }
@@ -254,7 +254,7 @@ function injectAddStyles() {
       position: relative;
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 42px; height: 32px; padding: 0 10px; border-radius: 8px;
-      font-size: 12px; font-weight: 700; border: 1.5px solid #e2e8f0;
+      font-size: 12px; font-weight: 700; border: 1.5px solid #e6e9ef;
       background: #fff; color: #64748b; font-family: inherit;
     }
     button.ae-round-chip--open {
@@ -329,7 +329,7 @@ function injectAddStyles() {
     .ae-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ae-multi-date-row input {
       flex: 1; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      border: 1.5px solid #e6e9ef; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b;
       background: #fff; font-family: inherit;
     }
@@ -340,7 +340,7 @@ function injectAddStyles() {
     .ae-multi-date-row .ae-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
     /* ✅ ทีมของแต่ละช่วง (ผู้ใช้สั่ง: บางช่วงคนเข้าไม่ตรงกัน) — ซ่อนไว้จนกว่าจะเอาออกจากงานหลัก */
     .ae-multi-date-row { flex-wrap: wrap; }
-    .ae-range-team { flex: 1 1 100%; border-top: 1px dashed #e2e8f0; margin-top: 6px; padding-top: 6px; }
+    .ae-range-team { flex: 1 1 100%; border-top: 1px dashed #e6e9ef; margin-top: 6px; padding-top: 6px; }
     .ae-range-same { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; font-weight: 600; cursor: pointer; }
     .ae-range-same input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
     .ae-range-team-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
@@ -355,7 +355,7 @@ function injectAddStyles() {
     .ae-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ae-team-member-row select {
       flex: 1; box-sizing: border-box;
-      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      border: 1.5px solid #e6e9ef; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b;
       background: #fff; font-family: inherit;
     }
@@ -382,7 +382,7 @@ function injectAddStyles() {
     #ae-action-bar {
       display: flex; gap: 10px; flex-wrap: wrap;
       padding: 16px 24px 20px;
-      background: #f1f5f9; border-top: 1px solid #e2e8f0;
+      background: #f1f5f9; border-top: 1px solid #e6e9ef;
       justify-content: flex-end;
       flex-shrink: 0;
       position: sticky; bottom: 0; z-index: 10;
@@ -397,14 +397,14 @@ function injectAddStyles() {
     .ae-btn:hover  { opacity: .88; transform: translateY(-1px); }
     .ae-btn:active { transform: translateY(0); }
     .ae-btn-success { background: #10b981; color: #fff; }
-    .ae-btn-ghost   { background: #e2e8f0; color: #475569; }
+    .ae-btn-ghost   { background: #e6e9ef; color: #475569; }
     .ae-btn-spacer  { flex: 1; }
     @media(max-width:520px) { .ae-btn-spacer { display:none; } #ae-action-bar { justify-content:center; } }
 
     /* ── TomSelect override ── */
     .swal-add-event .ts-wrapper { width: 100%; }
     .swal-add-event .ts-wrapper .ts-control {
-      border: 1.5px solid #e2e8f0 !important; border-radius: 8px !important;
+      border: 1.5px solid #e6e9ef !important; border-radius: 8px !important;
       padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
     }
     .swal-add-event .ts-wrapper.focus .ts-control { border-color: #2563eb !important; }
@@ -413,7 +413,7 @@ function injectAddStyles() {
        ✅ กฎออกแบบ: สีน้อย (น้ำเงิน = เลือก/ปุ่มหลัก) · หัวกล่องขาว · ระยะ/แนวเท่ากันทุกการ์ด
        ⚠️ วางท้ายสุดของสไตล์ชีตโดยตั้งใจ — ชนะกฎเดิมด้านบนด้วยลำดับ ไม่ต้องไล่แก้ทีละจุด ══ */
     .swal-add-event #ae-header {
-      background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 64px 14px 20px; text-align: left;
+      background: #fff; border-bottom: 1px solid #e6e9ef; padding: 14px 64px 14px 20px; text-align: left;
     }
     .swal-add-event #ae-header-icon {
       width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; font-size: 0;
@@ -432,7 +432,7 @@ function injectAddStyles() {
       background: #f1f5f9 !important; color: #475569 !important; border-radius: 10px !important;
       width: 34px !important; height: 34px !important; font-size: 22px !important;
     }
-    .swal-add-event .swal2-close:hover { background: #e2e8f0 !important; }
+    .swal-add-event .swal2-close:hover { background: #e6e9ef !important; }
     .swal-add-event #ae-body { text-align: left; padding: 18px 22px; }
     .swal-add-event .ae-date-badge { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 
@@ -442,7 +442,7 @@ function injectAddStyles() {
       border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
     .ae-jobtype-option input:checked + .ae-jobtype-card .ae-jobtype-title { color: #1d4ed8; }
-    .ae-contract-box, .ae-contract-pick-info { background: #f8fafc; border-color: #e2e8f0; }
+    .ae-contract-box, .ae-contract-pick-info { background: #f8fafc; border-color: #e6e9ef; }
     .ae-contract-pick-info b { color: #1d4ed8; }
     .ae-contract-option-badge, .ae-cpi-badge { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
     button.ae-round-chip--open:hover { border-color: #2563eb; }
@@ -456,7 +456,7 @@ function injectAddStyles() {
     .ae-btn:hover { opacity: 1; transform: none; }
     .ae-btn-success { background: #2563eb; color: #fff; }
     .ae-btn-success:hover { background: #1d4ed8; }
-    .ae-btn-ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+    .ae-btn-ghost { background: #fff; color: #475569; border: 1px solid #e6e9ef; }
     .ae-btn-ghost:hover { background: #f8fafc; }
 
     /* ── มือถือ: เต็มจอ ไม่มีขอบเว้น ── */

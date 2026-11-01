@@ -23,10 +23,7 @@ import {
 import PageLoader from "@/shared/ui/PageLoader";
 import { EmptyState } from "@/shared/ui/PageKit";
 import { alpha } from "@mui/material/styles";
-import {
-  Refresh, Search, Bolt, Schedule, Inbox, Description, Place,
-  CalendarMonth, HourglassTop, EventAvailable, TaskAlt, Close,
-} from "@mui/icons-material";
+import { RefreshRounded as Refresh, SearchRounded as Search, BoltRounded as Bolt, ScheduleRounded as Schedule, InboxRounded as Inbox, DescriptionRounded as Description, PlaceRounded as Place, CalendarMonthRounded as CalendarMonth, HourglassTopRounded as HourglassTop, EventAvailableRounded as EventAvailable, TaskAltRounded as TaskAlt, CloseRounded as Close } from "@mui/icons-material";
 import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";
 import { QueueToolbar, SectionHead, AllClear, ActionCard, PeopleField, QueueRow, RowGroup, SoftPill, AMBER, BLUE } from "./QueueKit";
 
@@ -610,7 +607,7 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
         sx={{
           mb: 2, p: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" },
           bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 3,
-          boxShadow: "0 1px 2px rgba(15, 23, 42, .04)",
+          boxShadow: "none",
         }}
       >
         <TextField
@@ -684,7 +681,7 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
                 // ✅ คอลัมน์พื้นขาวขอบเทา (เดิมพื้น/ขอบสีตามสถานะ) — สีสถานะเหลือแค่จุดหน้าหัวข้อ
                 sx={{
                   mb: isDesktop ? 0 : 2, p: 1.25, borderRadius: 3,
-                  bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                  bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, boxShadow: "none",
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.25, mb: 1.25 }}>

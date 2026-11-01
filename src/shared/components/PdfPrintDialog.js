@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, CircularProgress, useMediaQuery,
 } from "@mui/material";
-import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, MailOutline } from "@mui/icons-material";
+import { CloseRounded as Close, PrintRounded as Print, ShareRounded as Share, DownloadRounded as Download, OpenInNewRounded as OpenInNew, PictureAsPdfRounded as PictureAsPdf, MailOutlineRounded as MailOutline } from "@mui/icons-material";
 
 import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
@@ -23,7 +23,7 @@ import PdfPagesView from "@/shared/components/PdfPagesView";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 const TEXT_SUB = "#64748b";
-const BORDER_MAIN = "#e2e8f0";
+const BORDER_MAIN = "#e6e9ef";
 
 export default function PdfPrintDialog({ open, onClose, generate, jobKey, title, subtitle, badge, color = "#334155", dark, shareText, email }) {
   const [mailOpen, setMailOpen] = useState(false);

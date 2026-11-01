@@ -15,7 +15,7 @@ import {
   ToggleButtonGroup, ToggleButton, Tooltip, useMediaQuery, Pagination,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { FileDownload, Insights, ChevronRight, Assessment, WarningAmber } from "@mui/icons-material";
+import { FileDownloadRounded as FileDownload, InsightsRounded as Insights, ChevronRightRounded as ChevronRight, AssessmentRounded as Assessment, WarningAmberRounded as WarningAmber } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -299,7 +299,7 @@ export default function PurchaseReport() {
 
       {/* ── ตัวกรอง ── */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
-        sx={{ mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+        sx={{ mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "none" }}>
         <SelectField label="ช่วงเวลา" value={preset} onChange={(e) => applyPreset(e.target.value)} sx={{ minWidth: 170 }}>
           {PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </SelectField>

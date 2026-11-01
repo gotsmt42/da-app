@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { TextField } from "@mui/material";
-import { CalendarToday } from "@mui/icons-material";
+import { CalendarTodayRounded as CalendarToday } from "@mui/icons-material";
 import { InputAdornment } from "@mui/material";
 import { THAI_DATE_PLACEHOLDER, thaiDateNumeric } from "../utils/thaiDate";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";

@@ -65,7 +65,7 @@ export function closeCheckHtml(check) {
 
   const head = `<div style="font-size:12.5px;color:#64748b;text-align:center;margin-bottom:10px">
     ตรวจ ${files.length} ไฟล์ · ถูกต้อง <b style="color:#16a34a">${okCount}</b>${badCount ? ` · ต้องแก้ <b style="color:#dc2626">${badCount}</b>` : ""}</div>`;
-  const list = `<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff"><div style="margin-top:-1px">${rows.map(row).join("")}</div></div>`;
+  const list = `<div style="border:1px solid #e6e9ef;border-radius:12px;overflow:hidden;background:#fff"><div style="margin-top:-1px">${rows.map(row).join("")}</div></div>`;
   const tip = badCount
     ? `<div style="margin-top:10px;color:#64748b;font-size:12px;line-height:1.5">เอกสารไม่มีจริง (เช่น ลูกค้าไม่ออกให้) — กด <b style="white-space:nowrap;color:#334155">ขอแอดมินพิจารณา</b> แล้วใส่เหตุผล</div>`
     : `<div style="margin-top:10px;color:#64748b;font-size:12px;text-align:center">งานจะเข้าสถานะ “รอแอดมินอนุมัติ” ทันที</div>`;

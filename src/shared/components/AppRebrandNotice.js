@@ -13,7 +13,7 @@
  */
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, Collapse, Stack, Typography } from "@mui/material";
-import { InstallMobile } from "@mui/icons-material";
+import { InstallMobileRounded as InstallMobile } from "@mui/icons-material";
 
 const ACK_KEY = "app.rebrand.tidtam.ack";   // ⚠️ เปลี่ยนคีย์ทุกครั้งที่เปลี่ยนชื่อ/ไอคอน ไม่งั้นคนที่เคยกดรับทราบรอบก่อนจะไม่เห็นรอบใหม่
 

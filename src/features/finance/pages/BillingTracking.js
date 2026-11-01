@@ -22,7 +22,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, IconButton, Skeleton, Tooltip, useMediaQuery, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Refresh, ReceiptLong, ChevronRight, AttachFileRounded } from "@mui/icons-material";
+import { RefreshRounded as Refresh, ReceiptLongRounded as ReceiptLong, ChevronRightRounded as ChevronRight, AttachFileRounded } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import BillingDialog from "../components/BillingDialog";
@@ -312,7 +312,7 @@ export default function BillingTracking() {
         </>
       ) : (
         <>
-          <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+          <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
             <Box component="table" sx={{ width: "100%", minWidth: 1200, borderCollapse: "collapse" }}>
               <thead>
                 <tr>{["วันที่เข้างาน", "งาน", "ลูกค้า / โครงการ", "ใบวางบิล", "ครบกำหนดชำระ", "ยอดสุทธิ / ค้างรับ", "สถานะ", ""].map((h, i) => (
