@@ -52,6 +52,7 @@ import HandymanRounded from "@mui/icons-material/HandymanRounded";
 import BadgeRounded from "@mui/icons-material/BadgeRounded";
 import StorageRounded from "@mui/icons-material/StorageRounded";
 import LanguageRounded from "@mui/icons-material/LanguageRounded";
+import HistoryRounded from "@mui/icons-material/HistoryRounded";
 
 /** ทำให้ไอคอน MUI รับ prop แบบ react-icons (size) และมีขนาดตั้งต้น 1em */
 export const asIcon = (Mui) => {
@@ -83,6 +84,7 @@ export const AppIcon = {
   Claim: asIcon(ReceiptLongRounded),
   Purchase: asIcon(ShoppingCartRounded),
   Stock: asIcon(Inventory2Rounded),
+  History: asIcon(HistoryRounded),
   Ot: asIcon(MoreTimeRounded),
   Contractor: asIcon(EngineeringRounded),
   Approve: asIcon(FactCheckRounded),

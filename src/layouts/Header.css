@@ -213,7 +213,18 @@
 
 .profile-img:hover .rounded-circle,
 .profile-img:hover .header-avatar-fallback {
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.35);
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.12);
+}
+/* (2 พ.ย. 2569 ผู้ใช้: "เอากรอบแดงตรงรูปภาพ user ออก บดบังไม่สวย") — ปุ่มรูปโปรไฟล์ไม่ต้องมีกรอบ focus/active ของ Bootstrap */
+.profile-img .btn,
+.profile-img .btn:focus,
+.profile-img .btn:focus-visible,
+.profile-img .btn:active,
+.profile-img .btn.show {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  background: transparent !important;
 }
 
 /* --------------------------------------------------------------------------

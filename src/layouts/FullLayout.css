@@ -275,3 +275,13 @@
 @media (max-width: 767.98px) {
   .contentArea { background-color: #fff !important; }
 }
+
+/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ระยะย่น บน ล่าง มากเกินไป ลดลงให้พอดีสวยงาม")
+   จอคอม: ระยะบน-ล่างเดิมซ้อน 2 ชั้น (Container p-4 = 24px + ระยะของตัวหน้าเอง ~20px) → ชั้นนี้เหลือ 10/4px
+   ซ้าย-ขวาเท่าเดิม · มือถือมีกฎของตัวเองด้านบนแล้ว */
+@media (min-width: 768px) {
+  .app-page-container {
+    padding-top: 10px !important;
+    padding-bottom: 4px !important;
+  }
+}

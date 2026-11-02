@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Nav, NavItem, Collapse } from "reactstrap";
 import { Link, useLocation } from "react-router-dom";
+import Tooltip from "@mui/material/Tooltip";
 import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
@@ -268,11 +269,33 @@ const side = (key, extra) => {
     return n ? `${item.title} (${BADGE_LABEL[item.badgeKey] || "รอดำเนินการ"} ${n})` : item.title;
   };
 
+  /**
+   * กล่องชื่อเมนูตอนย่อแถบ — ✅ (2 พ.ย. 2569 ผู้ใช้: "เวลาชี้เมนูด้านข้างตอนย่อ ให้แสดงกล่องชื่อเมนูให้ละเอียด สวยงาม ดูง่าย")
+   * ชื่อเมนู + คำอธิบายสั้น + จำนวนที่รอดำเนินการ (ถ้ามี) · แสดงเฉพาะตอนย่อ (ตอนกางเห็นชื่ออยู่แล้ว)
+   */
+  const withTip = (item, node, count = null) => {
+    if (!isCollapsed) return node;
+    const n = count ?? (item.badgeKey ? Number(badges[item.badgeKey]) || 0 : 0);
+    const tip = (
+      <div className="sb-tip">
+        <div className="sb-tip-title">{item.title}</div>
+        {item.sub && <div className="sb-tip-sub">{item.sub}</div>}
+        {n > 0 && <div className="sb-tip-badge"><span />{BADGE_LABEL[item.badgeKey] || "รอดำเนินการ"} {n} รายการ</div>}
+      </div>
+    );
+    return (
+      <Tooltip title={tip} placement="right" arrow enterDelay={80} disableInteractive
+        slotProps={{ tooltip: { className: "sb-tip-pop" }, arrow: { className: "sb-tip-arrow" }, popper: { modifiers: [{ name: "offset", options: { offset: [0, 6] } }] } }}>
+        {node}
+      </Tooltip>
+    );
+  };
+
   const renderLink = (item, key) => (
     <NavItem key={key}>
-      <Link
+      {withTip(item, <Link
         to={item.href}
-        title={item.title}
+        title={isCollapsed ? undefined : item.title}
         aria-label={badgeAria(item)}
         className={`nav-link ${isActiveHref(item.href) ? "active" : ""}`}
         onClick={handleItemClick}
@@ -280,7 +303,7 @@ const side = (key, extra) => {
         <span className="nav-icon">{item.icon}</span>
         <span className="nav-text">{item.title}</span>
         {renderBadge(item)}
-      </Link>
+      </Link>)}
     </NavItem>
   );
 
@@ -290,10 +313,9 @@ const side = (key, extra) => {
     const childTotal = (navi.items || []).reduce((sum, it) => sum + (it.badgeKey ? Number(badges[it.badgeKey]) || 0 : 0), 0);
     return (
     <NavItem key={index}>
-      {isCollapsed ? (
+      {isCollapsed ? withTip(navi, (
         <Link
           to={navi.href}
-          title={navi.title}
           className={`nav-link ${isParentActive(navi) || isActiveHref(navi.href) ? "active" : ""}`}
           onClick={handleItemClick}
         >
@@ -301,7 +323,7 @@ const side = (key, extra) => {
           <span className="nav-text">{navi.title}</span>
           {childTotal > 0 && <span className="nav-badge" aria-hidden="true">{childTotal > 99 ? "99+" : childTotal}</span>}
         </Link>
-      ) : (
+      ), childTotal) : (
         <>
           <button
             className={`nav-link menu-dropdown-btn ${isMenuOpen(navi, index) ? "expanded" : ""} ${isParentActive(navi) ? "parent-active" : ""}`}
@@ -443,6 +465,7 @@ const side = (key, extra) => {
             <>
               <div className="admin-divider-label">คลังแผนก</div>
               {renderLink(side("stock"), "stock-0")}
+              {renderLink(side("stockHistory"), "stock-1")}
             </>
           )}
 

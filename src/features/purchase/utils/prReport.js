@@ -4,7 +4,7 @@
  * ⚠️ "ยอดจริง" = ยอดสั่งซื้อจริงที่ฝ่ายจัดซื้อบันทึก (actualTotal) — ใบที่ยังไม่สั่งซื้อใช้ยอดประมาณการแทนในช่อง "ยอดใช้"
  */
 import moment from "moment";
-import { prJobText, receiveProgress } from "../prMeta";
+import { prJobText, receiveProgress, categoryLabel } from "../prMeta";
 
 const num = (v) => Number(v) || 0;
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -45,6 +45,28 @@ const groupBy = (rows, keyOf) => {
   return [...m.values()].map((g) => ({ ...g, est: r2(g.est), actual: r2(g.actual), pendingReceive: r2(g.pendingReceive) }))
     .sort((a, b) => (b.actual || b.est) - (a.actual || a.est) || b.count - a.count);
 };
+
+/** จำนวนวัน (ทศนิยม 1 ตำแหน่ง) ระหว่างสองเวลา — ขาดข้างใดข้างหนึ่ง = null */
+const daysBetween = (a, b) => (a && b ? Math.max(0, moment(b).diff(moment(a), "hours") / 24) : null);
+const avgOf = (list) => {
+  const v = list.filter((x) => x != null);
+  return { n: v.length, avg: v.length ? Math.round((v.reduce((s, x) => s + x, 0) / v.length) * 10) / 10 : null };
+};
+
+/**
+ * ระยะเวลาดำเนินการเฉลี่ย (วัน) — ✅ (2 พ.ย. 2569 ผู้ใช้: "หน้ารายงานขอซื้อทำให้ละเอียดสมบูรณ์ แบบหน้ารายงานการเบิก")
+ * ขอซื้อ → อนุมัติ · อนุมัติ → สั่งซื้อ · สั่งซื้อ → รับครบ · รวมทั้งใบ — นับเฉพาะใบที่ผ่านขั้นนั้นจริง
+ */
+export function leadTimeOf(rows) {
+  const live = rows.filter((r) => r.status !== "cancelled");
+  const start = (r) => r.submittedAt || r.docDate;
+  return {
+    approve: avgOf(live.map((r) => daysBetween(start(r), r.approvedAt))),
+    order: avgOf(live.map((r) => daysBetween(r.approvedAt, r.order?.orderedAt))),
+    receive: avgOf(live.filter((r) => r.status === "received").map((r) => daysBetween(r.order?.orderedAt, r.receivedAt))),
+    total: avgOf(live.filter((r) => r.status === "received").map((r) => daysBetween(start(r), r.receivedAt))),
+  };
+}
 
 export function buildPrReport(rows) {
   const totals = blank("all", "ทั้งหมด");
@@ -98,6 +120,9 @@ export function buildPrReport(rows) {
       const s = String(r.order?.supplier || "").trim();
       return s ? [s.toLowerCase(), s] : ["-", "ไม่ระบุร้านค้า"];
     }),
+    byCategory: groupBy(rows, (r) => [r.category || "material", categoryLabel(r.category || "material")]),
+    leadTime: leadTimeOf(rows),
+    lateRows: rows.filter(isLate).sort((a, b) => moment(a.neededBy).diff(moment(b.neededBy))),
     topItems: [...items.values()]
       .map((g) => ({ ...g, docs: g.docs.size, amount: r2(g.amount), minPrice: g.prices.length ? Math.min(...g.prices) : 0, maxPrice: g.prices.length ? Math.max(...g.prices) : 0 }))
       .sort((a, b) => b.amount - a.amount || b.qty - a.qty),

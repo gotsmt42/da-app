@@ -65,6 +65,8 @@ export const DEST = {
   purchaseReport: { title: "รายงานการจัดซื้อ", short: "รายงาน", sub: "ยอดซื้อ · ร้านค้า · ค้างรับ", href: "/purchase/report", icon: AppIcon.Report },
   // ✅ (27 ต.ค. 2569) คลังของแผนก — วัสดุเบิกแล้วตัดยอด · ทรัพย์สินยืม-คืน · ทุกใบอิงงาน
   stock: { title: "สต๊อกของ · ทรัพย์สินแผนก", short: "สต๊อกของ", sub: "เบิกของ · ยืม-คืน · คงคลัง", href: "/stock", icon: AppIcon.Stock, badgeKey: "stock" },
+  // ✅ (2 พ.ย. 2569 ผู้ใช้: "เพิ่มเมนูประวัติการเบิกด้วย") — เปิดหน้าสต๊อกที่แท็บ "ประวัติ" ตรงๆ (ทุกการเบิก/ยืม/คืน/รับเข้า)
+  stockHistory: { title: "ประวัติการเบิก", short: "ประวัติเบิก", sub: "เบิก · ยืม · คืน · รับเข้า", href: "/stock?tab=moves", icon: AppIcon.History },
   ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "บันทึกชั่วโมง OT · อิงงาน · ขออนุมัติ", href: "/ot", icon: AppIcon.Ot, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: AppIcon.Contractor, badgeKey: "contractorPay" },
   // ✅ (11 ต.ค. 2569) คิวอนุมัติใบเบิก — คลิปบอร์ดติ๊กถูก (ไม่ใช้ถาดรับเข้าซ้ำกับคำขอลงงาน) · ชื่อบอกตรงๆ ว่าต้องอนุมัติ

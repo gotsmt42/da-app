@@ -458,3 +458,32 @@
 .sidebar-container .submenu-wrapper { border-left-color: #eceef2 !important; }
 .sidebar-container .submenu-link.active { background: #fdecec !important; }
 .sidebar-fixed-bottom { border-top: 1px solid #eceef2 !important; background-color: #fff !important; }
+
+/* ── โหมดย่อ: ชี้แล้วไม่เป็นกล่องเทาทั้งแถว — ✅ (2 พ.ย. 2569 ผู้ใช้: "ชี้ไปมันเป็นสีเทาซึ่งไม่แมทกับพื้นหลัง")
+   พื้นแถวโปร่ง · ไฮไลต์เฉพาะช่องไอคอนเป็นโทนแดงอ่อน (สีหลักของแถบ) · เมนูที่เปิดอยู่ = ช่องไอคอนแดงอย่างเดียว */
+.sidebar-container.collapsed .nav-link,
+.sidebar-container.collapsed .nav-link:hover,
+.sidebar-container.collapsed .nav-link.active,
+.sidebar-container.collapsed button.menu-dropdown-btn:hover { background: transparent !important; }
+.sidebar-container.collapsed .nav-icon { background: transparent; }
+.sidebar-container.collapsed .nav-link:hover .nav-icon { background: #fef2f2; color: #dc2626; }
+.sidebar-container.collapsed .nav-link.active .nav-icon,
+.sidebar-container.collapsed .nav-link.active:hover .nav-icon { background: var(--accent-color, #dc2626); color: #fff; }
+
+/* ── กล่องชื่อเมนูตอนย่อแถบ (MUI Tooltip) ── */
+.MuiTooltip-tooltip.sb-tip-pop {
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px -10px rgba(15, 23, 42, 0.28), 0 2px 6px rgba(15, 23, 42, 0.06);
+  padding: 9px 12px;
+  max-width: 260px;
+  font-family: inherit;
+}
+.MuiTooltip-arrow.sb-tip-arrow { color: #fff; }
+.MuiTooltip-arrow.sb-tip-arrow::before { border: 1px solid #e6e9ef; }
+.sb-tip-title { font-size: 13.5px; font-weight: 800; line-height: 1.35; }
+.sb-tip-sub { margin-top: 2px; font-size: 12px; color: #64748b; line-height: 1.4; }
+.sb-tip-badge { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid #f1f5f9; font-size: 12px; font-weight: 700; color: #dc2626; }
+.sb-tip-badge span { width: 6px; height: 6px; border-radius: 50%; background: #dc2626; }

@@ -141,7 +141,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ✅ (27 ต.ค. 2569 ผู้ใช้: "เอาระบบทำโอทีกลับมา แต่ไม่ต้องระบุเงิน แค่กรอกชั่วโมง อิงงาน") — เปิดเมนู OT กลับมา (สิทธิ์ชุดเดียวกับระบบเบิก)
   const people = canExpense ? [dest("ot")] : [];
   // ✅ (27 ต.ค. 2569) สต๊อก · ทรัพย์สินแผนก — สิทธิ์ของตัวเอง
-  const stock = can(userData, "requestStock") || can(userData, "manageStock") ? [dest("stock")] : [];
+  const stock = can(userData, "requestStock") || can(userData, "manageStock") ? [dest("stock"), dest("stockHistory")] : [];
 
   // ── เอกสาร ──────────────────────────────────────────────────────────────
   const docs = [];

@@ -860,7 +860,7 @@
   --ec-head-from: #2563eb;
   --ec-head-to: #1e3a8a;
   /* วันเสาร์-อาทิตย์ และ "วันนี้" ใช้โทนน้ำเงินชุดเดียวกับหัวตาราง (ตารางช่างยังเป็นแดงอ่อนตามเดิม) */
-  --ec-weekend: #eef4ff;
+  --ec-weekend: #f7f9fe; /* (2 พ.ย. 2569) อ่อนลง — ผู้ใช้: "สีวันหยุดของเซลมันเข้มเกินไป ไม่สวย" */
 }
 .calendar-wrapper.ec-sales .fc-day-today {
   background-color: #e6efff !important;
