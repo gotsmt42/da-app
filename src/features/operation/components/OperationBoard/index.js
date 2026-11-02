@@ -99,6 +99,7 @@ import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
+import WorkValueField from "@/shared/ui/WorkValueField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
@@ -232,7 +233,8 @@ const ACTION_META = {
   check_in:       { label: "เข้างาน",          icon: <Login sx={{ fontSize: 13 }} />,       color: "#8b5cf6" },
   check_out:      { label: "เช็คเอาท์",         icon: <Logout sx={{ fontSize: 13 }} />,      color: "#10b981" },
   time_corrected: { label: "แก้เวลาเข้างาน", icon: <History sx={{ fontSize: 13 }} />, color: "#d97706" },
-  note_saved:     { label: "บันทึกสรุปงาน",     icon: <Edit sx={{ fontSize: 13 }} />,        color: "#3b82f6" },
+  note_saved:     { label: "บันทึกรายละเอียดงานที่ทำ",     icon: <Edit sx={{ fontSize: 13 }} />,        color: "#3b82f6" },
+  value_saved:    { label: "บันทึกมูลค่างาน",   icon: <Edit sx={{ fontSize: 13 }} />,        color: "#059669" },
   report_saved:   { label: "บันทึก Report",     icon: <NoteAdd sx={{ fontSize: 13 }} />,     color: "#10b981" },
   file_uploaded:  { label: "อัปโหลดไฟล์",       icon: <CloudUpload sx={{ fontSize: 13 }} />, color: "#f59e0b" },
   status_changed: { label: "เปลี่ยนสถานะ",      icon: <Circle sx={{ fontSize: 7 }} />,       color: "#6b7280" },
@@ -1185,7 +1187,7 @@ const EventRowCard = ({
     <Grid container spacing={1.25}>
       {event.workNote && (
         <Grid item xs={12} sx={{ mb: 0.75 }}>
-          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "สรุปงานที่ทำ (จากช่าง)")}
+          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "รายละเอียดงานที่ทำ (จากช่าง)")}
           <Box sx={{ px: 1.75, py: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
             <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>
               {event.workNote}
@@ -1496,6 +1498,15 @@ const EventRowCard = ({
                       </InfoLine>
                     );
                   })()}
+                  {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ (ไม่บังคับ)
+                      แอดมิน/manager แก้ได้แม้งานปิดแล้ว (เติมงานเก่าย้อนหลัง) · ช่างแก้ได้จนกว่างานปิด */}
+                  {event.department !== "sales" && (
+                    <InfoLine label="มูลค่างาน" center>
+                      <WorkValueField compact value={event.workValue}
+                        disabled={!onStatusUpdate || (!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น")}
+                        onSave={(v) => onStatusUpdate?.(event._id, { workValue: v })} />
+                    </InfoLine>
+                  )}
                   {canAssignTeam && (
                     <AssignResponsibleMenu title="เลือกหัวหน้าทีมเข้างาน"
                       anchorEl={teamAnchor} onClose={() => setTeamAnchor(null)}
@@ -1757,6 +1768,13 @@ const EventRowCard = ({
                     {event.closeRequestedAt && ` · ${formatThai(moment(event.closeRequestedAt), "D MMM YY HH:mm")} น.`}
                   </Typography>
                 </Box>
+                {/* ✅ (2 พ.ย. 2569) มูลค่างานครั้งนี้ที่ช่างใส่ตอนขอปิด — แอดมินเห็นก่อนอนุมัติ */}
+                {event.workValue != null && event.workValue !== "" && (
+                  <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#0e7490" }}>มูลค่างานครั้งนี้</Typography>
+                    <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#155e75", lineHeight: 1.2 }}>{baht(event.workValue)}</Typography>
+                  </Box>
+                )}
               </Stack>
               <Box sx={{ px: 1.75, py: 1.25 }}>
                 {/* ✅ (26 ต.ค. 2569) ผลตรวจเอกสารด้วย AI — แอดมินเห็นก่อนอนุมัติ · คำขอเก่าที่ยังไม่เคยตรวจ กดให้ AI ตรวจได้เลย */}
@@ -1849,7 +1867,7 @@ const EventRowCard = ({
             sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px", display: { xs: o ? "flex" : "none", sm: "flex" },
               fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
             <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
-              {[event.workNote ? "สรุปงาน ✓" : "สรุปงาน", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
+              {[event.workNote ? "รายละเอียดงานที่ทำ ✓" : "รายละเอียดงานที่ทำ", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
             </Typography>
             <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: ACCENT, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
               เปิด<ChevronRight sx={{ fontSize: 18 }} />
@@ -2009,6 +2027,20 @@ const StatusStrip = ({ items, value, onChange }) => (
   </Box>
 );
 
+/** มูลค่างานครั้งนี้ของงาน (ทุกวันในกลุ่มเก็บค่าเดียวกัน — ใช้ค่าแรกที่มี) · null = ช่างยังไม่ใส่ */
+const workValueOf = (sessions) => {
+  const hit = (sessions || []).find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "");
+  return hit ? Number(hit.workValue) : null;
+};
+const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+
+/** กรองผู้เข้างาน: "all" | "noteam" (ยังไม่มีทีม) | ชื่อคน (หัวหน้าทีมหรือลูกทีม) */
+const matchMember = (event, member) => {
+  if (!member || member === "all") return true;
+  const names = teamNamesOf(event);
+  return member === "noteam" ? names.length === 0 : names.includes(member);
+};
+
 // ─── FilterPanel ──────────────────────────────────────────────────────
 const FilterPanel = ({
   search, onSearch, filterType, onFilterType, filterSystem, onFilterSystem,
@@ -2016,6 +2048,7 @@ const FilterPanel = ({
   showAll, onToggleShowAll, selectedDate, onDateChange, onClearAll, activeCount,
   typeOptions, systemOptions, inSheet = false,
   peopleSelect = null, // 🔁 (26 ต.ค. 2569) ช่องเลือกผู้รับผิดชอบ (รูป + จำนวนงาน) แทนปุ่มกางแผง — จอคอม · แอดมิน
+  memberSelect = null, // ✅ (2 พ.ย. 2569) ช่องเลือกผู้เข้างานทีละคน
 }) => {
   const [open, setOpen] = useState(false);
   // ✅ จอคอม/จอใหญ่ แสดงช่องเลือกตัวกรองตลอด (ผู้ใช้ขอ) — พื้นที่พอ ไม่ต้องกดเปิดก่อน · มือถือยังพับเก็บได้เหมือนเดิม
@@ -2152,6 +2185,7 @@ const FilterPanel = ({
             )}
             {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เลือกผู้รับผิดชอบ ให้ทำเป็น Select ... หน้าการดำเนินงาน และหน้าอื่นๆด้วยทำเหมือนกัน") */}
             {peopleSelect && <Box sx={{ flexShrink: 0, width: 220 }}>{peopleSelect}</Box>}
+            {memberSelect && <Box sx={{ flexShrink: 0, width: 220 }}>{memberSelect}</Box>}
           </Stack>
           {!isWide && (
           <Badge badgeContent={activeCount} color="error" invisible={activeCount === 0}>
@@ -2233,7 +2267,7 @@ export const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
 
 // ✅ (25 ต.ค. 2569 ผู้ใช้: "เปิดฟอร์มหน่วง กระตุก") memo — กดแถวเพื่อเปิดรายละเอียดไม่ต้องวาดตารางทั้งตารางใหม่
 //    (เดิมกดแถวแล้วรอ ~0.5 วินาทีก่อนหน้าต่างเริ่มเลื่อนขึ้น เพราะวาดทุกแถวใหม่หมด)
-const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
+const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible, showValue = false, onSaveValue }) => {
   const avatarMap = useAvatarMap(employee);
   const [assign, setAssign] = useState(null); // { anchor, job } | null
   const th = { fontWeight: 800, fontSize: "0.74rem", bgcolor: SURFACE, color: MUTED, whiteSpace: "nowrap", borderColor: LINE, py: 1.1 };
@@ -2248,10 +2282,11 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
           <TableCell>งาน</TableCell>
           <TableCell>โครงการ / บริษัท</TableCell>
           <TableCell>ผู้รับผิดชอบ</TableCell>
-          <TableCell>ทีมเข้างาน</TableCell>
+          <TableCell>ผู้ปฏิบัติงาน</TableCell>
           <TableCell>ผู้ติดต่อ</TableCell>
           <TableCell>เอกสารอ้างอิง</TableCell>
           <TableCell>เอกสารที่แนบ</TableCell>
+          {showValue && <TableCell align="right">มูลค่างาน</TableCell>}
           <TableCell>สถานะ</TableCell>
           <TableCell sx={{ width: 32 }} />
         </TableRow>
@@ -2301,10 +2336,10 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
               <TableCell sx={{ minWidth: 150, maxWidth: 200 }}>
                 {teamNames.length > 0 ? (
                   <Stack spacing={0.5}>
-                    {teamNames.slice(0, 3).map((n, i) => (
+                    {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "แสดงผู้ที่เข้างาน แยกกันอย่างละเอียดทุกคน") — แสดงครบทุกคน ไม่ตัด "+ อีก N คน" */}
+                    {teamNames.map((n, i) => (
                       <PersonChip key={n} name={n} avatar={avatarMap.get(n)} size={20} badge={i === 0 && teamNames.length > 1 ? "หัวหน้า" : undefined} />
                     ))}
-                    {teamNames.length > 3 && <Typography sx={{ ...sub, fontWeight: 700 }} title={teamNames.slice(3).join(", ")}>+ อีก {teamNames.length - 3} คน</Typography>}
                   </Stack>
                 ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#d97706" }}>ยังไม่มอบหมาย</Typography>}
               </TableCell>
@@ -2320,6 +2355,15 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
               <TableCell sx={{ minWidth: 140, maxWidth: 180 }}><RefDoc event={a} /></TableCell>
               {/* เอกสารที่แนบ — ตรรกะเดียวกับการ์ดงาน (x/4 · ครบ/ต้องมี/ไม่มี) · ใบเสนอราคากดติดตามได้ทันที */}
               <TableCell sx={{ minWidth: 200 }}><JobDocsCell event={a} /></TableCell>
+              {showValue && (() => {
+                const wv = workValueOf(job.sessions);
+                return (
+                  // ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้แก้ไข และใส่มูลค่างานในนี้ได้ด้วย") กดดินสอ → พิมพ์ → บันทึก (ทุกวันของงานนี้)
+                  <TableCell align="right" sx={{ minWidth: 120, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                    <WorkValueField compact value={wv} disabled={!onSaveValue} onSave={(v) => onSaveValue?.(job, v)} />
+                  </TableCell>
+                );
+              })()}
               {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "สถานะงานให้เอาไว้หลังสุด และทำให้ชัดเจน") — ป้ายทึบสีตามสถานะ ตัวหนา อ่านได้จากระยะไกล */}
               <TableCell sx={{ minWidth: 150 }}>
                 {(() => {
@@ -2799,6 +2843,8 @@ const Operation = () => {
   // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
   // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
   const [filterResponsible, setFilterResponsible] = useState("all");
+  // ✅ (2 พ.ย. 2569 ผู้ใช้: "เพิ่มให้เลือกแสดงผู้ที่เข้างาน แยกกันอย่างละเอียดทุกคน") — "all" | "noteam" | ชื่อคน (หัวหน้าหรือลูกทีม)
+  const [filterMember, setFilterMember] = useState("all");
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState(null);
   /**
@@ -2817,6 +2863,7 @@ const Operation = () => {
       if (filterOP && event.status !== filterOP) return false;
       if (filterResponsible === "unassigned" && event.responsiblePerson) return false;
       if (filterResponsible !== "all" && filterResponsible !== "unassigned" && event.responsiblePerson !== filterResponsible) return false;
+      if (!matchMember(event, filterMember)) return false;
       if (keyword) {
         const hit = [event.company, event.site, event.title, event.system, event.team, event.docNo, event.contactName, event.contactTel,
           formatThai(moment(event.start), "DD/MM/YYYY HH:mm")].map((v) => (v || "").toLowerCase()).some((t) => t.includes(keyword));
@@ -2824,7 +2871,7 @@ const Operation = () => {
       }
       return true;
     });
-  }, [events, dateSearch, filterType, filterSystem, filterTeam, filterStatus, filterOP, filterResponsible, search]);
+  }, [events, dateSearch, filterType, filterSystem, filterTeam, filterStatus, filterOP, filterResponsible, filterMember, search]);
 
   const pendingCount = useMemo(
     () => countDistinctJobs(countBase, e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
@@ -2927,10 +2974,11 @@ const Operation = () => {
    * ⚠️ ตัวเลขบนแผงนับจาก filteredEvents (ก่อนกรองผู้รับผิดชอบ) — เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน
    */
   const responsibleFiltered = useMemo(() => (
-    filterResponsible === "all" ? filteredEvents
+    (filterResponsible === "all" ? filteredEvents
       : filterResponsible === "unassigned" ? filteredEvents.filter((e) => !e.responsiblePerson)
         : filteredEvents.filter((e) => e.responsiblePerson === filterResponsible)
-  ), [filteredEvents, filterResponsible]);
+    ).filter((e) => matchMember(e, filterMember))
+  ), [filteredEvents, filterResponsible, filterMember]);
 
   const sortedEvents = useMemo(() => {
     if (effectiveGroup === "overdue") {
@@ -3043,6 +3091,15 @@ const Operation = () => {
     if (splitClosed) jobGroups.forEach((g) => { const k = sectionOfGroup(g); c[k] = (c[k] || 0) + 1; });
     return c;
   }, [jobGroups, splitClosed, sectionOfGroup]);
+  // ✅ ยอดมูลค่างานรวมตามตัวกรองปัจจุบัน — นับงานละครั้ง (allJobGroups รวมงานที่ปิดแล้วด้วย)
+  const valueSummary = useMemo(() => {
+    let total = 0; let withValue = 0; let missing = 0;
+    allJobGroups.forEach((g) => {
+      const wv = workValueOf(g);
+      if (wv === null) missing += 1; else { total += wv; withValue += 1; }
+    });
+    return { total, withValue, missing, jobs: allJobGroups.length };
+  }, [allJobGroups]);
   const hiddenClosedCount = splitClosed ? allJobGroups.length - jobGroups.length : 0;
 
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
@@ -3124,11 +3181,13 @@ const Operation = () => {
       const ids = getGroupEventIds(id);
       await Promise.all(ids.map(gid => EventService.UpdateEvent(gid, updates)));
       setEvents(prev => prev.map(e => (ids.includes(e._id) ? { ...e, ...updates } : e)));
+      return true;
     } catch (err) {
       console.error(err);
       // ✅ ตอนนี้ backend ปฏิเสธ (403) การเปลี่ยนเป็น "ดำเนินการเสร็จสิ้น" สำหรับงานที่ยังรออนุมัติ
       // (ดู PUT /:id operational guard) — เดิม error หายเงียบๆ ไม่มีอะไรบอกผู้ใช้เลยว่าทำไมสถานะไม่เปลี่ยน
       setSnackbar({ open: true, msg: err?.response?.data?.message || "เปลี่ยนสถานะไม่สำเร็จ", severity: "error" });
+      return false;
     }
   }, [getGroupEventIds]);
 
@@ -3401,7 +3460,11 @@ const Operation = () => {
         meta: {
           fileName: buildOperationFileName(groupLabel),
           groupLabel: `กลุ่ม: ${groupLabel}`,
-          filterSummary: activeFilterCount > 0 ? `ตัวกรอง ${activeFilterCount} เงื่อนไข` : "ไม่ได้กรองเพิ่มเติม",
+          filterSummary: [
+            activeFilterCount > 0 ? `ตัวกรอง ${activeFilterCount} เงื่อนไข` : "ไม่ได้กรองเพิ่มเติม",
+            filterResponsible !== "all" ? `ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}` : "",
+            filterMember !== "all" ? `ผู้ปฏิบัติงาน: ${filterMember === "noteam" ? "ยังไม่มีทีม" : filterMember}` : "",
+          ].filter(Boolean).join("  ·  "),
           exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
         },
         daysPastDueMap,
@@ -3415,6 +3478,7 @@ const Operation = () => {
         },
         roundLabel: (e) => formatRoundLabel(e.time, e.visitCount, e),
         srOf: (sessions) => srSummaries.get(srKey(sessions)) || null,
+        showValue: isAdminOrManager,
       });
       setSnackbar({ open: true, msg: srSummaries.size ? `ส่งออก Excel เรียบร้อย (รวมสรุป Service Report ${srSummaries.size} งาน)` : "ส่งออก Excel เรียบร้อย", severity: "success" });
     } catch (err) {
@@ -3429,7 +3493,7 @@ const Operation = () => {
   // ✅ มือถือ: การ์ดสถานะ/ผู้รับผิดชอบ/ค้นหา/ตัวกรอง รวมในแผ่นล่างแผ่นเดียว (ผู้ใช้ขอ — เหมือนหน้าภาพรวมงาน)
   // ✅ มือถือ: เลือกสถานะ/ตัวกรอง/เดือนแล้วปิดแผ่นทันที — ยกเว้นกด "เลือกเดือน" (ยังต้องเลือกเดือนในช่องที่โผล่มา)
   useCloseOnPick(mobileSheetOpen, () => setMobileSheetOpen(false), {
-    statusGroup, filterResponsible, filterOP, filterType, filterSystem, filterTeam, month: showAll ? "ALL" : selectedDate,
+    statusGroup, filterResponsible, filterMember, filterOP, filterType, filterSystem, filterTeam, month: showAll ? "ALL" : selectedDate,
   }, (prev, next) => prev.month === "ALL" && next.month !== "ALL");
 
   const statusTileGroups = [{
@@ -3452,7 +3516,7 @@ const Operation = () => {
     ],
   }];
   const statusItem = statusTileGroups[0].items.find((i) => i.value === effectiveGroup);
-  const mobileActiveCount = activeFilterCount + (filterResponsible !== "all" ? 1 : 0) + (effectiveGroup && effectiveGroup !== "all" ? 1 : 0);
+  const mobileActiveCount = activeFilterCount + (filterResponsible !== "all" ? 1 : 0) + (filterMember !== "all" ? 1 : 0) + (effectiveGroup && effectiveGroup !== "all" ? 1 : 0);
   const responsibleOptions = (() => {
     const m = new Map();
     let unassigned = 0;
@@ -3474,8 +3538,30 @@ const Operation = () => {
       sx={{ width: "100%" }}
     />
   );
+  // ✅ ช่องเลือกผู้เข้างาน — นับทุกคนที่อยู่ในทีม (หัวหน้า + ลูกทีม) แยกรายคน · งานเดียวมีหลายคนนับให้ทุกคน
+  const memberOptions = (() => {
+    const m = new Map();
+    let noTeam = 0;
+    responsibleRows.forEach((r) => {
+      const names = teamNamesOf(r);
+      if (!names.length) { noTeam += 1; return; }
+      names.forEach((n) => m.set(n, (m.get(n) || 0) + 1));
+    });
+    return { list: [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th")), noTeam, total: responsibleRows.length };
+  })();
+  const memberSelect = (
+    <PersonSelectField
+      label="ผู้ปฏิบัติงาน" title="เลือกผู้ปฏิบัติงาน" value={filterMember} onChange={(v) => { setFilterMember(v); setPage(1); }}
+      allLabel="ทุกคน" allCount={memberOptions.total} unit="งาน"
+      options={[
+        ...(memberOptions.noTeam > 0 ? [{ id: "noteam", name: "ยังไม่มีผู้ปฏิบัติงาน", count: memberOptions.noTeam, unassigned: true }] : []),
+        ...memberOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: (employee || []).find((e) => e.fname === name)?.imageUrl })),
+      ]}
+      sx={{ width: "100%" }}
+    />
+  );
   const clearAllOpFilters = () => {
-    setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all");
+    setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all"); setFilterMember("all");
   };
   const filterPanelProps = {
     search, onSearch: setSearch,
@@ -3490,6 +3576,7 @@ const Operation = () => {
     onClearAll: clearAllOpFilters,
     activeCount: activeFilterCount,
     peopleSelect: isAdminOrManager && activeTab !== 1 && !id && responsibleOptions.total > 0 ? personSelect : null,
+    memberSelect: isAdminOrManager && activeTab !== 1 && !id && memberOptions.total > 0 ? memberSelect : null,
   };
 
   // ✅ แถบแบ่งหน้าแบบเดียวกับทั้งแอป (สไตล์ปุ่มมาจากธีม — app/theme.js) — ซ้าย: แสดงกี่รายการ + ต่อหน้า · ขวา: เลขหน้า
@@ -3735,7 +3822,7 @@ const Operation = () => {
               )}
               {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้ามือถือให้เลือกดูผู้รับผิดชอบง่ายๆด้วย ไม่ซ่อนไว้") */}
               {isAdminOrManager && !id && activeTab !== 1 && responsibleOptions.total > 0 && (
-                <Box sx={{ mb: 1, display: "flex", "& > *": { flex: 1 } }}>{personSelect}</Box>
+                <Box sx={{ mb: 1, display: "flex", gap: 1, "& > *": { flex: 1, minWidth: 0 } }}>{personSelect}{memberSelect}</Box>
               )}
               <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
                 <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e6e9ef", color: "#334155" }} />
@@ -3776,6 +3863,23 @@ const Operation = () => {
             </>
           )}
 
+          {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ค้นหาว่าช่างคนนั้นๆ มีมูลค่างานรวมทั้งหมดเท่าไร") — รวมตามตัวกรองปัจจุบัน (รวมงานที่ปิดแล้ว) · แอดมิน/manager */}
+          {isAdminOrManager && !loading && !id && activeTab !== 1 && effectiveGroup !== "today" && valueSummary.jobs > 0 && (
+            <Box sx={{ mb: 1.5, px: 2, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: "wrap" }}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>
+                  มูลค่างานรวม{filterMember !== "all" && filterMember !== "noteam" ? ` · ${filterMember}` : ""}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
+                </Typography>
+                <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, color: "#0f172a", lineHeight: 1.2 }}>{baht(valueSummary.total)}</Typography>
+              </Box>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", fontSize: "0.8rem", color: "#334155" }}>
+                <span><b>{valueSummary.withValue}</b> งานใส่มูลค่าแล้ว</span>
+                {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> งานยังไม่ใส่</span>}
+                {valueSummary.withValue > 0 && <span>เฉลี่ย <b>{baht(valueSummary.total / valueSummary.withValue)}</b> / งาน</span>}
+              </Box>
+            </Box>
+          )}
+
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
           ) : effectiveGroup === "today" ? (
@@ -3791,6 +3895,11 @@ const Operation = () => {
                จัดการงานได้จริง: แนบเอกสาร/เช็คอิน/คอมเมนต์) จึงไม่ทำ dialog ซ้อนอีกชั้นให้ซับซ้อน */
             <>
             <OperationTable
+              showValue={isAdminOrManager}
+              onSaveValue={async (job, v) => {
+                if (!(await handleStatusUpdate(job.sessions[0]._id, { workValue: v }))) return;
+                setSnackbar({ open: true, msg: v === null ? "ล้างมูลค่างานแล้ว" : `บันทึกมูลค่างาน ${baht(v)} แล้ว`, severity: "success" });
+              }}
               employee={employee}
               canAssign={can(currentUser, "editContracts")}
               onAssignResponsible={assignResponsibleStable}

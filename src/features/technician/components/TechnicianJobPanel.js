@@ -31,6 +31,7 @@ import { BuildRounded as Build, AssignmentRounded as Assignment, VisibilityRound
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
+import WorkValueField from "@/shared/ui/WorkValueField";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import EventService from "@/shared/services/EventService";
@@ -526,7 +527,7 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave }) => {
             startIcon={<NoteAdd sx={{ fontSize: 16 }} />}
             onClick={() => setEditing(true)}
             fullWidth>
-            เขียนสรุปงานที่ทำ
+            เขียนรายละเอียดงานที่ทำ
           </ActionBtn>
         )}
       </Box>
@@ -538,7 +539,7 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave }) => {
       <TextField
         multiline minRows={3} maxRows={8}
         fullWidth autoFocus
-        placeholder="สรุปงานที่ทำ เช่น ตรวจสอบระบบ FA ชั้น 3, เปลี่ยนหัวสปริงเกอร์ 2 หัว..."
+        placeholder="รายละเอียดงานที่ทำ เช่น ตรวจสอบระบบ FA ชั้น 3, เปลี่ยนหัวสปริงเกอร์ 2 หัว..."
         value={note}
         onChange={e => setNote(e.target.value)}
         size="small"
@@ -558,7 +559,7 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave }) => {
           size="small"
           disabled={!note.trim() || saving}
           onClick={handleSave}>
-          {saving ? "กำลังบันทึก..." : "บันทึกสรุปงาน"}
+          {saving ? "กำลังบันทึก..." : "บันทึก"}
         </ActionBtn>
       </Stack>
     </Box>
@@ -779,6 +780,30 @@ const TechnicianJobCard = ({
     // ✅ กันไว้อีกชั้น (defense in depth) เผื่อเงื่อนไข UI ด้านล่างหลุดไปด้วยเหตุผลใดก็ตาม (เช่น
     // เปิดค้างไว้หลายแท็บ ข้อมูลไม่ sync ทันเวลา) ไม่ให้ยิง request ออกไปได้ถ้ายังไม่เข้าเงื่อนไขจริง
     if (event.closeRequested || !canRequestClose) return;
+    /**
+     * ✅ (2 พ.ย. 2569 ผู้ใช้: "เพิ่มการใส่มูลค่างาน ... ก่อนขอปิดงาน" → "ไม่ต้องบังคับ บางงานไม่มีมูลค่างาน")
+     *    ยังไม่เคยใส่ = ถามครั้งเดียวตอนขอปิด (ข้ามได้) · ใส่ไว้แล้ว = ไม่ถามซ้ำ (แก้ได้ที่ช่อง "มูลค่างานครั้งนี้")
+     */
+    let workValue = null;
+    if (event.workValue === null || event.workValue === undefined || event.workValue === "") {
+      const wvAsk = await Swal.fire({
+        title: "มูลค่างานครั้งนี้",
+        html: '<div style="font-size:.86rem;color:#64748b">ใส่มูลค่างานที่ทำในครั้งนี้ (บาท) — ไม่บังคับ<br/>งานที่ไม่มีมูลค่า กด “ไม่มีมูลค่างาน”</div>',
+        input: "text",
+        inputPlaceholder: "เช่น 15,000",
+        inputAttributes: { inputmode: "decimal", autocomplete: "off" },
+        inputValidator: (v) => {
+          if (!String(v || "").trim()) return undefined;
+          const n = Number(String(v).replace(/[,\s฿]/g, ""));
+          return !Number.isFinite(n) || n < 0 ? "ใส่เป็นตัวเลข 0 ขึ้นไป หรือเว้นว่าง" : undefined;
+        },
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: "ถัดไป", denyButtonText: "ไม่มีมูลค่างาน", cancelButtonText: "ยกเลิก",
+        confirmButtonColor: "#f59e0b", denyButtonColor: "#64748b",
+      });
+      if (wvAsk.isDismissed) return;
+      if (wvAsk.isConfirmed && String(wvAsk.value || "").trim()) workValue = Number(String(wvAsk.value).replace(/[,\s฿]/g, ""));
+    }
     // ✅ ป้องกันกดผิด/กดพลาด — งานนี้จะเข้าสถานะ "รอแอดมินอนุมัติ" ทันทีที่กด (และถ้าเป็นงานกลุ่ม
     // เข้าหลายวัน จะมีผลกับทุกวันในกลุ่มพร้อมกัน ดูคอมเมนต์ด้านบน) ควรให้ยืนยันก่อนอีกชั้น
     /**
@@ -839,10 +864,19 @@ const TechnicianJobCard = ({
       // ✅ เก็บ userId จริงของคนกดขอปิดงานไว้ด้วย เพื่อให้แจ้งเตือน push ตอนอนุมัติ/ไม่อนุมัติ
       // ส่งถึงคนที่กดขอจริงๆ ได้ (resPerson ของงานอาจไม่ตรงกับคนกดขอ เช่น งานมอบหมายผ่านชื่อทีมแบบเก่า)
       closeRequestedByUserId: payload?.userId || "",
+      ...(workValue !== null ? { workValue } : {}),
       ...(overrideReason ? { closeOverrideReason: overrideReason } : {}),
     });
-    await pushLog("close_requested", overrideReason ? `ขอปิดงาน (เอกสารไม่ผ่านการตรวจ — ขอแอดมินพิจารณา: ${overrideReason})` : "ขอปิดงาน รอแอดมินอนุมัติ");
+    const wvNow = workValue !== null ? workValue : event.workValue;
+    const wvText = wvNow !== null && wvNow !== undefined && wvNow !== "" ? ` · มูลค่างาน ${Number(wvNow).toLocaleString("th-TH")} บาท` : "";
+    await pushLog("close_requested", overrideReason ? `ขอปิดงาน${wvText} (เอกสารไม่ผ่านการตรวจ — ขอแอดมินพิจารณา: ${overrideReason})` : `ขอปิดงาน${wvText} · รอแอดมินอนุมัติ`);
     setRequestingClose(false);
+  };
+
+  // ── Save Work Value (ทั้งกลุ่มวันของงานเดียวกัน) ─────────────────────
+  const handleSaveWorkValue = async (v) => {
+    await (onStatusUpdate || onInputUpdate)(event._id, { workValue: v });
+    await pushLog("value_saved", v === null ? "ล้างมูลค่างาน" : `มูลค่างานครั้งนี้ ${Number(v).toLocaleString("th-TH")} บาท`);
   };
 
   // ── Save Work Note ───────────────────────────────────────────────
@@ -902,11 +936,14 @@ const TechnicianJobCard = ({
   // แบบกางลงในหน้า (Collapse บนมือถือ) และแบบ Dialog ทับขึ้นมา (จอกว้าง) ไม่ต้องเขียนซ้ำสองที่
   const expandedContent = (
     <Stack spacing={2}>
+      {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ ไม่บังคับ */}
+      <WorkValueField value={event.workValue} disabled={isLocked} onSave={handleSaveWorkValue} />
+
       {/* สรุปงาน */}
       <Box>
         <Typography variant="caption" fontWeight={700} color="text.secondary"
           sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 1 }}>
-          สรุปงานที่ทำ
+          รายละเอียดงานที่ทำ
         </Typography>
         <WorkNoteEditor
           eventId={event._id}
@@ -947,7 +984,8 @@ const TechnicianJobCard = ({
                     {moment(log.timestamp).format("HH:mm")}
                   </Typography>
                   <Typography variant="caption" fontWeight={600} color="text.secondary">
-                    {log.action === "note_saved"             ? "บันทึกสรุปงาน"
+                    {log.action === "note_saved"             ? "บันทึกรายละเอียดงานที่ทำ"
+                    : log.action === "value_saved"            ? "บันทึกมูลค่างาน"
                     : log.action === "file_uploaded"          ? "อัปโหลดไฟล์"
                     : log.action === "file_deleted"           ? "ลบไฟล์"
                     : log.action === "document_checked"       ? "ทำเครื่องหมายเอกสาร"
@@ -1297,7 +1335,7 @@ const TechnicianJobCard = ({
           sx={{ width: "100%", mt: 1.5, px: 1.25, py: 0.9, gap: 1, justifyContent: "flex-start", borderRadius: "10px",
             fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
           <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
-            {[`ไฟล์แนบ ${(event.sitePhotoFiles || []).length}`, "สรุปงาน",
+            {[`ไฟล์แนบ ${(event.sitePhotoFiles || []).length}`, "รายละเอียดงานที่ทำ",
               `คุยกับแอดมิน${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
           </Typography>
           <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: ACCENT, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>

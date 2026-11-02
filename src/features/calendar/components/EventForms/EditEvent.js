@@ -204,29 +204,29 @@ function injectStyles() {
       box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
     .ee-card-head {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #eef2f7;
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px 6px; background: #fff; border-bottom: 0;
     }
     .ee-card-ico {
-      width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
-      background: #fff; border: 1px solid #e6e9ef; font-size: 15px; line-height: 1;
+      background: #eff6ff; border: 0; font-size: 19px; line-height: 1;
     }
     .ee-card-titles { flex: 1; min-width: 0; }
-    .ee-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
-    .ee-card-titles p { margin: 1px 0 0; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+    .ee-card-titles h4 { margin: 0; font-size: 16.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .ee-card-titles p { margin: 2px 0 0; font-size: 12.5px; color: #64748b; line-height: 1.4; }
     .ee-card-badge {
       flex-shrink: 0; font-size: 11px; font-weight: 700; color: #15803d;
       background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 999px; padding: 2px 9px; white-space: nowrap;
     }
-    .ee-card-body { padding: 12px 14px 4px; }
+    .ee-card-body { padding: 8px 16px 8px; }
     .ee-card-body > .ee-field { margin-bottom: 10px; }
     .ee-card .ee-grid { gap: 10px 12px; margin-bottom: 10px; }
     /* ช่องจำนวนไม่แน่นอน (มูลค่างานโผล่เฉพาะงานที่ไม่ใช่สัญญา) — จัดเต็มแถวเองไม่เหลือช่องว่างกำพร้า */
     .ee-grid-auto { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-    .ee-field label { font-size: 11.5px; font-weight: 700; color: #475569; }
+    .ee-field label { font-size: 12.5px; font-weight: 700; color: #334155; }
     .ee-field label .ee-opt { font-weight: 500; color: #94a3b8; }
-    .ee-hint { font-size: 10.5px; color: #94a3b8; }
+    .ee-hint { font-size: 11.5px; color: #94a3b8; }
     @media (max-width: 600px) {
       .ee-card { border-radius: 12px; }
       .ee-card-head { padding: 9px 12px; }
@@ -581,6 +581,48 @@ function injectStyles() {
     .ee-row-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .ee-row-confirm-actions .ee-btn { padding: 5px 12px; font-size: 12px; height: auto; }
 
+    /* ── กลุ่มข้อมูลหลัก (2 พ.ย. 2569) — ผู้ปฏิบัติงาน · มูลค่างาน · รายละเอียดงานที่ทำ · ไฟล์แนบ ── */
+    #ee-keyGroup { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+    #ee-keyGroup .ee-key-card { margin: 0; border: 1px solid #dbe4f0; box-shadow: none; }
+    #ee-keyGroup .ee-key-card .ee-card-head { background: #fff; border-bottom: 0; padding: 12px 14px 4px; }
+    /* 🔁 (2 พ.ย. 2569 ผู้ใช้: "หัวข้อยังดูเล็กๆไม่ชัดเจน") หัวข้อใหญ่ขึ้น หนาขึ้น + ไอคอนใหญ่ขึ้น */
+    #ee-keyGroup .ee-key-card .ee-card-head { padding: 14px 16px 6px !important; gap: 12px !important; align-items: center; }
+    #ee-keyGroup .ee-key-card .ee-card-ico { width: 36px !important; height: 36px !important; border-radius: 10px !important; font-size: 19px !important; background: #eff6ff; border: 0; }
+    #ee-keyGroup .ee-key-card .ee-card-titles h4 { font-size: 16.5px !important; font-weight: 800 !important; color: #0f172a !important; letter-spacing: 0; line-height: 1.3; margin: 0; }
+    #ee-keyGroup .ee-key-card .ee-card-titles p { display: block !important; font-size: 12.5px !important; color: #64748b !important; margin: 2px 0 0; line-height: 1.4; }
+    #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 16px 14px !important; }
+    #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 14px 12px; }
+    #ee-keyGroup .ee-key-files .ee-card-body { padding: 4px; }
+    .ee-worker-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ee-worker-row .ee-worker-field { flex: 1 1 auto; min-width: 0; margin: 0; }
+    .ee-worker-no {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      background: #eef2ff; color: #3730a3; font-size: 12.5px; font-weight: 800;
+    }
+    .ee-worker-row--lead .ee-worker-no { background: #2563eb; color: #fff; }
+    .ee-worker-tag { flex-shrink: 0; font-size: 11px; font-weight: 800; color: #1d4ed8; background: #dbeafe; border-radius: 99px; padding: 3px 9px; }
+    #ee-teamMembersList { counter-reset: eeWorker 1; }
+    #ee-teamMembersList .ee-worker-row { counter-increment: eeWorker; }
+    #ee-teamMembersList .ee-worker-no::before { content: counter(eeWorker); }
+    .ee-worker-add { margin: 0 0 2px 34px; }
+    .ee-value-box { display: flex; align-items: center; gap: 8px; max-width: 320px; }
+    .ee-value-box input {
+      flex: 1; min-width: 0; box-sizing: border-box; border: 1.5px solid #e6e9ef; border-radius: 8px; padding: 9px 12px;
+      font-size: 16px; font-weight: 800; color: #0f172a; background: #fff; font-family: inherit;
+    }
+    .ee-value-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.10); }
+    .ee-value-box input:disabled { background: #f8fafc; color: #475569; }
+    .ee-value-unit { font-size: 13px; font-weight: 700; color: #64748b; }
+    #ee-keyGroup .ee-note-field { margin-top: 10px; }
+    #ee-keyGroup .ee-note-field label { font-size: 12.5px; font-weight: 700; color: #475569; }
+    .ee-ts-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .ee-ts-person > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #0f172a; }
+    .ee-ts-person--muted { color: #94a3b8; }
+    .ee-ts-person--item { gap: 8px; }
+    .ts-dropdown .ee-ts-person { padding: 2px 0; }
+    .ts-dropdown .active .ee-ts-person > span:last-child { color: #1d4ed8; }
+    .ee-hm-count { font-weight: 800; color: #2563eb; margin-left: 4px; font-style: normal; }
+
     /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
     .ee-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ee-team-member-row select {
@@ -735,8 +777,39 @@ function injectStyles() {
     }
     .ee-map-bar {
       display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-      border-top: 1px solid #f1f5f9;
     }
+    .ee-map-frame[hidden] { display: none !important; }
+    /* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ทำให้ดูดี จัดวางให้ดีขึ้น ยังงงๆ ดูยาก") ส่วนบนของฟอร์ม — การ์ดขาวชุดเดียวกับการ์ดอื่น */
+    .ee-link-card {
+      width: 100%; display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 12px 14px;
+      border-radius: 14px; border: 1px solid #e6e9ef; background: #fff; cursor: pointer; text-align: left; font-family: inherit;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04); transition: border-color .15s, background .15s;
+    }
+    .ee-link-card:hover { border-color: #bfdbfe; background: #f8fbff; }
+    .ee-link-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; background: #eff6ff; color: #2563eb; display: grid; place-items: center; }
+    .ee-link-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .ee-link-text b { font-size: 15px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ee-link-text small { font-size: 12.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ee-link-arrow { flex-shrink: 0; font-size: 22px; color: #94a3b8; font-weight: 700; line-height: 1; }
+    #ee-mapCard .ee-map-bar { padding: 12px 14px; gap: 12px; }
+    .ee-map-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; background: #fef2f2; display: grid; place-items: center; }
+    .ee-map-title { font-size: 15px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    #ee-mapCard .ee-map-name { font-size: 13px; font-weight: 600; color: #334155; }
+    #ee-mapCard .ee-map-note { font-size: 11.5px; }
+    #ee-mapCard .ee-map-go, #ee-mapCard .ee-map-edit, #ee-mapCard .ee-map-toggle { height: 36px; padding: 0 12px; border-radius: 10px; display: inline-flex; align-items: center; }
+    @media (max-width: 600px) {
+      #ee-mapCard .ee-map-bar { flex-wrap: wrap; }
+      #ee-mapCard .ee-map-info { flex: 1 1 calc(100% - 48px); }
+      #ee-mapCard .ee-map-edit { margin-left: 48px; }
+    }
+    #ee-mapCard .ee-map-frame { border-top: 1px solid #f1f5f9; }
+    .ee-map-toggle {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; border-radius: 10px;
+      font-size: 12.5px; font-weight: 700; color: #334155; background: #f1f5f9; border: 0; cursor: pointer; font-family: inherit;
+    }
+    .ee-map-toggle:hover { background: #e2e8f0; }
+    .ee-map-toggle svg { transition: transform .18s ease; }
+    .ee-map-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
     .ee-map-info { flex: 1; min-width: 0; text-align: left; }
     .ee-map-name { font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 6px; }
     .ee-map-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1411,6 +1484,8 @@ export const getEditEvent = async ({
   const eventSystem = ev.extendedProps?.system || "";
   const eventTeam = ev.extendedProps?.team || "";
   const eventTeamMembers = ev.extendedProps?.teamMembers || [];
+  // ผู้ปฏิบัติงานคนที่ 2 ขึ้นไป (ไม่นับหัวหน้าทีมที่อาจซ้ำอยู่ใน teamMembers)
+  const extraWorkerCount = [...new Set(eventTeamMembers.map((m) => m?.name).filter((n) => n && n !== eventTeam))].length;
   // ✅ "ผู้รับผิดชอบ" — คนละแนวคิดกับ team ด้านบน (team คือใครเข้างานจริง อาจไม่ใช่คนที่รับผิดชอบ
   // สัญญา/ลูกค้ารายนี้โดยรวมเสมอไป) ใช้เช็คสิทธิ์ดูการดำเนินงาน/แก้ไขหัวหน้าทีม-ลูกทีม ด้านล่าง
   const eventResponsiblePerson = ev.extendedProps?.responsiblePerson || "";
@@ -1425,6 +1500,7 @@ export const getEditEvent = async ({
   // (หัวเรื่องของเอกสารมีช่องของตัวเองอยู่ในกล่องออกใบแจ้งเข้างาน/ใบส่งมอบงานแล้ว) ค่าเดิมในฐานข้อมูล
   // ยังอยู่ครบ ไม่ได้ถูกลบ — แค่ไม่แสดง/ไม่แก้จากหน้านี้อีกต่อไป
   const eventDescription = ev.extendedProps?.description || "";
+  const eventWorkNote = ev.extendedProps?.workNote || "";
   // ✅ normalize เผื่อข้อมูลเก่าที่กรอกเป็น text อิสระมาก่อน (เช่น "8.00" ใช้จุดแทนโคลอน ไม่มีเลขศูนย์นำหน้า)
   // ตอนนี้เปลี่ยนช่องเป็น <input type="time"> ซึ่งรับได้แค่รูปแบบ HH:mm มาตรฐานเท่านั้น
   // ถ้าไม่ normalize ค่าเก่าที่ไม่ตรงรูปแบบจะโชว์ว่างเปล่า แล้วถ้าผู้ใช้กดบันทึกโดยไม่ได้แก้ไข
@@ -1459,6 +1535,8 @@ export const getEditEvent = async ({
   const eventVisitCount      = ev.extendedProps?.visitCount || "";
   const eventIntervalMonths  = ev.extendedProps?.intervalMonths || "";
   const eventJobValue        = ev.extendedProps?.jobValue ?? "";
+  // ✅ (2 พ.ย. 2569) มูลค่างานครั้งนี้ (รายครั้ง — คนละค่ากับ jobValue ระดับสัญญา) · "" = ยังไม่ใส่
+  const eventWorkValue       = ev.extendedProps?.workValue ?? "";
   // ✅ บันทึกประวัติ — เดิมมีแค่ในหน้า Operation (ActivityLogMini) หน้า /event เองยังไม่เคยแสดงเลย
   // ทั้งที่ activityLog บันทึกลงงานทุกตัวเหมือนกันอยู่แล้ว ดึงมาแสดงแบบเดียวกัน (ย่อ/กางได้) ที่นี่ด้วย
   const eventActivityLog = ev.extendedProps?.activityLog || [];
@@ -1640,6 +1718,8 @@ export const getEditEvent = async ({
   // ต้องเติมรายละเอียดที่หน้างานเพิ่มทีหลัง) ถ้าล็อกตายตอนปิดงานจะกลายเป็นต้องรบกวนแอดมินทุกครั้ง
   // ⚠️ ยังบล็อกงานที่รออนุมัติอยู่ (isPendingForTech) — ช่างแตะอะไรไม่ได้เลยจนกว่าจะอนุมัติ/ไม่อนุมัติ
   const canEditDocFields = !readOnly && (isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech));
+  // รายละเอียดงานที่ทำ (workNote) — ช่างแก้ได้จนกว่างานปิด (เซิร์ฟเวอร์ล็อกหลังปิด) · แอดมินแก้ได้เสมอ
+  const canEditWorkNote = canEditDocFields && !isClosedForTech;
 
   /**
    * ✅ "เบิก Advance งานนี้" (ผู้ใช้ขอ: "เพิ่มเมนูให้สามารถกดเบิก Advance ในงานหน้า Event ได้เลย")
@@ -1951,10 +2031,10 @@ export const getEditEvent = async ({
           : "ยังไม่ได้มอบหมาย"}</span>`}
       </div>
       <div class="ee-hm-item">
-        <span class="ee-hm-label"><i aria-hidden="true">👷</i>หัวหน้าทีมเข้างาน</span>
+        <span class="ee-hm-label"><i aria-hidden="true">👷</i>ผู้ปฏิบัติงาน 1 · หัวหน้าทีม${extraWorkerCount ? ` <b class="ee-hm-count">+${extraWorkerCount} คน</b>` : ""}</span>
         ${/* ✅ (9 ต.ค. 2569 ผู้ใช้: "ระบุหัวหน้าทีมที่เข้างานได้เลย เหมือนผู้รับผิดชอบ") — เลือกแล้วบันทึกทันที */""}
         ${canEditTeamAssignment
-          ? `<span class="ee-hm-value ee-hm-value--edit"><select id="ee-teamSelect" aria-label="หัวหน้าทีมเข้างาน">${headTeamOpts}</select><em id="ee-teamMsg" class="ee-hm-msg" aria-live="polite"></em></span>`
+          ? `<span class="ee-hm-value ee-hm-value--edit"><select id="ee-teamSelect" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)">${headTeamOpts}</select><em id="ee-teamMsg" class="ee-hm-msg" aria-live="polite"></em></span>`
           : `<span class="ee-hm-value${eventTeam ? "" : " ee-hm-value--empty"}">${eventTeam ? attrHtml(eventTeam) : "ยังไม่ระบุ"}</span>`}
       </div>
       ${eventJobClassMeta ? `<div class="ee-hm-item">
@@ -2004,15 +2084,17 @@ export const getEditEvent = async ({
          (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
     ${canViewOperation ? `
     <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่าง = งานของฉัน · แอดมิน = การดำเนินงาน · ปุ่มเล็กลง ไม่กินพื้นที่ แต่ชัดเจนสวยงาม") -->
-    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:8px 10px 8px 8px;border-radius:12px;border:1.5px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
-      <span style="flex-shrink:0;width:30px;height:30px;border-radius:9px;background:#2563eb;color:#fff;display:grid;place-items:center">
+    <button type="button" id="btnGoOperation" class="ee-link-card">
+      <span class="ee-link-ico">
         ${showBoard
           ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h2v2H3V5Zm4 0h14v2H7V5Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Z"/></svg>'
           : '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.8-3.6 2.1-4.7-1.8-.2-3.6-.3-6.1-.3Zm11.7 1.3-1.4-1.4-3.3 3.3-1.6-1.6-1.4 1.4 3 3 4.7-4.7Z"/></svg>'}
       </span>
-      <span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#1d4ed8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${showBoard ? "เปิดในการดำเนินงาน" : "เปิดในงานของฉัน"}</span>
-      <span style="flex-shrink:0;font-size:12px;font-weight:600;color:#64748b">${showBoard ? "เอกสาร · ปิดงาน" : "เข้างาน · เอกสาร"}</span>
-      <span style="flex-shrink:0;font-size:18px;color:#2563eb;font-weight:700;line-height:1">›</span>
+      <span class="ee-link-text">
+        <b>${showBoard ? "เปิดหน้าการดำเนินงาน" : "เปิดหน้างานของฉัน"}</b>
+        <small>${showBoard ? "ตรวจเอกสาร · อนุมัติปิดงาน" : "บันทึกเข้างาน · แนบเอกสาร · ขอปิดงาน"}</small>
+      </span>
+      <span class="ee-link-arrow" aria-hidden="true">›</span>
     </button>` : ""}
 
     <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
@@ -2052,15 +2134,14 @@ export const getEditEvent = async ({
          • ยังไม่มี → แสดงแผนที่ค้นหาจากชื่อโครงการ พร้อมบอกชัดว่าเป็นตำแหน่งโดยประมาณ
          ⚠️ iframe ใส่ src ทีหลังใน didOpen (ต้องรอแปลงลิงก์ก่อน) — ช่วงนั้นแสดง "กำลังโหลดแผนที่" -->
     ${eventSite || savedMapUrl ? `
-    <div class="ee-map-card">
-      <div class="ee-map-frame">
-        <div class="ee-map-wait" id="ee-mapWait">กำลังโหลดแผนที่…</div>
-        <iframe id="ee-mapFrame" title="แผนที่หน้างาน ${attrHtml(eventSite)}" loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade" allowfullscreen style="display:none;"></iframe>
-      </div>
+    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ให้ map กดพับปิดได้ ไม่กินพื้นที่") — แถบชื่อหน้างานอยู่บน กดลูกศรเพื่อกาง/พับแผนที่
+         ค่าเริ่มต้นพับไว้ · จำค่าที่เลือกล่าสุดในเครื่อง · แผนที่โหลดตอนกางครั้งแรก (ไม่เปลืองเน็ตตอนพับ) */""}
+    <div class="ee-map-card" id="ee-mapCard">
       <div class="ee-map-bar">
+        <span class="ee-map-ico" aria-hidden="true">${googleMapsPinSvg(18)}</span>
         <div class="ee-map-info">
-          <div class="ee-map-name">${googleMapsPinSvg(15)}<span>${attrHtml(eventSite) || "—"}</span></div>
+          <div class="ee-map-title">ตำแหน่งหน้างาน</div>
+          <div class="ee-map-name"><span>${attrHtml(eventSite) || "—"}</span></div>
           <div class="ee-map-note${savedMapUrl ? "" : " ee-map-note--warn"}" id="ee-mapNote">
             ${savedMapUrl ? "ตำแหน่งที่บันทึกไว้ของโครงการนี้" : "ตำแหน่งโดยประมาณจากชื่อโครงการ — ยังไม่ได้บันทึกพิกัด"}
           </div>
@@ -2069,6 +2150,15 @@ export const getEditEvent = async ({
         <a class="ee-map-go" id="ee-mapGo" href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
           ${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}
         </a>
+        <button type="button" class="ee-map-toggle" id="ee-mapToggle" aria-expanded="false" title="แสดง/ซ่อนแผนที่">
+          <span id="ee-mapToggleText">แผนที่</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="ee-map-frame" id="ee-mapFrameWrap" hidden>
+        <div class="ee-map-wait" id="ee-mapWait">กำลังโหลดแผนที่…</div>
+        <iframe id="ee-mapFrame" title="แผนที่หน้างาน ${attrHtml(eventSite)}" loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade" allowfullscreen style="display:none;"></iframe>
       </div>
       ${isAdminOrManagerUser ? `
       <div id="ee-mapEditor" style="display:none;">
@@ -2087,6 +2177,78 @@ export const getEditEvent = async ({
     ${ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled ? stepperHtml : ""}
 
 
+
+    <!-- ✅ (2 พ.ย. 2569 ผู้ใช้: "หน้า event ทำให้ข้อมูลสอดคล้อง ดูง่าย ไม่ตาลาย ไม่รก เน้น 1 ผู้เข้าปฏิบัติงาน
+         2 ผู้รับผิดชอบงาน 3 มูลค่างาน 4 รายละเอียดงานที่ทำ พร้อมไฟล์แนบ")
+         กลุ่ม "ข้อมูลหลัก" ขึ้นก่อนทุกอย่าง (ผู้รับผิดชอบอยู่หัวกล่องเป็นช่องแรกอยู่แล้ว) · ข้อมูลงาน/ผู้ติดต่อ/วันที่/สี อยู่ถัดลงไป
+         ผู้ปฏิบัติงานเรียงเลข 1, 2, 3 … ตรงกับ Excel — ข้อมูลเก็บแบบเดิม: team = คนที่ 1 · teamMembers = คนที่ 2 ขึ้นไป -->
+    <div id="ee-keyGroup">
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">👷</span>
+        <div class="ee-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
+        ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span class="ee-card-badge">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+        <div class="ee-worker-row ee-worker-row--lead">
+          <span class="ee-worker-no" aria-hidden="true">1</span>
+          <div class="ee-field ee-worker-field">
+            <select id="editTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ชื่อ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
+          </div>
+          <span class="ee-worker-tag">หัวหน้าทีม</span>
+        </div>
+        <div id="ee-teamMembersList"></div>
+        ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost ee-worker-add" id="ee-addTeamMemberBtn">➕ เพิ่มผู้ปฏิบัติงาน</button>` : ""}
+      </div>
+    </section>
+
+    ${ev.extendedProps?.department === "sales" ? "" : `
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">💰</span>
+        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้</p></div>
+      </div>
+      <div class="ee-card-body">
+        <div class="ee-value-box">
+          <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
+            value="${eventWorkValue === "" || eventWorkValue === null ? "" : Number(eventWorkValue).toLocaleString("th-TH")}" ${isViewOnly ? "disabled" : ""}>
+          <span class="ee-value-unit">บาท</span>
+        </div>
+      </div>
+    </section>`}
+
+    <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
+         (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📄</span>
+        <div class="ee-card-titles"><h4>รายละเอียดงานที่ทำ</h4><p>ช่างบันทึกว่าทำอะไรไปบ้าง — ข้อความเดียวกับในงานของฉัน/การดำเนินงาน/Excel</p></div>
+        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+    <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
+         ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
+    <!-- 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดเลขที่อ้างอิงออก") — ไม่แสดงช่องแล้ว · เก็บค่าเดิมไว้ในช่องซ่อน
+         ตอนบันทึกจึงส่งค่าเดิมกลับไป ไม่ล้างเลขที่เคยกรอกไว้ -->
+    <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
+    ${/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ไฟล์แนบ รายละเอียดงาน ให้ตรงและสอดคล้องกันทุกหน้า")
+         รายละเอียดงานที่ทำ = workNote (ช่องเดียวกับ "สรุปงาน" เดิมในงานของฉัน/การดำเนินงาน/Excel)
+         หมายเหตุงาน = description (ข้อมูลประกอบของงาน — เดิมชื่อ "รายละเอียดงาน") */""}
+    <div class="ee-field">
+      <textarea id="editWorkNote" rows="5" placeholder="เช่น ตรวจระบบ FA ชั้น 3, เปลี่ยนหัวตรวจจับควัน 2 ตัว…" ${canEditWorkNote ? "" : "disabled"}>${attrHtml(eventWorkNote)}</textarea>
+    </div>
+    <div class="ee-field ee-note-field">
+      <label for="editDescription">หมายเหตุงาน <span class="ee-opt">ถ้ามี</span></label>
+      <textarea id="editDescription" rows="3" placeholder="ข้อมูลประกอบ เช่น ต้องแลกบัตรที่ รปภ., ลูกค้าขอให้เข้าหลัง 10 โมง" ${canEditDocFields ? "" : "disabled"}></textarea>
+      <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
+    </div>
+
+      </div>
+    </section>
+
+
+    ${ev.extendedProps?.department === "sales" ? "" : `<section class="ee-card ee-key-card ee-key-files"><div class="ee-card-body"><div id="ee-sitePhotosMount" data-no-draft></div></div></section>`}
+    </div>
 
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
@@ -2160,18 +2322,11 @@ export const getEditEvent = async ({
 
     ${/* ✅ (8 ต.ค. 2569 "ดูยาวและเยอะเกินไป ควรให้กดข้อมูลแก้ไขได้เลย") เลิกใช้กล่องสรุป + แผงพับ
           แสดงช่องข้อมูลให้แก้ได้ทันทีในแผงเดียวกะทัดรัด (หัวข้อย่อยบาง คั่นด้วยเส้น) */""}
+    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ข้อมูลงานส่วนนี้จัดรูปแบบใหม่ให้ดูง่าย") — การ์ดแยกทีละหมวด หัวข้อใหญ่ชัด แบบเดียวกับกลุ่มข้อมูลหลักด้านบน */""}
     <style>
-      #ee-editGroup { border:1px solid #e6e9ef; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
-      #ee-editGroup > .ee-eg-head { display:flex; align-items:baseline; gap:8px; padding:11px 14px; background:#f8fafc; border-bottom:1px solid #eef2f7; }
-      #ee-editGroup > .ee-eg-head b { font-size:14px; font-weight:800; color:#0f172a; }
-      #ee-editGroup > .ee-eg-head small { font-size:12px; font-weight:600; color:#64748b; }
-      #ee-editGroup .ee-card { border:0; border-radius:0; box-shadow:none; margin:0; border-top:1px solid #eef2f7; }
-      #ee-editGroup .ee-card:first-of-type { border-top:0; }
-      #ee-editGroup .ee-card-head { background:transparent; border-bottom:0; padding:12px 14px 2px; gap:8px; }
-      #ee-editGroup .ee-card-ico { width:24px; height:24px; border-radius:7px; font-size:13px; }
-      #ee-editGroup .ee-card-titles h4 { font-size:12.5px; color:#475569; letter-spacing:.01em; }
-      #ee-editGroup .ee-card-titles p { display:none; }
-      #ee-editGroup .ee-card-body { padding:8px 14px 6px; }
+      #ee-editGroup { display:flex; flex-direction:column; gap:12px; margin:0 0 12px; }
+      #ee-editGroup > .ee-eg-head { display:none; }
+      #ee-editGroup .ee-card { margin:0; }
     </style>
     <div id="ee-editGroup">
       <div class="ee-eg-head"><b>รายละเอียดงาน</b><small>${isViewOnly ? "ดูได้อย่างเดียว" : "กดที่ช่องเพื่อแก้ไขได้ทันที"}</small></div>
@@ -2238,13 +2393,13 @@ export const getEditEvent = async ({
            ✅ วางไว้ในกลุ่ม "ข้อมูลโครงการ" คู่กับครั้งที่ — เป็นข้อมูลของ "ตัวงาน" เหมือนกัน ไม่ใช่ข้อมูลคน -->
       ${!eventContractGroupId ? `
       <div class="ee-field">
-        <label>มูลค่างาน (บาท)</label>
+        <label>มูลค่างานรวม (บาท)</label>
         <div class="ee-money-input">
           <span class="ee-money-symbol">฿</span>
           <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
                  placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
-        <span class="ee-hint">ไม่บังคับ — ใช้รวมยอดในหน้า "ภาพรวมงาน"</span>
+        <span class="ee-hint">ยอดรวมของงาน (หน้าภาพรวมงาน) — คนละช่องกับ “มูลค่างานครั้งนี้”</span>
       </div>
       ` : ""}
     </div>
@@ -2275,36 +2430,6 @@ export const getEditEvent = async ({
           <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
         </div>
       </div>
-      </div>
-    </section>
-
-    <!-- ✅ แยก "ผู้เข้างาน" ออกมาเป็นหมวดของตัวเอง — เดิมหัวหน้าทีม/ลูกทีมถูกยัดรวมอยู่ในหมวด
-         "ข้อมูลโครงการ" ซึ่งเป็นคนละเรื่องกัน (หมวดนั้นคือข้อมูลระบุตัวงาน: บริษัท/โครงการ/ระบบ/ครั้งที่)
-         ทำให้หมวดเดียวยาวมากและอ่านแล้วหาไม่เจอว่าใครเข้างาน ซ้ำสิทธิ์แก้ไขของสองกลุ่มนี้ก็คนละชุดกัน
-         (ข้อมูลงาน = แอดมิน/manager เท่านั้น, ผู้เข้างาน = ผู้รับผิดชอบแก้ได้ด้วย) แยกออกมาแล้วอธิบาย
-         สิทธิ์ได้ตรงจุด ไม่ต้องเขียนรวมกันในประโยคเดียวให้สับสน -->
-    <section class="ee-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">👷</span>
-        <div class="ee-card-titles"><h4>ทีมเข้างาน</h4><p>หัวหน้าทีมและลูกทีมที่ไปหน้างาน</p></div>
-        ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span class="ee-card-badge">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-    <div class="ee-grid ee-grid-2">
-      <div class="ee-field">
-        <label>หัวหน้าทีม</label>
-        <select id="editTeam" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
-      </div>
-      <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน — แก้ไข/เพิ่ม/ลบ
-           ได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ (canEditTeamAssignment) เหมือนหัวหน้าทีม
-           ⚠️ ลูกทีมที่มีชื่อในงานเปิดดูงานนี้ได้ แต่แก้ไม่ได้ (ดู isTeamMemberViewer ด้านบน) -->
-      <div class="ee-field">
-        <label>ลูกทีม <span class="ee-opt">ถ้ามี</span></label>
-        <div id="ee-teamMembersList"></div>
-        ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>` : ""}
-      </div>
-    </div>
-
       </div>
     </section>
 
@@ -2416,29 +2541,6 @@ export const getEditEvent = async ({
     ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "อัพไฟล์รูปให้ทำใน editEvent ด้วย แล้วให้ข้อมูลเชื่อมต่อกัน")
          รูปและไฟล์หน้างาน — ชุดเดียวกับการ์ดในหน้าการดำเนินงาน/งานของฉัน (Events.sitePhotoFiles) อัปจากที่ไหนก็เห็นทุกที่
          ⚠️ data-no-draft: ช่องเลือกไฟล์ไม่ต้องเข้าระบบกู้คืนข้อมูลฟอร์ม */""}
-    ${ev.extendedProps?.department === "sales" ? "" : `<div id="ee-sitePhotosMount" data-no-draft style="margin-bottom:16px"></div>`}
-
-    <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
-         (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
-    <section class="ee-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">📄</span>
-        <div class="ee-card-titles"><h4>รายละเอียดงาน</h4><p>หมายเหตุ/รายละเอียดเพิ่มเติมของงานนี้</p></div>
-        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-    <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
-         ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
-    <!-- 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดเลขที่อ้างอิงออก") — ไม่แสดงช่องแล้ว · เก็บค่าเดิมไว้ในช่องซ่อน
-         ตอนบันทึกจึงส่งค่าเดิมกลับไป ไม่ล้างเลขที่เคยกรอกไว้ -->
-    <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
-    <div class="ee-field">
-      <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${canEditDocFields ? "" : "disabled"}></textarea>
-      <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
-    </div>
-
-      </div>
-    </section>
 
     ${eventActivityLog.length > 0 ? `
     <hr class="ee-divider">
@@ -2822,7 +2924,24 @@ export const getEditEvent = async ({
           mapNote.className = `ee-map-note${exact ? "" : " ee-map-note--warn"}`;
         }
       };
-      showMap(savedMapUrl);
+      // ── พับ/กางแผนที่ (จำค่าในเครื่อง) — โหลดแผนที่ครั้งแรกตอนกาง ──
+      let mapLoaded = false;
+      let mapUrlNow = savedMapUrl;
+      const mapWrap = document.getElementById("ee-mapFrameWrap");
+      const mapToggle = document.getElementById("ee-mapToggle");
+      const setMapOpen = (open) => {
+        if (!mapWrap || !mapToggle) return;
+        mapWrap.hidden = !open;
+        mapToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        const t = document.getElementById("ee-mapToggleText");
+        if (t) t.textContent = open ? "ซ่อน" : "แผนที่";
+        if (open && !mapLoaded) { mapLoaded = true; showMap(mapUrlNow); }
+        try { localStorage.setItem("ee.mapOpen", open ? "1" : "0"); } catch { /* ไม่มี storage ก็ใช้ค่าเริ่มต้น */ }
+      };
+      mapToggle?.addEventListener("click", () => setMapOpen(mapWrap?.hidden));
+      let mapOpenPref = false;
+      try { mapOpenPref = localStorage.getItem("ee.mapOpen") === "1"; } catch { /* ignore */ }
+      setMapOpen(mapOpenPref);
       if (mapEditBtn && mapEditor && mapInput) {
         mapEditBtn.addEventListener("click", () => {
           mapEditor.style.display = mapEditor.style.display === "none" ? "block" : "none";
@@ -2854,7 +2973,8 @@ export const getEditEvent = async ({
               }
             }
             mapEditBtn.textContent = url ? "✏️ แก้พิกัด" : "📍 บันทึกพิกัด";
-            showMap(url);   // แผนที่ด้านบนเปลี่ยนตามทันที
+            mapUrlNow = url;
+            if (mapLoaded) showMap(url); // แผนที่ด้านบนเปลี่ยนตามทันที (ถ้ากางอยู่)
             if (mapMsg) { mapMsg.textContent = url ? "บันทึกพิกัดแล้ว" : "ลบพิกัดแล้ว"; mapMsg.style.color = "#059669"; }
             setTimeout(() => { mapEditor.style.display = "none"; }, 900);
           } catch (err) {
@@ -3095,6 +3215,20 @@ export const getEditEvent = async ({
       // AddEvent.js ไม่มีปัญหานี้เพราะไม่ได้ใช้ plugin นี้เลย ตัดออกให้ตรงกันไปเลย
       // ✅ overrides — เผื่อบางช่องต้องปิดการพิมพ์ค่าเอง (create:false) เช่น "ครั้งที่" ของงานสัญญา
       // ซึ่งต้องเลือกได้เฉพาะครั้งที่มีอยู่จริงในสัญญานั้นเท่านั้น
+      /**
+       * ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้แสดงรูปด้วย ให้สวยงาม") ช่องเลือกผู้ปฏิบัติงานแสดงรูป/อักษรย่อหน้าชื่อ
+       *    ทั้งในรายการตัวเลือกและค่าที่เลือกแล้ว — รูปชุดเดียวกับหัวกล่อง (personAvatarHtml)
+       */
+      const tsImgByName = new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""]));
+      const personTsRender = {
+        option: (d, esc) => (d.value
+          ? `<div class="ee-ts-person">${personAvatarHtml(d.value, tsImgByName.get(d.value), 28)}<span>${esc(d.text)}</span></div>`
+          : `<div class="ee-ts-person ee-ts-person--muted">${esc(d.text)}</div>`),
+        item: (d, esc) => (d.value
+          ? `<div class="ee-ts-person ee-ts-person--item">${personAvatarHtml(d.value, tsImgByName.get(d.value), 24)}<span>${esc(d.text)}</span></div>`
+          : `<div>${esc(d.text)}</div>`),
+        option_create: (d, esc) => `<div class="create">➕ เพิ่มชื่อ <b>${esc(d.input)}</b></div>`,
+      };
       const mkTs = (id, placeholder = "", overrides = {}) => {
         try {
           return new TomSelect(id, {
@@ -3146,7 +3280,7 @@ export const getEditEvent = async ({
       // ⚠️ "ครั้งที่" ไม่จำกัด (null) — สัญญาเข้าได้ถึง 24 ครั้ง ถ้าตัดที่ 20 ครั้งที่ 21–24 จะเลือกไม่ได้เลย (รายการสั้นอยู่แล้ว ไม่หน่วง)
       if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false, maxOptions: null });
       else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime, { maxOptions: null });
-      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam, { maxOptions: 20 });
+      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน", eventTeam, { maxOptions: 20, render: personTsRender });
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
@@ -3159,12 +3293,13 @@ export const getEditEvent = async ({
             persist: false,
             closeAfterSelect: true,
             selectOnTab: false,
-            placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
+            placeholder: "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน",
             allowEmptyOption: true,
             maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             // ⚠️ ไม่ต้องก็อป onItemAdd (บังคับเลือกได้ทีละคน) มาจาก mkTs ด้านบน — <select> ที่ไม่มี
             // attribute multiple ถูก TomSelect ตั้ง maxItems:1 / mode:"single" ให้เองอยู่แล้ว
             dropdownParent: "body", // ✅ กัน #ee-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
+            render: personTsRender,
           });
           if (prefillName) {
             // ✅ ชื่อลูกทีมเดิมที่ไม่มีอยู่ในลิสต์พนักงานแล้ว (ลาออก/เคยพิมพ์เองไว้) ต้อง addOption
@@ -3185,9 +3320,10 @@ export const getEditEvent = async ({
 
       const addTeamMemberRow = (prefillName = "") => {
         const row = document.createElement("div");
-        row.className = "ee-team-member-row";
+        row.className = "ee-team-member-row ee-worker-row";
         row.innerHTML = `
-          <select class="ee-team-member-select"><option value="">— เลือกลูกทีม —</option>${plainTeamOpts}</select>
+          <span class="ee-worker-no" aria-hidden="true"></span>
+          <select class="ee-team-member-select" aria-label="ผู้ปฏิบัติงาน"><option value="">— เลือกผู้ปฏิบัติงาน —</option>${plainTeamOpts}</select>
           ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost ee-team-member-remove" title="ลบออก">✕</button>` : ""}
         `;
         teamMembersList.appendChild(row); // ต้อง append ก่อน init (ดูคอมเมนต์ใน AddEvent.js)
@@ -3619,7 +3755,25 @@ export const getEditEvent = async ({
           .filter((name, idx, arr) => arr.indexOf(name) === idx)
           .map((name) => ({ userId: teamToId.get(name) || "", name }));
 
+      // ✅ มูลค่างานครั้งนี้ — ส่งเฉพาะตอนค่าเปลี่ยน · ว่าง = ล้าง · ตัวเลขผิด = ไม่ส่ง (ค่าเดิมคงอยู่)
+      const readWorkValue = () => {
+        const el = document.getElementById("editWorkValue");
+        if (!el || el.disabled) return {};
+        const t = el.value.replace(/[,\s฿]/g, "");
+        const n = t === "" ? null : Number(t);
+        if (n !== null && (!Number.isFinite(n) || n < 0)) return {};
+        const before = eventWorkValue === "" || eventWorkValue === null ? null : Number(eventWorkValue);
+        return n === before ? {} : { workValue: n };
+      };
+      const readWorkNote = () => {
+        const el = document.getElementById("editWorkNote");
+        if (!el || el.disabled) return {};
+        const v = el.value.trim();
+        return v === eventWorkNote.trim() ? {} : { workNote: v };
+      };
       const buildSharedFields = () => ({
+        ...readWorkValue(),
+        ...readWorkNote(),
         // ✅ ข้อมูล Job (ด่วน · ครบกำหนด · อุปกรณ์ · รอข้อมูล) — ไม่มีการ์ดนี้ (นัดฝ่ายขาย) = ไม่ส่ง
         ...(document.getElementById("ji-dueDate") ? readJobInfo(Swal.getPopup()) : {}),
         docNo: getVal("editdocNo"),

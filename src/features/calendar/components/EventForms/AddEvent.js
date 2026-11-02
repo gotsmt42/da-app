@@ -1,5 +1,6 @@
 import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
+import { personTsRender, PERSON_TS_CSS } from "@/shared/utils/personTsRender";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
@@ -98,18 +99,19 @@ function injectAddStyles() {
       margin: 0 0 12px; overflow: hidden; text-align: left;
       box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
-    .ae-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #eef2f7; }
+    /* 🔁 (2 พ.ย. 2569 ผู้ใช้: "แก้ไขรูปแบบหน้าเพิ่มงานใหม่ให้เหมือนกันด้วย") หัวข้อขาว ใหญ่ ชัด เหมือนฟอร์มแก้ไขงาน */
+    .ae-card-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px 6px; background: #fff; border-bottom: 0; }
     .ae-card-ico {
-      width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
       display: inline-flex; align-items: center; justify-content: center;
-      background: #fff; border: 1px solid #e6e9ef; font-size: 15px; line-height: 1;
+      background: #eff6ff; border: 0; font-size: 19px; line-height: 1;
     }
     .ae-card-titles { flex: 1; min-width: 0; }
-    .ae-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
-    .ae-card-titles p { margin: 1px 0 0; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+    .ae-card-titles h4 { margin: 0; font-size: 16.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .ae-card-titles p { margin: 2px 0 0; font-size: 12.5px; color: #64748b; line-height: 1.4; }
     .ae-card-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
     .ae-card-badge--muted { color: #64748b; background: #f1f5f9; border: 1px solid #e6e9ef; }
-    .ae-card-body { padding: 12px 14px 4px; }
+    .ae-card-body { padding: 8px 16px 8px; }
     .ae-card-body > .ae-field { margin-bottom: 10px; }
     .ae-card .ae-grid { gap: 10px 12px; margin-bottom: 10px; }
     .ae-grid-2 { grid-template-columns: 1fr 1fr; }
@@ -350,6 +352,21 @@ function injectAddStyles() {
       flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
     }
+
+    /* ── ผู้ปฏิบัติงาน 1, 2, 3 … (ชุดเดียวกับฟอร์มแก้ไขงาน) — เลขลำดับนับด้วย CSS counter ── */
+    .ae-worker-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ae-worker-row .ae-worker-field { flex: 1 1 auto; min-width: 0; margin: 0; }
+    .ae-worker-no {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      background: #eef2ff; color: #3730a3; font-size: 12.5px; font-weight: 800;
+    }
+    .ae-worker-row--lead .ae-worker-no { background: #2563eb; color: #fff; }
+    .ae-worker-tag { flex-shrink: 0; font-size: 11px; font-weight: 800; color: #1d4ed8; background: #dbeafe; border-radius: 99px; padding: 3px 9px; }
+    #ae-teamMembersList { counter-reset: aeWorker 1; }
+    #ae-teamMembersList .ae-worker-row { counter-increment: aeWorker; }
+    #ae-teamMembersList .ae-worker-no::before { content: counter(aeWorker); }
+    .ae-worker-add { margin: 0 0 6px 34px; }
+    ${PERSON_TS_CSS}
 
     /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
     .ae-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -758,21 +775,19 @@ export const getAddEvent = async ({
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">👷</span>
-        <div class="ae-card-titles"><h4>ทีมเข้างาน</h4><p>หัวหน้าทีมและลูกทีมที่ไปหน้างาน</p></div>
+        <div class="ae-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
       </div>
       <div class="ae-card-body">
-      <div class="ae-grid ae-grid-2">
-        <div class="ae-field">
-          <label>หัวหน้าทีม</label>
-          <select id="eventTeam"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+        <div class="ae-worker-row ae-worker-row--lead">
+          <span class="ae-worker-no" aria-hidden="true">1</span>
+          <div class="ae-field ae-worker-field">
+            <select id="eventTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)"><option selected disabled value="">— เลือกหรือพิมพ์ชื่อ —</option>${teamOpts}</select>
+          </div>
+          <span class="ae-worker-tag">หัวหน้าทีม</span>
         </div>
-        <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
-        <div class="ae-field">
-          <label>ลูกทีม <span class="ae-opt">ถ้ามี</span></label>
-          <div id="ae-teamMembersList"></div>
-          <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
-        </div>
-      </div>
+        <!-- ✅ ผู้ปฏิบัติงานคนที่ 2, 3, … — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
+        <div id="ae-teamMembersList"></div>
+        <button type="button" class="ae-btn ae-btn-ghost ae-worker-add" id="ae-addTeamMemberBtn">➕ เพิ่มผู้ปฏิบัติงาน</button>
       </div>
     </section>
 
@@ -872,7 +887,7 @@ export const getAddEvent = async ({
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📅</span>
-        <div class="ae-card-titles"><h4>วันที่และทีมเข้างาน</h4></div>
+        <div class="ae-card-titles"><h4>วันที่และผู้ปฏิบัติงาน</h4></div>
       </div>
       <div class="ae-card-body">
       <div class="ae-grid ae-grid-datetime">
@@ -886,7 +901,7 @@ export const getAddEvent = async ({
         </div>
       </div>
       <div class="ae-field" style="margin-bottom:16px;">
-        <label>หัวหน้าทีมเข้างาน</label>
+        <label>ผู้ปฏิบัติงาน 1 · หัวหน้าทีม</label>
         <select id="ae-cpTeam"><option value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
         <p style="font-size:11px;color:#94a3b8;margin:4px 0 0;">ถ้าไม่เลือก ระบบจะลงผู้รับผิดชอบของสัญญานี้เป็นหัวหน้าทีมเข้างานให้อัตโนมัติ</p>
       </div>
@@ -905,7 +920,7 @@ export const getAddEvent = async ({
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
-        <div class="ae-card-titles"><h4>เอกสาร</h4><p>เลขที่อ้างอิงและรายละเอียดงาน</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
+        <div class="ae-card-titles"><h4>หมายเหตุงาน</h4><p>เลขที่อ้างอิง และข้อมูลประกอบของงานนี้</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
       </div>
       <div class="ae-card-body">
     <div class="ae-field" style="margin-bottom:12px;">
@@ -913,8 +928,8 @@ export const getAddEvent = async ({
       <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
     </div>
     <div class="ae-field" style="margin-bottom:16px;">
-      <label>รายละเอียดงาน</label>
-      <textarea id="description" rows="5" placeholder="กรอกรายละเอียดงาน..."></textarea>
+      <label>หมายเหตุงาน</label>
+      <textarea id="description" rows="4" placeholder="ข้อมูลประกอบ เช่น ต้องแลกบัตรที่ รปภ., ลูกค้าขอให้เข้าหลัง 10 โมง"></textarea>
       <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
     </div>
@@ -979,7 +994,8 @@ export const getAddEvent = async ({
       // ใช้ค่าเริ่มต้นเดียวกับที่ TomSelect ให้มาเอง (50) แล้วยังส่งความยาวลิสต์จริงมาที่แต่ละช่องด้านล่าง
       // อีกชั้น (เทียบ pattern เดียวกับ contractTs/attachTs ที่ใช้ selectableContracts.length มาตั้งแต่แรก)
       // รับประกันว่าไม่มีทางถูกตัดรายการทิ้งไม่ว่าลิสต์จะยาวแค่ไหนก็ตาม
-      const mkTs = (id, placeholder = "") => {
+      const personRender = personTsRender(new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""])));
+      const mkTs = (id, placeholder = "", _maxOptions, overrides = {}) => {
         try {
           return new TomSelect(id, {
             create: true,
@@ -996,6 +1012,7 @@ export const getAddEvent = async ({
             // ต่ำกว่าไม่ได้เลย — "body" ทำให้ dropdown หลุดออกจาก DOM ที่ถูกตัดขอบ ไปแปะไว้ที่ <body>
             // แทน ไม่โดน overflow ของ modal จำกัดอีก
             dropdownParent: "body",
+            ...overrides,
           });
         } catch { return null; }
       };
@@ -1030,7 +1047,7 @@ export const getAddEvent = async ({
       });
       mkTs("#eventTitle",   "เลือกหรือพิมพ์ประเภทงาน", (jobTypes?.items || []).length || 50);
       mkTs("#eventSystem",  "เลือกหรือพิมพ์ระบบงาน", (systemTypes?.items || []).length || 50);
-      mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
+      mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน", employeeList.length || 50, { render: personRender });
 
       /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน) ── */
       const teamMembersList = document.getElementById("ae-teamMembersList");
@@ -1043,7 +1060,8 @@ export const getAddEvent = async ({
           const ts = new TomSelect(el, {
             create: true, // ✅ พิมพ์ชื่อที่ไม่มีในลิสต์เพิ่มเองได้ (ตามที่ผู้ใช้ขอ)
             maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
-            placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
+            placeholder: "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน",
+            render: personRender,
             sortField: { field: "text", direction: "asc" },
             allowEmptyOption: true,
             dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
@@ -1060,9 +1078,10 @@ export const getAddEvent = async ({
       // ใน mkTeamMemberTs เสมอ (ไม่งั้นค่าที่ตั้งไว้จะถูกเคลียร์ทิ้งทันที)
       const addTeamMemberRow = (presetName) => {
         const row = document.createElement("div");
-        row.className = "ae-team-member-row";
+        row.className = "ae-team-member-row ae-worker-row";
         row.innerHTML = `
-          <select class="ae-team-member-select"><option value="">— เลือกลูกทีม —</option>${teamOpts}</select>
+          <span class="ae-worker-no" aria-hidden="true"></span>
+          <select class="ae-team-member-select" aria-label="ผู้ปฏิบัติงาน"><option value="">— เลือกผู้ปฏิบัติงาน —</option>${teamOpts}</select>
           <button type="button" class="ae-btn ae-btn-ghost ae-team-member-remove" title="ลบออก">✕</button>
         `;
         // ⚠️ ต้อง appendChild ก่อนแล้วค่อย new TomSelect — TomSelect อ่าน getComputedStyle ของ
@@ -1213,7 +1232,7 @@ export const getAddEvent = async ({
           dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
         });
       } catch { contractTs = null; }
-      mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
+      mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน", employeeList.length || 50, { render: personRender });
 
       // ตัวนับตัวอักษรของช่องรายละเอียดงาน — ให้เหมือนฟอร์มแก้ไขงาน
       const descEl = document.getElementById("description");

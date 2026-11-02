@@ -55,7 +55,8 @@ const thinBorder = {
  * @param roundLabel (event) => "1/4 - 2569-70" — ครั้งที่แบบเดียวกับหน้าจอ
  * @param srOf       (sessions) => สรุป Service Report ของงาน { status, data } | null — มี = เพิ่มชีตสรุป/ปัญหาที่พบ
  */
-export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel, srOf }) {
+/** @param showValue แสดงมูลค่างานครั้งนี้ + ชีต "มูลค่างานรายช่าง" (แอดมิน/manager) */
+export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel, srOf, showValue = false }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
   wb.created = new Date();
@@ -63,6 +64,18 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
 
+  // ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้เป็นผู้รับผิดชอบ ผู้ปฏิบัติงาน 1,2,3,4 แยกช่องทุกคน") — คนที่ 1 = หัวหน้าทีม
+  //    อย่างน้อย 4 ช่อง · งานไหนมีคนมากกว่านั้นเพิ่มช่องให้พอทุกคน
+  const workersOf = (a) => [...new Set([a.team, ...((a.teamMembers || []).map((m) => m?.name))].filter(Boolean))];
+  // มูลค่างานครั้งนี้ของงาน — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่
+  const workValueOf = (sessions) => {
+    const hit = sessions.find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "");
+    return hit ? Number(hit.workValue) : null;
+  };
+  const workerSlots = Math.max(4, ...jobs.map((job) => workersOf(job.sessions[0] || {}).length));
+  const workerCols = Array.from({ length: workerSlots }, (_, i) => (
+    { key: `worker${i + 1}`, header: i === 0 ? "ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" : `ผู้ปฏิบัติงาน ${i + 1}`, width: i === 0 ? 24 : 18, group: "ผู้เกี่ยวข้อง" }
+  ));
   const cols = [
     { key: "status", header: "สถานะงาน", width: 18, group: "สถานะ", align: "center" },
     { key: "step", header: "ขั้นตอนตอนนี้", width: 14, group: "สถานะ", align: "center" },
@@ -84,13 +97,13 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     { key: "parts", header: "จำนวนช่วง", width: 10, group: "กำหนดการ", align: "center" },
     { key: "timeRange", header: "เวลา", width: 14, group: "กำหนดการ", align: "center" },
     { key: "responsible", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
-    { key: "head", header: "หัวหน้าทีมเข้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
-    { key: "team", header: "ลูกทีม", width: 22, group: "ผู้เกี่ยวข้อง", wrap: true },
+    ...workerCols,
     { key: "ack", header: "รับทราบโดย / เมื่อ", width: 24, group: "ผู้เกี่ยวข้อง", wrap: true },
     { key: "checkIn", header: "เวลาเข้างานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "checkOut", header: "เวลาเสร็จงานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
-    { key: "workNote", header: "สรุปงาน (ช่างบันทึก)", width: 36, group: "การปฏิบัติงาน", wrap: true },
+    { key: "workNote", header: "รายละเอียดงานที่ทำ", width: 36, group: "การปฏิบัติงาน", wrap: true },
     { key: "closeState", header: "สถานะการปิดงาน", width: 18, group: "การปฏิบัติงาน", align: "center" },
+    ...(showValue ? [{ key: "workValue", header: "มูลค่างานครั้งนี้ (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
     { key: "docReport", header: "Service Report", width: 14, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docQuotation", header: "ใบเสนอราคา", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docInvoice", header: "ใบวางบิล", width: 12, group: "เอกสารแนบ (ไฟล์)", align: "center" },
@@ -186,7 +199,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       source: { sales: "ฝ่ายขาย", service: "ฝ่ายบริการ", project: "ฝ่ายโครงการ", customer: "ลูกค้าแจ้งตรง", calendar: "ลงตารางตรง", dispatch: "คำขอลงงาน" }[a.intakeSource] || "",
       dispatchNo: a.dispatchNo || "",
       parts: sessions.length,
-      head: a.team || "",
+      ...Object.fromEntries(workersOf(a).map((n, i) => [`worker${i + 1}`, n])),
       ack: (a.acks || []).map((k) => `${k.name || ""}${k.at ? ` ${moment(k.at).format("DD/MM/YY HH:mm")}` : ""}`).filter((x) => x.trim()).join(", "),
       overdue: isOverdue ? overdueDays : "",
       approval: approvalState,
@@ -202,12 +215,12 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       endDate: maxEnd.toDate(),
       dayCount,
       timeRange: a.startTime || a.endTime ? `${a.startTime || "-"}-${a.endTime || "-"}` : "ทั้งวัน",
-      team: [...new Set((a.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== a.team))].join(", "),
       responsible: a.responsiblePerson || "",
       checkIn: a.checkedInAt ? new Date(a.checkedInAt) : "",
       checkOut: a.checkedOutAt ? new Date(a.checkedOutAt) : "",
       workNote: a.workNote || "",
       closeState,
+      ...(showValue ? { workValue: workValueOf(sessions) ?? "ยังไม่ใส่" } : {}),
       docReport: (a.reportFiles || []).length,
       docQuotation: (a.quotationFiles || []).length,
       docInvoice: (a.invoiceFiles || []).length,
@@ -224,6 +237,10 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
       if (["startDate", "endDate"].includes(colDef.key)) cell.numFmt = "dd/mm/yyyy";
       if (["checkIn", "checkOut"].includes(colDef.key)) cell.numFmt = "dd/mm/yyyy hh:mm";
+      if (colDef.key === "workValue") {
+        if (typeof cell.value === "number") { cell.numFmt = "#,##0.00"; cell.font = { name: "Tahoma", size: 10, bold: true }; }
+        else cell.font = { name: "Tahoma", size: 10, color: { argb: C.warn } };
+      }
 
       if (colDef.key === "status") {
         cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: STATUS_COLOR[a.status] || C.muted } };
@@ -260,6 +277,10 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW + jobs.length, column: lastCol } };
   }
 
+  // ✅ (2 พ.ย. 2569 ผู้ใช้: "ค้นหาว่าช่างคนนั้นๆ มีมูลค่างานรวมทั้งหมดเท่าไร ... และ export")
+  //    ชีต "มูลค่างานรายช่าง" — ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน (ผลรวมรายคนจึงมากกว่ามูลค่างานจริงได้)
+  if (showValue && jobs.length) addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta);
+
   // ✅ ชีตสรุป Service Report — เฉพาะงานที่มีสรุปแล้ว เรียงตามลำดับเดียวกับชีตหลัก
   const srJobs = srOf ? jobs.map((job) => ({ sessions: job.sessions, summary: srOf(job.sessions) })).filter((x) => x.summary?.data && !srUnreadable(x.summary)) : [];
   if (srJobs.length) {
@@ -274,6 +295,71 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
     meta.fileName
   );
+}
+
+function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
+  const ws = wb.addWorksheet("มูลค่างานรายช่าง", { pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  const per = new Map();
+  let grand = 0; let valued = 0; let missing = 0;
+  jobs.forEach(({ sessions }) => {
+    const a = sessions[0] || {};
+    const wv = workValueOf(sessions);
+    if (wv === null) missing += 1; else { grand += wv; valued += 1; }
+    workersOf(a).forEach((name, i) => {
+      const r = per.get(name) || { name, jobs: 0, lead: 0, valued: 0, missing: 0, total: 0 };
+      r.jobs += 1;
+      if (i === 0) r.lead += 1;
+      if (wv === null) r.missing += 1; else { r.valued += 1; r.total += wv; }
+      per.set(name, r);
+    });
+  });
+  const rows = [...per.values()].sort((x, y) => y.total - x.total || y.jobs - x.jobs || x.name.localeCompare(y.name, "th"));
+  const cols = [
+    { key: "no", header: "ลำดับ", width: 7, align: "center" },
+    { key: "name", header: "ผู้ปฏิบัติงาน", width: 26 },
+    { key: "jobs", header: "จำนวนงาน", width: 11, align: "center" },
+    { key: "lead", header: "เป็นหัวหน้าทีม", width: 13, align: "center" },
+    { key: "valued", header: "ใส่มูลค่าแล้ว", width: 13, align: "center" },
+    { key: "missing", header: "ยังไม่ใส่มูลค่า", width: 14, align: "center" },
+    { key: "total", header: "มูลค่างานรวม (บาท)", width: 20, align: "right" },
+    { key: "avg", header: "เฉลี่ย / งาน (บาท)", width: 18, align: "right" },
+  ];
+  ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
+  ws.mergeCells(1, 1, 1, cols.length);
+  ws.getCell(1, 1).value = "มูลค่างานรายช่าง";
+  ws.getCell(1, 1).font = { name: "Tahoma", size: 16, bold: true, color: { argb: C.titleText } };
+  ws.mergeCells(2, 1, 2, cols.length);
+  ws.getCell(2, 1).value = `${meta.groupLabel}  ·  ${meta.filterSummary}  ·  ส่งออก ${meta.exportedAt}`;
+  ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
+  ws.mergeCells(3, 1, 3, cols.length);
+  ws.getCell(3, 1).value = `มูลค่างานรวมทั้งหมด (นับงานละครั้ง) ${grand.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท จาก ${valued} งาน${missing ? ` · ยังไม่ใส่มูลค่า ${missing} งาน` : ""}  ·  หมายเหตุ: ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน`;
+  ws.getCell(3, 1).font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.titleText } };
+  const HEAD = 5;
+  const hr = ws.getRow(HEAD);
+  cols.forEach((c, i) => {
+    const cell = hr.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = thinBorder;
+  });
+  hr.height = 26;
+  rows.forEach((r, idx) => {
+    const row = ws.addRow({ no: idx + 1, name: r.name, jobs: r.jobs, lead: r.lead, valued: r.valued, missing: r.missing || "", total: r.total, avg: r.valued ? r.total / r.valued : "" });
+    row.height = 22;
+    cols.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      cell.font = { name: "Tahoma", size: 10, bold: c.key === "total" || c.key === "name" };
+      cell.border = thinBorder;
+      cell.alignment = { vertical: "middle", horizontal: c.align || "left" };
+      if (idx % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
+      if (c.key === "total" || c.key === "avg") cell.numFmt = "#,##0.00";
+      if (c.key === "missing" && r.missing) cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.warn } };
+    });
+  });
+  ws.views = [{ state: "frozen", ySplit: HEAD }];
+  if (rows.length) ws.autoFilter = { from: { row: HEAD, column: 1 }, to: { row: HEAD + rows.length, column: cols.length } };
 }
 
 export const buildOperationFileName = (groupLabel) =>
