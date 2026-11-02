@@ -1,5 +1,8 @@
 /** ชิ้นส่วนที่ใช้ซ้ำในระบบสต๊อก — ป้าย · รูปสินค้า · กล่องหัวข้อฟอร์ม */
-import { Box, Stack, Typography } from "@mui/material";
+import { useEffect, useState } from "react";
+import { Box, Stack, Typography, FormControlLabel, Checkbox } from "@mui/material";
+import { HistoryEdu } from "@mui/icons-material";
+import SignatureService from "@/shared/services/SignatureService";
 import { CategoryRounded as Category, HandymanRounded as Handyman } from "@mui/icons-material";
 import { kindMeta, reqStatus, reqView, REQ_VIEW, outstanding, fmt, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STOCK_ACCENT } from "../stockMeta";
 
@@ -70,6 +73,27 @@ export const LineThumbs = ({ lines = [], itemById, size = 34, max = 3 }) => {
     </Stack>
   );
 };
+
+/**
+ * ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน — ✅ (2 พ.ย. 2569 ผู้ใช้: "เพิ่มให้ใส่ลายเซ็นอิเล็กทรอนิกส์")
+ * แสดงเมื่อผู้ใช้ตั้งลายเซ็นไว้แล้ว (เมนูตั้งค่า) · ยังไม่ตั้ง = บอกวิธีตั้ง ไม่บังคับ
+ */
+export function SignatureToggle({ checked, onChange, slotLabel }) {
+  const [mine, setMine] = useState(undefined);
+  useEffect(() => { let alive = true; SignatureService.me().then((s) => alive && setMine(s || null)).catch(() => alive && setMine(null)); return () => { alive = false; }; }, []);
+  if (mine === undefined) return null;
+  if (!mine?.image) {
+    return <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>ยังไม่ได้ตั้งลายเซ็นอิเล็กทรอนิกส์ — ตั้งได้ที่ “ตั้งค่า → ลายเซ็นของฉัน” (ไม่ตั้งก็ลงนามด้วยมือบน PDF ได้)</Typography>;
+  }
+  return (
+    <Box sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
+      <FormControlLabel sx={{ mr: 0 }}
+        control={<Checkbox size="small" checked={checked} onChange={(e) => onChange(e.target.checked)} />}
+        label={<Stack direction="row" alignItems="center" spacing={0.75}><HistoryEdu sx={{ fontSize: 17, color: STOCK_ACCENT }} /><Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน{slotLabel ? ` (ช่อง${slotLabel})` : ""}</Typography></Stack>} />
+      <Box component="img" src={mine.image} alt="" sx={{ display: "block", ml: 3.75, height: 34, maxWidth: 160, objectFit: "contain", opacity: checked ? 1 : 0.28 }} />
+    </Box>
+  );
+}
 
 /** ช่องกรอก — ป้ายอยู่เหนือช่อง (อ่านง่ายกว่าป้ายลอย) · พื้นขาว มุมมน */
 export const FIELD_SX = {

@@ -24,7 +24,7 @@ import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import StockService, { errorText } from "../services/StockService";
 import { STOCK_ACCENT, STOCK_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, outstanding, fmt, jobOf, reqStatus } from "../stockMeta";
-import { KindTag, ReqBadge, Thumb, FIELD_SX, Label } from "./StockBits";
+import { KindTag, ReqBadge, Thumb, FIELD_SX, Label, SignatureToggle } from "./StockBits";
 import StockReturnForm from "./StockReturnForm";
 import { RtBadge, RT_TONE } from "./StockReturnDetail";
 
@@ -79,6 +79,7 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null); // "issue" | "reject" | "cancel"
   const [reason, setReason] = useState("");
+  const [useSignature, setUseSignature] = useState(true);
   const [rts, setRts] = useState([]);
   const [rtForm, setRtForm] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -115,7 +116,7 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
 
   const CONFIRM = {
     issue: { title: "ยืนยันอนุมัติและจ่ายของ", tone: STOCK_ACCENT, icon: <TaskAlt />, label: "ยืนยันอนุมัติ · ตัดยอด",
-      text: "ระบบจะตัดยอดออกจากคลังทันทีตามรายการด้านล่าง และแจ้งผู้เบิกให้มารับของ — ย้อนกลับไม่ได้", act: () => StockService.issue(doc._id) },
+      text: "ระบบจะตัดยอดออกจากคลังทันทีตามรายการด้านล่าง และแจ้งผู้เบิกให้มารับของ — ย้อนกลับไม่ได้", act: () => StockService.issue(doc._id, "", useSignature) },
     reject: { title: "ไม่อนุมัติใบเบิกนี้", tone: "#dc2626", icon: <DoNotDisturbAlt />, label: "ยืนยันไม่อนุมัติ",
       text: "ยอดที่จองไว้จะคืนเข้าคลัง และแจ้งผู้เบิกพร้อมเหตุผล", act: () => StockService.reject(doc._id, reason.trim()), need: !reason.trim() },
     cancel: { title: "ยกเลิกใบเบิกนี้", tone: "#475569", icon: <Close />, label: "ยืนยันยกเลิก",
@@ -305,6 +306,7 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
                   ))}
                 </Box>
               )}
+              {confirm === "issue" && <Box sx={{ mt: 1.5 }}><SignatureToggle checked={useSignature} onChange={setUseSignature} slotLabel="ผู้อนุมัติ/จ่ายของ" /></Box>}
               {confirm === "reject" && (
                 <Box sx={{ mt: 1.5 }}>
                   <Label required>เหตุผลที่ไม่อนุมัติ</Label>
@@ -331,8 +333,8 @@ export default function StockRequestDetail({ id, open, canManage, myId, items = 
         onClose={() => setPdfOpen(false)}
         jobKey={`${doc?._id}:${doc?.status}:${doc?.updatedAt}`}
         generate={async () => {
-          const { generateStockPdf } = await import("../utils/stockPdf");
-          return generateStockPdf({ request: doc, deptLabel, mode: "blob" });
+          const [{ generateStockPdf }, signatures] = await Promise.all([import("../utils/stockPdf"), StockService.signatures(doc._id)]);
+          return generateStockPdf({ request: doc, deptLabel, signatures, mode: "blob" });
         }}
         title={doc?.docNo || "ใบเบิกของ"}
         subtitle={doc ? `ใบเบิกของ · ${doc.jobTitle || ""}` : ""}

@@ -36,6 +36,25 @@ const FullLayout = () => {
   useNewBuildReload(); // มีรุ่นใหม่ → รีโหลดตอนเปลี่ยนหน้า กันหน้า "มีเวอร์ชันใหม่" บนมือถือที่เปิดแอปค้างไว้
   const navigate = useNavigate();
 
+  /**
+   * 🐛 (2 พ.ย. 2569 ผู้ใช้: "ตรงนี้มันล้นย่นมาไม่พอดี") — แถบข้างจอคอมสูง "จอ − แถบบน" แต่แถบบนเลื่อนหายไปกับหน้า
+   * พอเลื่อนลง แถบข้างจึงสั้นกว่าจอเท่าความสูงแถบบน เห็นเป็นกล่องขาดลอยอยู่เหนือท้ายหน้า
+   * ✅ บอก CSS ว่าเลื่อนไปแล้วกี่ px (ไม่เกินความสูงแถบบน) → แถบข้างยืดลงเต็มจอพอดีทุกตำแหน่ง (FullLayout.css · --sb-extra)
+   */
+  useEffect(() => {
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-header-h")) || 70;
+      document.documentElement.style.setProperty("--sb-extra", `${Math.min(window.scrollY, headerH)}px`);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    apply();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, []);
+
   useEffect(() => {
     const handleOutsideClick = (e) => {
       // ถ้ากดนอก Sidebar บนมือถือ ให้สั่งหุบซ่อน

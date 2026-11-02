@@ -16,7 +16,7 @@ import { CloseRounded as Close, AddRounded as Add, RemoveRounded as Remove, Atta
 import { prepareUploadFile, ACCEPT_ALL } from "@/shared/utils/fileUpload";
 import StockService, { errorText } from "../services/StockService";
 import { STOCK_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, CONDITIONS, fmt } from "../stockMeta";
-import { FIELD_SX, Label, Section, Thumb, KindTag } from "./StockBits";
+import { FIELD_SX, Label, Section, Thumb, KindTag, SignatureToggle } from "./StockBits";
 
 const RT_TONE = "#0f766e";
 const MAX_PHOTOS = 6;
@@ -28,6 +28,7 @@ export default function StockReturnForm({ open, request: sr, items = [], canMana
   const [note, setNote] = useState("");
   const [photos, setPhotos] = useState([]);
   const [receiveNow, setReceiveNow] = useState(true);
+  const [useSignature, setUseSignature] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef(null);
@@ -71,7 +72,7 @@ export default function StockReturnForm({ open, request: sr, items = [], canMana
     setBusy(true); setError("");
     try {
       const doc = await StockService.createReturn({
-        requestId: sr._id, note, receiveNow: canManage && receiveNow,
+        requestId: sr._id, note, receiveNow: canManage && receiveNow, useSignature,
         lines: picked.map((l) => ({ lineId: l._id, ...row(String(l._id)) })),
       }, photos.map((p) => p.file));
       onSaved(doc);
@@ -178,6 +179,7 @@ export default function StockReturnForm({ open, request: sr, items = [], canMana
                 label={<Typography sx={{ fontSize: "0.86rem" }}>ตรวจรับคืนทันที <Box component="span" sx={{ color: TEXT_SUB }}>(ผู้ดูแลคลังรับของจากมือผู้คืนแล้ว)</Box></Typography>} />
             )}
           </Section>
+          <SignatureToggle checked={useSignature} onChange={setUseSignature} slotLabel={canManage && receiveNow ? "ผู้คืน + ผู้ตรวจรับ" : "ผู้คืนของ"} />
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>

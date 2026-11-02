@@ -24,7 +24,10 @@ const StockService = {
   async requests(params = {}) { return (await API.get("/stock/requests", { params })).data.requests || []; },
   async request(id) { return (await API.get(`/stock/requests/${id}`)).data.request; },
   async createRequest(fields) { return (await API.post("/stock/requests", fields)).data.request; },
-  async issue(id, note = "") { return (await API.post(`/stock/requests/${id}/issue`, { note })).data.request; },
+  async issue(id, note = "", useSignature = true) { return (await API.post(`/stock/requests/${id}/issue`, { note, useSignature })).data.request; },
+  /** ลายเซ็นที่ผนึกในใบ (ใช้พิมพ์ PDF) — ล้มเหลวคืน {} (ยังพิมพ์ได้ เว้นช่องเซ็นมือ) */
+  async signatures(id) { try { return (await API.get(`/stock/requests/${id}/signatures`)).data.signatures || {}; } catch { return {}; } },
+  async returnSignatures(id) { try { return (await API.get(`/stock/returns/${id}/signatures`)).data.signatures || {}; } catch { return {}; } },
   async reject(id, reason) { return (await API.post(`/stock/requests/${id}/reject`, { reason })).data.request; },
   async cancel(id) { return (await API.post(`/stock/requests/${id}/cancel`)).data.request; },
   // ── ใบคืนของ (RT) ──
@@ -37,7 +40,7 @@ const StockService = {
     photos.forEach((f) => fd.append("photos", f));
     return (await API.post("/stock/returns", fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 })).data.return;
   },
-  async receiveReturn(id) { return (await API.post(`/stock/returns/${id}/receive`)).data.return; },
+  async receiveReturn(id, useSignature = true) { return (await API.post(`/stock/returns/${id}/receive`, { useSignature })).data.return; },
   async rejectReturn(id, reason) { return (await API.post(`/stock/returns/${id}/reject`, { reason })).data.return; },
   async cancelReturn(id) { return (await API.post(`/stock/returns/${id}/cancel`)).data.return; },
   /** ของชำรุด: action "repair" (ซ่อมเสร็จ → เข้าคลัง) | "writeoff" (ตัดจำหน่าย) */

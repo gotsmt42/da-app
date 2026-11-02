@@ -52,8 +52,8 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: calc(100vh - var(--app-header-h));
-    height: calc(100dvh - var(--app-header-h));
+    height: calc(100vh - var(--app-header-h) + var(--sb-extra, 0px));
+    height: calc(100dvh - var(--app-header-h) + var(--sb-extra, 0px));
     left: 0;
     visibility: visible;
     display: block;

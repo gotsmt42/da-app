@@ -32,7 +32,23 @@ const LINE = [148, 163, 184];
  * @param {object} opts.request  ใบเบิกจาก GET /api/stock/requests/:id
  * @param {string} [opts.deptLabel] ชื่อแผนก/คลัง
  */
-export async function generateStockPdf({ request: r, deptLabel = "", mode = "open" }) {
+/** วางลายเซ็นอิเล็กทรอนิกส์บนเส้นลงชื่อ — รูปเสียต้องไม่ทำให้พิมพ์ไม่ได้ (แบบเดียวกับ prPdf) */
+const drawSignatureImage = (doc, seal, { centerX, lineY, maxW, maxH }) => {
+  if (!seal?.image) return false;
+  try {
+    const props = doc.getImageProperties(seal.image);
+    const ratio = props.height / props.width || 0.35;
+    let w = maxW; let h = w * ratio;
+    if (h > maxH) { h = maxH; w = h / ratio; }
+    doc.addImage(seal.image, "PNG", centerX - w / 2, lineY - h - 0.6, w, h, undefined, "MEDIUM");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** @param {object} [opts.signatures] { requester, issuer } จาก GET /api/stock/requests/:id/signatures */
+export async function generateStockPdf({ request: r, deptLabel = "", signatures = null, mode = "open" }) {
   const [{ jsPDF }, fontModule, boldFont] = await Promise.all([import("jspdf"), import("@/assets/fonts/THSarabunNew_base64"), loadBoldFont()]);
   await preparePrintAssets();
   const doc = newDoc(jsPDF, fontModule.default, boldFont);
@@ -185,8 +201,8 @@ export async function generateStockPdf({ request: r, deptLabel = "", mode = "ope
   if (y > SIG_TOP - 2) doc.addPage();
   const returnedLog = [...(r.activityLog || [])].reverse().find((a) => a.action === "returned");
   const boxes = [
-    { role: "ผู้เบิก", name: req.name, date: r.createdAt },
-    { role: "ผู้อนุมัติ / จ่ายของ", name: r.issuedBy?.name, date: r.issuedAt },
+    { role: "ผู้เบิก", name: req.name, date: r.createdAt, seal: signatures?.requester },
+    { role: "ผู้อนุมัติ / จ่ายของ", name: r.issuedBy?.name, date: r.issuedAt, seal: r.issuedAt ? signatures?.issuer : null },
     hasAsset
       ? { role: "ผู้รับคืนทรัพย์สิน", name: r.status === "returned" ? returnedLog?.userName : "", date: r.status === "returned" ? returnedLog?.timestamp : null }
       : { role: "ผู้รับของ", name: r.issuedAt ? req.name : "", date: r.issuedAt },
@@ -198,12 +214,14 @@ export async function generateStockPdf({ request: r, deptLabel = "", mode = "ope
     const lineY = SIG_TOP + 14;
     doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
     doc.line(cxm - half, lineY, cxm + half, lineY);
+    const signed = drawSignatureImage(doc, b.seal, { centerX: cxm, lineY, maxW: Math.min(half * 2 - 4, 50), maxH: 12 });
     size(12.5); bold(false); color(INK);
     doc.text(b.name ? `( ${T(b.name)} )` : "(                                   )", cxm, lineY + 5.5, { align: "center" });
     bold(true);
     doc.text(b.role, cxm, lineY + 11, { align: "center" });
     bold(false); size(11); color(SUB);
     doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : "วันที่ ......../......../..........", cxm, lineY + 16, { align: "center" });
+    if (signed) { size(8.5); color(FAINT); doc.text(`ลงนามอิเล็กทรอนิกส์ ${thaiDateTime(b.seal.signedAt)}`, cxm, lineY + 20, { align: "center" }); }
   });
 
   // ── ท้ายกระดาษทุกหน้า ─────────────────────────────────────────────
@@ -224,7 +242,8 @@ export async function generateStockPdf({ request: r, deptLabel = "", mode = "ope
  */
 const COND_TXT = { good: "ปกติ", damaged: "ชำรุด", lost: "สูญหาย" };
 const RT_TXT = { pending: "รอตรวจรับ", received: "รับคืนแล้ว", rejected: "ไม่รับคืน", cancelled: "ยกเลิก" };
-export async function generateReturnPdf({ doc: r, deptLabel = "", mode = "open" }) {
+/** @param {object} [opts.signatures] { returner, receiver } จาก GET /api/stock/returns/:id/signatures */
+export async function generateReturnPdf({ doc: r, deptLabel = "", signatures = null, mode = "open" }) {
   const [{ jsPDF }, fontModule, boldFont] = await Promise.all([import("jspdf"), import("@/assets/fonts/THSarabunNew_base64"), loadBoldFont()]);
   await preparePrintAssets();
   const doc = newDoc(jsPDF, fontModule.default, boldFont);
@@ -342,8 +361,8 @@ export async function generateReturnPdf({ doc: r, deptLabel = "", mode = "open" 
 
   if (y > SIG_TOP - 2) doc.addPage();
   const boxes = [
-    { role: "ผู้คืนของ", name: r.createdBy?.name || r.requester?.name, date: r.createdAt },
-    { role: "ผู้ตรวจรับคืน", name: r.receivedBy?.name, date: r.receivedAt },
+    { role: "ผู้คืนของ", name: r.createdBy?.name || r.requester?.name, date: r.createdAt, seal: signatures?.returner },
+    { role: "ผู้ตรวจรับคืน", name: r.receivedBy?.name, date: r.receivedAt, seal: r.receivedAt ? signatures?.receiver : null },
   ];
   const colW = W / boxes.length;
   boxes.forEach((b, i) => {
@@ -352,11 +371,13 @@ export async function generateReturnPdf({ doc: r, deptLabel = "", mode = "open" 
     const lineY = SIG_TOP + 14;
     doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
     doc.line(cxm - half, lineY, cxm + half, lineY);
+    const signed = drawSignatureImage(doc, b.seal, { centerX: cxm, lineY, maxW: Math.min(half * 2 - 4, 50), maxH: 12 });
     size(12.5); bold(false); color(INK);
     doc.text(b.name ? `( ${T(b.name)} )` : "(                                   )", cxm, lineY + 5.5, { align: "center" });
     bold(true); doc.text(b.role, cxm, lineY + 11, { align: "center" });
     bold(false); size(11); color(SUB);
     doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : "วันที่ ......../......../..........", cxm, lineY + 16, { align: "center" });
+    if (signed) { size(8.5); color(FAINT); doc.text(`ลงนามอิเล็กทรอนิกส์ ${thaiDateTime(b.seal.signedAt)}`, cxm, lineY + 20, { align: "center" }); }
   });
 
   const pages = doc.getNumberOfPages();

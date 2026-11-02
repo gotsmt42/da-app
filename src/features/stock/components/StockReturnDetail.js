@@ -17,7 +17,7 @@ import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import StockService, { errorText } from "../services/StockService";
 import { TEXT_MAIN, TEXT_SUB, BORDER_MAIN, CONDITIONS, rtStatus, fmt, jobOf } from "../stockMeta";
-import { KindTag, Thumb, FIELD_SX, Label } from "./StockBits";
+import { KindTag, Thumb, FIELD_SX, Label, SignatureToggle } from "./StockBits";
 
 export const RT_TONE = "#0f766e";
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap" };
@@ -44,6 +44,7 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [reason, setReason] = useState("");
+  const [useSignature, setUseSignature] = useState(true);
   const [pdfOpen, setPdfOpen] = useState(false);
   const photoOf = useMemo(() => new Map(items.map((it) => [String(it._id), it])), [items]);
 
@@ -63,7 +64,7 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
   const units = (doc?.lines || []).reduce((t, l) => t + l.qty, 0);
   const deptLabel = deptLabels[doc?.dept] || doc?.dept || "";
   const CONFIRM = {
-    receive: { title: "ยืนยันตรวจรับคืน", tone: RT_TONE, icon: <TaskAlt />, label: "ยืนยันรับคืน", text: "ตรวจของจริงตรงกับรายการและสภาพแล้ว — ยอดในคลังจะเปลี่ยนตามด้านล่างทันที", act: () => StockService.receiveReturn(doc._id) },
+    receive: { title: "ยืนยันตรวจรับคืน", tone: RT_TONE, icon: <TaskAlt />, label: "ยืนยันรับคืน", text: "ตรวจของจริงตรงกับรายการและสภาพแล้ว — ยอดในคลังจะเปลี่ยนตามด้านล่างทันที", act: () => StockService.receiveReturn(doc._id, useSignature) },
     reject: { title: "ไม่รับคืน", tone: "#dc2626", icon: <DoNotDisturbAlt />, label: "ยืนยันไม่รับคืน", text: "ยอดในคลังไม่เปลี่ยน · แจ้งผู้คืนพร้อมเหตุผล ให้ยื่นใบใหม่ให้ถูกต้อง", act: () => StockService.rejectReturn(doc._id, reason.trim()), need: !reason.trim() },
     cancel: { title: "ยกเลิกใบคืน", tone: "#475569", icon: <Close />, label: "ยืนยันยกเลิก", text: "ยกเลิกแล้วแก้กลับไม่ได้ — ต้องยื่นใบใหม่", act: () => StockService.cancelReturn(doc._id) },
   };
@@ -239,6 +240,7 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
                   ))}
                 </Box>
               )}
+              {confirm === "receive" && <Box sx={{ mt: 1.5 }}><SignatureToggle checked={useSignature} onChange={setUseSignature} slotLabel="ผู้ตรวจรับคืน" /></Box>}
               {confirm === "reject" && (
                 <Box>
                   <Label required>เหตุผลที่ไม่รับคืน</Label>
@@ -261,8 +263,8 @@ export default function StockReturnDetail({ id, open, canManage, myId, items = [
         onClose={() => setPdfOpen(false)}
         jobKey={`${doc?._id}:${doc?.status}:${doc?.updatedAt}`}
         generate={async () => {
-          const { generateReturnPdf } = await import("../utils/stockPdf");
-          return generateReturnPdf({ doc, deptLabel, mode: "blob" });
+          const [{ generateReturnPdf }, signatures] = await Promise.all([import("../utils/stockPdf"), StockService.returnSignatures(doc._id)]);
+          return generateReturnPdf({ doc, deptLabel, signatures, mode: "blob" });
         }}
         title={doc?.docNo || "ใบคืนของ"}
         subtitle={doc ? `ใบคืนของ · อ้าง ${doc.requestDocNo}` : ""}

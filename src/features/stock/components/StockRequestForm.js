@@ -20,7 +20,7 @@ import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
 import { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import StockService, { errorText } from "../services/StockService";
 import { STOCK_ACCENT, STOCK_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, kindMeta, available, fmt } from "../stockMeta";
-import { FIELD_SX, Label, Section, Thumb } from "./StockBits";
+import { FIELD_SX, Label, Section, Thumb, SignatureToggle } from "./StockBits";
 
 let seq = 0;
 /** คอลัมน์แถวรายการบนจอกว้าง: รูป · สินค้า · เบิกได้ · จำนวน · ลบ */
@@ -30,6 +30,10 @@ const key = () => `l${Date.now()}_${(seq += 1)}`;
 export default function StockRequestForm({ open, dept, deptLabel, items, preset, onClose, onSaved }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [job, setJob] = useState(null);
+  // ✅ (2 พ.ย. 2569 ผู้ใช้: "เวลาเบิกให้พิมพ์ชื่อโครงการแยกได้ด้วย ไม่อิงแค่งานที่เข้าอย่างเดียว")
+  const [refMode, setRefMode] = useState("job"); // "job" = เลือกงานในตาราง · "project" = พิมพ์ชื่อโครงการเอง
+  const [projectName, setProjectName] = useState("");
+  const [useSignature, setUseSignature] = useState(true);
   const [jobQuery, setJobQuery] = useState("");
   const [jobOptions, setJobOptions] = useState([]);
   const [jobLoading, setJobLoading] = useState(false);
@@ -42,7 +46,7 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
 
   useEffect(() => {
     if (!open) return;
-    setJob(null); setNote(""); setDue(""); setTouched(false); setError("");
+    setJob(null); setNote(""); setDue(""); setTouched(false); setError(""); setRefMode("job"); setProjectName(""); setUseSignature(true);
     setLines(preset ? [{ key: key(), itemId: preset._id, qty: 1 }] : [{ key: key(), itemId: "", qty: 1 }]);
   }, [open, preset]);
 
@@ -66,13 +70,14 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
 
   const submit = async () => {
     setTouched(true);
-    if (!job) { setError("กรุณาเลือกงานที่จะใช้ของ — ทุกใบเบิกต้องอิงงาน"); return; }
+    if (refMode === "job" && !job) { setError("กรุณาเลือกงานที่จะใช้ของ หรือสลับไป “พิมพ์ชื่อโครงการ”"); return; }
+    if (refMode === "project" && !projectName.trim()) { setError("กรุณาพิมพ์ชื่อโครงการที่จะใช้ของ"); return; }
     if (!filled.length) { setError("เลือกรายการที่จะเบิกอย่างน้อย 1 รายการ"); return; }
     if (over) { setError("มีรายการที่เบิกเกินยอดคงเหลือ"); return; }
     setBusy(true); setError("");
     try {
       const r = await StockService.createRequest({
-        dept, eventId: job._id, note, dueReturnAt: hasAsset && due ? due : "",
+        dept, eventId: refMode === "job" ? job._id : "", projectName: refMode === "project" ? projectName.trim() : "", useSignature, note, dueReturnAt: hasAsset && due ? due : "",
         lines: filled.map((l) => ({ item: l.itemId, qty: l.qty })),
       });
       onSaved(r);
@@ -97,7 +102,19 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
       </DialogTitle>
       <DialogContent sx={{ bgcolor: "#f8fafc", pt: "16px !important", pb: 2 }}>
         <Stack spacing={1.5}>
-          <Section n={1} title="ใช้กับงาน" hint="ทุกใบเบิกต้องอิงงาน — ดูย้อนหลังได้ว่างานไหนใช้ของอะไร" error={touched && !job}>
+          <Section n={1} title="ใช้กับงาน / โครงการ" hint="เลือกงานในตาราง หรือพิมพ์ชื่อโครงการเอง — ดูย้อนหลังได้ว่าใช้ของกับอะไร"
+            error={touched && (refMode === "job" ? !job : !projectName.trim())}>
+            <Stack direction="row" sx={{ p: 0.4, borderRadius: 2, bgcolor: "#f1f5f9", mb: 1.25, width: { xs: "100%", sm: "fit-content" } }}>
+              {[["job", "เลือกงานในตาราง"], ["project", "พิมพ์ชื่อโครงการ"]].map(([k, label]) => (
+                <ButtonBase key={k} onClick={() => setRefMode(k)}
+                  sx={{ flex: 1, px: 1.75, height: 32, borderRadius: 1.5, fontFamily: "inherit", fontSize: "0.82rem", whiteSpace: "nowrap", fontWeight: refMode === k ? 800 : 600,
+                    color: refMode === k ? STOCK_DARK : TEXT_SUB, bgcolor: refMode === k ? "#fff" : "transparent", boxShadow: refMode === k ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>{label}</ButtonBase>
+              ))}
+            </Stack>
+            {refMode === "project" ? (
+              <TextField fullWidth size="small" sx={FIELD_SX} value={projectName} onChange={(e) => setProjectName(e.target.value)} autoFocus
+                placeholder="เช่น ปรับปรุงสำนักงาน ชั้น 2 / งานซ่อมภายใน" error={touched && !projectName.trim()} inputProps={{ maxLength: 200 }} />
+            ) : (
             <Autocomplete
               options={jobOptions} value={job} loading={jobLoading} filterOptions={(x) => x}
               onChange={(_, v) => setJob(v)}
@@ -116,6 +133,7 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
                   InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
               )}
             />
+            )}
           </Section>
 
           <Section n={2} title="รายการที่จะเบิก" hint="ใส่ได้ไม่เกินยอดที่เบิกได้ของแต่ละรายการ"
@@ -203,6 +221,7 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
               </Box>
             </Box>
           </Section>
+          <SignatureToggle checked={useSignature} onChange={setUseSignature} slotLabel="ผู้เบิก" />
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>

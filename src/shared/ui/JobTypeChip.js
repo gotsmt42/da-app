@@ -23,11 +23,33 @@ const FALLBACK = ["#db2777", "#65a30d", "#9333ea", "#0369a1", "#b45309", "#be123
 
 const hash = (s) => [...String(s)].reduce((h, c) => ((h * 31) + c.charCodeAt(0)) >>> 0, 7);
 
+/**
+ * ความสว่างของสี (0–1) — ✅ (2 พ.ย. 2569 ผู้ใช้: "สีมันไม่แมทพื้นหลัง ดูไม่ออก")
+ * งานที่ตั้งสีอ่อนบนปฏิทิน (เช่น เหลือง #ffff00) เคยได้ตัวอักษรขาว อ่านไม่ออก → พื้นสว่างใช้ตัวอักษรเข้มเสมอ
+ */
+const luminance = (color) => {
+  const c = String(color || "").trim();
+  let r; let g; let b;
+  const hex = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].split("").map((x) => x + x).join("") : hex[1];
+    [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  } else {
+    const m = c.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i);
+    if (!m) return 0;
+    [r, g, b] = [m[1], m[2], m[3]].map(Number);
+  }
+  const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+};
+/** สีตัวอักษรที่อ่านออกบนพื้นนี้ */
+export const readableText = (bg) => (luminance(bg) > 0.45 ? "#1f2937" : "#fff");
+
 /** สีพื้น/สีตัวอักษรของประเภทงาน */
 export const jobTypeColor = (job) => {
   const title = String(job?.title || job || "").trim();
   if (job?.backgroundColor && /^#|^rgb/i.test(job.backgroundColor)) {
-    return { bg: job.backgroundColor, fg: job.textColor || "#fff" };
+    return { bg: job.backgroundColor, fg: readableText(job.backgroundColor) };
   }
   const hit = TYPE_COLORS.find(([re]) => re.test(title));
   return { bg: hit ? hit[1] : FALLBACK[hash(title.toLowerCase()) % FALLBACK.length], fg: "#fff" };
