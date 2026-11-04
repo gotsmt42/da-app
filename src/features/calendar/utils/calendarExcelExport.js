@@ -203,8 +203,10 @@ function headerCell(cell, text, bg) {
 /** ชีตสรุป: ตารางนับตามกลุ่ม */
 function writeSummary(wb, theme, title, subtitle, rowsInfo, mode) {
   const ws = wb.addWorksheet("สรุป", { pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  ws.columns = [{ width: 32 }, { width: 12 }, { width: 16 }, { width: 4 }, { width: 32 }, { width: 12 }, { width: 16 }];
-  writeTitle(ws, 7, theme, `${title} — สรุป`, subtitle);
+  // 🔁 (4 พ.ย. 2569 ผู้ใช้: "export excel ให้ข้อมูลต่อกันไปด้านขวา แบบนี้ดูสับสน") ทุกตารางเรียงลงล่างคอลัมน์เดียวกัน
+  //    (สถานะ → ประเภท → คน) แต่ละตารางมีหัวข้อของตัวเอง + แถวรวม — อ่านจากบนลงล่างได้ทีละเรื่อง
+  ws.columns = [{ width: 44 }, { width: 12 }, { width: 18 }];
+  writeTitle(ws, 3, theme, `${title} — สรุป`, subtitle);
 
   const total = rowsInfo.reduce((a, r) => a + (Number(r.values.jobValue) || 0), 0);
   const kpi = [
@@ -229,10 +231,16 @@ function writeSummary(wb, theme, title, subtitle, rowsInfo, mode) {
       cur.n += 1; cur.v += Number(x.values.jobValue) || 0;
       counts.set(k, cur);
     });
-    headerCell(ws.getCell(startRow, col), heading, theme.dark);
-    headerCell(ws.getCell(startRow, col + 1), "จำนวน", theme.dark);
-    headerCell(ws.getCell(startRow, col + 2), "มูลค่า", theme.dark);
-    let rr = startRow + 1;
+    // หัวข้อตาราง (ตัวหนา) เหนือหัวคอลัมน์
+    ws.mergeCells(startRow, col, startRow, col + 2);
+    const t = ws.getCell(startRow, col);
+    t.value = `ตาม${heading}`;
+    t.font = { name: FONT, size: 12, bold: true, color: { argb: theme.dark } };
+    ws.getRow(startRow).height = 22;
+    headerCell(ws.getCell(startRow + 1, col), heading, theme.dark);
+    headerCell(ws.getCell(startRow + 1, col + 1), "จำนวน", theme.dark);
+    headerCell(ws.getCell(startRow + 1, col + 2), "มูลค่า", theme.dark);
+    let rr = startRow + 2;
     [...counts.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([k, v], i) => {
       const c1 = ws.getCell(rr, col); c1.value = k;
       const c2 = ws.getCell(rr, col + 1); c2.value = v.n; c2.alignment = { horizontal: "center" };
@@ -241,12 +249,17 @@ function writeSummary(wb, theme, title, subtitle, rowsInfo, mode) {
       if (colorMap?.[k]) c1.font = { name: FONT, size: 10, bold: true, color: { argb: colorMap[k] } };
       rr += 1;
     });
-    return rr;
+    // แถวรวมท้ายตาราง
+    const tc = [ws.getCell(rr, col), ws.getCell(rr, col + 1), ws.getCell(rr, col + 2)];
+    tc[0].value = "รวม"; tc[1].value = rowsInfo.length; tc[2].value = total || ""; tc[2].numFmt = MONEY_FMT;
+    tc[1].alignment = { horizontal: "center" }; tc[2].alignment = { horizontal: "right" };
+    tc.forEach((c) => { c.border = border; c.font = { name: FONT, size: 10, bold: true }; c.fill = fill(theme.zebra); });
+    return rr + 1;
   };
-  const top = r + 1;
-  const endA = block(1, top, mode === "sales" ? "สถานะนัด" : "สถานะงาน", "status", mode === "sales" ? SALES_STATUS_COLOR : TECH_STATUS_COLOR);
-  const endB = block(5, top, mode === "sales" ? "ประเภทนัด" : "ประเภทงาน", "type");
-  block(1, Math.max(endA, endB) + 1, mode === "sales" ? "ฝ่ายขาย" : "หัวหน้าทีม / ผู้รับผิดชอบ", "person");
+  let next = r + 1;
+  next = block(1, next, mode === "sales" ? "สถานะนัด" : "สถานะงาน", "status", mode === "sales" ? SALES_STATUS_COLOR : TECH_STATUS_COLOR) + 1;
+  next = block(1, next, mode === "sales" ? "ประเภทนัด" : "ประเภทงาน", "type") + 1;
+  block(1, next, mode === "sales" ? "ฝ่ายขาย" : "หัวหน้าทีม / ผู้รับผิดชอบ", "person");
 }
 
 /**

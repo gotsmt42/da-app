@@ -114,6 +114,33 @@ const BORDER_SOFT = "#eef2f7";      // เส้นคั่นระหว่�
 const BORDER_HAIR = "#f4f6fa";      // เส้นคั่นระหว่างคอลัมน์ — จางมากจนเกือบไม่เห็น แค่พอเป็นแนวสายตา
 const TEXT_SUB = "#64748b";         // slate-500 — ตัวหนังสือรอง/หัวคอลัมน์
 
+/**
+ * ✅ (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์")
+ *    ใต้ชื่อหัวหน้าทีมของแต่ละวัน: ผู้ปฏิบัติงานคนอื่น (+N คน ชี้ดูชื่อ) · มูลค่างานครั้งนี้ (workValue — เฉพาะผู้ดูมูลค่าได้)
+ *    ชื่อเรียกชุดเดียวกับหน้า event / การดำเนินงาน / Excel
+ */
+const VisitExtra = ({ visit, showValue, size = "0.62rem" }) => {
+  const others = [...new Set((visit.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== visit.team))];
+  const hasValue = showValue && visit.workValue !== null && visit.workValue !== undefined && visit.workValue !== "";
+  if (!others.length && !hasValue) return null;
+  return (
+    <>
+      {others.length > 0 && (
+        <Typography variant="caption" title={`ผู้ปฏิบัติงาน: ${[visit.team, ...others].filter(Boolean).join(", ")}`}
+          sx={{ display: "block", fontSize: size, lineHeight: 1.3, color: "text.secondary", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          👥 {others.length <= 2 ? others.join(", ") : `${others.slice(0, 2).join(", ")} +${others.length - 2}`}
+        </Typography>
+      )}
+      {hasValue && (
+        <Typography variant="caption" title="มูลค่างานครั้งนี้"
+          sx={{ display: "block", fontSize: size, lineHeight: 1.3, fontWeight: 800, color: "#059669", whiteSpace: "nowrap" }}>
+          ฿{Number(visit.workValue).toLocaleString("th-TH", { maximumFractionDigits: 2 })}
+        </Typography>
+      )}
+    </>
+  );
+};
+
 // ✅ สไตล์แท็บสลับมุมมอง — เปลี่ยนจาก "ปุ่มมีกรอบเรียงติดกัน" (ลุคเก่า) เป็น segmented control แบบที่
 // iOS/แอปสมัยใหม่ใช้กัน: รางพื้นเทาอ่อนทรงแคปซูล ตัวที่เลือกอยู่เป็นการ์ดสีขาวลอยขึ้นมามีเงาบางๆ
 // อ่านง่ายกว่าเดิมมากเพราะ "ตัวที่เลือก" ต่างจากพื้นด้วยความสว่าง+เงา ไม่ใช่แค่สีพื้นแดงจางที่ต้องเพ่ง
@@ -4590,6 +4617,7 @@ export default function ContractOverview() {
                                           👷 {visit.team || (canEditRoundTeam(c) ? "ระบุทีม" : "-")}
                                         </Typography>
                                       )}
+                                      <VisitExtra visit={visit} showValue={isAdminOrManager} />
                                     </Box>
                                   ))}
                                   {/* ✅ ปุ่มกาง/ย่อรายการวันที่ที่เหลือของครั้งนี้ — บอกจำนวนที่ซ่อนอยู่ให้ชัด
@@ -5397,6 +5425,7 @@ export default function ContractOverview() {
                               👷 {visit.team || (canEditRoundTeam(c) ? "ระบุทีม" : "-")}
                             </Typography>
                           )}
+                          <VisitExtra visit={visit} showValue={isAdminOrManager} size="0.7rem" />
                         </Box>
                       ))}
                       {/* ✅ ป้ายวางบิลอยู่ท้ายครั้ง 1 อัน (ไม่ใช่ใต้ทุกวันที่) — วางบิลทีเดียวต่อครั้ง */}
@@ -7510,7 +7539,7 @@ export default function ContractOverview() {
 
               <FormSection step={2} optional title="ทีมที่เข้างาน" hint="เลือกภายหลังได้ในตาราง">
                 <SelectField
-                  fullWidth size="small" label="หัวหน้าทีมเข้างาน"
+                  fullWidth size="small" label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)"
                   value={newVisitTeam} onChange={(e) => setNewVisitTeam(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                 >

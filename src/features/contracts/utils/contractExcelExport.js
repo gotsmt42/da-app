@@ -118,7 +118,9 @@ export async function exportContractsToExcel({
     { key: "estimatedDaysPerVisit", header: "วันเข้างาน/ครั้ง", width: 20, group: "ระยะเวลา", align: "center" },
     { key: "perYear", header: "เข้าปีละ (ครั้ง)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
-    { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    { key: "jobValue", header: "มูลค่างานรวม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    // ✅ (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์") ผลรวม "มูลค่างานครั้งนี้" ที่ใส่ไว้ (นับครั้งละ 1 ค่า)
+    { key: "workValueSum", header: "มูลค่างานที่ใส่รายครั้ง (฿)", width: 17, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     // ✅ ค่าคอมที่จ่ายให้ฝั่งลูกค้า + สัดส่วนเทียบมูลค่างาน — ใส่ % เป็นคอลัมน์แยกให้เรียง/กรองได้
     // (บนจอโชว์เป็นบรรทัดเล็กใต้ตัวเลข ซึ่งดีเวลาไล่ดูทีละแถว แต่ในไฟล์ต้องเป็นคอลัมน์ถึงจะใช้งานต่อได้)
     { key: "commission", header: "ค่าคอม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
@@ -175,7 +177,7 @@ export async function exportContractsToExcel({
     // และเบอร์ที่ขึ้นต้นด้วย 0 จะโดนตัดศูนย์หน้าทิ้งทันที
     { key: "contactName", header: "ผู้ติดต่อหน้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
     { key: "contactTel", header: "เบอร์ผู้ติดต่อ", width: 16, group: "ผู้เกี่ยวข้อง" },
-    { key: "teamMembers", header: "ลูกทีมทั้งหมด (รวมทุกครั้ง — ไว้ค้นหา/กรอง)", width: 30, group: "ผู้เกี่ยวข้อง", wrap: true },
+    { key: "teamMembers", header: "ผู้ปฏิบัติงานทั้งหมด (รวมทุกครั้ง — ไว้ค้นหา/กรอง)", width: 32, group: "ผู้เกี่ยวข้อง", wrap: true },
     // ✅ หมายเหตุที่คนทำงานจดไว้เอง — วางท้ายสุดเพราะยาวไม่แน่นอน ถ้าแทรกกลางตารางจะดันคอลัมน์ที่ต้อง
     // กวาดสายตาเทียบกันทุกแถวให้เลื่อนหนีไปทางขวา (ตรงกับตำแหน่งคอลัมน์เดียวกันบนหน้าจอ)
     { key: "remark", header: "หมายเหตุ", width: 36, group: "หมายเหตุ", wrap: true },
@@ -188,7 +190,7 @@ export async function exportContractsToExcel({
     departmentTag: "departmentTag", contractNo: "doc", quotationNo: "doc", docNo: "doc", jobNo: "doc",
     company: "customer", site: "customer", system: "work", title: "work",
     contractStart: "period", contractEnd: "period", durationYears: "period", intervalMonths: "period", estimatedDaysPerVisit: "period", perYear: "period", visitCount: "period",
-    jobValue: "jobValue", commission: "commission", commissionPct: "commission",
+    jobValue: "jobValue", workValueSum: "jobValue", commission: "commission", commissionPct: "commission",
     contractStatus: "statusProgress", missingFields: "statusProgress", progress: "statusProgress",
     billingStatus: "statusProgress", billingInvoiced: "statusProgress", billingPaid: "statusProgress", billingOutstanding: "statusProgress",
     responsiblePerson: "responsiblePerson", contactName: "customer", contactTel: "customer",
@@ -324,14 +326,19 @@ export async function exportContractsToExcel({
       responsiblePerson: c.responsiblePerson || "— ยังไม่มอบหมาย —",
       // ✅ ลูกทีมจากทุกครั้งของแถวนี้ (ไม่ใช่แค่ครั้งที่ 1 เหมือนเดิม) ตัดชื่อซ้ำ + ตัดชื่อที่เป็นหัวหน้า
       // ทีมของครั้งนั้นๆ ออก (บางที่บันทึกหัวหน้าทีมซ้ำลงใน teamMembers ด้วย จะได้ไม่ขึ้นซ้ำในช่องลูกทีม)
+      // 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์") รวมหัวหน้าทีมด้วย = ผู้ปฏิบัติงานทุกคนที่เคยเข้างานนี้
       teamMembers: [...new Set(
-        (c.visits || []).flatMap((v) =>
-          (v.teamMembers || [])
-            .map((m) => m?.name)
-            .filter(Boolean)
-            .filter((name) => name !== v.team)
-        )
+        (c.visits || []).filter((v) => !v.unscheduled).flatMap((v) => [v.team, ...(v.teamMembers || []).map((m) => m?.name)]).filter(Boolean)
       )].join(", "),
+      workValueSum: (() => {
+        const byRound = new Map();
+        (c.visits || []).forEach((v) => {
+          if (v.workValue === null || v.workValue === undefined || v.workValue === "") return;
+          const k = String(v.jobGroupId || `t${Number(v.time) || 1}`);
+          if (!byRound.has(k)) byRound.set(k, Number(v.workValue) || 0);
+        });
+        return byRound.size ? [...byRound.values()].reduce((a, b) => a + b, 0) : "";
+      })(),
       remark: c.remark || "",
       contactName: c.contactName || "",
       contactTel: c.contactTel || "",
@@ -355,10 +362,12 @@ export async function exportContractsToExcel({
             .filter(Boolean)
             .filter((name) => name !== v.team) // กันหัวหน้าทีมโผล่ซ้ำในบรรทัดลูกทีม
         )];
+        // 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์") ชื่อเรียกเดียวกับหน้า event: ผู้ปฏิบัติงาน (คนแรก = หัวหน้าทีม) · มูลค่างานครั้งนี้
         return [
           formatEventDateRange(v),
-          v.team ? `👷 ${v.team}` : "",
+          v.team ? `👷 ${v.team} (หัวหน้าทีม)` : "",
           members.length > 0 ? `👥 ${members.join(", ")}` : "",
+          v.workValue !== null && v.workValue !== undefined && v.workValue !== "" ? `฿ ${Number(v.workValue).toLocaleString("th-TH")}` : "",
         ].filter(Boolean).join("\n");
       });
 

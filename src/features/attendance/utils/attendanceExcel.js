@@ -37,7 +37,7 @@ export async function exportAttendance(rows, byPerson, { periodLabel, filterLabe
 
   const sorted = rows.slice().sort((a, b) => String(a.userName).localeCompare(String(b.userName), "th") || new Date(a.checkIn?.at) - new Date(b.checkIn?.at));
   addTable(wb, "บันทึกเข้างาน", {
-    title: "บันทึกเข้างาน", sub: `${sub}\nเวลาจากเซิร์ฟเวอร์ · ตำแหน่งเทียบพิกัดหน้างาน (ตรงหน้างาน = ไม่เกิน ${ON_SITE_M} ม.)`, freezeCols: 1,
+    title: "บันทึกเข้างาน", sub: `${sub}\nเวลาจากเซิร์ฟเวอร์ · ตำแหน่งเทียบพิกัดหน้างาน (ตรงหน้างาน = ไม่เกิน ${ON_SITE_M} ม.)`,
     cols: [
       { key: "name", header: "ผู้บันทึกเข้างาน", width: 20, bold: true },
       { key: "at", header: "วันเวลาเข้างาน", width: 18, align: "center", fmt: "dd/mm/yyyy hh:mm" },

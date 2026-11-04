@@ -23,20 +23,32 @@ export const monthName = (key) => {
 const toDate = (s) => (s ? new Date(`${s}T00:00:00`) : "");
 
 /** ชีตตารางมาตรฐาน: หัวเรื่อง · บรรทัดรอง · หัวตาราง · แถวข้อมูล · แถวรวม(ถ้ามี) */
-export function addTable(wb, name, { title, sub, cols, rows, total, freezeCols = 0 }) {
-  const ws = wb.addWorksheet(name, { pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  ws.columns = cols.map((c) => ({ key: c.key, width: c.width || 14 }));
-  const last = cols.length;
-  ws.mergeCells(1, 1, 1, last);
+/**
+ * หัวเรื่อง + บรรทัดรอง — ไม่ merge / ไม่ตัดบรรทัด: ข้อความยาวล้นไปช่องว่างด้านขวาเอง อ่านครบเสมอ
+ * 🔁 (4 พ.ย. 2569 ผู้ใช้: "ทำให้มองง่าย ดูง่าย ไม่สับสน") เดิม merge เท่าความกว้างตาราง → ตารางแคบ ข้อความโดนตัดครึ่ง
+ * @returns แถวหัวตาราง (เว้น 1 บรรทัดหลังบรรทัดรอง)
+ */
+function writeHeading(ws, title, sub) {
   ws.getCell(1, 1).value = title;
   ws.getCell(1, 1).font = { name: "Tahoma", size: 15, bold: true, color: { argb: C.titleText } };
-  ws.getRow(1).height = 24;
-  ws.mergeCells(2, 1, 2, last);
-  ws.getCell(2, 1).value = sub;
-  ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
-  ws.getCell(2, 1).alignment = { wrapText: true, vertical: "top" };
-  ws.getRow(2).height = 30;
-  const HEAD = 4;
+  ws.getRow(1).height = 26;
+  const lines = String(sub || "").split("\n").filter(Boolean);
+  lines.forEach((line, i) => {
+    const c = ws.getCell(2 + i, 1);
+    c.value = line;
+    c.font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
+    ws.getRow(2 + i).height = 17;
+  });
+  return 2 + lines.length + 1;
+}
+
+/** ตารางมาตรฐาน — ตัวกรองเฉพาะตารางยาว (>15 แถว) ไม่ให้ปุ่มกรองบังหัวคอลัมน์ในตารางสั้น · ตรึงเฉพาะหัวตาราง */
+export function addTable(wb, name, { title, sub, cols, rows, total }) {
+  const ws = wb.addWorksheet(name, { pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  const withFilter = rows.length > 15;
+  ws.columns = cols.map((c) => ({ key: c.key, width: (c.width || 14) + (withFilter ? 3 : 0) }));
+  const last = cols.length;
+  const HEAD = writeHeading(ws, title, sub);
   const hr = ws.getRow(HEAD);
   cols.forEach((c, i) => {
     const cell = hr.getCell(i + 1);
@@ -61,8 +73,8 @@ export function addTable(wb, name, { title, sub, cols, rows, total, freezeCols =
   };
   rows.forEach((r, idx) => paint(ws.addRow(r), idx, false));
   if (total) paint(ws.addRow(total), 0, true);
-  ws.views = [{ state: "frozen", ySplit: HEAD, xSplit: freezeCols }];
-  if (rows.length) ws.autoFilter = { from: { row: HEAD, column: 1 }, to: { row: HEAD + rows.length, column: last } };
+  ws.views = [{ state: "frozen", ySplit: HEAD }];
+  if (withFilter) ws.autoFilter = { from: { row: HEAD, column: 1 }, to: { row: HEAD + rows.length, column: last } };
   return ws;
 }
 
@@ -74,6 +86,8 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
   const ws = wb.addWorksheet("รายละเอียดรายคน", { pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
   const cols = [
     { key: "no", header: "ลำดับ", width: 7, align: "center" },
+    // ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้แสดงชื่อผู้ปฏิบัติงานให้ดูง่ายชัดเจน") ชื่ออยู่ทุกแถว ไม่ใช่แค่แถบหัวของคน — กรอง/เรียงใน Excel ได้
+    { key: "name", header: "ผู้ปฏิบัติงาน", width: 20, bold: true },
     { key: "date", header: "วันที่เข้างาน", width: 13, align: "center", fmt: "dd/mm/yyyy" },
     { key: "days", header: "จำนวนวัน", width: 9, align: "center" },
     { key: "site", header: "โครงการ (สถานที่)", width: 32, wrap: true, bold: true },
@@ -86,17 +100,7 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
   ];
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const last = cols.length;
-  ws.mergeCells(1, 1, 1, last);
-  ws.getCell(1, 1).value = "รายละเอียดการเข้างานรายคน";
-  ws.getCell(1, 1).font = { name: "Tahoma", size: 15, bold: true, color: { argb: C.titleText } };
-  ws.getRow(1).height = 24;
-  ws.mergeCells(2, 1, 2, last);
-  ws.getCell(2, 1).value = `${sub}\n${note}`;
-  ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
-  ws.getCell(2, 1).alignment = { wrapText: true, vertical: "top" };
-  ws.getRow(2).height = 30;
-
-  const HEAD = 4;
+  const HEAD = writeHeading(ws, "รายละเอียดการเข้างานรายคน", `${sub}\n${note}`);
   const hr = ws.getRow(HEAD);
   cols.forEach((c, i) => {
     const cell = hr.getCell(i + 1);
@@ -117,16 +121,16 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
     ws.mergeCells(rowIdx, 1, rowIdx, last);
     const h = ws.getCell(rowIdx, 1);
     h.value = `${p.key}  ·  เข้างาน ${p.visits} ครั้ง  ·  ${p.days} วัน  ·  มูลค่ารวม ${p.total.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท${p.missing ? `  ·  ยังไม่ใส่มูลค่า ${p.missing} ครั้ง` : ""}`;
-    h.font = { name: "Tahoma", size: 11, bold: true, color: { argb: "FF1D4ED8" } };
+    h.font = { name: "Tahoma", size: 12, bold: true, color: { argb: "FF1D4ED8" } };
     h.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } };
     h.alignment = { vertical: "middle" };
     h.border = border;
-    ws.getRow(rowIdx).height = 24;
+    ws.getRow(rowIdx).height = 26;
     rowIdx += 1;
     list.forEach((r, i) => {
       const row = ws.getRow(rowIdx);
       const vals = {
-        no: i + 1, date: toDate(r.date), days: r.days, site: r.site || "-", company: r.company || "-",
+        no: i + 1, name: r.name, date: toDate(r.date), days: r.days, site: r.site || "-", company: r.company || "-",
         job: [r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : ""].filter(Boolean).join(" · ") || "-",
         jobNo: r.jobNo || "", role: r.lead ? "หัวหน้าทีม" : "ทีม", status: r.status || "", value: r.value === null ? "ยังไม่ใส่" : r.value,
       };
@@ -203,7 +207,7 @@ ${note}`,
   const months = summary.months;
   addTable(wb, "รายเดือน", {
     title: "มูลค่างานรายเดือน (บาท)", sub: `${sub}
-${note}`, freezeCols: 1,
+${note}`,
     cols: [
       { key: "name", header: "ผู้ปฏิบัติงาน", width: 24, bold: true },
       ...months.map((m) => ({ key: m, header: monthName(m), width: 14, align: "right", fmt: MONEY })),
@@ -242,7 +246,7 @@ ${note}`,
   const log = entries.slice().sort((a, b) => a.name.localeCompare(b.name, "th") || a.date.localeCompare(b.date));
   addTable(wb, "บันทึกเข้างาน", {
     title: "บันทึกเข้างานรายบุคคล", sub: `${sub}  ·  ${log.length} รายการ (1 แถว = 1 คน × 1 งาน)
-${note}`, freezeCols: 1,
+${note}`,
     cols: [
       { key: "name", header: "ผู้ปฏิบัติงาน", width: 20, bold: true },
       { key: "date", header: "วันที่เข้างาน", width: 13, align: "center", fmt: "dd/mm/yyyy" },

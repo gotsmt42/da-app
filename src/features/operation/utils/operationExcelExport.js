@@ -74,7 +74,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   };
   const workerSlots = Math.max(4, ...jobs.map((job) => workersOf(job.sessions[0] || {}).length));
   const workerCols = Array.from({ length: workerSlots }, (_, i) => (
-    { key: `worker${i + 1}`, header: i === 0 ? "ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" : `ผู้ปฏิบัติงาน ${i + 1}`, width: i === 0 ? 24 : 18, group: "ผู้เกี่ยวข้อง" }
+    { key: `worker${i + 1}`, header: i === 0 ? "ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" : `ผู้ปฏิบัติงาน ${i + 1}`, width: i === 0 ? 24 : 18, group: "ผู้ปฏิบัติงาน", worker: true }
   ));
   const cols = [
     { key: "status", header: "สถานะงาน", width: 18, group: "สถานะ", align: "center" },
@@ -97,8 +97,8 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     { key: "parts", header: "จำนวนช่วง", width: 10, group: "กำหนดการ", align: "center" },
     { key: "timeRange", header: "เวลา", width: 14, group: "กำหนดการ", align: "center" },
     { key: "responsible", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
-    ...workerCols,
     { key: "ack", header: "รับทราบโดย / เมื่อ", width: 24, group: "ผู้เกี่ยวข้อง", wrap: true },
+    ...workerCols,
     { key: "checkIn", header: "เวลาเข้างานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "checkOut", header: "เวลาเสร็จงานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "workNote", header: "รายละเอียดงานที่ทำ", width: 36, group: "การปฏิบัติงาน", wrap: true },
@@ -242,6 +242,12 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
         else cell.font = { name: "Tahoma", size: 10, color: { argb: C.warn } };
       }
 
+      // ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้แสดงชื่อผู้ปฏิบัติงานให้ดูง่ายชัดเจน") ชื่อผู้ปฏิบัติงานตัวหนา · ช่องว่าง = ขีด
+      if (colDef.worker) {
+        cell.font = { name: "Tahoma", size: 10, bold: Boolean(cell.value), color: { argb: cell.value ? (colDef.key === "worker1" ? "FF1D4ED8" : C.titleText) : C.muted } };
+        if (!cell.value) cell.value = "—";
+        cell.alignment = { vertical: "middle", horizontal: cell.value === "—" ? "center" : "left" };
+      }
       if (colDef.key === "status") {
         cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: STATUS_COLOR[a.status] || C.muted } };
       }

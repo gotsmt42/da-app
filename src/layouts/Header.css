@@ -216,6 +216,14 @@
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.12);
 }
 /* (2 พ.ย. 2569 ผู้ใช้: "เอากรอบแดงตรงรูปภาพ user ออก บดบังไม่สวย") — ปุ่มรูปโปรไฟล์ไม่ต้องมีกรอบ focus/active ของ Bootstrap */
+/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เอากรอบแดงรอบๆออก") กรอบสี่เหลี่ยมยังโผล่ = วงโฟกัสของเบราว์เซอร์ (Chrome บน Windows
+   ใช้สีเน้นของระบบ เช่น แดง) ค้างอยู่ที่ปุ่ม/ลิงก์/รูป หลังกดเปิดเมนู → ปิดวงโฟกัสทุกชิ้นในกลุ่มรูปโปรไฟล์ */
+.profile-img,
+.profile-img *,
+.profile-img *:focus,
+.profile-img *:focus-visible,
+.profile-img *:active { outline: none !important; }
+.profile-img .dropdown-toggle { box-shadow: none !important; border: 0 !important; }
 .profile-img .btn,
 .profile-img .btn:focus,
 .profile-img .btn:focus-visible,

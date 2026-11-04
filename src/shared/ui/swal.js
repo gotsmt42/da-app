@@ -12,7 +12,11 @@
 import BaseSwal from "sweetalert2";
 
 const CSS = `
-.swal2-container.swal2-backdrop-show:has(.tt-swal) { background: rgba(15,23,42,.42) !important; backdrop-filter: blur(3px); }
+.swal2-container.swal2-backdrop-show:has(.tt-swal:not(.swal2-toast)) { background: rgba(15,23,42,.42) !important; backdrop-filter: blur(3px); }
+/* 🐛 (4 พ.ย. 2569 ผู้ใช้: "การแจ้งนี้ไม่ให้บดบังอันอื่น") แจ้งเตือนเล็ก (toast) เดิมโดนพื้นมืด+เบลอทั้งจอไปด้วย
+   → toast ไม่มีพื้นหลัง ไม่เบลอ และไม่บังการกด — คลิก/ลากงานต่อได้ทันทีระหว่างที่แจ้งเตือนยังแสดงอยู่ */
+.swal2-container:has(> .swal2-toast) { background: transparent !important; backdrop-filter: none !important; pointer-events: none !important; }
+.swal2-container > .swal2-toast { pointer-events: auto; }
 .tt-swal:not(.swal2-toast) {
   width: min(92vw, 440px) !important; padding: 22px 22px 18px !important; border-radius: 18px !important;
   font-family: inherit !important; border: 1px solid #e6e9ef; box-shadow: 0 24px 60px -18px rgba(15,23,42,.45) !important;

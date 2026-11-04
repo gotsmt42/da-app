@@ -50,7 +50,7 @@ export async function exportJobSummary(jobs, summary, { periodLabel, filterLabel
   addTable(wb, "ตามผู้รับผิดชอบ", { title: "สรุปตามผู้รับผิดชอบงาน", sub, cols: groupCols("ผู้รับผิดชอบ"), rows: summary.byResponsible.map(toRow()), total: totalRow });
 
   addTable(wb, "รายการงาน", {
-    title: "รายการงาน", sub: `${sub}\n1 แถว = 1 งาน (งานที่เข้าหลายวันรวมเป็นแถวเดียว)`, freezeCols: 1,
+    title: "รายการงาน", sub: `${sub}\n1 แถว = 1 งาน (งานที่เข้าหลายวันรวมเป็นแถวเดียว)`,
     cols: [
       { key: "start", header: "วันเริ่มงาน", width: 12, align: "center", fmt: "dd/mm/yyyy" },
       { key: "site", header: "โครงการ", width: 30, wrap: true, bold: true },
