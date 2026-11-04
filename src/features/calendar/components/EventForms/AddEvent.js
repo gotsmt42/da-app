@@ -920,7 +920,7 @@ export const getAddEvent = async ({
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
-        <div class="ae-card-titles"><h4>รายละเอียดงาน <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div><span class="ae-card-badge" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;">บังคับ</span>
+        <div class="ae-card-titles"><h4>รายละเอียดงานที่ทำ <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div><span class="ae-card-badge" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;">บังคับ</span>
       </div>
       <div class="ae-card-body">
     <div class="ae-field" style="margin-bottom:12px;">
@@ -928,7 +928,7 @@ export const getAddEvent = async ({
       <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
     </div>
     <div class="ae-field" style="margin-bottom:16px;">
-      <label><span class="req">*</span> รายละเอียดงานที่จะทำ <span class="ae-opt">อย่างน้อย 10 ตัวอักษร</span></label>
+      <label><span class="req">*</span> รายละเอียดงานที่ทำ <span class="ae-opt">ทำอะไร ที่ไหน อุปกรณ์/จุดไหน · อย่างน้อย 10 ตัวอักษร</span></label>
       <textarea id="description" rows="5" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector ที่แจ้งเสีย 2 จุด · ลูกค้าขอเข้าหลัง 10 โมง"></textarea>
       <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
@@ -1370,7 +1370,7 @@ export const getAddEvent = async ({
         //    ทุกงานที่ลง/ขอลง ต้องมีรายละเอียดงาน (อย่างน้อย 10 ตัวอักษร) — ทั้งงานทั่วไปและงานตามสัญญา
         const descText = getVal("description");
         if (descText.replace(/\s+/g, "").length < 10) {
-          Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่จะทำ (อย่างน้อย 10 ตัวอักษร) — เช่น ทำอะไร จุดไหน อุปกรณ์อะไร");
+          Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่ทำ (อย่างน้อย 10 ตัวอักษร) — เช่น ทำอะไร จุดไหน อุปกรณ์อะไร");
           document.getElementById("description")?.focus();
           return;
         }

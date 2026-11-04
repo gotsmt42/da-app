@@ -1718,8 +1718,6 @@ export const getEditEvent = async ({
   // ต้องเติมรายละเอียดที่หน้างานเพิ่มทีหลัง) ถ้าล็อกตายตอนปิดงานจะกลายเป็นต้องรบกวนแอดมินทุกครั้ง
   // ⚠️ ยังบล็อกงานที่รออนุมัติอยู่ (isPendingForTech) — ช่างแตะอะไรไม่ได้เลยจนกว่าจะอนุมัติ/ไม่อนุมัติ
   const canEditDocFields = !readOnly && (isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech));
-  // รายละเอียดงานที่ทำ (workNote) — ช่างแก้ได้จนกว่างานปิด (เซิร์ฟเวอร์ล็อกหลังปิด) · แอดมินแก้ได้เสมอ
-  const canEditWorkNote = canEditDocFields && !isClosedForTech;
 
   /**
    * ✅ "เบิก Advance งานนี้" (ผู้ใช้ขอ: "เพิ่มเมนูให้สามารถกดเบิก Advance ในงานหน้า Event ได้เลย")
@@ -2202,6 +2200,23 @@ export const getEditEvent = async ({
       </div>
     </section>
 
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📝</span>
+        <div class="ee-card-titles"><h4>รายละเอียดงานที่ทำ <span style="color:#dc2626">*</span></h4><p>ทำอะไร ที่ไหน อุปกรณ์/จุดไหน — ช่องเดียวใช้ทั้งตอนลงงานและหลังเข้างาน (อย่างน้อย 10 ตัวอักษร)</p></div>
+        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+        <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
+        <div class="ee-field">
+          <textarea id="editDescription" rows="4" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
+          <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
+        </div>
+        ${/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") บันทึกเก่าของช่าง (workNote) ก่อนรวมเป็นช่องเดียว — แสดงอ่านอย่างเดียว ไม่หาย */""}
+        ${eventWorkNote ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px dashed #dbe3ef;font-size:12.5px;color:#334155;white-space:pre-line;"><b style="display:block;font-size:11.5px;color:#64748b;margin-bottom:2px;">บันทึกเดิมจากช่าง</b>${attrHtml(eventWorkNote)}</div>` : ""}
+      </div>
+    </section>
+
     ${ev.extendedProps?.department === "sales" ? "" : `
     <section class="ee-card ee-key-card">
       <div class="ee-card-head">
@@ -2216,36 +2231,6 @@ export const getEditEvent = async ({
         </div>
       </div>
     </section>`}
-
-    <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
-         (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
-    <section class="ee-card ee-key-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">📄</span>
-        <div class="ee-card-titles"><h4>รายละเอียดงานที่ทำ</h4><p>ช่างบันทึกว่าทำอะไรไปบ้าง — ข้อความเดียวกับในงานของฉัน/การดำเนินงาน/Excel</p></div>
-        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-    <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
-         ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
-    <!-- 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดเลขที่อ้างอิงออก") — ไม่แสดงช่องแล้ว · เก็บค่าเดิมไว้ในช่องซ่อน
-         ตอนบันทึกจึงส่งค่าเดิมกลับไป ไม่ล้างเลขที่เคยกรอกไว้ -->
-    <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
-    ${/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ไฟล์แนบ รายละเอียดงาน ให้ตรงและสอดคล้องกันทุกหน้า")
-         รายละเอียดงานที่ทำ = workNote (ช่องเดียวกับ "สรุปงาน" เดิมในงานของฉัน/การดำเนินงาน/Excel)
-         หมายเหตุงาน = description (ข้อมูลประกอบของงาน — เดิมชื่อ "รายละเอียดงาน") */""}
-    <div class="ee-field">
-      <textarea id="editWorkNote" rows="5" placeholder="เช่น ตรวจระบบ FA ชั้น 3, เปลี่ยนหัวตรวจจับควัน 2 ตัว…" ${canEditWorkNote ? "" : "disabled"}>${attrHtml(eventWorkNote)}</textarea>
-    </div>
-    <div class="ee-field ee-note-field">
-      <label for="editDescription"><span style="color:#dc2626">*</span> รายละเอียดงาน (สิ่งที่ต้องทำ) <span class="ee-opt">กรอกตอนลงงาน · อย่างน้อย 10 ตัวอักษร</span></label>
-      <textarea id="editDescription" rows="3" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
-      <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
-    </div>
-
-      </div>
-    </section>
-
 
     ${ev.extendedProps?.department === "sales" ? "" : `<section class="ee-card ee-key-card ee-key-files"><div class="ee-card-body"><div id="ee-sitePhotosMount" data-no-draft></div></div></section>`}
     </div>
@@ -3765,15 +3750,8 @@ export const getEditEvent = async ({
         const before = eventWorkValue === "" || eventWorkValue === null ? null : Number(eventWorkValue);
         return n === before ? {} : { workValue: n };
       };
-      const readWorkNote = () => {
-        const el = document.getElementById("editWorkNote");
-        if (!el || el.disabled) return {};
-        const v = el.value.trim();
-        return v === eventWorkNote.trim() ? {} : { workNote: v };
-      };
       const buildSharedFields = () => ({
         ...readWorkValue(),
-        ...readWorkNote(),
         // ✅ ข้อมูล Job (ด่วน · ครบกำหนด · อุปกรณ์ · รอข้อมูล) — ไม่มีการ์ดนี้ (นัดฝ่ายขาย) = ไม่ส่ง
         ...(document.getElementById("ji-dueDate") ? readJobInfo(Swal.getPopup()) : {}),
         docNo: getVal("editdocNo"),
@@ -3986,7 +3964,7 @@ export const getEditEvent = async ({
           {
             const descEl = document.getElementById("editDescription");
             if (descEl && !descEl.disabled && descEl.value.replace(/\s+/g, "").length < 10) {
-              Swal.showValidationMessage("กรุณากรอกรายละเอียดงาน (สิ่งที่ต้องทำ) อย่างน้อย 10 ตัวอักษร");
+              Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่ทำ อย่างน้อย 10 ตัวอักษร");
               descEl.focus();
               return;
             }

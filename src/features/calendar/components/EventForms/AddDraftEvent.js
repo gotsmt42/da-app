@@ -608,7 +608,7 @@ export const getAddDraftEvent = async ({
         <div style="font-size:12px;color:#64748b;margin-top:4px;">ผู้รับผิดชอบจะได้รับแจ้งเตือน และกดรับทราบ → ยืนยันนัดหมาย ในหน้า "งานของฉัน"</div>
       </div>` : ""}
       <div class="ade-field" style="margin-top:12px;">
-        <label>อาการเสีย / ขอบเขตงาน</label>
+        <label><span style="color:#ef4444">*</span> รายละเอียดงานที่ทำ <span style="font-weight:500;color:#94a3b8">อาการเสีย / ขอบเขตงาน · อย่างน้อย 10 ตัวอักษร</span></label>
         <textarea id="adeDescription" rows="5" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
       </div>
       <div id="ade-jobInfoBlock">${jobInfoSectionHtml(existingDraft || {}, "ade")}</div>
@@ -983,6 +983,12 @@ export const getAddDraftEvent = async ({
           const plannedMonth = getVal("adeMonth");
 
           // ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) — บังคับแค่สิ่งที่ต้องทำ
+          // ⛔ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") — งานที่รับ/ขอมาจากฝ่ายอื่นก็ต้องมีรายละเอียดงานที่ทำ (ติดไปกับงานตอนลงตาราง)
+          if (getVal("adeDescription").replace(/\s+/g, "").length < 10) {
+            Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่ทำ (อย่างน้อย 10 ตัวอักษร) — อาการเสีย / ขอบเขตงาน");
+            document.getElementById("adeDescription")?.focus();
+            return;
+          }
           const isNoteMode = isIntakeForm && radioVal("adeVisitMode") === "note";
           const isDeliveryMode = isIntakeForm && radioVal("adeVisitMode") === "novisit";
           if (isNoteMode) {

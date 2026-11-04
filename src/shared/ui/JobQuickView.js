@@ -136,16 +136,15 @@ export default function JobQuickView({ eventId, onClose, employees = [], showVal
 
         </Stack>
         <Stack spacing={1.5}>
-          {/* รายละเอียดงานที่ทำ + หมายเหตุ */}
+          {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") — ช่องเดียว (description) · บันทึกเดิมของช่าง (workNote) ต่อท้าย */}
           <Section title="รายละเอียดงานที่ทำ">
-            {ev.workNote
-              ? <Typography sx={{ fontSize: "0.88rem", color: INK, whiteSpace: "pre-line", lineHeight: 1.7 }}>{ev.workNote}</Typography>
-              : <Empty>ช่างยังไม่ได้บันทึก</Empty>}
-            {ev.description && (
-              <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px dashed ${LINE}` }}>
-                <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>หมายเหตุงาน</Typography>
-                <Typography sx={{ fontSize: "0.86rem", color: INK, whiteSpace: "pre-line", lineHeight: 1.6 }}>{ev.description}</Typography>
-              </Box>
+            {ev.description
+              ? <Typography sx={{ fontSize: "0.88rem", color: INK, whiteSpace: "pre-line", lineHeight: 1.7 }}>{ev.description}</Typography>
+              : !ev.workNote && <Empty>ยังไม่ได้ระบุ</Empty>}
+            {ev.workNote && (
+              <Typography sx={{ fontSize: "0.84rem", color: MUTED, whiteSpace: "pre-line", lineHeight: 1.6, mt: ev.description ? 1 : 0 }}>
+                <b>บันทึกเดิมจากช่าง:</b> {ev.workNote}
+              </Typography>
             )}
           </Section>
 

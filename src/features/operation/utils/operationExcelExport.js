@@ -218,7 +218,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       responsible: a.responsiblePerson || "",
       checkIn: a.checkedInAt ? new Date(a.checkedInAt) : "",
       checkOut: a.checkedOutAt ? new Date(a.checkedOutAt) : "",
-      workNote: a.workNote || "",
+      workNote: [...new Set(sessions.flatMap((x) => [x.description, x.workNote]).map((v) => String(v || "").trim()).filter(Boolean))].join("\n"),
       closeState,
       ...(showValue ? { workValue: workValueOf(sessions) ?? "ยังไม่ใส่" } : {}),
       docReport: (a.reportFiles || []).length,

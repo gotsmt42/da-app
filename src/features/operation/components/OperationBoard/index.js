@@ -1185,13 +1185,19 @@ const EventRowCard = ({
   );
   const expandedContent = (
     <Grid container spacing={1.25}>
-      {event.workNote && (
+      {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") — description คือช่องเดียว · workNote = บันทึกเดิมก่อนรวม */}
+      {(event.description || event.workNote) && (
         <Grid item xs={12} sx={{ mb: 0.75 }}>
-          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "รายละเอียดงานที่ทำ (จากช่าง)")}
+          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "รายละเอียดงานที่ทำ")}
           <Box sx={{ px: 1.75, py: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-            <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>
-              {event.workNote}
-            </Typography>
+            {event.description && (
+              <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>{event.description}</Typography>
+            )}
+            {event.workNote && (
+              <Typography sx={{ fontSize: "0.8rem", color: MUTED, whiteSpace: "pre-line", lineHeight: 1.6, mt: event.description ? 0.75 : 0 }}>
+                <b>บันทึกเดิมจากช่าง:</b> {event.workNote}
+              </Typography>
+            )}
           </Box>
         </Grid>
       )}
@@ -1791,10 +1797,10 @@ const EventRowCard = ({
                     )}
                   </Box>
                 )}
-                {event.workNote && (
+                {(event.description || event.workNote) && (
                   <Typography sx={{ fontSize: "0.84rem", color: INK, bgcolor: SURFACE, borderRadius: 2, px: 1.25, py: 0.9, mb: 1, whiteSpace: "pre-line", wordBreak: "break-word" }}>
-                    <Box component="span" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 800, color: MUTED, mb: 0.25 }}>บันทึกจากช่าง</Box>
-                    {event.workNote}
+                    <Box component="span" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 800, color: MUTED, mb: 0.25 }}>รายละเอียดงานที่ทำ</Box>
+                    {[event.description, event.workNote].filter(Boolean).join("\n")}
                   </Typography>
                 )}
                 <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: isAdminOrManager ? 1.25 : 0 }}>
@@ -1867,7 +1873,7 @@ const EventRowCard = ({
             sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px", display: { xs: o ? "flex" : "none", sm: "flex" },
               fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
             <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
-              {[event.workNote ? "รายละเอียดงานที่ทำ ✓" : "รายละเอียดงานที่ทำ", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
+              {[(event.description || event.workNote) ? "รายละเอียดงานที่ทำ ✓" : "รายละเอียดงานที่ทำ", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
             </Typography>
             <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: ACCENT, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
               เปิด<ChevronRight sx={{ fontSize: 18 }} />

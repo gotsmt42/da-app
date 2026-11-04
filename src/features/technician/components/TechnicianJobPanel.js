@@ -881,7 +881,8 @@ const TechnicianJobCard = ({
 
   // ── Save Work Note ───────────────────────────────────────────────
   const handleSaveNote = async (eventId, note) => {
-    await onInputUpdate(eventId, { workNote: note });
+    // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") ช่องเดียว = description (ช่องเดียวกับตอนลงงาน) · ทุกวันของงานเดียวกัน
+    await (onStatusUpdate || onInputUpdate)(eventId, { description: note });
     await pushLog("note_saved", note.slice(0, 80) + (note.length > 80 ? "…" : ""));
   };
 
@@ -945,9 +946,14 @@ const TechnicianJobCard = ({
           sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 1 }}>
           รายละเอียดงานที่ทำ
         </Typography>
+        {event.workNote && (
+          <Typography variant="caption" component="div" sx={{ mb: 1, px: 1.25, py: 0.75, borderRadius: 1.5, bgcolor: "#f8fafc", border: "1px dashed #dbe3ef", whiteSpace: "pre-line", color: "text.secondary" }}>
+            <b>บันทึกเดิม:</b> {event.workNote}
+          </Typography>
+        )}
         <WorkNoteEditor
           eventId={event._id}
-          currentNote={event.workNote}
+          currentNote={event.description}
           onSave={handleSaveNote}
         />
       </Box>
