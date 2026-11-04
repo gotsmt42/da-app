@@ -550,7 +550,7 @@ function LinkButton({ job, card = false }) {
       <Button variant="outlined" size={card ? "medium" : "small"} onClick={() => ctx.open(job)} startIcon={<LinkRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, ...(card ? { flex: { xs: 1, sm: "0 0 auto" } } : { height: 30, px: 1.1 }), color: tone, borderColor: alpha(tone, 0.45), bgcolor: n ? alpha(AMBER, 0.06) : "transparent",
           "&:hover": { borderColor: tone, bgcolor: alpha(tone, 0.08) } }}>
-        {n ? `ลงตารางแล้ว? (${n})` : "ลงตารางแล้ว"}
+        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{n ? `ลงตารางแล้ว? (${n})` : "ลงตารางแล้ว"}</Box>
       </Button>
     </Tooltip>
   );
@@ -1506,7 +1506,20 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           </Box>
         </Stack>
         {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "ย่อการ์ดลงอีก ดูยาวไป · ดูงาน เห็นด้านขวาว่าง") มือถือ: ปุ่ม "ดูงาน" ย้ายขึ้นมุมขวาบน ไม่กินแถวเต็ม */}
-        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: { xs: 1.25, md: 1.5 }, justifyContent: inRow ? "flex-end" : "flex-start", display: inRow ? "flex" : { xs: viewOnly ? "none" : "flex", md: "none" } }}>{actions}</Stack>}
+        {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ปรับหน้ารับงานใหม่ ให้จัดวางสวยงามดูง่าย ไม่ล้น ไม่เพี้ยน · ใช้งานง่าย")
+            มือถือ: ปุ่มหลัก (ส่งลงตาราง/ยืนยัน…) เต็มความกว้างแถวบน · ปุ่มรอง (แก้ไข/ยกเลิก/ลงตารางแล้ว) แบ่งเท่ากันแถวล่าง */}
+        {actions && (
+          <Box sx={{
+            mt: { xs: 1.25, md: 1.5 }, display: inRow ? "flex" : { xs: viewOnly ? "none" : "flex", md: "none" }, flexWrap: "wrap", gap: 0.75,
+            justifyContent: inRow ? "flex-end" : "flex-start",
+            ...(inRow ? {} : {
+              "& > *": { flex: "1 1 0 !important", minWidth: "0 !important", m: "0 !important" },
+              "& > .MuiButton-contained, & > label.MuiButton-contained": { order: -1, flexBasis: "100% !important", height: 42, fontSize: "0.92rem" },
+              "& .MuiButton-root": { width: "100%", px: 1, fontSize: "0.8rem" },
+              "& > span": { display: "flex" },
+            }),
+          }}>{actions}</Box>
+        )}
       </Box>
 
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
@@ -1548,11 +1561,11 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
 /** ไอคอนปฏิทินบนการ์ดมือถือ — กว้าง/สูงเท่ากันทุกใบ แถวการ์ดเรียงตรงกัน */
 // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ลดขนาดวันที่ลงอีกให้พอดี") กว้าง 48 · ตัวเลข 1.1rem
 const DateTile = ({ head, big, foot, color = "#475569", footColor = null, dashed = false, small = false }) => (
-  <Box sx={{ width: 48, borderRadius: 1.75, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
+  <Box sx={{ width: 52, borderRadius: 1.75, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
     border: `1px ${dashed ? "dashed" : "solid"} ${dashed ? "#cbd5e1" : "#d5dce5"}` }}>
     <Box sx={{ py: 0.1, bgcolor: dashed ? SURFACE : "#475569", color: dashed ? "#64748b" : "#fff", fontSize: "0.58rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap" }}>{head}</Box>
     <Typography sx={{ fontSize: small ? "0.9rem" : "1.1rem", fontWeight: 900, lineHeight: 1.15, pt: small ? 0.35 : 0.15, color: dashed ? color : INK, fontVariantNumeric: "tabular-nums" }}>{big}</Typography>
-    <Typography sx={{ fontSize: "0.56rem", fontWeight: 700, lineHeight: 1.3, pb: 0.3, color: footColor || (dashed ? color : MUTED), whiteSpace: "nowrap" }}>{foot}</Typography>
+    <Typography sx={{ fontSize: "0.58rem", fontWeight: 700, lineHeight: 1.3, pb: 0.3, px: 0.25, color: footColor || (dashed ? color : MUTED), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{foot}</Typography>
   </Box>
 );
 
@@ -1598,7 +1611,8 @@ const scheduleTagOf = (job, text) => {
     icon: CalendarMonthRounded,
     accent: diff < 0 ? RED : diff === 0 ? AMBER : null,
     text: `แผนเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
-    rel: diff > 0 ? `อีก ${diff} เดือน` : diff === 0 ? "เดือนนี้" : `เลยมา ${-diff} เดือน`,
+    // 🔁 (4 พ.ย. 2569) สั้นลงให้พอดีช่องวันที่ 48px (เดิม "เลยมา 1 เดือน" ล้นช่อง)
+    rel: diff > 0 ? `อีก ${diff} ด.` : diff === 0 ? "เดือนนี้" : `เลย ${-diff} ด.`,
   };
 };
 /** ข้อมูลสั้น 1 ชิ้น: ไอคอนเทา + ข้อความ */
@@ -1939,15 +1953,16 @@ export default function JobIntake() {
       )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
-      <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+      {/* 🔁 (4 พ.ย. 2569) มือถือ: ช่องค้นหาเต็มแถวบน (เดิมเหลือกว้างนิดเดียว พิมพ์ไม่ได้) · ตัวกรอง/Excel/มุมมอง แถวล่าง */}
+      <Stack direction="row" gap={1} sx={{ mb: 1.5, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+        <Box sx={{ flex: { xs: "1 1 100%", sm: 1 }, minWidth: 0, display: "flex", alignItems: "center", gap: 1, height: 42, px: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
           <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่องาน / โครงการ / เลขที่งาน / เลขเอกสาร"
             sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
           {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
         </Box>
         {tab !== "requests" && ownerOptions.total > 0 && (
-          <Box sx={{ width: { xs: 150, sm: 220 }, flexShrink: 0 }}>
+          <Box sx={{ flex: { xs: 1, sm: "0 0 220px" }, minWidth: 0 }}>
             <PersonSelectField label="" title="เลือกผู้รับผิดชอบ" value={owner} onChange={setOwner}
               allLabel="ผู้รับผิดชอบทุกคน" allCount={ownerOptions.total} unit="งาน" options={ownerOptions.list} sx={{ width: "100%" }} />
           </Box>

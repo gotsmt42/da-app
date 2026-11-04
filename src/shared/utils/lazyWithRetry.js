@@ -17,7 +17,8 @@ const RELOAD_GAP_MS = 30_000;
 
 export const isChunkLoadError = (err) => {
   const msg = String(err?.message || err || "");
-  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk [\w-]+ failed|ChunkLoadError|Unable to preload CSS/i.test(msg);
+  // 🔁 (4 พ.ย. 2569) + "Outdated Optimize Dep" (dev) · ไฟล์ .js ถูกตอบเป็น HTML (หลัง deploy ไฟล์เก่าหาย → ได้ index.html แทน)
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk [\w-]+ failed|ChunkLoadError|Unable to preload CSS|Outdated Optimize Dep|Expected a JavaScript.*MIME type|is not a valid JavaScript MIME type/i.test(msg);
 };
 
 /** รีโหลดหน้าเพื่อเอาไฟล์รุ่นใหม่ — คืน true ถ้าสั่งรีโหลดแล้ว (ไม่เกิน 1 ครั้งต่อ 30 วินาที) */
