@@ -172,7 +172,10 @@
    • ผู้ติดต่อ/เบอร์โทร: ไม่แสดงบนตารางเดือน (ดูได้ในหน้างาน) — เหลือ ประเภท · โครงการ · ระบบ · ครั้งที่ · ทีม */
 .ec-modern .fc-daygrid .ec-card { padding-top: 5px !important; padding-bottom: 5px !important; }
 .ec-modern .fc-daygrid .ec-card-head { padding-right: 30px; }
-.ec-modern .fc-daygrid .fc-daygrid-day-events { margin-top: 2px !important; }
+/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "งานยังบังเลขปฏิทิน") 2 → 14px — ติ่งไอคอนที่คร่อมขอบบนการ์ดใบแรกโผล่ขึ้นไปทับเลขวัน (โดยเฉพาะวงแดงวันนี้)
+   ⚠️ ตัวนี้ (!important) ชนะกฎใน index.css — ต้องแก้ที่นี่ */
+.ec-modern .fc-daygrid .fc-daygrid-day-events { margin-top: 14px !important; }
+@media (max-width: 600px) { .ec-modern .fc-daygrid .fc-daygrid-day-events { margin-top: 9px !important; } }
 .ec-modern .fc-daygrid .ec-card-team {
   display: block;
   width: auto !important;
@@ -236,6 +239,23 @@
    ป้ายยาวได้เต็มความกว้าง ถ้ายาวเกินค่อยขึ้นบรรทัดใหม่ (ติ่งไอคอนลอยอยู่นอกการ์ด ไม่ต้องเว้นที่) */
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-head { display: block !important; width: 100%; padding-right: 0 !important; }
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-grip { display: none !important; }
+/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ทำให้ในคอมเลื่อนเปลี่ยนตำแหน่งงานได้ด้วย") จอคอม: ปุ่มจับ ⠿ มุมซ้ายบนในการ์ด
+   ลากขึ้น/ลงเพื่อสลับลำดับงานในวันเดียวกัน · ลากที่ตัวการ์ด = ย้ายวันเหมือนเดิม
+   มือถือยังใช้ "กดค้างที่การ์ดแล้วลาก" (ปุ่มนี้ซ่อน ≤1100px ตามเดิม) */
+@media (min-width: 1101px) {
+  /* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ดูไม่สวย ล้นๆ") เลิกเป็นติ่งยื่นนอกการ์ด — อยู่ "ในการ์ด" หน้าป้ายประเภทงาน
+     จางไว้ (ไม่แย่งสายตา) ชี้แล้วชัดขึ้น · float ซ้าย = ป้ายประเภทงานไหลต่อท้ายบรรทัดเดียวกัน ไม่เพิ่มความสูงการ์ด */
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card-grip {
+    display: inline-flex !important; align-items: center; justify-content: center; float: left;
+    position: static; width: 14px; height: 18px; margin: 1px 4px 0 -3px !important; padding: 0;
+    background: transparent !important; color: var(--ec-t, #fff) !important; border: 0; border-radius: 4px;
+    font-size: 13px; line-height: 1; opacity: .55 !important; cursor: grab; transition: opacity .15s, background-color .15s;
+  }
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card:hover .ec-card-grip { opacity: .9 !important; }
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card-grip:hover { opacity: 1 !important; background: rgba(255, 255, 255, .22) !important; }
+  .modern-calendar-container.ec-modern .fc-daygrid .ec-card-grip:active { cursor: grabbing; }
+}
+
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-title {
   display: block !important; width: 100%; max-width: none !important; padding-right: 0 !important;
   overflow: visible !important; white-space: normal !important;
