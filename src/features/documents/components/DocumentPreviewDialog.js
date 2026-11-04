@@ -26,6 +26,7 @@ import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import { renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser } from "@/shared/utils/pdfRaster";
 import PdfPagesView from "@/shared/components/PdfPagesView";
 import { INK, INK_2, MUTED, LINE, PRIMARY_BTN_SX, SUCCESS_BTN_SX, ACCENT } from "@/shared/ui/PageKit";
+import { sharePdf } from "@/shared/utils/pdfShare";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 
@@ -121,23 +122,10 @@ const DocumentPreviewDialog = ({
     link.click();
   };
 
-  const handleShare = async () => {
+  // 🔁 (4 พ.ย. 2569) ตัวกลาง shared/utils/pdfShare — ลองแชร์จริงก่อน · ไม่ได้ = ดาวน์โหลดให้ + บอกตรงๆ
+  const handleShare = () => {
     if (!preview?.blob) return;
-    if (!window.isSecureContext) { setNotice("การแชร์ไฟล์ใช้ได้เมื่อเปิดระบบผ่านลิงก์ https เท่านั้น — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้"); return; }
-    if (isInAppBrowser()) { setNotice(IN_APP_NOTICE); return; }
-    const file = new File([preview.blob], preview.fileName, { type: "application/pdf" });
-    let files = canShareFile(file) ? [file] : null;
-    if (!files && pages?.length) {
-      const imgs = pages.map((p, i) => new File([p.blob], `${preview.fileName.replace(/\.pdf$/i, "")}${pages.length > 1 ? `-${i + 1}` : ""}.${p.blob.type === "image/png" ? "png" : "jpg"}`, { type: p.blob.type || "image/jpeg" }));
-      if (canShareFile(imgs[0])) files = imgs;
-    }
-    if (!files) { setNotice("เครื่องนี้แชร์ไฟล์โดยตรงไม่ได้ — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้เลย"); return; }
-    try {
-      await navigator.share({ files, title: preview.fileName, text: title });
-    } catch (err) {
-      // ⚠️ ผู้ใช้กดยกเลิกแผงแชร์เองก็เข้ามาทางนี้ (AbortError) — ไม่ใช่ความผิดพลาด
-      if (err?.name !== "AbortError") setNotice("แชร์ไม่สำเร็จ — ลองใหม่อีกครั้ง หรือใช้ปุ่มดาวน์โหลดแทน");
-    }
+    sharePdf({ blob: preview.blob, fileName: preview.fileName, pages, text: title, download: handleDownload, notify: setNotice });
   };
 
   const preparing = imageMode && Boolean(preview?.blob) && !pages && !rasterFailed;

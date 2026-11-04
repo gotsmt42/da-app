@@ -106,7 +106,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     ...(showValue ? [{ key: "workValue", header: "มูลค่างานครั้งนี้ (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
     { key: "docReport", header: "Service Report", width: 14, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docQuotation", header: "ใบเสนอราคา", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
-    { key: "docInvoice", header: "ใบวางบิล", width: 12, group: "เอกสารแนบ (ไฟล์)", align: "center" },
+    { key: "docInvoice", header: "เอกสารการเงิน (ไฟล์)", width: 16, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docCompletion", header: "ใบส่งมอบงาน", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     // ✅ (25 ต.ค. 2569) สรุป Service Report ด้วย AI — รายละเอียดเต็มอยู่ชีต "สรุป Service Report" / "ปัญหาที่พบ"
     { key: "srStatus", header: "สรุป Service Report", width: 15, group: "สรุป Service Report (AI)", align: "center" },

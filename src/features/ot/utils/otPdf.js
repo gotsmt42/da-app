@@ -49,7 +49,7 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
 
   // ── 1. หัวกระดาษ ─────────────────────────────────────────────────────
   doc.setFontSize(17);
-  let y = drawLetterhead(doc) + 3.5;
+  let y = drawLetterhead(doc, { left: L, right: L }) + 3.5;
   doc.setDrawColor(...INK); doc.setLineWidth(0.4);
   doc.line(L, y, R, y);
   y += 9;

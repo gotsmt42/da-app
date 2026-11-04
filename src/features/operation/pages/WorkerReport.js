@@ -11,11 +11,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { Box, Button, ButtonBase, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography, useMediaQuery } from "@mui/material";
+import { Box, Button, ButtonBase, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { EngineeringRounded, SearchRounded } from "@mui/icons-material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 import SectionTabs from "@/shared/ui/SectionTabs";
 import SelectField from "@/shared/ui/SelectField";
@@ -25,6 +23,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
+import AttendanceService from "@/shared/services/AttendanceService";
 import JobQuickView from "@/shared/ui/JobQuickView";
 import { thaiDate, THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
 import { PAGE_SX, PageHeader, INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
@@ -32,6 +31,7 @@ import PeriodFilter from "../components/PeriodFilter";
 import { ReportSection, Segmented, RankRow, TotalRow, Stat, TotalHero, FilterCard, BarRow, PersonAvatar, R_CARD, baht } from "../components/ReportKit";
 import { periodRange, periodText, monthLabel } from "../utils/reportPeriod";
 import { buildWorkerEntries, filterEntries, summarizeEntries, DONE_STATUS } from "../utils/workerLog";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const STATUS_COLOR = { "กำลังรอยืนยัน": "#d97706", ยืนยันแล้ว: "#2563eb", กำลังดำเนินการ: "#7c3aed", [DONE_STATUS]: "#059669" };
 const WARN = "#d97706";
@@ -68,7 +68,14 @@ function LogRow({ r, avatar, onClick, showWorker }) {
         {r.value === null
           ? <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, color: WARN }}>ยังไม่ใส่มูลค่า</Typography>
           : <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: INK, fontVariantNumeric: "tabular-nums" }}>{baht(r.value)}</Typography>}
-        <Box component="span" sx={{ display: "inline-block", mt: 0.5, fontSize: "0.72rem", fontWeight: 800, color: tone, bgcolor: alpha(tone, 0.1), borderRadius: "6px", px: 0.9, py: 0.2 }}>{r.status || "—"}</Box>
+        <Stack direction="row" spacing={0.5} justifyContent="flex-end" sx={{ mt: 0.5 }}>
+          {/* ✅ กดเข้างานจริงของคนนี้ (เวลาแรก) — ไม่มี = ยังไม่กด */}
+          <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, borderRadius: "6px", px: 0.9, py: 0.2,
+            color: r.checkIns?.length ? "#15803d" : "#b45309", bgcolor: r.checkIns?.length ? "#f0fdf4" : "#fffbeb" }}>
+            {r.checkIns?.length ? `✓ เข้างาน ${moment(r.checkIns[0]).format("HH:mm")}${r.checkIns.length > 1 ? ` (${r.checkIns.length} วัน)` : ""}` : "ยังไม่กดเข้างาน"}
+          </Box>
+          <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, bgcolor: alpha(tone, 0.1), borderRadius: "6px", px: 0.9, py: 0.2 }}>{r.status || "—"}</Box>
+        </Stack>
       </Box>
     </ButtonBase>
   );
@@ -77,11 +84,11 @@ function LogRow({ r, avatar, onClick, showWorker }) {
 export default function WorkerReport() {
   const { can } = usePermissions();
   const { userData } = useAuth();
-  const isDesktop = useMediaQuery("(min-width:900px)");
   const viewAll = can("viewAllJobs") || can("approveJobs");
   const myName = userData?.fname || "";
 
   const [events, setEvents] = useState(null);
+  const [attendance, setAttendance] = useState([]);
   const [error, setError] = useState("");
   const [employees, setEmployees] = useState([]);
   const [period, setPeriod] = useState({
@@ -105,12 +112,25 @@ export default function WorkerReport() {
     return () => { alive = false; };
   }, []);
 
+  // ✅ (4 พ.ย. 2569 ผู้ใช้: "เข้างานแยกรายคน ... ให้สอดคล้องกับที่จะแยกดูผลงาน และมูลค่างานแยกคน") บันทึกเข้างานรายคน (ทั้งงานที่ปิดแล้ว) ตามช่วงที่เลือก — ผูกกับแถว "คน × งาน"
+  const [rFrom0, rTo0] = periodRange(period.preset, period);
+  useEffect(() => {
+    let alive = true;
+    // เผื่อ 60 วันก่อนช่วง: งานที่เริ่มในช่วงอาจกดเข้างานวันหลังๆ — กรองตามงานอยู่แล้ว ไม่นับเกิน
+    const from = rFrom0 ? moment(rFrom0).subtract(7, "days").format("YYYY-MM-DD") : undefined;
+    const to = rTo0 ? moment(rTo0).add(60, "days").format("YYYY-MM-DD") : undefined;
+    AttendanceService.list({ from, to, includeClosed: 1 })
+      .then((r) => { if (alive) setAttendance(r?.attendance || []); })
+      .catch(() => { if (alive) setAttendance([]); });
+    return () => { alive = false; };
+  }, [rFrom0, rTo0]);
+
   const avatarOf = useMemo(() => {
     const m = new Map(employees.map((e) => [e.fname, e.imageUrl]));
     return (n) => m.get(n);
   }, [employees]);
 
-  const allEntries = useMemo(() => (events ? buildWorkerEntries(events) : []), [events]);
+  const allEntries = useMemo(() => (events ? buildWorkerEntries(events, attendance) : []), [events, attendance]);
   const [rFrom, rTo] = periodRange(period.preset, period);
   const effPerson = viewAll ? person : (myName || "__none__");
 
@@ -162,13 +182,7 @@ export default function WorkerReport() {
 
   if (!events) return <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={26} /></Stack>;
 
-  const exportBtn = (
-    <Button variant="outlined" onClick={doExport} disabled={exporting || !entries.length}
-      startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />}
-      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: INK, borderColor: LINE, whiteSpace: "nowrap", "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
-      {exporting ? "กำลังส่งออก…" : isDesktop ? "ส่งออก Excel" : "Excel"}
-    </Button>
-  );
+  const exportBtn = <ExportExcelButton onClick={doExport} loading={exporting} disabled={!entries.length} />;
 
   return (
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
@@ -216,6 +230,7 @@ export default function WorkerReport() {
           <Stat key="j" label="จำนวนงาน" value={`${t.jobs} งาน`} />,
           <Stat key="d" label="วันทำงานรวม" value={`${t.days} วัน`} />,
           <Stat key="p" label="ผู้ปฏิบัติงาน" value={`${t.people} คน`} />,
+          <Stat key="c" label="กดเข้างานจริง" value={`${t.checked}/${t.visits} ครั้ง`} tone={t.checked < t.visits ? "#b45309" : "#15803d"} />,
           <Stat key="a" label="เฉลี่ยต่อครั้ง" value={t.valued ? baht(t.avg) : "–"} />,
           <Stat key="m" label="ยังไม่ใส่มูลค่า" value={`${t.missing} ครั้ง`} tone={t.missing ? WARN : undefined}
             active={valueMode === "missing"} onClick={t.missing || valueMode === "missing" ? () => setValueMode(valueMode === "missing" ? "all" : "missing") : undefined} />,
@@ -241,7 +256,7 @@ export default function WorkerReport() {
                   <RankRow key={p.key} rank={(personPg.page - 1) * personPg.size + i + 1}
                     leading={<PersonAvatar name={p.key} avatar={avatarOf(p.key)} />}
                     title={p.key}
-                    sub={`เข้างาน ${p.visits} ครั้ง · หัวหน้าทีม ${p.lead} ครั้ง · ${p.days} วัน · ล่าสุด ${thaiDate(p.last)}`}
+                    sub={`เข้างาน ${p.visits} ครั้ง · กดเข้างานจริง ${p.checked}/${p.visits} · หัวหน้าทีม ${p.lead} · ล่าสุด ${thaiDate(p.last)}`}
                     value={baht(p.total)}
                     valueSub={p.missing ? <span style={{ color: WARN, fontWeight: 700 }}>ยังไม่ใส่มูลค่า {p.missing} ครั้ง</span> : p.valued ? `เฉลี่ย ${baht(p.avg)} / ครั้ง` : ""}
                     active={person === p.key}

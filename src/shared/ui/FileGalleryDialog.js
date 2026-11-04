@@ -71,7 +71,8 @@ function PdfView({ url, onDownload }) {
 
 const STRIP_H = 76;
 
-export default function FileGalleryDialog({ previewUrl, previewFileName, gallery, onNavigate, onClose, caption }) {
+/** @param zIndex เปิดซ้อนบนกล่อง SweetAlert/แผ่นเอกสารในฟอร์มแก้ไขงาน — ส่งค่าสูงกว่า (เช่น 20020) */
+export default function FileGalleryDialog({ previewUrl, previewFileName, gallery, onNavigate, onClose, caption, zIndex }) {
   const list = useMemo(() => {
     const g = (gallery || []).filter((f) => f?.fileUrl);
     return g.some((f) => f.fileUrl === previewUrl) ? g : (previewUrl ? [{ fileUrl: previewUrl, fileName: previewFileName }] : []);
@@ -123,6 +124,7 @@ export default function FileGalleryDialog({ previewUrl, previewFileName, gallery
 
   return (
     <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth fullScreen={mobile}
+      {...(zIndex ? { sx: { zIndex }, disableEnforceFocus: true } : {})}
       PaperProps={{ sx: { borderRadius: mobile ? 0 : 3, overflow: "hidden" } }}>
       <DialogTitle sx={{ m: 0, p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center", gap: 1.5 }}>
         {kindIcon(previewFileName)}

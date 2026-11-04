@@ -95,6 +95,7 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
     { key: "job", header: "งานที่เข้าไปทำ", width: 26, wrap: true },
     { key: "jobNo", header: "เลขที่งาน", width: 16 },
     { key: "role", header: "บทบาท", width: 11, align: "center" },
+    { key: "checkIn", header: "กดเข้างานจริง", width: 18, align: "center", wrap: true },
     { key: "status", header: "สถานะงาน", width: 17, align: "center" },
     { key: "value", header: "มูลค่าครั้งนี้ (บาท)", width: 17, align: "right", fmt: MONEY, bold: true },
   ];
@@ -132,7 +133,9 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
       const vals = {
         no: i + 1, name: r.name, date: toDate(r.date), days: r.days, site: r.site || "-", company: r.company || "-",
         job: [r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : ""].filter(Boolean).join(" · ") || "-",
-        jobNo: r.jobNo || "", role: r.lead ? "หัวหน้าทีม" : "ทีม", status: r.status || "", value: r.value === null ? "ยังไม่ใส่" : r.value,
+        jobNo: r.jobNo || "", role: r.lead ? "หัวหน้าทีม" : "ทีม",
+        checkIn: r.checkIns?.length ? r.checkIns.map((d) => new Date(d).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })).join("\n") : "ยังไม่กด",
+        status: r.status || "", value: r.value === null ? "ยังไม่ใส่" : r.value,
       };
       cols.forEach((c, ci) => {
         const cell = row.getCell(ci + 1);
@@ -196,11 +199,12 @@ ${note}`,
       { key: "no", header: "ลำดับ", width: 7, align: "center" },
       { key: "name", header: "ผู้ปฏิบัติงาน", width: 26, bold: true },
       { key: "visits", header: "เข้างาน (ครั้ง)", width: 14, align: "center" },
+      { key: "checked", header: "กดเข้างานจริง (ครั้ง)", width: 17, align: "center" },
       { key: "total", header: "มูลค่างานรวม (บาท)", width: 20, align: "right", fmt: MONEY, bold: true },
       { key: "missing", header: "ยังไม่ใส่มูลค่า (ครั้ง)", width: 16, align: "center", color: warnIf },
     ],
-    rows: summary.byPerson.map((p, i) => ({ no: i + 1, name: p.key, visits: p.visits, total: p.total, missing: p.missing || "" })),
-    total: { no: "", name: `รวม ${summary.byPerson.length} คน`, visits: t.visits, total: t.total, missing: t.missing || "" },
+    rows: summary.byPerson.map((p, i) => ({ no: i + 1, name: p.key, visits: p.visits, checked: `${p.checked}/${p.visits}`, total: p.total, missing: p.missing || "" })),
+    total: { no: "", name: `รวม ${summary.byPerson.length} คน`, visits: t.visits, checked: `${t.checked}/${t.visits}`, total: t.total, missing: t.missing || "" },
   });
 
   // 2) รายเดือน — แถว = คน · คอลัมน์ = เดือน (มูลค่า) · แถวล่างสุด = ยอดรวมของแต่ละเดือน

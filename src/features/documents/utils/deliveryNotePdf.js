@@ -618,37 +618,55 @@ export const createDocument = (jsPDF, thSarabunFont) => {
  * ย้ายที่อยู่/เบอร์ทีเดียวแล้วเปลี่ยนครบทุกใบ ไม่ต้องไล่แก้ทีละไฟล์แล้วลืมไปใบหนึ่ง
  * @returns {number} พิกัด y หลังวาดหัวกระดาษเสร็จ (ตัวเรียกเอาไปวางเนื้อหาต่อ)
  */
-export const drawLetterhead = (doc) => {
-  const centerX = PAGE.w / 2;
-  // ✅ โลโก้ชิดขอบบน 8 มม. (ขอบพิมพ์ไม่ติดของเครื่องพิมพ์ทั่วไปอยู่ราว 4–6 มม.) กว้าง 28 มม. ≈ ขนาดตัวโลโก้เท่าเดิม
-  let y = 8;
+/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "แก้ไขหัวกระดาษที่ออกทุกๆเมนูให้ขยับมาชิดด้านซ้าย แบบตัวอย่าง")
+   เดิมโลโก้กลางหน้า + ข้อความกลาง 4 บรรทัด (สูง ~45 มม.) → แบบหนังสือบริษัท: โลโก้ชิดซ้าย · ชื่อบริษัท (ตัวหนา) +
+   ภาษาอังกฤษ + ที่อยู่ + เลขผู้เสียภาษี เรียงชิดซ้ายข้างโลโก้ — ชุดเดียวกับใบแจ้งเข้าปฏิบัติงาน/ใบส่งมอบงาน (drawLetterheadModern)
+   และเตี้ยลง เหลือที่ให้เนื้อหามากขึ้น
+   @param left ขอบซ้ายของเนื้อหาในเอกสารนั้น (โลโก้ตรงแนวเดียวกับตาราง/ข้อความด้านล่าง) */
+export const drawLetterhead = (doc, { left = 16, right = 16, compact = false } = {}) => {
+  // compact = เอกสารยาวที่ต้องบีบให้จบหน้าเดียว — โลโก้/ตัวอักษรเล็กลง ที่อยู่+เลขภาษีบรรทัดเดียว (ยังมีโลโก้เหมือนใบอื่น)
+  const top = compact ? 7 : 9;
+  let logoW = 0;
+  let logoH = 0;
   try {
     const logo = printAsset(ISSUER.logo);
-    const props = doc.getImageProperties(logo);
-    const w = 28;
-    const h = (props.height / props.width) * w;
+    const p = doc.getImageProperties(logo);
+    logoH = compact ? 12 : 18;
+    logoW = (p.width / p.height) * logoH;
+    const maxW = compact ? 24 : 34;
+    if (logoW > maxW) { logoW = maxW; logoH = (p.height / p.width) * logoW; }
     // alias = ฝังรูปเดียวกันซ้ำในไฟล์เดียวไม่ได้ทำให้ไฟล์ใหญ่ขึ้นอีกรอบ
-    doc.addImage(logo, "PNG", centerX - w / 2, y, w, h, "letterhead-logo", "MEDIUM");
-    y += h + 2.2;
+    doc.addImage(logo, "PNG", left, top, logoW, logoH, "letterhead-logo", "MEDIUM");
   } catch {
-    // ⚠️ ไม่มีโลโก้ก็ยังต้องออกเอกสารได้ — เว้นที่ไว้เท่าความสูงโลโก้จริงเพื่อไม่ให้เลย์เอาต์ที่เหลือขยับ
-    y += 14.5;
+    // ⚠️ ไม่มีโลโก้ก็ยังต้องออกเอกสารได้ — ข้อความชิดขอบซ้ายแทน
+    logoW = 0; logoH = 0;
   }
-
-  // ✅ ไล่ขนาดตัวอักษรลงตามลำดับความสำคัญ (17 → 11.5 → 10.5) และเว้นระยะแต่ละบรรทัดให้ต่างกันตาม
-  // ขนาดจริงของแต่ละบรรทัด แทนการบวกทีละ 6 คงที่แบบเดิมซึ่งทำให้ชื่อบริษัทตัวใหญ่ดูอึดอัดติดบรรทัดล่าง
-  doc.setFontSize(17);
-  y += 5.6;
-  doc.text(ISSUER.nameTh, centerX, y, { align: "center" });
-  doc.setFontSize(11.5);
-  y += 5.6;
-  doc.text(ISSUER.nameEn, centerX, y, { align: "center" });
-  doc.setFontSize(10.5);
-  y += 5.2;
-  doc.text(ISSUER.address, centerX, y, { align: "center" });
-  y += 4.6;
-  doc.text(ISSUER.taxId, centerX, y, { align: "center" });
-  return y;
+  const tx = left + (logoW ? logoW + 5 : 0);
+  const tw = PAGE.w - right - tx;
+  if (compact) {
+    let cy = top + 4.2;
+    doc.setTextColor(30, 41, 59);
+    const hb = Boolean(doc.getFontList?.()?.THSarabun?.includes?.("bold"));
+    doc.setFont("THSarabun", hb ? "bold" : "normal"); doc.setFontSize(14);
+    doc.text(ISSUER.nameTh, tx, cy);
+    doc.setFont("THSarabun", "normal"); doc.setFontSize(9); doc.setTextColor(100, 116, 139);
+    doc.splitTextToSize(`${ISSUER.address}  ${ISSUER.taxId || ""}`.trim(), tw).forEach((ln) => { cy += 3.8; doc.text(ln, tx, cy); });
+    doc.setTextColor(0, 0, 0);
+    return Math.max(top + logoH, cy + 1);
+  }
+  let y = top + 5;
+  doc.setTextColor(30, 41, 59);
+  // ⚠️ บางเอกสารไม่ได้ฝังฟอนต์ตัวหนา — ใช้ตัวหนาเฉพาะเมื่อมีจริง (ไม่งั้น jsPDF ถอยไปฟอนต์ที่ไม่มีภาษาไทย)
+  const hasBold = Boolean(doc.getFontList?.()?.THSarabun?.includes?.("bold"));
+  doc.setFont("THSarabun", hasBold ? "bold" : "normal"); doc.setFontSize(16.5);
+  doc.text(ISSUER.nameTh, tx, y);
+  doc.setFont("THSarabun", "normal"); doc.setFontSize(10.5); doc.setTextColor(100, 116, 139);
+  y += 4.8; doc.text(ISSUER.nameEn, tx, y);
+  doc.setFontSize(10);
+  doc.splitTextToSize(ISSUER.address, tw).forEach((ln) => { y += 4.3; doc.text(ln, tx, y); });
+  if (ISSUER.taxId) { y += 4.3; doc.text(ISSUER.taxId, tx, y); }
+  doc.setTextColor(0, 0, 0);
+  return Math.max(top + logoH, y + 1.2);
 };
 
 /**

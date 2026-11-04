@@ -386,7 +386,7 @@ export default function MyJobs() {
   }, [fetchJobs]);
 
   // ✅ (20 ต.ค. 2569 ผู้ใช้: "งานของฉันให้มีงานวันนี้แยกตามเดิม และเด้งงานที่ยังไม่รับทราบ/บันทึกเข้างานขึ้นก่อน กันลืม")
-  const todayCheckedIds = useTodayCheckins();
+  const todayCheckedIds = useTodayCheckins(userData?.userId); // ✅ เข้างานแยกรายคน — นับเฉพาะที่ฉันกดแล้ว
   /** งานกลุ่มนี้ต้องทำอะไรด่วน (checkin/ack/confirm) — ดูทุกวันของงาน */
   const attentionOfGroup = useCallback((sessions) => {
     let best = null;

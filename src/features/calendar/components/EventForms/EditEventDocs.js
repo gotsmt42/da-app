@@ -5,15 +5,18 @@
  *    กล่องสรุป (ตัวเดียวกับการ์ดหน้าการดำเนินงาน) → กด "ดู / ตรวจเอกสาร" = กางช่องเอกสาร 4 ชนิดในฟอร์มนี้เลย
  *    ดูไฟล์ (เลื่อนดูไฟล์อื่นในช่องเดียวกันได้) · แนบ/ลบได้ตามสิทธิ์ (ชุดเดียวกับหน้าการดำเนินงาน)
  * ⚠️ อยู่ในกล่อง Swal — FileUploadSection โหมด embedded (ไม่เปิด Swal ซ้อน)
+ * 🔁 (4 พ.ย. 2569 ผู้ใช้: "ตรวจเอกสารให้กดเปิดเด้งขึ้นมา ไม่ต้องเลื่อนลงดูยาก") เดิมกางลงในฟอร์ม (ต้องเลื่อนหา)
+ *    → เปิดเป็นหน้าต่างเด้งขึ้น (MobileSheet: มือถือ = แผ่นเลื่อนขึ้น · คอม = กล่องกลางจอ) ซ้อนบนฟอร์มแก้ไขงาน
  */
 import { useState } from "react";
-import { Box, Stack, Collapse, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
+import MobileSheet from "@/shared/ui/MobileSheet";
 import EventService from "@/shared/services/EventService";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { FileUploadSection, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
 
-const LABEL = { report: "Service Report", quotation: "ใบเสนอราคาเพิ่มเติม", invoice: "ใบวางบิล", completion: "ใบส่งมอบงาน" };
+const LABEL = { report: "Service Report", quotation: "ใบเสนอราคาเพิ่มเติม", invoice: "เอกสารการเงิน", completion: "ใบส่งมอบงาน" };
 
 export default function EditEventDocs({ event: initial, currentUser, onChanged }) {
   const [event, setEvent] = useState(initial);
@@ -56,9 +59,11 @@ export default function EditEventDocs({ event: initial, currentUser, onChanged }
 
   return (
     <>
-      <JobDocsSummaryCard event={event} onOpen={() => setOpen((v) => !v)} openLabel={open ? "ซ่อนเอกสาร" : "ดู / ตรวจเอกสาร"} sx={{ mt: 0, mb: 1.5 }} />
-      <Collapse in={open} unmountOnExit>
-        <Stack spacing={1} sx={{ mb: 1.5 }}>
+      <JobDocsSummaryCard event={event} onOpen={() => setOpen(true)} openLabel="ดู / ตรวจเอกสาร" sx={{ mt: 0, mb: 1.5 }} />
+      <MobileSheet open={open} onClose={() => setOpen(false)} zIndex={20010} maxWidth="md"
+        title="เอกสารประจำงาน"
+        subtitle={[event.title, event.system, event.site].filter(Boolean).join(" · ")}>
+        <Stack spacing={1.25} sx={{ p: { xs: 1.25, sm: 2 } }}>
           {err && <Typography sx={{ fontSize: "0.8rem", color: "#b91c1c", px: 0.5 }}>{err}</Typography>}
           {JOB_DOC_TYPES.map((t) => (
             <Box key={t.key}>
@@ -75,8 +80,8 @@ export default function EditEventDocs({ event: initial, currentUser, onChanged }
             </Box>
           ))}
         </Stack>
-      </Collapse>
-      <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} gallery={preview.gallery}
+      </MobileSheet>
+      <FilePreviewDialog zIndex={20020} previewUrl={preview.url} previewFileName={preview.name} gallery={preview.gallery}
         onNavigate={(f) => setPreview((p) => ({ ...p, url: f.fileUrl, name: f.fileName || "" }))}
         onClose={() => setPreview({ url: null, name: "", gallery: null })} />
     </>

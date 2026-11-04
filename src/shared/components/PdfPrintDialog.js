@@ -16,10 +16,10 @@ import {
 } from "@mui/material";
 import { CloseRounded as Close, PrintRounded as Print, ShareRounded as Share, DownloadRounded as Download, OpenInNewRounded as OpenInNew, PictureAsPdfRounded as PictureAsPdf, MailOutlineRounded as MailOutline } from "@mui/icons-material";
 
-import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import { renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser } from "@/shared/utils/pdfRaster";
 import PdfPagesView from "@/shared/components/PdfPagesView";
+import { sharePdf } from "@/shared/utils/pdfShare";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 const TEXT_SUB = "#64748b";
@@ -102,21 +102,10 @@ export default function PdfPrintDialog({ open, onClose, generate, jobKey, title,
     const a = document.createElement("a");
     a.href = pdf.url; a.download = pdf.fileName; a.click();
   };
-  const handleShare = async () => {
+  // 🔁 (4 พ.ย. 2569) แชร์ = ตัวกลาง shared/utils/pdfShare (ลองแชร์จริงก่อน · ไม่ได้ = ดาวน์โหลดให้ + บอกตรงๆ)
+  const handleShare = () => {
     if (!pdf?.blob) return;
-    if (!window.isSecureContext) { setNotice("การแชร์ไฟล์ใช้ได้เมื่อเปิดระบบผ่านลิงก์ https เท่านั้น — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้"); return; }
-    if (isInAppBrowser()) { setNotice(IN_APP_NOTICE); return; }
-    const file = new File([pdf.blob], pdf.fileName, { type: "application/pdf" });
-    let files = canShareFile(file) ? [file] : null;
-    // ⚠️ ห้าม await ก่อน navigator.share (Safari) — ภาพเก็บ blob ไว้ตั้งแต่ตอนวาดแล้ว
-    if (!files && pages?.length) {
-      const imgs = pages.map((p, i) => new File([p.blob], `${pdf.safeName}${pages.length > 1 ? `-${i + 1}` : ""}.${p.blob.type === "image/png" ? "png" : "jpg"}`, { type: p.blob.type || "image/jpeg" }));
-      if (canShareFile(imgs[0])) files = imgs;
-    }
-    if (!files) { setNotice("เครื่องนี้แชร์ไฟล์โดยตรงไม่ได้ — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้เลย"); return; }
-    try { await navigator.share({ files, title: pdf.fileName, text: shareText || title }); } catch (err) {
-      if (err?.name !== "AbortError") setNotice("แชร์ไม่สำเร็จ — ลองใหม่ หรือใช้ปุ่มดาวน์โหลดแทน");
-    }
+    sharePdf({ blob: pdf.blob, fileName: pdf.fileName, pages, text: shareText || title, download: handleDownload, notify: setNotice });
   };
 
   const printReady = imageMode ? Boolean(pages) || rasterFailed : Boolean(pdf);

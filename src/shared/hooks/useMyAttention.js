@@ -10,7 +10,7 @@ import { isRespOrHead } from "@/shared/utils/jobFlow";
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 
 export default function useMyAttention(events, userData) {
-  const todayCheckedIds = useTodayCheckins();
+  const todayCheckedIds = useTodayCheckins(userData?.userId); // ✅ เข้างานแยกรายคน — นับเฉพาะที่ฉันกดแล้ว
   return useMemo(() => {
     const out = { checkin: [], ack: [], confirm: [] };
     const seen = new Set();

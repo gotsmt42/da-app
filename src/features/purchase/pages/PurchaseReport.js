@@ -23,8 +23,6 @@ import {
   ReceiptLongRounded as ReceiptLong, StorefrontRounded as Storefront, TimerRounded as Timer, Inventory2Rounded as Inventory2,
   ExpandMoreRounded as ExpandMore, CloseRounded as Close, TuneRounded as Tune, CalendarMonthRounded as CalendarMonth,
 } from "@mui/icons-material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -42,6 +40,7 @@ import {
 } from "../prMeta";
 import { buildPrReport, isLate, pendingReceiveOf, amountOf } from "../utils/prReport";
 import { PAGE_SX } from "@/shared/ui/PageKit";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const PRESETS = [
   { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
@@ -651,10 +650,7 @@ export default function PurchaseReport() {
       )}
       <Box sx={{ flex: 1, display: { xs: "none", md: "block" } }} />
       <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>{periodLabel} · อิงวันที่ของใบขอซื้อ</Typography>
-      <Button variant="outlined" startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />} onClick={doExport} disabled={loading || exporting || !rows.length}
-        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: TEXT_MAIN, borderColor: BORDER_MAIN, "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
-        {exporting ? "กำลังส่งออก..." : "ส่งออก Excel"}
-      </Button>
+      <ExportExcelButton onClick={doExport} loading={exporting} disabled={loading || !rows.length} />
     </Stack>
   );
 

@@ -35,8 +35,21 @@ export const workValueOfRows = (rows) => {
   return hit ? Number(hit.workValue) : null;
 };
 
-/** แปลงงานดิบ → แถว "คน × งาน" (เรียงวันล่าสุดก่อน) */
-export function buildWorkerEntries(events = []) {
+/** ชื่อใน attendance เป็น "ชื่อ นามสกุล" — เทียบกับชื่อในทีม (ชื่อเล่น/ชื่อจริงคำแรก) */
+const sameName = (full, name) => full === name || String(full || "").split(" ")[0] === name;
+
+/**
+ * แปลงงานดิบ → แถว "คน × งาน" (เรียงวันล่าสุดก่อน)
+ * @param attendance แถวบันทึกเข้างาน (GET /attendance) — ✅ (4 พ.ย. 2569 ผู้ใช้: "เข้างานแยกรายคน ... ให้สอดคล้องกับที่จะแยกดูผลงาน และมูลค่างานแยกคน")
+ *        ใส่มา = แต่ละแถวรู้ว่าคนนั้น "กดเข้างานจริง" กี่วัน เวลาไหน (checkIns) · ไม่ใส่ = checkIns ว่าง
+ */
+export function buildWorkerEntries(events = [], attendance = []) {
+  const attByEvent = new Map();
+  (attendance || []).forEach((a) => {
+    const k = String(a.eventId);
+    if (!attByEvent.has(k)) attByEvent.set(k, []);
+    attByEvent.get(k).push(a);
+  });
   const jobs = new Map();
   events.forEach((e) => {
     if (!e || e.department === "sales" || e.unscheduled || !(e.start || e.date)) return;
@@ -68,8 +81,15 @@ export function buildWorkerEntries(events = []) {
         if (e.isAfter(last)) last = e;
         days += Math.max(1, e.diff(s, "days") + 1);
       });
+      const ids = new Set(x.sessions.map((r) => String(r._id)));
+      const member = x.sessions.flatMap((r) => r.teamMembers || []).find((m) => m?.name === name);
+      const checkIns = [...ids].flatMap((id) => attByEvent.get(id) || [])
+        .filter((a) => a.checkIn?.at && ((member?.userId && String(a.userId) === String(member.userId)) || sameName(a.userName, name)))
+        .map((a) => a.checkIn.at)
+        .sort();
       out.push({
         id: `${jobKey}|${name}`,
+        checkIns,
         jobKey,
         name,
         lead: x.lead,
@@ -118,9 +138,10 @@ export function filterEntries(entries, { from, to, person = "all", q = "", statu
   });
 }
 
-const emptyAgg = (key) => ({ key, visits: 0, lead: 0, days: 0, valued: 0, missing: 0, total: 0, people: new Set(), jobs: new Set(), last: "" });
+const emptyAgg = (key) => ({ key, visits: 0, lead: 0, days: 0, valued: 0, missing: 0, total: 0, checked: 0, checkInDays: 0, people: new Set(), jobs: new Set(), last: "" });
 const add = (agg, r) => {
   agg.visits += 1;
+  if (r.checkIns?.length) { agg.checked += 1; agg.checkInDays += r.checkIns.length; }
   if (r.lead) agg.lead += 1;
   agg.days += r.days;
   if (r.value === null) agg.missing += 1; else { agg.valued += 1; agg.total += r.value; }

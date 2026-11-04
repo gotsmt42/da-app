@@ -23,8 +23,6 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SelectField from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { thaiDate, THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -36,6 +34,7 @@ import {
 } from "../expenseMeta";
 import KindBadge from "../components/KindBadge";
 import StatusBadge from "../components/StatusBadge";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const PRESETS = [
   { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
@@ -861,10 +860,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
       )}
       <Box sx={{ flex: 1, display: { xs: "none", md: "block" } }} />
       <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>{periodLabel} · อิงวันที่ของใบ Advance</Typography>
-      <Button variant="outlined" startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />} onClick={doExport} disabled={loading || exporting || !hasData}
-        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: TEXT_MAIN, borderColor: BORDER_MAIN, "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
-        {exporting ? "กำลังส่งออก..." : "ส่งออก Excel"}
-      </Button>
+      <ExportExcelButton onClick={doExport} loading={exporting} disabled={loading || !hasData} />
     </Stack>
   );
 

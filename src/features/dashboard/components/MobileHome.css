@@ -377,3 +377,29 @@
 }
 .mh .mh-quick .mh-icon { font-size: 21px; opacity: 0.92; filter: none; }
 .mh-quick .mh-icon-wrap .mh-badge { top: -4px; right: -6px; }
+
+/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ปุ่มงานของฉันทำให้ชัดเจน สังเกตง่าย" → "สีเข้มไป ไม่มืออาชีพ")
+   การ์ดพื้นขาวอมแดงอ่อน ขอบแดงอ่อน · ไอคอนขาวในวงกลมแดงทึบ (จุดเด่นเดียว) · ชื่อตัวใหญ่สีเข้ม · ปุ่ม "เปิด" แดงทึบด้านขวา */
+.mh .mh-myjobs:not(.mh-myjobs--plain) {
+  margin-top: 0;
+  padding: 12px 12px 12px 12px;
+  gap: 12px;
+  border: 1px solid #fbcaca;
+  border-radius: 16px;
+  background: #fff5f5;
+  box-shadow: 0 6px 16px -12px rgba(220, 38, 38, 0.45);
+  color: var(--mh-ink);
+}
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-art { width: 46px; height: 46px; background: #dc2626; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-icon { font-size: 24px; filter: none; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-title { font-size: 1.08rem; font-weight: 800; color: #0f172a; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-sum { font-size: 0.82rem; color: #475569; margin-top: 2px; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-sum b { font-weight: 700; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-sum i { color: #cbd5e1; }
+.mh .mh-myjobs-flag { font-weight: 800; }
+.mh .mh-myjobs-cta {
+  margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px;
+  padding: 6px 6px 6px 12px; border-radius: 999px; background: #dc2626; color: #fff;
+  font-size: 0.82rem; font-weight: 800;
+}
+.mh .mh-myjobs-cta .mh-myjobs-go { margin-left: 0; font-size: 19px; color: #fff; }

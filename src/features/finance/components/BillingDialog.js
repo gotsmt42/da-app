@@ -25,11 +25,32 @@ import { isImageFile } from "@/shared/utils/jobDocTypes";
 import { billingStatus, previewAmounts, paidTotal, baht, perRoundAmount, BILLING_STATE_META } from "@/shared/utils/billing";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
+import { renderPdfToImages, revokePageImages } from "@/shared/utils/pdfRaster";
+
+/** ✅ (4 พ.ย. 2569 ผู้ใช้: "ทำให้สวยงาม และสมบูรณ์ ใช้ง่าย") PDF ใบวางบิล: วาดหน้าแรกเป็นภาพในช่องดูใหญ่ (เดิมเห็นแค่ไอคอนไฟล์ ต้องกดเปิดทุกครั้ง) · ไม่ได้ = ไอคอนเดิม */
+const usePdfFirstPage = (url, enabled) => {
+  const [img, setImg] = useState(null);
+  useEffect(() => {
+    if (!enabled || !url) { setImg(null); return undefined; }
+    let alive = true;
+    let pages = [];
+    setImg(null);
+    (async () => {
+      try {
+        const blob = await (await fetch(url)).blob();
+        let first = false;
+        pages = await renderPdfToImages(blob, { dpi: 110, isCancelled: () => first || !alive, onPage: (p) => { if (p.length) first = true; } });
+        if (alive && pages[0]) setImg(pages[0].url);
+      } catch { /* แสดงไอคอนไฟล์แทน */ }
+    })();
+    return () => { alive = false; revokePageImages(pages); };
+  }, [url, enabled]);
+  return img;
+};
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
 const BORDER_MAIN = "#e6e9ef";
-const SURFACE_SUBTLE = "#f8fafc";
 
 /**
  * ✅ การ์ดครอบแต่ละส่วนของกล่อง — กล่องนี้มี "ฟอร์มอิสระ 2 ชุด" อยู่ในหน้าเดียว (ใบวางบิล กับ การรับเงิน)
@@ -52,22 +73,22 @@ const ThaiDateField = ThaiDatePicker;
 const SectionCard = ({ title, caption, right, children, sx, accent }) => (
   <Box
     sx={{
-      border: `1px solid ${accent ? alpha(accent, 0.28) : BORDER_MAIN}`,
+      border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff",
       borderRadius: 2.5, overflow: "hidden", ...sx,
     }}
   >
     <Stack
       direction="row" alignItems="center" spacing={1}
       sx={{
-        px: 1.75, py: 1.1,
-        bgcolor: accent ? alpha(accent, 0.07) : SURFACE_SUBTLE,
-        borderBottom: `1px solid ${accent ? alpha(accent, 0.22) : BORDER_MAIN}`,
+        px: 1.75, py: 1.25,
+        bgcolor: "#fff",
+        borderBottom: `1px solid ${BORDER_MAIN}`,
       }}
     >
       {/* แถบสีบางๆ ด้านซ้าย — จุดยึดสายตาว่ากำลังอยู่ส่วนไหน โดยไม่ต้องระบายสีทั้งหัวการ์ดจนแสบตา */}
       {accent && <Box sx={{ width: 3, alignSelf: "stretch", borderRadius: 3, bgcolor: accent, flexShrink: 0 }} />}
       <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", lineHeight: 1.3 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3, color: "#0f172a" }}>{title}</Typography>
         {caption && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{caption}</Typography>}
       </Box>
       {right}
@@ -98,6 +119,8 @@ const emptyPayment = () => ({
  * ⚠️ ห้าม fallback ไปที่ jobValue เต็มจำนวนเด็ดขาด — นั่นคือบั๊กที่กำลังแก้อยู่
  */
 const defaultAmount = (event) => {
+  // ✅ (4 พ.ย. 2569 ผู้ใช้: "ทำให้สวยงาม และสมบูรณ์ ใช้ง่าย") มูลค่างานครั้งนี้ (ใส่ไว้ตอนลงงาน/ขอปิดงาน) = ยอดของครั้งนี้ตรงที่สุด → ใช้ก่อน
+  if (event.workValue !== null && event.workValue !== undefined && event.workValue !== "" && Number(event.workValue) > 0) return Number(event.workValue);
   const split = perRoundAmount(event.jobValue, event.visitCount, event.time);
   if (split !== null) return split;
   return event.quotationAmount || "";
@@ -105,6 +128,7 @@ const defaultAmount = (event) => {
 
 /** ข้อความอธิบายว่ายอดตั้งต้นมาจากไหน — ไม่มีคำอธิบาย = คนกรอกไม่มีทางรู้ว่าเลขนี้เชื่อได้แค่ไหน */
 const amountHint = (event) => {
+  if (event.workValue !== null && event.workValue !== undefined && event.workValue !== "" && Number(event.workValue) > 0) return `จากมูลค่างานครั้งนี้ ${baht(event.workValue)}`;
   const rounds = Number(event.visitCount);
   const total = Number(event.jobValue);
   if (!Number.isFinite(total) || total <= 0) return "";
@@ -118,12 +142,14 @@ const amountHint = (event) => {
  * @param {Function} props.onSaved   เรียกทุกครั้งที่บันทึกสำเร็จ พร้อม event ตัวใหม่จาก server
  *                                   (ผู้เรียกต้องเอาไปอัปเดต state ของตัวเอง กล่องนี้ไม่รู้จักที่มาของข้อมูล)
  */
-export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
+/** @param zIndex เปิดซ้อนบนกล่อง Swal/แผ่นเอกสาร (ฟอร์มแก้ไขงาน) — ส่ง 20030 ขึ้นไป (4 พ.ย. 2569) */
+export default function BillingDialog({ event, onClose, onSaved, subtitle, zIndex }) {
   const isMobile = useMediaQuery("(max-width:900px)");
   const [form, setForm] = useState(emptyInvoice);
   const [payForm, setPayForm] = useState(emptyPayment);
   const [saving, setSaving] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
+  const [mainFileId, setMainFileId] = useState(null); // ไฟล์ใบวางบิลที่แสดงในช่องดูใหญ่ (ซ้าย)
   const [previewFiles, setPreviewFiles] = useState(null); // ไฟล์ทั้งช่อง — เลื่อนดูต่อกันได้
   // ⚠️ ใช้ ref + .click() แทน <Button component="label"> ที่ครอบ <input hidden> — วิธี label ใช้ได้
   // ในหลายเบราว์เซอร์แต่ไม่รับประกัน โดยเฉพาะเมื่อ MUI ห่อ children ด้วย span หลายชั้น
@@ -305,6 +331,10 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
     }
   };
 
+  // ⚠️ hook ต้องอยู่ก่อน return ใดๆ — คิดไฟล์หลักจาก event?. ตรงนี้
+  const mainFile = (event?.invoiceFiles || []).find((f) => f._id === mainFileId) || (event?.invoiceFiles || [])[0] || null;
+  const mainIsImage = mainFile ? isImageFile(mainFile) : false;
+  const pdfPage = usePdfFirstPage(mainFile?.fileUrl, Boolean(mainFile) && !mainIsImage && /\.pdf($|\?)/i.test(String(mainFile?.fileName || mainFile?.fileUrl || "")));
   if (!event) return null;
 
   // ⚠️ ช่างอัปโหลดผ่านหน้าการดำเนินงานด้วย type="invoice" → เก็บลง invoiceFiles (ดู models/Events.js)
@@ -365,20 +395,29 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
   // การรับเงิน) ต่อกันลงมาในคอลัมน์แคบๆ ทำให้ต้องเลื่อนขึ้นลงตลอดเวลาที่กรอก และบนจอคอมก็เหลือ
   // พื้นที่ว่างสองข้างเปล่าๆ — ขยายเป็น lg แล้วจัด 2 คอลัมน์บนจอกว้าง (ดูด้านล่าง) ให้เห็นครบในจอเดียว
   return (
-    <Dialog open onClose={() => !saving && onClose?.()} fullWidth maxWidth="lg" fullScreen={isMobile}>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: "1rem", minWidth: 0 }} noWrap>
-            {event.company || "ไม่ระบุลูกค้า"}
-          </Typography>
-          <Chip
-            size="small" label={st.label}
-            sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(meta.color, 0.12), color: meta.color }}
-          />
+    <Dialog open onClose={() => !saving && onClose?.()} fullWidth maxWidth="lg" fullScreen={isMobile}
+      {...(zIndex ? { sx: { zIndex }, disableEnforceFocus: true } : {})}>
+      {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าบันทึกวางบิลให้แก้ไขให้สอดคล้องปัจจุบัน ux ui ให้มองง่ายทำง่าย เข้าธีม")
+          หัวกล่องแบบเดียวกับหน้าต่างอื่นในแอป: ไอคอน · ชื่อกล่อง (บอกว่ากำลังทำอะไร) · งานไหน · สถานะ · ปุ่มปิด */}
+      <DialogTitle sx={{ p: 0 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 2, sm: 2.5 }, py: 1.5 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.12), color: ACCENT }}>
+            <ReceiptLong sx={{ fontSize: 22 }} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography noWrap sx={{ fontWeight: 900, fontSize: "1.12rem", color: "#0f172a" }}>
+                {event.billing?.invoicedAt ? "วางบิล / รับเงิน" : "บันทึกการวางบิล"}
+              </Typography>
+              <Chip size="small" label={st.label}
+                sx={{ height: 22, fontSize: "0.72rem", fontWeight: 800, bgcolor: alpha(meta.color, 0.12), color: meta.color }} />
+            </Stack>
+            <Typography noWrap sx={{ fontSize: "0.8rem", color: TEXT_SUB }}>
+              {subtitle || [event.site || event.company, event.company && event.site ? event.company : "", [event.title, event.system].filter(Boolean).join(" · "), event.time ? `ครั้งที่ ${event.time}` : ""].filter(Boolean).join(" · ")}
+            </Typography>
+          </Box>
+          <IconButton onClick={() => !saving && onClose?.()} aria-label="ปิด"><Close /></IconButton>
         </Stack>
-        <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-          {subtitle || [event.site, event.title, event.time ? `ครั้งที่ ${event.time}` : ""].filter(Boolean).join(" · ")}
-        </Typography>
       </DialogTitle>
 
       <DialogContent dividers>
@@ -411,6 +450,191 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
             ที่ไม่มี hover ให้โผล่ตลอด) — การ์ดเหลือความสูงราวครึ่งเดียว สองคอลัมน์จึงใกล้เคียงกัน */}
       
 
+  <SectionCard
+          title={`เอกสารการเงิน (ไฟล์)${attachments.length ? ` · ${attachments.length}` : ""}`}
+          caption={attachments.length
+            ? "กดที่ไฟล์เพื่อดูขนาดเต็ม แล้วกรอกยอดตามใบจริง"
+            : "แนบรูป/PDF ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ ไว้เป็นหลักฐานคู่กับยอดที่กรอก"}
+          right={(
+            <Tooltip title="แนบไฟล์ใบวางบิล (รูป หรือ PDF)">
+              <span>
+                <Button
+                  size="small" disabled={saving}
+                  startIcon={<AttachFile sx={{ fontSize: 15 }} />}
+                  onClick={() => invoiceInputRef.current?.click()}
+                  sx={{
+                    textTransform: "none", fontWeight: 700, fontSize: "0.72rem", borderRadius: 1.5,
+                    py: 0.15, px: 1, minHeight: 0, color: ACCENT, bgcolor: alpha(ACCENT, 0.1),
+                    "&:hover": { bgcolor: alpha(ACCENT, 0.2) },
+                  }}
+                >
+                  แนบไฟล์
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+        >
+          {/* ✅ (4 พ.ย. 2569 ผู้ใช้: "หน้าบันทึกวางบิลให้แก้ไขให้สอดคล้องปัจจุบัน ux ui ให้มองง่ายทำง่าย เข้าธีม") ช่องดูใบวางบิลขนาดใหญ่ — ดูใบจริงไปพร้อมกรอกยอดด้านขวา ไม่ต้องกดเปิดทีละครั้ง */}
+          {mainFile && (
+            <Box sx={{ mb: 1.25 }}>
+              <Box onClick={() => { setPreviewCaption("ใบวางบิล"); setPreviewFiles(attachments); setPreviewFile(mainFile); }}
+                sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: `1px solid ${BORDER_MAIN}`, bgcolor: "#f1f5f9", cursor: "zoom-in",
+                  height: { xs: 260, md: 420 }, display: "grid", placeItems: "center" }}>
+                {mainIsImage || pdfPage
+                  ? <Box component="img" src={mainIsImage ? mainFile.fileUrl : pdfPage} alt={mainFile.fileName}
+                      sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", bgcolor: "#fff", boxShadow: "0 2px 10px rgba(15,23,42,.12)" }} />
+                  : (
+                    <Stack alignItems="center" spacing={1}>
+                      <InsertDriveFile sx={{ fontSize: 48, color: TEXT_SUB }} />
+                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#334155", px: 2, textAlign: "center" }}>{mainFile.fileName || "ไฟล์ใบวางบิล"}</Typography>
+                      <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>กำลังเตรียมภาพตัวอย่าง… หรือกดเพื่อเปิดดู</Typography>
+                    </Stack>
+                  )}
+                <Stack direction="row" spacing={0.75} sx={{ position: "absolute", left: 8, right: 8, bottom: 8, alignItems: "center" }}>
+                  <Box sx={{ px: 1, py: 0.3, borderRadius: 1.5, bgcolor: alpha("#0f172a", 0.65), color: "#fff", fontSize: "0.72rem", fontWeight: 700, maxWidth: "70%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {mainFile.fileName || "ใบวางบิล"} · กดเพื่อดูขนาดเต็ม
+                  </Box>
+                </Stack>
+                <Tooltip title="ลบไฟล์นี้">
+                  <span style={{ position: "absolute", top: 8, right: 8 }}>
+                    <IconButton size="small" disabled={saving}
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteFileId(mainFile._id); }}
+                      sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, color: TEXT_SUB, "&:hover": { bgcolor: "#fef2f2", color: "#dc2626" } }}>
+                      <DeleteOutline sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                {confirmDeleteFileId === mainFile._id && (
+                  <Stack onClick={(e) => e.stopPropagation()} alignItems="center" justifyContent="center" spacing={1}
+                    sx={{ position: "absolute", inset: 0, bgcolor: alpha("#0f172a", 0.7), cursor: "default" }}>
+                    <Typography sx={{ color: "#fff", fontWeight: 800 }}>ลบไฟล์ใบวางบิลนี้?</Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Button size="small" variant="contained" color="error" disableElevation disabled={saving}
+                        onClick={() => removeInvoiceFile(mainFile._id)} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>ลบไฟล์</Button>
+                      <Button size="small" variant="outlined" onClick={() => setConfirmDeleteFileId(null)}
+                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, color: "#fff", borderColor: alpha("#fff", 0.6) }}>ยกเลิก</Button>
+                    </Stack>
+                  </Stack>
+                )}
+              </Box>
+              {scanEnabled && mainIsImage && !event.billing?.invoicedAt && (
+                <Button fullWidth variant="outlined" startIcon={scanning === mainFile._id ? <CircularProgress size={15} /> : <AutoAwesome />}
+                  disabled={Boolean(scanning) || saving} onClick={() => scanInvoice(mainFile)}
+                  sx={{ mt: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#7c3aed", borderColor: alpha("#7c3aed", 0.4), "&:hover": { bgcolor: alpha("#7c3aed", 0.06), borderColor: "#7c3aed" } }}>
+                  {scanning === mainFile._id ? "AI กำลังอ่านใบวางบิล…" : "ให้ AI อ่านเลขที่และยอดจากใบนี้"}
+                </Button>
+              )}
+            </Box>
+          )}
+          {attachments.length === 0 ? (
+            <Box component="button" type="button" onClick={() => invoiceInputRef.current?.click()} disabled={saving}
+              sx={{ width: "100%", py: 4, borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: "#f8fafc", color: TEXT_SUB, cursor: "pointer",
+                fontFamily: "inherit", fontSize: "0.86rem", fontWeight: 700, display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75,
+                "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+              <AttachFile />
+              ยังไม่มีไฟล์ — กดเพื่อแนบใบวางบิล / ใบกำกับภาษี / ใบเสร็จ (รูปหรือ PDF)
+            </Box>
+          ) : attachments.length < 2 ? null : (
+            <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
+              {attachments.map((f) => {
+                const isImage = isImageFile(f);
+                const pendingDelete = confirmDeleteFileId === f._id;
+                return (
+                  <Box key={f._id || f.fileUrl} sx={{ flexShrink: 0, width: 66 }}>
+                    <Box
+                      sx={{
+                        position: "relative", width: 66, height: 66, borderRadius: 1.5, overflow: "hidden",
+                        border: "1px solid", borderColor: "divider", bgcolor: alpha("#0f172a", 0.03),
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        // ⚠️ จอสัมผัสไม่มี hover — ปุ่มที่ซ่อนไว้รอ hover จะกดไม่ได้เลยตลอดกาล
+                        // จึงโชว์ตลอดบนจอเล็ก แล้วซ่อนรอ hover เฉพาะจอที่มีเมาส์จริงๆ
+                        "& .tileAction": { opacity: { xs: 1, md: 0 }, transition: "opacity .15s" },
+                        "&:hover": { borderColor: ACCENT },
+                        "&:hover .tileAction": { opacity: 1 },
+                      }}
+                    >
+                      <Box
+                        onClick={() => setMainFileId(f._id)}
+                        sx={{ position: "absolute", inset: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                          outline: mainFile?._id === f._id ? `2px solid ${ACCENT}` : "none", outlineOffset: -2 }}
+                      >
+                        {isImage
+                          ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <InsertDriveFile sx={{ fontSize: 26, color: TEXT_SUB }} />}
+                      </Box>
+
+                      {/* ยืนยันลบในตัวการ์ดเอง — ไม่เปิด modal ซ้อน modal (กล่องนี้เป็น Dialog อยู่แล้ว) */}
+                      {pendingDelete ? (
+                        <Stack
+                          alignItems="center" justifyContent="center" spacing={0.25}
+                          sx={{ position: "absolute", inset: 0, bgcolor: alpha("#0f172a", 0.72) }}
+                        >
+                          <Typography sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 700 }}>ลบไฟล์นี้?</Typography>
+                          <Stack direction="row" spacing={0.25}>
+                            <Button
+                              size="small" disabled={saving} onClick={() => removeInvoiceFile(f._id)}
+                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 800, color: "#fca5a5", textTransform: "none" }}
+                            >
+                              ลบ
+                            </Button>
+                            <Button
+                              size="small" onClick={() => setConfirmDeleteFileId(null)}
+                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 700, color: "#e6e9ef", textTransform: "none" }}
+                            >
+                              ยกเลิก
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      ) : (
+                        <>
+                          <Tooltip title="ลบไฟล์นี้">
+                            <IconButton
+                              className="tileAction" size="small" disabled={saving}
+                              onClick={() => setConfirmDeleteFileId(f._id)}
+                              sx={{
+                                position: "absolute", top: 1, right: 1, p: 0.2,
+                                bgcolor: alpha("#0f172a", 0.55), color: "#fff",
+                                "&:hover": { bgcolor: "#dc2626" },
+                              }}
+                            >
+                              <Close sx={{ fontSize: 12 }} />
+                            </IconButton>
+                          </Tooltip>
+                          {/* ✅ ให้ AI อ่านยอดจากรูปมาเติมในฟอร์ม — เฉพาะไฟล์รูป (PDF อ่านไม่ได้)
+                              ⚠️ โผล่เฉพาะเมื่อเซิร์ฟเวอร์เปิดใช้งานไว้จริง ไม่งั้นกดแล้วเจอ error เปล่าๆ */}
+                          {scanEnabled && isImage && !event.billing?.invoicedAt && (
+                            <Tooltip title="ให้ AI อ่านยอดจากรูปนี้มาเติมในฟอร์ม">
+                              <IconButton
+                                className="tileAction" size="small" disabled={Boolean(scanning) || saving}
+                                onClick={() => scanInvoice(f)}
+                                sx={{
+                                  position: "absolute", bottom: 1, right: 1, p: 0.2,
+                                  bgcolor: alpha("#0f172a", 0.55), color: "#e9d5ff",
+                                  "&:hover": { bgcolor: "#8b5cf6", color: "#fff" },
+                                }}
+                              >
+                                {scanning === f._id
+                                  ? <CircularProgress size={11} thickness={6} sx={{ color: "#e9d5ff" }} />
+                                  : <AutoAwesome sx={{ fontSize: 12 }} />}
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                    <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, fontSize: "0.58rem", mt: 0.2 }} noWrap>
+                      {f.fileName || "ไฟล์แนบ"}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          )}
+        </SectionCard>
+          </Box>
+
+          {/* ── คอลัมน์ขวา: ข้อมูลใบวางบิล → การรับเงิน (ลำดับที่ทำจริง) ── */}
+          <Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
         {/* ⚠️ ผลจาก AI เป็น "ข้อเสนอให้ตรวจ" ไม่ใช่ค่าที่บันทึกแล้ว — ต้องบอกให้ชัดที่สุดเท่าที่ทำได้
             เพราะเป็นตัวเลขการเงินที่ถ้าผิดแล้วออกใบกำกับภาษี/แจ้งลูกค้าไปแล้วตามแก้ยากมาก
             ⚠️ ใช้ severity ตามความมั่นใจที่โมเดลบอกมา ไม่ใช่ success เสมอ — "อ่านได้" กับ "อ่านได้ถูก"
@@ -505,147 +729,21 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
 
         {/* ปุ่มบันทึกของ "ส่วนใบวางบิล" — อยู่มุมขวาล่างของการ์ดตัวเอง ไม่ปนกับปุ่มของส่วนรับเงิน */}
         <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}>
-          <Button variant="contained" onClick={saveInvoice} disabled={saving || !form.amountBeforeVat}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5, "&:hover": { bgcolor: "#0e7490" } }}>
+          <Button variant="contained" disableElevation fullWidth onClick={saveInvoice} disabled={saving || !form.amountBeforeVat}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 800, fontSize: "0.95rem", borderRadius: 2, py: 1.1, "&:hover": { bgcolor: "#0e7490" } }}>
             {saving ? "กำลังบันทึก..." : event.billing?.invoicedAt ? "อัปเดตใบวางบิล" : "บันทึกการวางบิล"}
           </Button>
         </Stack>
+        {!form.amountBeforeVat && (
+          <Typography sx={{ mt: 0.75, fontSize: "0.76rem", color: TEXT_SUB, textAlign: "center" }}>กรอก "ยอดก่อน VAT" เพื่อบันทึก</Typography>
+        )}
         </SectionCard>
-  <SectionCard
-          sx={{ mb: 2 }}
-          title={`ไฟล์ใบวางบิล${attachments.length ? ` (${attachments.length})` : ""}`}
-          caption={attachments.length
-            ? "กดที่ไฟล์เพื่อดูขนาดเต็ม แล้วกรอกยอดตามใบจริง"
-            : "แนบรูป/PDF ใบวางบิลไว้เป็นหลักฐานคู่กับยอดที่กรอก"}
-          right={(
-            <Tooltip title="แนบไฟล์ใบวางบิล (รูป หรือ PDF)">
-              <span>
-                <Button
-                  size="small" disabled={saving}
-                  startIcon={<AttachFile sx={{ fontSize: 15 }} />}
-                  onClick={() => invoiceInputRef.current?.click()}
-                  sx={{
-                    textTransform: "none", fontWeight: 700, fontSize: "0.72rem", borderRadius: 1.5,
-                    py: 0.15, px: 1, minHeight: 0, color: ACCENT, bgcolor: alpha(ACCENT, 0.1),
-                    "&:hover": { bgcolor: alpha(ACCENT, 0.2) },
-                  }}
-                >
-                  แนบไฟล์
-                </Button>
-              </span>
-            </Tooltip>
-          )}
-        >
-          {attachments.length === 0 ? (
-            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-              ยังไม่มีไฟล์แนบ — กด "แนบไฟล์" เพื่ออัปโหลดใบวางบิล
-            </Typography>
-          ) : (
-            <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-              {attachments.map((f) => {
-                const isImage = isImageFile(f);
-                const pendingDelete = confirmDeleteFileId === f._id;
-                return (
-                  <Box key={f._id || f.fileUrl} sx={{ flexShrink: 0, width: 66 }}>
-                    <Box
-                      sx={{
-                        position: "relative", width: 66, height: 66, borderRadius: 1.5, overflow: "hidden",
-                        border: "1px solid", borderColor: "divider", bgcolor: alpha("#0f172a", 0.03),
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        // ⚠️ จอสัมผัสไม่มี hover — ปุ่มที่ซ่อนไว้รอ hover จะกดไม่ได้เลยตลอดกาล
-                        // จึงโชว์ตลอดบนจอเล็ก แล้วซ่อนรอ hover เฉพาะจอที่มีเมาส์จริงๆ
-                        "& .tileAction": { opacity: { xs: 1, md: 0 }, transition: "opacity .15s" },
-                        "&:hover": { borderColor: ACCENT },
-                        "&:hover .tileAction": { opacity: 1 },
-                      }}
-                    >
-                      <Box
-                        onClick={() => { setPreviewCaption("ใบวางบิล"); setPreviewFiles(attachments); setPreviewFile(f); }}
-                        sx={{ position: "absolute", inset: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      >
-                        {isImage
-                          ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <InsertDriveFile sx={{ fontSize: 26, color: TEXT_SUB }} />}
-                      </Box>
 
-                      {/* ยืนยันลบในตัวการ์ดเอง — ไม่เปิด modal ซ้อน modal (กล่องนี้เป็น Dialog อยู่แล้ว) */}
-                      {pendingDelete ? (
-                        <Stack
-                          alignItems="center" justifyContent="center" spacing={0.25}
-                          sx={{ position: "absolute", inset: 0, bgcolor: alpha("#0f172a", 0.72) }}
-                        >
-                          <Typography sx={{ color: "#fff", fontSize: "0.6rem", fontWeight: 700 }}>ลบไฟล์นี้?</Typography>
-                          <Stack direction="row" spacing={0.25}>
-                            <Button
-                              size="small" disabled={saving} onClick={() => removeInvoiceFile(f._id)}
-                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 800, color: "#fca5a5", textTransform: "none" }}
-                            >
-                              ลบ
-                            </Button>
-                            <Button
-                              size="small" onClick={() => setConfirmDeleteFileId(null)}
-                              sx={{ minWidth: 0, px: 0.6, py: 0, fontSize: "0.6rem", fontWeight: 700, color: "#e6e9ef", textTransform: "none" }}
-                            >
-                              ยกเลิก
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      ) : (
-                        <>
-                          <Tooltip title="ลบไฟล์นี้">
-                            <IconButton
-                              className="tileAction" size="small" disabled={saving}
-                              onClick={() => setConfirmDeleteFileId(f._id)}
-                              sx={{
-                                position: "absolute", top: 1, right: 1, p: 0.2,
-                                bgcolor: alpha("#0f172a", 0.55), color: "#fff",
-                                "&:hover": { bgcolor: "#dc2626" },
-                              }}
-                            >
-                              <Close sx={{ fontSize: 12 }} />
-                            </IconButton>
-                          </Tooltip>
-                          {/* ✅ ให้ AI อ่านยอดจากรูปมาเติมในฟอร์ม — เฉพาะไฟล์รูป (PDF อ่านไม่ได้)
-                              ⚠️ โผล่เฉพาะเมื่อเซิร์ฟเวอร์เปิดใช้งานไว้จริง ไม่งั้นกดแล้วเจอ error เปล่าๆ */}
-                          {scanEnabled && isImage && !event.billing?.invoicedAt && (
-                            <Tooltip title="ให้ AI อ่านยอดจากรูปนี้มาเติมในฟอร์ม">
-                              <IconButton
-                                className="tileAction" size="small" disabled={Boolean(scanning) || saving}
-                                onClick={() => scanInvoice(f)}
-                                sx={{
-                                  position: "absolute", bottom: 1, right: 1, p: 0.2,
-                                  bgcolor: alpha("#0f172a", 0.55), color: "#e9d5ff",
-                                  "&:hover": { bgcolor: "#8b5cf6", color: "#fff" },
-                                }}
-                              >
-                                {scanning === f._id
-                                  ? <CircularProgress size={11} thickness={6} sx={{ color: "#e9d5ff" }} />
-                                  : <AutoAwesome sx={{ fontSize: 12 }} />}
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
-                    </Box>
-                    <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, fontSize: "0.58rem", mt: 0.2 }} noWrap>
-                      {f.fileName || "ไฟล์แนบ"}
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
-        </SectionCard>
-          </Box>
-
-          {/* ── คอลัมน์ขวา: การรับเงิน ─────────────────────────────────────── */}
-          <Box sx={{ minWidth: 0 }}>
         {/* ⚠️ ส่วนรับเงินโผล่หลังวางบิลแล้วเท่านั้น — ก่อนหน้านั้นไม่มียอดให้เทียบว่าครบหรือยัง
             (ฝั่ง server ก็ปฏิเสธด้วย 409 ไม่ได้พึ่งการซ่อนปุ่มอย่างเดียว) */}
         {st.state !== "not_invoiced" && (
           <SectionCard
             accent="#10b981"
-            sx={{ mt: { xs: 2, md: 0 } }}
             title="การรับเงิน"
             caption={`รับแล้ว ${baht(paidTotal(event.billing))} จาก ${baht(st.net)}`}
             right={st.outstanding > 0 ? (
@@ -901,8 +999,9 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
           }} />
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none" }}>ปิด</Button>
+      <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+        <Button variant="outlined" onClick={() => onClose?.()} disabled={saving}
+          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 3, color: "#334155", borderColor: BORDER_MAIN }}>ปิด</Button>
       </DialogActions>
 
       {/* ✅ ตัวดูไฟล์เป็นของกลาง (features/documents/components/FilePreviewDialog.js) — ตัวเดียวกับที่

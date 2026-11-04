@@ -10,10 +10,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import SectionTabs from "@/shared/ui/SectionTabs";
 import { useSearchParams } from "react-router-dom";
 import moment from "moment";
-import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip, Button, TextField, InputAdornment, useMediaQuery } from "@mui/material";
+import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip, TextField, InputAdornment } from "@mui/material";
 import { SearchRounded } from "@mui/icons-material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 import SelectField from "@/shared/ui/SelectField";
 import PeriodFilter from "@/features/operation/components/PeriodFilter";
 import { ReportSection, RankRow, TotalRow, Stat, TotalHero, FilterCard, PersonAvatar, R_CARD } from "@/features/operation/components/ReportKit";
@@ -32,6 +30,7 @@ import AttendanceList, { AttendanceTable } from "../components/AttendanceList";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { ON_SITE_M } from "../attendanceMeta";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 
 const fmt = (m) => m.format("YYYY-MM-DD");
@@ -76,7 +75,6 @@ export default function AttendancePage() {
   const [place, setPlace] = useState("all"); // all | on | off
   const [includeClosed, setIncludeClosed] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const isDesktop = useMediaQuery("(min-width:900px)");
   const [rows, setRows] = useState(null);
   const [pendingRows, setPendingRows] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -218,11 +216,7 @@ export default function AttendancePage() {
               </Stack>
             )}
             {tab === "list" && (
-              <Button variant="outlined" onClick={doExport} disabled={exporting || !view$.length}
-                startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />}
-                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: INK, borderColor: "#e6e9ef", whiteSpace: "nowrap", height: 40, "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
-                {exporting ? "กำลังส่งออก…" : isDesktop ? "ส่งออก Excel" : "Excel"}
-              </Button>
+              <ExportExcelButton onClick={doExport} loading={exporting} disabled={!view$.length} count={view$.length} unit="ครั้ง" />
             )}
             <Tooltip title="โหลดใหม่"><IconButton onClick={load} sx={ICON_BTN_SX}><RefreshRounded fontSize="small" /></IconButton></Tooltip>
           </>

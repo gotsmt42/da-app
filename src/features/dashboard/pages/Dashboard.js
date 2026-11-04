@@ -696,15 +696,16 @@ const Dashboard = () => {
               {showMyJobsHero && (
                 <ButtonBase component={Link} to="/technician/jobs" title={loading ? "" : myJobsSummary}
                   sx={{
-                    width: { xs: "100%", sm: "auto" }, minWidth: { sm: 260 }, gap: 1.25, px: 1.25, py: 1, borderRadius: 2.5, justifyContent: "flex-start",
-                    bgcolor: "#eff6ff", border: "1.5px solid #bfdbfe", textDecoration: "none", fontFamily: "inherit",
-                    transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#2563eb", boxShadow: "0 6px 16px -10px rgba(37,99,235,.6)" },
+                    // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ตรวจสอบสีและธีมหน้าจอคอมให้เหมือนกับมือถือ") โทนแดงแบรนด์ชุดเดียวกับหน้าแรกมือถือ
+                    width: { xs: "100%", sm: "auto" }, minWidth: { sm: 300 }, gap: 1.25, px: 1.5, py: 1.1, borderRadius: "16px", justifyContent: "flex-start",
+                    bgcolor: "#fff5f5", border: "1px solid #fbcaca", textDecoration: "none", fontFamily: "inherit", boxShadow: "0 6px 16px -12px rgba(220,38,38,.45)",
+                    transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#dc2626", boxShadow: "0 8px 20px -12px rgba(220,38,38,.6)" },
                   }}>
-                  <Box sx={{ width: 38, height: 38, borderRadius: "50%", bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <Box sx={{ width: 42, height: 42, borderRadius: "50%", bgcolor: "#dc2626", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
                     <FaUserCheck size={17} />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                    <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: "#1d4ed8", lineHeight: 1.25 }}>งานของฉัน</Typography>
+                    <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: INK, lineHeight: 1.25 }}>งานของฉัน</Typography>
                     <Typography noWrap sx={{ fontSize: "0.74rem", color: INK_2, lineHeight: 1.4 }}>
                       {loading ? "กำลังโหลด..." : (
                         <>
@@ -715,12 +716,10 @@ const Dashboard = () => {
                       )}
                     </Typography>
                   </Box>
-                  {!loading && myActiveJobsCount + myPendingApprovalCount > 0 && (
-                    <Box sx={{ minWidth: 28, height: 28, px: 0.75, borderRadius: 99, bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", fontWeight: 900, fontSize: "0.85rem", flexShrink: 0 }}>
-                      {myActiveJobsCount + myPendingApprovalCount}
-                    </Box>
-                  )}
-                  <FaChevronRight size={12} style={{ color: "#2563eb", flexShrink: 0 }} />
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0, pl: 1.5, pr: 1, py: 0.6, borderRadius: 99,
+                    bgcolor: "#dc2626", color: "#fff", fontWeight: 800, fontSize: "0.84rem" }}>
+                    เปิด<FaChevronRight size={11} />
+                  </Box>
                 </ButtonBase>
               )}
             </Box>

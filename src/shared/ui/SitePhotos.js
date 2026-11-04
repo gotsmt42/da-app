@@ -96,14 +96,25 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
     <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", ...sx }} onClick={(e) => e.stopPropagation()}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <PhotoLibraryRounded sx={{ fontSize: 18, color: MUTED }} />
-        <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: INK }}>
-          ไฟล์แนบ{files.length ? ` · ${files.length}` : ""}
-        </Typography>
+        {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "แก้เป็นหลักฐานไฟล์แนบ หรือให้เข้าใจว่างานนี้มีเอกสารอ้างอิงจริง ให้สมบูรณ์")
+            ชื่อ "หลักฐาน / ไฟล์แนบ" + บอกว่าแนบอะไรได้ + ป้ายสถานะ มี/ยังไม่มีหลักฐาน */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={0.75} useFlexGap flexWrap="wrap">
+            <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>หลักฐาน / ไฟล์แนบ</Typography>
+            <Box component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, borderRadius: "6px", px: 0.75, py: 0.15,
+              color: files.length ? "#047857" : "#b45309", bgcolor: files.length ? "#ecfdf5" : "#fffbeb" }}>
+              {files.length ? `มีหลักฐาน ${files.length} ไฟล์` : "ยังไม่มีหลักฐาน"}
+            </Box>
+          </Stack>
+          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.4 }}>
+            รูปหน้างาน · ใบสั่งงาน/PO · เอกสารอ้างอิง — ยืนยันว่างานนี้มีอยู่จริง
+          </Typography>
+        </Box>
         {canEdit && (
           <Button size="small" disabled={Boolean(uploading)} onClick={() => inputRef.current?.click()}
             startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoRounded sx={{ fontSize: 17 }} />}
             sx={{ textTransform: "none", fontWeight: 800, color: BLUE, py: 0.2, borderRadius: 2 }}>
-            {uploading ? `กำลังอัปโหลด ${uploading}` : "แนบไฟล์"}
+            {uploading ? `กำลังอัปโหลด ${uploading}` : "แนบหลักฐาน"}
           </Button>
         )}
         <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
@@ -116,7 +127,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
           color: MUTED, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
           "&:hover": { borderColor: alpha(BLUE, 0.5), color: BLUE },
         }}>
-          <AddAPhotoRounded sx={{ fontSize: 19 }} /> ยังไม่มีไฟล์แนบ · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
+          <AddAPhotoRounded sx={{ fontSize: 19 }} /> ยังไม่มีหลักฐาน · แตะเพื่อถ่ายรูปหน้างาน หรือแนบใบสั่งงาน/เอกสารอ้างอิง
         </Box>
       ) : (
         <>

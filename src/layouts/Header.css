@@ -202,7 +202,7 @@
   color: #fff;
   font-weight: 700;
   font-size: 14px;
-  border: 2px solid #243048;
+  border: 2px solid #dc2626; /* ✅ (4 พ.ย. 2569) วงแดงเหมือนรูปในเมนูข้าง */
   transition: box-shadow 0.18s ease;
 }
 
@@ -363,3 +363,6 @@
   .fix-header { padding: 0 12px !important; }
   .fix-header > .container-fluid { padding-left: 0 !important; padding-right: 0 !important; }
 }
+
+/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ขยับให้ห่างจากแถบแจ้งเตือนอีกหน่อย ดูชิดไป") รูปโปรไฟล์บนแถบหัวเว้นจากปุ่มกระดิ่ง */
+.profile-img.d-lg-block { margin-left: 14px; }

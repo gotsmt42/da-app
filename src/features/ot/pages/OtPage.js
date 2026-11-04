@@ -19,7 +19,7 @@ import {
   useMediaQuery, ButtonBase, Avatar,
 } from "@mui/material";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
-import { AddRounded as Add, AccessTimeRounded as AccessTime, SearchRounded as Search, CloseRounded as Close, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, FileDownloadRounded as FileDownload, TaskAltRounded as TaskAlt, InboxRounded as Inbox, AppsRounded as Apps, CalendarMonthRounded as CalendarMonth } from "@mui/icons-material";
+import { AddRounded as Add, AccessTimeRounded as AccessTime, SearchRounded as Search, CloseRounded as Close, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, TaskAltRounded as TaskAlt, InboxRounded as Inbox, AppsRounded as Apps, CalendarMonthRounded as CalendarMonth } from "@mui/icons-material";
 import moment from "moment";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -38,6 +38,7 @@ import {
   OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel,
 } from "../otMeta";
 import { PAGE_SX } from "@/shared/ui/PageKit";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const DARK = "#334155";
 const PAGE_SIZE = 10;
@@ -197,9 +198,8 @@ const ReportView = ({ reloadKey, canClose }) => {
         <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", minWidth: 110, textAlign: "center" }}>{periodLabel(period)}</Typography>
         <IconButton size="small" onClick={() => shift(1)} sx={{ border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}><ChevronRight /></IconButton>
         <Box sx={{ flex: 1 }} />
-        <Button variant="outlined" startIcon={<FileDownload />} disabled={!data?.people?.length}
-          onClick={async () => { const { exportOtReport } = await import("../utils/otExcelExport"); exportOtReport(data); }}
-          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: TEXT_MAIN, borderColor: BORDER_MAIN }}>ส่งออก Excel</Button>
+        <ExportExcelButton disabled={!data?.people?.length}
+          onClick={async () => { const { exportOtReport } = await import("../utils/otExcelExport"); exportOtReport(data); }} />
         {canClose && (
           <Button variant="contained" startIcon={<TaskAlt />} disabled={!data?.approvedCount} onClick={() => setConfirm(true)}
             sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
@@ -403,11 +403,7 @@ export default function OtPage({ view = "mine" }) {
             </Box>
           )}
           {view !== "report" && (
-            <Button variant="outlined" startIcon={<FileDownload />} onClick={exportExcel} disabled={exporting || loading || !visible.length}
-              sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, whiteSpace: "nowrap", color: "#334155", borderColor: "#e6e9ef", bgcolor: "#fff",
-                "& .MuiButton-startIcon": { color: "#16a34a" }, "&:hover": { borderColor: "#16a34a", bgcolor: "#fff" } }}>
-              {exporting ? "กำลังส่งออก…" : "Excel"}
-            </Button>
+            <ExportExcelButton onClick={exportExcel} loading={exporting} disabled={loading || !visible.length} count={visible.length} />
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
             sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>

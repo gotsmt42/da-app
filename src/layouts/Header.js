@@ -375,7 +375,7 @@ const Header = ({ toggleMobileSidebar }) => {
                     className="rounded-circle"
                     width="38"
                     height="38"
-                    style={{ objectFit: 'cover', border: '2px solid #243048' }}
+                    style={{ objectFit: 'cover', border: '2px solid #dc2626' }} // ✅ (4 พ.ย. 2569) วงแดงเหมือนรูปในเมนูข้าง
                   />
                 ) : (
                   <div className="header-avatar-fallback">{initials}</div>

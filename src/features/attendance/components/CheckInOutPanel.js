@@ -390,6 +390,62 @@ ${text}`);
   //    ✅ วันนี้เป็นวันเข้างานตามแผน = ให้บันทึกเข้างานได้ตามปกติ (ถือว่าเริ่มแล้วเฉพาะวันที่ไม่ใช่วันนัด)
   const todayPlanned = plannedDays.some((d) => d.format("YYYY-MM-DD") === todayKey);
   const todayDayNo = todayPlanned ? plannedDays.findIndex((d) => d.format("YYYY-MM-DD") === todayKey) + 1 : 0;
+  // ✅ (4 พ.ย. 2569 ผู้ใช้: "การบันทึกเข้างาน ให้แยกทุกคนต้องกดเข้างานเองด้วย แยกเป็นบุคคล ... แสดงผลให้ชัดเจนสมบูรณ์")
+  //    ผู้ปฏิบัติงานทุกคน (หัวหน้าทีม + ลูกทีม) กดเข้างานของตัวเอง · แถบขั้นตอนของทีมยังนับจาก "มีคนเข้างานแล้ว"
+  const workers = [head, ...members].filter(Boolean);
+  const memberIds = new Set((event.teamMembers || []).map((m) => String(m?.userId || "")).filter(Boolean));
+  const isWorker = Boolean(isHead || memberIds.has(me) || (userData?.fname && workers.includes(userData.fname)));
+  const dayKeyOf = (r) => (r.checkIn?.at ? moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD") : "");
+  const todayRows = (rows || []).filter((r) => dayKeyOf(r) === todayKey);
+  const myCheckin = todayRows.find((r) => String(r.userId) === me);
+  const rowOfWorker = (name) => {
+    const m = (event.teamMembers || []).find((x) => x?.name === name);
+    return todayRows.find((r) => (m?.userId && String(r.userId) === String(m.userId))
+      || (name === head && event.resPerson && String(r.userId) === String(event.resPerson))
+      || r.userName === name || String(r.userName || "").split(" ")[0] === name);
+  };
+  const teamIn = workers.filter((n) => rowOfWorker(n)).length;
+  const myRecordedDays = recordedAttendanceDayKeys(myRows);
+  const myAllDone = plannedDays.length > 0
+    && (plannedDays.every((d) => myRecordedDays.has(d.format("YYYY-MM-DD"))) || myRecordedDays.size >= plannedDays.length);
+  const canMeCheckIn = isWorker && !myCheckin && (todayPlanned || !myAllDone);
+  const teamText = workers.length > 1 ? `ทีมเข้างานแล้ว ${teamIn}/${workers.length} คน` : "";
+  /** รายชื่อผู้ปฏิบัติงานวันนี้ — ใครเข้างานแล้ว (เวลา) · ใครยังไม่เข้า */
+  const roster = workers.length > 0 && (
+    <Box sx={{ mt: 1.25, p: 1.25, borderRadius: "12px", border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.75 }}>
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>ผู้ปฏิบัติงานวันนี้</Typography>
+        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: teamIn === workers.length ? "#15803d" : MUTED }}>
+          เข้างานแล้ว {teamIn}/{workers.length} คน
+        </Typography>
+      </Stack>
+      <Stack spacing={0.6}>
+        {workers.map((n, i) => {
+          const r = rowOfWorker(n);
+          const b = r ? locationBadge(r.checkIn) : null;
+          return (
+            <Stack key={n} direction="row" alignItems="center" gap={1}>
+              <Box sx={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", fontSize: "0.7rem", fontWeight: 800,
+                bgcolor: i === 0 ? "#2563eb" : "#eef2ff", color: i === 0 ? "#fff" : "#3730a3" }}>{i + 1}</Box>
+              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.84rem", fontWeight: 700, color: INK }}>
+                {n}{i === 0 && <Box component="span" sx={{ ml: 0.75, fontSize: "0.68rem", fontWeight: 800, color: "#1d4ed8" }}>หัวหน้าทีม</Box>}
+              </Typography>
+              {r ? (
+                <Box component="span" sx={{ flexShrink: 0, px: 0.9, py: 0.2, borderRadius: "6px", fontSize: "0.72rem", fontWeight: 800,
+                  color: b?.tone === "warn" ? "#b45309" : "#15803d", bgcolor: b?.tone === "warn" ? "#fffbeb" : "#f0fdf4" }}>
+                  ✓ {fmtTime(r.checkIn?.at)}{b?.tone === "warn" ? ` · ${b.text}` : ""}
+                </Box>
+              ) : (
+                <Box component="span" sx={{ flexShrink: 0, px: 0.9, py: 0.2, borderRadius: "6px", fontSize: "0.72rem", fontWeight: 700, color: MUTED, bgcolor: "#f1f5f9" }}>
+                  ยังไม่เข้างาน
+                </Box>
+              )}
+            </Stack>
+          );
+        })}
+      </Stack>
+    </Box>
+  );
   const legacyStarted = !checkin && !latestCheckin && !todayPlanned && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
@@ -491,6 +547,17 @@ ${text}`);
     action = <Note icon={<HourglassTopRounded />} tone="#d97706">งานนี้รอแอดมินอนุมัติ — อนุมัติแล้วจึงเริ่มงานได้</Note>;
   } else if (event.closeRequested) {
     action = <Note icon={<HourglassTopRounded />} tone="#d97706">ส่งขอปิดงานแล้ว — รอแอดมินตรวจเอกสารและอนุมัติ</Note>;
+  } else if (canMeCheckIn && hasHead && acked && confirmed && !beforeDay && !declined) {
+    // ✅ แต่ละคนกดของตัวเอง — มีคนในทีมเข้างานแล้วก็ยังต้องกดของตัวเอง
+    action = (
+      <Box>
+        <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={MBTN.primary}>
+          บันทึกเข้างานของฉัน{plannedDays.length > 1 ? ` · วันที่ ${todayDayNo || Math.min(myRecordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
+        </Button>
+        <Hint>ผู้ปฏิบัติงานทุกคนกดเข้างานของตัวเอง · ระบบบันทึกเวลาและตำแหน่งให้</Hint>
+        {roster}
+      </Box>
+    );
   } else if (checkin) {
     // เข้างานแล้ว — กล่องเดียว: เวลา · ใคร/ตำแหน่ง · (เส้นคั่น) ขั้นถัดไปเป็นข้อความธรรมดา
     // ✅ (11 ต.ค. 2569 ผู้ใช้: "ข้างล่างเข้างานอย่าทำให้เป็นเหมือนปุ่มกด เดี๋ยวสับสนได้") — ไม่มีกรอบ/สีปุ่ม
@@ -502,15 +569,18 @@ ${text}`);
             <TaskAltRounded sx={{ fontSize: 19 }} />
           </Box>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, color: INK, lineHeight: 1.35 }}>เข้างานแล้ว {fmtTime(checkin.checkIn?.at)} น.</Typography>
+            <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, color: INK, lineHeight: 1.35 }}>
+              {myCheckin ? `คุณเข้างานแล้ว ${fmtTime(myCheckin.checkIn?.at)} น.` : `${checkin.userName} เข้างานแล้ว ${fmtTime(checkin.checkIn?.at)} น.`}
+            </Typography>
             <Typography sx={{ fontSize: "0.78rem", color: MUTED, lineHeight: 1.45 }}>
-              {[checkin.userName, inBadge?.text].filter(Boolean).join(" · ")}
+              {[locationBadge((myCheckin || checkin).checkIn)?.text, teamText].filter(Boolean).join(" · ") || inBadge?.text}
             </Typography>
           </Box>
         </Stack>
         <Typography sx={{ mt: 1.25, pt: 1.1, borderTop: "1px dashed #d8dee6", fontSize: "0.8rem", color: INK_2, lineHeight: 1.5 }}>
-          บันทึกของวันนี้เรียบร้อยแล้ว{rows.length > 1 ? ` · บันทึกแล้ว ${rows.length} วัน` : ""}
+          {teamIn >= workers.length ? "ทุกคนในทีมบันทึกเข้างานวันนี้แล้ว" : "รอผู้ปฏิบัติงานที่เหลือกดเข้างานของตัวเอง"}
         </Typography>
+        {roster}
       </Box>
     );
   } else if (attendanceDone) {
@@ -519,8 +589,8 @@ ${text}`);
         <Note icon={<TaskAltRounded />} tone="#16a34a">
           {allPlannedDaysRecorded ? `บันทึกเข้างานครบตามวันที่กำหนดแล้ว · ${plannedDays.length}/${plannedDays.length} วัน` : `บันทึกเข้างานแล้ว ${recordedDays.size} วัน · ขั้นถัดไป: แนบเอกสารแล้วขอปิดงาน`}
         </Note>
-        {isHead && !allPlannedDaysRecorded && (
-          <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.5, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานเพิ่มวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
+        {isWorker && !myCheckin && (
+          <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.5, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานของฉันวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
         )}
       </Box>
     );
@@ -536,16 +606,17 @@ ${text}`);
   } else if (!hasHead) {
     action = <Note icon={<InfoRounded />} tone="#d97706">ยังไม่มีหัวหน้าทีมเข้างาน — รอแอดมินมอบหมายก่อนจึงกดเข้างานได้</Note>;
   } else if (beforeDay) {
-    action = <Note icon={<HourglassTopRounded />} tone={ACCENT}>รับทราบแล้ว · กดเข้างานได้ในวันที่ <b>{dayText}</b>{isHead ? "" : ` (หัวหน้าทีม ${head} เป็นคนกด)`}</Note>;
-  } else if (!isHead) {
-    action = <Note icon={<InfoRounded />} tone={ACCENT}>รอหัวหน้าทีม <b>{head}</b> กดเข้างานให้ทีม</Note>;
+    action = <Note icon={<HourglassTopRounded />} tone={ACCENT}>รับทราบแล้ว · ผู้ปฏิบัติงานทุกคนกดเข้างานของตัวเองได้ในวันที่ <b>{dayText}</b></Note>;
+  } else if (!isWorker) {
+    action = <Box><Note icon={<InfoRounded />} tone={ACCENT}>ผู้ปฏิบัติงานแต่ละคนกดเข้างานของตัวเอง</Note>{roster}</Box>;
   } else {
     action = (
       <Box>
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={MBTN.primary}>
-          บันทึกเข้างานวันนี้
+          บันทึกเข้างานของฉัน
         </Button>
-        <Hint>กดแทนทั้งทีม · ระบบบันทึกเวลาและตำแหน่งให้</Hint>
+        <Hint>ผู้ปฏิบัติงานทุกคนกดเข้างานของตัวเอง · ระบบบันทึกเวลาและตำแหน่งให้</Hint>
+        {roster}
       </Box>
     );
   }
@@ -582,11 +653,22 @@ ${text}`);
       ) : <Line icon={<HourglassTopRounded />} tone="#d97706">รอแอดมินอนุมัติงาน</Line>;
     }
     else if (event.closeRequested) line = <Line icon={<HourglassTopRounded />} tone="#d97706" right={logLink}>ส่งขอปิดงานแล้ว · รอแอดมินตรวจและอนุมัติปิดงาน</Line>;
-    else if (checkin) {
+    else if (canMeCheckIn && hasHead && acked && confirmed && !beforeDay && !declined && !viewOnly) {
+      // ✅ แต่ละคนกดของตัวเอง — ปุ่มของฉัน + ความคืบหน้าของทีมวันนี้
+      line = (
+        <Box>
+          <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
+            บันทึกเข้างานของฉัน{plannedDays.length > 1 ? ` · วันที่ ${todayDayNo || Math.min(myRecordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
+          </Button>
+          {teamText && <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.72rem", color: MUTED }}>{teamText} · ทุกคนกดของตัวเอง</Typography>}
+        </Box>
+      );
+    } else if (checkin) {
       const b = locationBadge(checkin.checkIn);
       line = (
         <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>
-          <b style={{ fontWeight: 600, color: INK }}>บันทึกวันนี้แล้ว · {fmtTime(checkin.checkIn?.at)}</b> · {checkin.userName}
+          <b style={{ fontWeight: 600, color: INK }}>{myCheckin ? `คุณเข้างานแล้ว · ${fmtTime(myCheckin.checkIn?.at)}` : `${checkin.userName} เข้างานแล้ว · ${fmtTime(checkin.checkIn?.at)}`}</b>
+          {teamText && <Box component="span" sx={{ color: teamIn >= workers.length ? "#15803d" : "#b45309" }}> · {teamText}</Box>}
           {plannedDays.length > 1 && <Box component="span" sx={{ color: allPlannedDaysRecorded ? "#15803d" : MUTED }}> · {Math.min(recordedDays.size, plannedDays.length)}/{plannedDays.length} วัน{allPlannedDaysRecorded ? " ครบแล้ว" : ""}</Box>}
           {b?.tone === "warn" && <Box component="span" sx={{ color: "#b45309" }}> · {b.text}</Box>}
         </Line>
@@ -597,8 +679,8 @@ ${text}`);
           <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>
             {allPlannedDaysRecorded ? `บันทึกเข้างานครบตามวันที่กำหนดแล้ว · ${plannedDays.length}/${plannedDays.length} วัน` : `บันทึกเข้างานแล้ว ${recordedDays.size} วัน · ขั้นถัดไป: แนบเอกสารแล้วขอปิดงาน`}
           </Line>
-          {isHead && !allPlannedDaysRecorded && (
-            <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.25, ml: 3, fontFamily: "inherit", fontSize: "0.74rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานเพิ่มวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
+          {isWorker && !myCheckin && (
+            <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.25, ml: 3, fontFamily: "inherit", fontSize: "0.74rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานของฉันวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
           )}
         </Box>
       );
@@ -624,8 +706,8 @@ ${text}`);
         : (
           <Line icon={<HourglassTopRounded />} tone={MUTED}>
             {[who, !confirmed ? "รอผู้รับผิดชอบยืนยันนัดหมาย" : beforeDay ? `ยืนยันนัดหมายแล้ว · เข้างาน ${day}`
-              : recordedDays.size > 0 && plannedDays.length > 1 ? `บันทึกแล้ว ${recordedDays.size}/${plannedDays.length} วัน · รอหัวหน้าทีม ${head} บันทึกวันนี้`
-              : `รอหัวหน้าทีม ${head} บันทึกเข้างาน`].filter(Boolean).join(" · ")}
+              : teamText ? `${teamText} · ผู้ปฏิบัติงานกดเข้างานของตัวเอง`
+              : "รอผู้ปฏิบัติงานบันทึกเข้างาน"].filter(Boolean).join(" · ")}
           </Line>
         );
     } else if (!acked && !canAck) {
@@ -657,14 +739,10 @@ ${text}`);
       ) : <Line icon={<HourglassTopRounded />} tone={MUTED}>รับทราบแล้ว · รอผู้รับผิดชอบ{respName ? ` ${respName}` : ""} ยืนยันนัดหมาย</Line>;
     } else if (!hasHead) line = <Line icon={<InfoRounded />} tone="#d97706">ยืนยันนัดหมายแล้ว · ยังไม่มีหัวหน้าทีม — มอบหมายหัวหน้าทีมเข้างาน</Line>;
     else if (beforeDay) {
-      line = <Line icon={<TaskAltRounded />} tone="#16a34a">ยืนยันนัดหมายแล้ว · {isHead ? `กดบันทึกเข้างานได้วันที่ ${day}` : `หัวหน้าทีม ${head} บันทึกเข้างานวันที่ ${day}`}</Line>;
-    } else if (!isHead) line = <Line icon={<InfoRounded />} tone={MUTED}>ยืนยันนัดหมายแล้ว · รอหัวหน้าทีม <b style={{ fontWeight: 600 }}>{head}</b> บันทึกเข้างาน</Line>;
+      line = <Line icon={<TaskAltRounded />} tone="#16a34a">ยืนยันนัดหมายแล้ว · {isWorker ? `กดบันทึกเข้างานของคุณได้วันที่ ${day}` : `ผู้ปฏิบัติงานกดเข้างานของตัวเองวันที่ ${day}`}</Line>;
+    } else if (!isWorker) line = <Line icon={<InfoRounded />} tone={MUTED}>ยืนยันนัดหมายแล้ว · {teamText || "รอผู้ปฏิบัติงานบันทึกเข้างาน"} · ทุกคนกดของตัวเอง</Line>;
     else {
-      line = (
-        <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
-          บันทึกเข้างานวันนี้{plannedDays.length > 1 ? ` · วันที่ ${todayDayNo || Math.min(recordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
-        </Button>
-      );
+      line = <Line icon={<TaskAltRounded />} tone="#16a34a">คุณบันทึกเข้างานครบแล้ว{teamText ? ` · ${teamText}` : ""}</Line>;
     }
     // ✅ (20 ต.ค. 2569 ผู้ใช้: "การ์ดย่อยังกินพื้นที่ ยาวไป") lineOnly = เฉพาะแถวปุ่ม/สถานะบรรทัดเดียว (ไม่มีแถบขั้นตอน/บันทึกรายวัน)
     //    ใช้บนการ์ดย่อมือถือ — รายละเอียดเต็มอยู่ในแผ่นรายละเอียด
@@ -733,7 +811,7 @@ ${text}`);
           </Stack>
           {/* ทีมของวันนี้ — หัวหน้าทีมเป็นหลัก + ลูกทีม */}
           <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: "0.76rem", color: MUTED, fontWeight: 700 }}>ทีม</Typography>
+            <Typography sx={{ fontSize: "0.76rem", color: MUTED, fontWeight: 700 }}>ผู้ปฏิบัติงาน</Typography>
             {head ? (
               <PersonChip name={head} strong badge="หัวหน้า" title={`หัวหน้าทีมเข้างาน: ${head}`} />
             ) : (

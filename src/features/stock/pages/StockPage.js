@@ -15,7 +15,7 @@ import {
   Box, Stack, Typography, Button, TextField, InputAdornment, Skeleton, Alert, IconButton, ButtonBase, Avatar, Menu, MenuItem, ListItemIcon,
   useMediaQuery, Snackbar, Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
-import { AddRounded as Add, SearchRounded as Search, CloseRounded as Close, Inventory2Rounded as Inventory2, AddBoxRounded as AddBox, FactCheckRounded as FactCheck, EditRounded as Edit, AppsRounded as Apps, WarningAmberRounded as WarningAmber, HandymanRounded as Handyman, CategoryRounded as Category, OutboxRounded as Outbox, MoreHorizRounded as MoreHoriz, FileDownloadRounded as FileDownload, BuildRounded as Build, AssignmentReturnRounded as AssignmentReturn } from "@mui/icons-material";
+import { AddRounded as Add, SearchRounded as Search, CloseRounded as Close, Inventory2Rounded as Inventory2, AddBoxRounded as AddBox, FactCheckRounded as FactCheck, EditRounded as Edit, AppsRounded as Apps, WarningAmberRounded as WarningAmber, HandymanRounded as Handyman, CategoryRounded as Category, OutboxRounded as Outbox, MoreHorizRounded as MoreHoriz, BuildRounded as Build, AssignmentReturnRounded as AssignmentReturn } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -38,6 +38,7 @@ import StockRequestForm from "../components/StockRequestForm";
 import StockRequestDetail from "../components/StockRequestDetail";
 import ItemInsight from "../components/ItemInsight";
 import StockReturnDetail, { RtBadge, CondTag } from "../components/StockReturnDetail";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const TABS = ["items", "requests", "loans", "returns", "moves"];
 const CARD = { bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3 };
@@ -622,10 +623,7 @@ export default function StockPage() {
             </Stack>
           )}
           <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            <Button variant="outlined" startIcon={<FileDownload />} onClick={exportExcel} disabled={exporting || !items}
-              sx={{ ...QUIET, display: { xs: "none", sm: "inline-flex" }, "& .MuiButton-startIcon": { color: "#16a34a" } }}>
-              {exporting ? "กำลังส่งออก…" : "Excel"}
-            </Button>
+            <ExportExcelButton onClick={exportExcel} loading={exporting} disabled={!items} />
             {canManage && (
               <Button variant="outlined" startIcon={<Add />} onClick={() => setItemForm({ open: true, item: null })}
                 sx={{ ...QUIET, display: { xs: "none", sm: "inline-flex" } }}>

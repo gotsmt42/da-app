@@ -26,8 +26,6 @@ import {
   Collapse, Drawer, Badge,
 } from "@mui/material";
 import { SearchRounded as Search, CloseRounded as Close, RefreshRounded as Refresh, RequestQuoteRounded as RequestQuote, SendRounded as Send, CheckCircleRounded as CheckCircle, CancelRounded as Cancel, AutorenewRounded as Autorenew, HourglassTopRounded as HourglassTop, WarningAmberRounded as WarningAmber, ChevronRightRounded as ChevronRight, AttachFileRounded as AttachFile, ChatRounded as Chat, OpenInNewRounded as OpenInNew, HistoryRounded as History, AppsRounded as Apps, DescriptionRounded as Description, EditRounded as Edit, PhoneRounded as Phone, EmailRounded as Email, EventRepeatRounded as EventRepeat, UndoRounded as Undo, SaveRounded as Save, InsightsRounded as Insights, ExpandMoreRounded as ExpandMore, TuneRounded as Tune, CheckRounded as Check } from "@mui/icons-material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -48,6 +46,7 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PAGE_SX } from "@/shared/ui/PageKit";
 import { confirmDelete } from "@/shared/ui/swal";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -1701,14 +1700,7 @@ export default function QuotationTracking() {
           <SelectField label="ช่วงเวลา" value={period} onChange={(e) => setPeriod(e.target.value)} sx={{ minWidth: { xs: 0, md: 150 }, flex: { xs: "1 1 0", md: "none" } }}>
             {PERIODS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
           </SelectField>
-          <Tooltip title="ส่งออกรายการที่กรองอยู่เป็น Excel">
-            <span>
-              <Button onClick={doExport} disabled={exporting || !visible.length} startIcon={<FontAwesomeIcon icon={faFileExcel} />}
-                sx={{ height: 40, flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5, color: "#047857", border: `1px solid ${alpha("#047857", 0.3)}`, px: 1.5, "& .MuiButton-startIcon": { mr: { xs: 0, sm: 1 } } }}>
-                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{exporting ? "กำลังส่งออก..." : "Excel"}</Box>
-              </Button>
-            </span>
-          </Tooltip>
+          <ExportExcelButton onClick={doExport} loading={exporting} disabled={!visible.length} count={visible.length} />
         </Stack>
       </Stack>
   );
@@ -1736,10 +1728,7 @@ export default function QuotationTracking() {
           {/* ✅ มือถือ: ค้นหา/ตัวกรอง/สถานะ ซ่อนในแผ่นล่าง (เหมือนหน้าใบเบิก/ใบขอซื้อ) — ผู้ใช้สั่ง 2 ต.ค. 2569 */}
           {/* ✅ Excel ต้องกดได้เสมอ (แท็บเล็ต/มือถือด้วย) — ไม่ซ่อนไว้ในแผ่นตัวกรองอย่างเดียว */}
           {!isDesktop && (
-            <IconButton aria-label="ส่งออก Excel" onClick={doExport} disabled={exporting || !visible.length}
-              sx={{ width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER}`, color: "#047857" }}>
-              <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 17 }} />
-            </IconButton>
+            <ExportExcelButton onClick={doExport} loading={exporting} disabled={!visible.length} compact />
           )}
           {!isDesktop && (
             <IconButton aria-label="ค้นหาและตัวกรอง" onClick={() => setFiltersOpen(true)}

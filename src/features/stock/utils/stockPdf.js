@@ -63,7 +63,7 @@ export async function generateStockPdf({ request: r, deptLabel = "", signatures 
 
   // ── 1. หัวกระดาษ + ชื่อเอกสาร ─────────────────────────────────────────
   doc.setFontSize(17);
-  let y = drawLetterhead(doc) + 3.5;
+  let y = drawLetterhead(doc, { left: L, right: L }) + 3.5;
   doc.setDrawColor(...INK); doc.setLineWidth(0.4);
   doc.line(L, y, R, y);
   y += 9;
@@ -254,7 +254,7 @@ export async function generateReturnPdf({ doc: r, deptLabel = "", signatures = n
   const T = (t) => spaceThaiLatin(String(t ?? ""));
 
   doc.setFontSize(17);
-  let y = drawLetterhead(doc) + 3.5;
+  let y = drawLetterhead(doc, { left: L, right: L }) + 3.5;
   doc.setDrawColor(...INK); doc.setLineWidth(0.4);
   doc.line(L, y, R, y);
   y += 9;

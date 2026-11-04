@@ -25,7 +25,6 @@ import {
 import { alpha } from "@mui/material/styles";
 import { CloseRounded as Close, PrintRounded as Print, ShareRounded as Share, DownloadRounded as Download, OpenInNewRounded as OpenInNew, PictureAsPdfRounded as PictureAsPdf, EditNoteRounded as EditNote, MailOutlineRounded as MailOutline } from "@mui/icons-material";
 
-import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
 import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import {
   renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser,
@@ -36,6 +35,7 @@ import { generateBlankClaimPdf, localFormCode } from "../utils/expenseBlankPdf";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import { KIND_META, slipKind, statusMeta, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
+import { sharePdf } from "@/shared/utils/pdfShare";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 
@@ -189,38 +189,11 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
     a.click();
   };
 
-  const handleShare = async () => {
+  // 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าใบเบิก เคลม ... กดแชร์ไม่ได้บางกรณี ขึ้นแจ้งเตือนเรื่องพิมพ์") ตัวกลาง shared/utils/pdfShare
+  const handleShare = () => {
     if (!pdf?.blob) return;
-    // ⚠️ navigator.share ใช้ได้เฉพาะหน้าเว็บที่เปิดผ่าน https — เปิดด้วย IP ในวง LAN ปุ่มจะไม่มีทางทำงาน
-    // บอกเหตุผลตรงๆ ดีกว่าขึ้นว่า "เบราว์เซอร์ไม่รองรับ" ซึ่งทำให้ผู้ใช้เข้าใจผิดว่าเครื่องมีปัญหา
-    if (!window.isSecureContext) {
-      setNotice("การแชร์ไฟล์ใช้ได้เมื่อเปิดระบบผ่านลิงก์ https เท่านั้น — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้");
-      return;
-    }
-    if (isInAppBrowser()) {
-      setNotice(IN_APP_NOTICE);
-      return;
-    }
-    const title = blank ? `${blankName} ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
-    const file = new File([pdf.blob], pdf.fileName, { type: "application/pdf" });
-    let files = canShareFile(file) ? [file] : null;
-    // ✅ บางเครื่องแชร์ไฟล์ PDF ไม่ได้แต่แชร์รูปได้ (เช่น ส่งเข้า LINE จาก Android บางรุ่น) —
-    // ถ้ามีภาพหน้าเอกสารอยู่แล้วให้ถอยไปแชร์ภาพแทน ดีกว่าบอกว่าแชร์ไม่ได้
-    // ⚠️ ห้าม await อะไรก่อนเรียก navigator.share — Safari ยอมให้แชร์เฉพาะในจังหวะที่ผู้ใช้แตะปุ่ม
-    // รอโหลดอะไรคั่นกลางแล้วจังหวะนั้นหลุด ได้ NotAllowedError (ภาพจึงเก็บ blob ไว้ตั้งแต่ตอนวาด)
-    if (!files && pages?.length) {
-      const imgs = pages.map((p, i) => new File([p.blob], `${pdf.safeName}${pages.length > 1 ? `-${i + 1}` : ""}.${p.blob.type === "image/png" ? "png" : "jpg"}`, { type: p.blob.type || "image/jpeg" }));
-      if (canShareFile(imgs[0])) files = imgs;
-    }
-    if (!files) {
-      setNotice("เครื่องนี้แชร์ไฟล์โดยตรงไม่ได้ — กด \"ดาวน์โหลด\" แล้วแนบไฟล์ส่งเองได้เลย");
-      return;
-    }
-    try {
-      await navigator.share({ files, title: pdf.fileName, text: title });
-    } catch (err) {
-      if (err?.name !== "AbortError") setNotice("แชร์ไม่สำเร็จ — ลองใหม่ หรือใช้ปุ่มดาวน์โหลดแทน");
-    }
+    const text = blank ? `${blankName} ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
+    sharePdf({ blob: pdf.blob, fileName: pdf.fileName, pages, text, download: handleDownload, notify: setNotice });
   };
 
   if (!expense && !blank) return null;

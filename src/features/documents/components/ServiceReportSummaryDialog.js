@@ -17,12 +17,13 @@ import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, IconButton, LinearProgress,
   MenuItem, Stack, TextField, Typography, useMediaQuery,
 } from "@mui/material";
-import { AutoAwesomeRounded as AutoAwesome, CloseRounded as Close, EditRounded, PictureAsPdfRounded as PictureAsPdf, RefreshRounded as Refresh, TaskAltRounded as TaskAlt, AddRounded, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded, DescriptionRounded as Description, CheckCircleRounded, GridOnRounded } from "@mui/icons-material";
+import { AutoAwesomeRounded as AutoAwesome, CloseRounded as Close, EditRounded, PictureAsPdfRounded as PictureAsPdf, RefreshRounded as Refresh, TaskAltRounded as TaskAlt, AddRounded, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded, DescriptionRounded as Description, CheckCircleRounded } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import { ISSUE_STATUS, issueStats, jobInfoOf, groupIssues, issueLine } from "../utils/serviceReportData";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, PRIMARY_BTN_SX, SUCCESS_BTN_SX } from "@/shared/ui/PageKit";
+import { ExcelIcon } from "@/shared/ui/ExportExcelButton";
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", minHeight: 38 };
 const EMPTY = { found: true, fileChecks: [], summary: "", workDone: [], issueSummary: "", issues: [], reviewNotes: [], confidence: "medium" };
@@ -346,7 +347,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                   if (ok.isConfirmed) scan(false);
                 }} disabled={!state.enabled || rescanLeft <= 0} sx={{ ...BTN, color: MUTED }}>{rescanLeft <= 0 ? "อ่านใหม่ (ครบวันนี้)" : `อ่านใหม่ (${rescanLeft})`}</Button>}
                 {state.canEdit && <Button startIcon={<EditRounded />} onClick={() => { setDraft(withDefaults(summary.data)); setEditing(true); }} sx={{ ...BTN, color: ACCENT }}>แก้ไข</Button>}
-                <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <GridOnRounded />} onClick={makeExcel} disabled={xlsBusy || badFiles.length > 0} sx={{ ...BTN, color: "#15803d" }}>Excel</Button>
+                <Button startIcon={xlsBusy ? <CircularProgress size={16} /> : <ExcelIcon />} onClick={makeExcel} disabled={xlsBusy || badFiles.length > 0} sx={{ ...BTN, color: "#0f172a" }}>{xlsBusy ? "กำลังส่งออก…" : "ส่งออก Excel"}</Button>
                 {/* มือถือ: ปุ่มรองแถวบน · ยืนยัน/สร้าง PDF แถวล่างเต็มกว้าง */}
                 <Box sx={isMobile ? { flexBasis: "100%", height: 0 } : { flex: 1 }} />
                 {state.canEdit && !confirmed && <Button variant="outlined" color="success" startIcon={<TaskAlt />} onClick={() => save(true)} disabled={saving || badFiles.length > 0} sx={{ ...BTN, flex: isMobile ? 1 : "none" }}>ยืนยันสรุป</Button>}

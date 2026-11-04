@@ -157,17 +157,13 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   // ── หัวกระดาษ ────────────────────────────────────────────────────────
   let y;
   color(SLATE);
+  // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ใบเบิกผู้รับเหมาไม่มี [หัวกระดาษ] เหมือนอันอื่น") ใบที่ยาวจนต้องบีบ (compact) เดิมตัดโลโก้ทิ้ง
+  //    เหลือชื่อบริษัทกลางหน้า → ใช้หัวกระดาษชิดซ้ายแบบเดียวกับใบอื่น แค่ขนาดเล็กลง
   if (compact) {
-    y = 13;
-    bold(true); size(15);
-    doc.text(ISSUER.nameTh, W_PAGE / 2, y, { align: "center" });
-    bold(false); size(10);
-    y += 4.6 * s + 0.6;
-    doc.text(`${ISSUER.address}  ${ISSUER.taxId}`, W_PAGE / 2, y, { align: "center" });
-    y += 2.4;
+    y = drawLetterhead(doc, { left: L, right: L, compact: true }) + 2;
   } else {
     doc.setFontSize(17);
-    y = drawLetterhead(doc) + 2.6;
+    y = drawLetterhead(doc, { left: L, right: L }) + 2.6;
   }
   // ✅ เส้นคั่นหัวกระดาษเป็นสีประจำชนิดใบ — แยก Advance (เขียวอมฟ้า) กับ Claim (ม่วง) ได้ตั้งแต่มองไกลๆ
   // 🔁 (24 ต.ค. 2569 ผู้ใช้: "หน้า PDF ยังดูไม่มืออาชีพ รก") เอกสารโทนเดียว — หมึกเข้ม เส้นเทา หัวตารางเทาอ่อน

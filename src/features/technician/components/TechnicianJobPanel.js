@@ -46,6 +46,7 @@ import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { confirmDelete } from "@/shared/ui/swal";
 import { closeCheckHtml } from "@/shared/utils/closeCheckHtml";
+import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -109,14 +110,14 @@ const DOCUMENT_TYPES = [
     uploadHint: "แนบไฟล์ใบเสนอราคาที่ทำให้ลูกค้า — แอดมินจะนำไปติดตามผลกับลูกค้าต่อในหน้า “ติดตามใบเสนอราคา”",
   },
   {
-    type: "invoice", label: "ใบวางบิล", color: "#0891b2", alwaysRequired: false,
+    type: "invoice", label: "เอกสารการเงิน", color: "#0891b2", alwaysRequired: false,
     icon: <ReceiptLong sx={{ fontSize: 18 }} />,
-    desc: "ใบวางบิล/ใบแจ้งหนี้ที่ต้องวางให้ลูกค้าสำหรับงานครั้งนี้",
+    desc: "ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ — แนบแล้วบันทึกการวางบิลและการรับเงินได้ในช่องนี้",
     question: "งานนี้ต้องวางบิลลูกค้าไหม?",
     yesLabel: "ต้องวางบิล",
     noLabel: "ไม่ต้องวางบิล",
     noneText: "งานนี้ไม่ต้องวางบิล",
-    uploadHint: "แนบไฟล์ใบวางบิลที่ส่งให้ลูกค้า",
+    uploadHint: "แนบใบวางบิล / ใบกำกับภาษี / ใบเสร็จ — แล้วกดบันทึกการวางบิลเพื่อติดตามรับเงิน",
   },
   {
     type: "completion", label: "ใบส่งมอบงาน", color: "#059669", alwaysRequired: false,
@@ -413,6 +414,8 @@ const DocumentChecklistItem = ({
       />
       {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ */}
       {type === "report" && hasFiles && <ServiceReportAiBar event={event} sx={{ mt: 0.5 }} />}
+      {/* ✅ (4 พ.ย. 2569) ใบวางบิล: แนบแล้วบันทึกการวางบิล (เลขที่/ยอด) ต่อได้ทันที — เชื่อมหน้า "วางบิล / รับเงิน" */}
+      {type === "invoice" && hasFiles && <InvoiceBillingBar event={event} filesCount={files.length} sx={{ mt: 0.5 }} />}
     </>
   );
   const linkBtn = (text, onClick) => (
@@ -1341,7 +1344,7 @@ const TechnicianJobCard = ({
           sx={{ width: "100%", mt: 1.5, px: 1.25, py: 0.9, gap: 1, justifyContent: "flex-start", borderRadius: "10px",
             fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
           <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
-            {[`ไฟล์แนบ ${(event.sitePhotoFiles || []).length}`, "รายละเอียดงานที่ทำ",
+            {[`หลักฐาน ${(event.sitePhotoFiles || []).length}`, "รายละเอียดงานที่ทำ",
               `คุยกับแอดมิน${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
           </Typography>
           <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: ACCENT, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>

@@ -34,13 +34,23 @@ const RED_TONE = "#dc2626";
  * หัวข้อย่อยในหน้าต่าง — ✅ (10 ต.ค. 2569 ผู้ใช้: "ยังไม่สวย ดูยาก ปุ่มล้าสมัย การจัดวางให้ดูง่ายกว่านี้")
  * แต่ละหัวข้อเป็นการ์ดขาวของตัวเองบนพื้นเทาอ่อน (แบบแอปมือถือสมัยใหม่) แทนเส้นคั่นบางๆ — แยกเรื่องชัด อ่านทีละกล่อง
  */
-const Section = ({ title, hint, required, children }) => (
-  <Box sx={{ ...CARD, p: 2, mb: 1.5 }}>
-    <Stack direction="row" alignItems="baseline" flexWrap="wrap" columnGap={0.75} sx={{ mb: 1.25 }}>
-      <Typography sx={{ fontSize: "0.95rem", fontWeight: 900, color: INK }}>
-        {title}{required && <Box component="span" sx={{ color: "#dc2626" }}> *</Box>}
-      </Typography>
-      {hint && <Typography sx={{ fontSize: "0.72rem", color: FAINT }}>{hint}</Typography>}
+/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าบันทึกเข้างานทำให้ชัดเจน สวยงาม ดูง่ายกว่านี้ · ux ui เข้าธีม")
+   ขั้นเป็นเลข 1-2-3 · ทำเสร็จแล้วเลขเปลี่ยนเป็น ✓ สีเขียว — รู้ทันทีว่าเหลืออะไรก่อนกดยืนยัน */
+const Section = ({ n, title, hint, required, done, children }) => (
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${done ? alpha(GREEN, 0.35) : LINE}`, borderRadius: "16px", p: 2, mb: 1.5, transition: "border-color .2s" }}>
+    <Stack direction="row" alignItems="center" gap={1.25} sx={{ mb: 1.25 }}>
+      {n !== undefined && (
+        <Box sx={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", fontSize: "0.82rem", fontWeight: 900,
+          bgcolor: done ? GREEN : ACCENT_SOFT, color: done ? "#fff" : ACCENT }}>
+          {done ? <CheckRounded sx={{ fontSize: 17 }} /> : n}
+        </Box>
+      )}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>
+          {title}{required && <Box component="span" sx={{ color: "#dc2626" }}> *</Box>}
+        </Typography>
+        {hint && <Typography sx={{ fontSize: "0.78rem", color: done ? "#15803d" : MUTED, lineHeight: 1.4 }}>{hint}</Typography>}
+      </Box>
     </Stack>
     {children}
   </Box>
@@ -367,27 +377,28 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
           <LoginRounded />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: INK }}>บันทึกเข้างานวันนี้</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.12rem", color: INK }}>บันทึกเข้างานของฉัน</Typography>
           <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED }}>{[jobLabel, event?.jobNo].filter(Boolean).join(" · ")}</Typography>
         </Box>
         <IconButton onClick={cancel} aria-label="ปิด"><Close /></IconButton>
       </Stack>
 
-      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, pt: "16px !important", pb: 1, bgcolor: "#f4f6f9" }}>
-        {/* เวลา */}
-        <Box sx={{ ...CARD, mb: 1.5, p: 2 }}>
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <AccessTimeRounded sx={{ color: ACCENT, fontSize: 28 }} />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: "1.9rem", fontWeight: 900, color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
-                {fmtTime(serverNow)}
-              </Typography>
-              <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>วันที่เข้างาน {new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "long", year: "numeric" }).format(new Date(serverNow))} · เวลาเข้างาน = เวลาที่กดยืนยัน</Typography>
-            </Box>
+      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, pt: "16px !important", pb: 1, bgcolor: "#f8fafc" }}>
+        {/* เวลา — ตัวใหญ่กลางการ์ด อ่านได้ในแวบเดียว */}
+        <Box sx={{ mb: 1.5, p: 2, borderRadius: "16px", bgcolor: "#fff", border: `1px solid ${LINE}`, textAlign: "center" }}>
+          <Stack direction="row" alignItems="center" justifyContent="center" gap={0.75}>
+            <AccessTimeRounded sx={{ color: ACCENT, fontSize: 20 }} />
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: ACCENT }}>เวลาเข้างาน</Typography>
           </Stack>
-          <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 1.25, pt: 1, borderTop: `1px dashed ${LINE}` }}>
+          <Typography sx={{ fontSize: "2.6rem", fontWeight: 900, color: INK, lineHeight: 1.15, fontVariantNumeric: "tabular-nums" }}>
+            {fmtTime(serverNow)} <Box component="span" sx={{ fontSize: "1rem", fontWeight: 700, color: MUTED }}>น.</Box>
+          </Typography>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#334155" }}>
+            {new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(serverNow))}
+          </Typography>
+          <Stack direction="row" alignItems="center" justifyContent="center" gap={0.6} sx={{ mt: 1, pt: 1, borderTop: `1px dashed ${LINE}` }}>
             <LockClockRounded sx={{ fontSize: 15, color: FAINT }} />
-            <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>บันทึกเวลาจากเซิร์ฟเวอร์ แก้จากเครื่องไม่ได้ · ต้องการแก้ ขอผ่านแอดมิน</Typography>
+            <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>เวลาจากเซิร์ฟเวอร์ = เวลาที่กดยืนยัน · แก้ได้โดยขอผ่านแอดมิน</Typography>
           </Stack>
         </Box>
 
@@ -395,7 +406,8 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         {gpsMissing ? (
           <GpsRequired kind={pos.gps === "denied" ? "denied" : "unavailable"} perm={perm} secure={secure} onRetry={locate} onRequest={requestPermission} onSkip={() => setSkipGps(true)} skipped={skipGps} />
         ) : (
-        <Section title="ตำแหน่งของคุณ เทียบกับหน้างาน">
+        <Section n={1} title="ตำแหน่งของคุณ" done={!gpsSettling && !gpsBlocked}
+          hint={gpsSettling ? "กำลังหาตำแหน่ง — ถือเครื่องนิ่งๆ ในที่โล่ง" : "เทียบกับพิกัดหน้างาน"}>
           {jobLabel && <Typography sx={{ mb: 0.75, fontSize: "0.78rem", color: MUTED }}>หน้างาน: <Box component="span" sx={{ fontWeight: 800, color: INK }}>{event?.site || event?.company || jobLabel}</Box></Typography>}
           <Stack direction="row" alignItems="center" gap={1.25} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(locationCard.tone, 0.3)}`, bgcolor: alpha(locationCard.tone, 0.05) }}>
             <Box sx={{ color: locationCard.tone, display: "flex", "& svg": { fontSize: 22 } }}>{locationCard.icon}</Box>
@@ -411,7 +423,8 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         )}
 
         {/* รูปก่อนเริ่มงาน — บังคับอย่างน้อย 1 รูป */}
-        <Section title="รูปหน้างาน" required hint={needPhoto ? "ต้องมีอย่างน้อย 1 รูป จึงกดเข้างานได้" : `${photos.length} รูป · บันทึกเป็นไฟล์แนบของงานนี้`}>
+        <Section n={2} title="รูปหน้างาน" required done={!needPhoto}
+          hint={needPhoto ? "ถ่ายรูปหน้างานอย่างน้อย 1 รูป จึงกดเข้างานได้" : `✓ ${photos.length} รูป · บันทึกเป็นหลักฐานของงานนี้`}>
           <FileGrid items={photos} uploading={uploading} onRemove={removePhoto} onAdd={() => fileRef.current?.click()} addLabel="ถ่าย/เลือกรูป" highlight={needPhoto} />
           <input ref={fileRef} type="file" hidden multiple accept="image/*,.heic,.heif" onChange={onPick} />
         </Section>
@@ -451,6 +464,18 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         </Box>
         {err && <Typography sx={{ mt: 2, fontSize: "0.82rem", fontWeight: 700, color: "#dc2626" }}>{err}</Typography>}
       </DialogContent>
+      {/* ✅ บอกชัดว่าเหลืออะไรก่อนกดยืนยันได้ */}
+      <Stack direction="row" alignItems="center" justifyContent="center" gap={1.5} sx={{ px: 2, py: 0.9, bgcolor: canSubmit ? "#f0fdf4" : "#fffbeb", borderTop: `1px solid ${LINE}` }}>
+        {[["ตำแหน่ง", !gpsSettling && !gpsBlocked], ["รูปหน้างาน", !needPhoto]].map(([label, ok]) => (
+          <Stack key={label} direction="row" alignItems="center" gap={0.5}>
+            {ok ? <CheckCircleRounded sx={{ fontSize: 17, color: GREEN }} /> : <Box sx={{ width: 15, height: 15, borderRadius: "50%", border: `2px solid ${AMBER}` }} />}
+            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: ok ? "#15803d" : "#92400e" }}>{label}</Typography>
+          </Stack>
+        ))}
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: canSubmit ? "#15803d" : "#92400e" }}>
+          {canSubmit ? "· พร้อมบันทึก" : "· ยังไม่ครบ"}
+        </Typography>
+      </Stack>
 
       <DialogActions sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${LINE}`, gap: 1, bgcolor: "#fff" }}>
         <Button onClick={cancel} disabled={saving} sx={{ ...MBTN.ghost, px: 2 }}>ยกเลิก</Button>

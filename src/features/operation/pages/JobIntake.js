@@ -56,8 +56,7 @@ import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 
 const AMBER = "#d97706";
@@ -855,7 +854,7 @@ function DeliverDialog({ job, onClose, onDone }) {
           </Box>
         </Section>
         {billing === "need" && (
-        <Section n={3} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่แถว/การ์ดงาน" last>
+        <Section n={3} title="เอกสารการเงิน" hint="ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ · ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่แถว/การ์ดงาน" last>
           <Button component="label" variant="outlined" startIcon={<UploadFileRounded />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
             {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "เลือกไฟล์ใบวางบิล"}
             <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFiles([...(e.target.files || [])])} />
@@ -1489,7 +1488,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             })()}
             {job.noVisit && invoiceFiles.length > 0 && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
-                <FileLinks files={invoiceFiles} label="ใบวางบิล" />
+                <FileLinks files={invoiceFiles} label="เอกสารการเงิน" />
               </Stack>
             )}
             {(job.infoPending && job.infoPendingNote) || (fu && st.i === 2) || st.i === -1 ? (
@@ -1953,16 +1952,7 @@ export default function JobIntake() {
               allLabel="ผู้รับผิดชอบทุกคน" allCount={ownerOptions.total} unit="งาน" options={ownerOptions.list} sx={{ width: "100%" }} />
           </Box>
         )}
-        <Tooltip title={canExport ? `ส่งออก Excel (${list.length} งาน)` : "ไม่มีงานให้ส่งออก"}>
-          <span>
-            <ButtonBase onClick={exportExcel} disabled={!canExport || exporting} aria-label="ส่งออก Excel"
-              sx={{ height: 40, px: { xs: 1.1, sm: 1.4 }, gap: 0.6, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff", fontFamily: "inherit",
-                fontSize: "0.8rem", fontWeight: 800, color: "#047857", opacity: canExport ? 1 : 0.45, "&:hover": { bgcolor: "#f0fdf4" } }}>
-              {exporting ? <CircularProgress size={15} sx={{ color: "#047857" }} /> : <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16 }} />}
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
-            </ButtonBase>
-          </span>
-        </Tooltip>
+        <ExportExcelButton onClick={exportExcel} loading={exporting} disabled={!canExport} count={list.length} unit="งาน" />
         <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           {[["card", ViewAgendaRounded, "การ์ด"], ["table", TableRowsRounded, "ตาราง"]].map(([k, Ico, label]) => (
             <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}

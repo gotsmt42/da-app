@@ -37,7 +37,7 @@ import {
  Drawer,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { SearchRounded as Search, FolderOpenRounded as FolderOpen, AddRounded as Add, CloseRounded as Close, PlaylistAddRounded as PlaylistAdd, MergeTypeRounded as MergeType, GroupWorkRounded as GroupWork, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded as WarningAmber, AddLinkRounded as AddLink, LinkOffRounded as LinkOff, BuildRounded as Build, EngineeringRounded as Engineering, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, CalendarMonthRounded as CalendarMonth, CategoryRounded as Category, AssignmentRounded as Assignment, DescriptionRounded as Description, HourglassEmptyRounded as HourglassEmpty, DeviceHubRounded as DeviceHub, SwapHorizRounded as SwapHoriz, TableChartRounded as TableChart, FilterListRounded as FilterList, ViewAgendaRounded as ViewAgenda, TableRowsRounded as TableRows, SwipeLeftRounded as SwipeLeft, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, AddCircleOutlineRounded as AddCircleOutline, CheckRounded as Check, AutorenewRounded as Autorenew, HistoryRounded as History, ApartmentRounded as Apartment, TimelapseRounded as Timelapse, TuneRounded as Tune } from "@mui/icons-material";
+import { SearchRounded as Search, FolderOpenRounded as FolderOpen, AddRounded as Add, CloseRounded as Close, PlaylistAddRounded as PlaylistAdd, MergeTypeRounded as MergeType, GroupWorkRounded as GroupWork, DeleteOutlineRounded as DeleteOutline, WarningAmberRounded as WarningAmber, AddLinkRounded as AddLink, LinkOffRounded as LinkOff, BuildRounded as Build, EngineeringRounded as Engineering, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, CalendarMonthRounded as CalendarMonth, CategoryRounded as Category, AssignmentRounded as Assignment, DescriptionRounded as Description, HourglassEmptyRounded as HourglassEmpty, DeviceHubRounded as DeviceHub, SwapHorizRounded as SwapHoriz, FilterListRounded as FilterList, ViewAgendaRounded as ViewAgenda, TableRowsRounded as TableRows, SwipeLeftRounded as SwipeLeft, ChevronLeftRounded as ChevronLeft, ChevronRightRounded as ChevronRight, AddCircleOutlineRounded as AddCircleOutline, CheckRounded as Check, AutorenewRounded as Autorenew, HistoryRounded as History, ApartmentRounded as Apartment, TimelapseRounded as Timelapse, TuneRounded as Tune } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -85,13 +85,13 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import TelLink from "@/shared/components/TelLink";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 // ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
 //    แดงเหลือไว้เฉพาะเรื่องที่อันตราย/เร่งด่วนจริง (ลบ · เลยกำหนด · หมดอายุ) — DANGER
 const ACCENT = "#2563eb";
 const DANGER = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
-const EXCEL_GREEN = "#217346";
 // ✅ เพดานจำนวนครั้งของสัญญา — บังคับทุกจุดที่ตั้งค่านี้ (ฟอร์มเพิ่มสัญญา/แก้ไข inline/จัดกลุ่มเป็นสัญญา
 // ทั้งฝั่งจอและฝั่ง backend) และใช้เป็นเพดานตอนคำนวณจำนวนคอลัมน์ "ครั้งที่ N" ของตารางด้วย (กันไว้อีก
 // ชั้น เผื่อมีข้อมูลเก่า/จากที่อื่นที่หลุดรอดมาสูงกว่านี้ — ไม่งั้นตารางทั้งหน้าจะกว้างจนพังได้)
@@ -5989,28 +5989,7 @@ export default function ContractOverview() {
           {/* ✅ เปลี่ยนจากปุ่มไอคอนกลมสีแดง (ไอคอนลูกศรดาวน์โหลดทั่วไป) เป็นปุ่มมีข้อความ "Excel" สีเขียว
               ตามสีแบรนด์ Excel (#217346) — เดิมเป็นวงกลมสีเดียวกับปุ่มรีเฟรชข้างๆ ดูไม่ออกว่าปุ่มไหนคือ
               ส่งออก ต้องเอาเมาส์ไปชี้อ่าน tooltip ทุกครั้ง (บนมือถือไม่มี hover ยิ่งเดาไม่ได้เลย) */}
-          <Tooltip title={filtered.length === 0 ? "ไม่มีข้อมูลให้ส่งออก" : `ส่งออก ${filtered.length} รายการที่กรองอยู่เป็นไฟล์ Excel (.xlsx)`}>
-            <span>
-              <Button
-                onClick={handleExportExcel}
-                disabled={exporting || filtered.length === 0}
-                variant="outlined"
-                startIcon={<TableChart sx={{ fontSize: 18, color: EXCEL_GREEN }} />}
-                // ✅ เดิมทั้งปุ่มเป็นสีเขียว (ตัวหนังสือ+ขอบ) วางคู่กับปุ่มแดง "เพิ่มสัญญาใหม่" — กลายเป็น
-                // 2 ปุ่มสีจัดขนาดเท่ากันแข่งกันดึงสายตา ทั้งที่ "ส่งออก" เป็นงานรอง ไม่ใช่สิ่งที่คนเปิด
-                // หน้านี้มาทำเป็นอันดับแรก → เหลือสีเขียวไว้แค่ที่ไอคอน (พอให้รู้ว่าเป็น Excel) ส่วนตัว
-                // ปุ่มเป็นกลาง ปล่อยให้ปุ่มแดงเป็นปุ่มหลักที่เด่นที่สุดบนหน้าเพียงตัวเดียว
-                sx={{
-                  flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5,
-                  ...(isMobile ? { minWidth: 40, width: 40, height: 40, px: 0, "& .MuiButton-startIcon": { m: 0 } } : {}),
-                  color: "text.primary", borderColor: BORDER_MAIN, bgcolor: "background.paper",
-                  "&:hover": { bgcolor: SURFACE_SUBTLE, borderColor: alpha("#0f172a", 0.28) },
-                }}
-              >
-                {exporting ? "กำลังสร้าง..." : isMobile ? "" : "Export Excel"}
-              </Button>
-            </span>
-          </Tooltip>
+          <ExportExcelButton onClick={handleExportExcel} loading={exporting} disabled={filtered.length === 0} count={filtered.length} compact={isMobile} />
           {/* ✅ มือถือ: ปุ่มมุมมอง/ค้นหา/ตัวกรอง ข้างปุ่มเพิ่ม — เปิดแผ่นล่าง */}
           {isMobile && (
             <IconButton

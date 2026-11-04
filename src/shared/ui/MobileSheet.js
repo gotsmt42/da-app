@@ -130,8 +130,11 @@ export const FadeIn = ({ children }) => (
 /**
  * @param title / subtitle  หัวแผ่น · actions = ปุ่มข้างหัว (เช่น "ดูในปฏิทิน")
  * @param maxWidth          ความกว้าง Dialog บนจอใหญ่
+ * @param zIndex            เปิดซ้อนบนกล่อง SweetAlert (ฟอร์มแก้ไขงาน z 20000) — ส่ง 20010 ขึ้นไป · ปิดการล็อกโฟกัสของ MUI ให้ด้วย
+ *                          (ไม่งั้นแย่งโฟกัสกับ Swal จนพิมพ์/กดไม่ได้)
  */
-export default function MobileSheet({ open, onClose, title, subtitle, actions, children, maxWidth = "md", bodySx }) {
+export default function MobileSheet({ open, onClose, title, subtitle, actions, children, maxWidth = "md", bodySx, zIndex }) {
+  const layer = zIndex ? { sx: { zIndex }, disableEnforceFocus: true, disableAutoFocus: true } : {};
   const isMobile = useMediaQuery("(max-width:599.95px)");
   const stage = useStagedOpen(open && isMobile);
   const head = (
@@ -161,7 +164,8 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
         <SwipeableDrawer anchor="bottom" open={stage.shown} onClose={onClose} onOpen={() => {}}
           disableSwipeToOpen disableDiscovery={iOS}
           transitionDuration={SHEET_DURATION} SlideProps={{ easing: SHEET_EASING }}
-          ModalProps={{ keepMounted: stage.mounted }}
+          ModalProps={{ keepMounted: stage.mounted, ...(zIndex ? { disableEnforceFocus: true, disableAutoFocus: true } : {}) }}
+          sx={zIndex ? { zIndex } : undefined}
           PaperProps={{ className: "tt-swipe-native", sx: SHEET_PAPER_SX }}>
           {head}
           {body}
@@ -170,7 +174,7 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
     );
   }
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth={maxWidth}
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth={maxWidth} {...layer}
       PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "90vh" } }}>
       {head}
       {body}

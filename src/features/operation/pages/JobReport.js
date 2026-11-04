@@ -12,11 +12,9 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { Box, Button, ButtonBase, CircularProgress, InputAdornment, Stack, TextField, Typography, useMediaQuery } from "@mui/material";
+import { Box, Button, ButtonBase, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { AssessmentRounded, SearchRounded } from "@mui/icons-material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 import SectionTabs from "@/shared/ui/SectionTabs";
 import SelectField from "@/shared/ui/SelectField";
@@ -33,6 +31,7 @@ import PeriodFilter from "../components/PeriodFilter";
 import { ReportSection, Segmented, RankRow, TotalRow, Stat, TotalHero, FilterCard, BarRow, PersonAvatar, R_CARD, baht } from "../components/ReportKit";
 import { periodRange, periodText, monthLabel } from "../utils/reportPeriod";
 import { buildJobs, filterJobs, summarizeJobs, GROUP_BY_KEY } from "../utils/jobSummary";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const GROUP_DIMS = [
   ["site", "โครงการ", "bySite"],
@@ -87,7 +86,6 @@ function JobRow({ j, avatarOf, onClick, showValue }) {
 
 export default function JobReport() {
   const { can } = usePermissions();
-  const isDesktop = useMediaQuery("(min-width:900px)");
   const showValue = can("approveJobs") || can("viewAllJobs");
 
   const [events, setEvents] = useState(null);
@@ -176,13 +174,7 @@ export default function JobReport() {
 
   if (!events) return <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={26} /></Stack>;
 
-  const exportBtn = (
-    <Button variant="outlined" onClick={doExport} disabled={exporting || !jobs.length}
-      startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />}
-      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: INK, borderColor: LINE, whiteSpace: "nowrap", "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
-      {exporting ? "กำลังส่งออก…" : isDesktop ? "ส่งออก Excel" : "Excel"}
-    </Button>
-  );
+  const exportBtn = <ExportExcelButton onClick={doExport} loading={exporting} disabled={!jobs.length} />;
 
   return (
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>

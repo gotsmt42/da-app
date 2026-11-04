@@ -49,14 +49,16 @@
   border-radius: 16px;
 }
 
-.profile-img {
+/* 🐛 (4 พ.ย. 2569 ผู้ใช้: "กรอบสี่เหลี่ยมแดงที่รูปยังไม่เอาออก") กฎนี้เดิมไม่ได้จำกัดที่เมนูข้าง — ไปโดน
+   กล่อง .profile-img (div สี่เหลี่ยม) ของรูปโปรไฟล์บนแถบหัวด้วย = กรอบแดงสี่เหลี่ยมรอบรูป → จำกัดเฉพาะเมนูข้าง */
+.sidebar-container .profile-img {
   border: 2px solid var(--accent-color);
   box-shadow: 0 0 15px rgba(220, 38, 38, 0.3);
   object-fit: cover;
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.profile-img:hover {
+.sidebar-container .profile-img:hover {
   transform: scale(1.1) rotate(5deg);
 }
 

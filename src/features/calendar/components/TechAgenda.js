@@ -15,10 +15,11 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AddRounded as Add, FileDownloadRounded, ChevronRightRounded as ChevronRight, EngineeringRounded, Groups2Rounded, EventRounded } from "@mui/icons-material";
+import { AddRounded as Add, ChevronRightRounded as ChevronRight, EngineeringRounded, Groups2Rounded, EventRounded } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { Kpi, usePaged, ListPager } from "./SalesAgenda";
+import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const AMBER = "#d97706";
 const RED = "#dc2626";
@@ -159,11 +160,7 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
         </Box>
         {onExport && (
           // ✅ (24 ต.ค. 2569 ผู้ใช้: "ทำไมไม่มีปุ่ม export excel ในมือถือ") มือถือ = ปุ่มไอคอน (ไม่กินที่) · จอใหญ่ = ไอคอน + คำว่า Excel
-          <Button variant="outlined" onClick={onExport} disabled={exportDisabled} aria-label="ส่งออก Excel"
-            sx={{ flexShrink: 0, minWidth: { xs: 38, sm: 64 }, height: { xs: 36, sm: "auto" }, px: { xs: 0, sm: 1.5 }, gap: 0.6, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
-            <FileDownloadRounded sx={{ fontSize: 20 }} />
-            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Excel</Box>
-          </Button>
+          <ExportExcelButton onClick={onExport} disabled={exportDisabled} />
         )}
         {canAdd && (
           <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" }, flexShrink: 0, whiteSpace: "nowrap", minWidth: "auto", px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>

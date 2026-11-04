@@ -104,6 +104,8 @@ import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
+import ExportExcelButton, { ExcelIcon } from "@/shared/ui/ExportExcelButton";
+import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
 
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "ปุ่มต่างๆ ที่เป็นของเดิมปรับแก้สีสันให้สอดคล้อง สวยงาม")
 //    ปุ่มหลัก = น้ำเงินทึบ (อนุมัติปิดงาน = เขียวทึบ) · ไม่อนุมัติ = เส้นขอบแดง · ปุ่มรอง = เส้นขอบน้ำเงิน — สูง 36 เท่ากันทั้งหน้า
@@ -793,6 +795,10 @@ export const FileUploadSection = ({
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
+          {/* ✅ (4 พ.ย. 2569) เอกสารการเงิน: บอกว่าแนบอะไรได้บ้าง */}
+          {type === "invoice" && (
+            <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.35 }}>ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ</Typography>
+          )}
           <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 0.15 }}>
             {pill.icon
               ? <CheckCircle sx={{ fontSize: 13, color: pill.fg }} />
@@ -831,6 +837,11 @@ export const FileUploadSection = ({
 
       {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ */}
       {type === "report" && hasFiles && event?._id && !embedded && <ServiceReportAiBar event={event} sx={{ mb: uploading || (!card && canEdit) ? 1 : 0 }} />}
+
+      {/* ✅ (4 พ.ย. 2569) ใบวางบิล: แนบแล้วบันทึกการวางบิล (เลขที่/ยอด) ต่อได้ทันที — เชื่อมหน้า "วางบิล / รับเงิน" */}
+      {type === "invoice" && hasFiles && event?._id && (
+        <InvoiceBillingBar event={event} filesCount={fileList.length} zIndex={embedded ? 20030 : undefined} sx={{ mb: uploading || canEdit ? 1 : 0 }} />
+      )}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
       <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
@@ -1255,7 +1266,7 @@ const EventRowCard = ({
        <Grid item xs={12}>
         <FileUploadSection
           card event={event}
-          eventId={event._id} type="invoice" label="ใบวางบิล"
+          eventId={event._id} type="invoice" label="เอกสารการเงิน"
           files={event.invoiceFiles}
           applicable={event.invoiceApplicable}
           onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
@@ -3680,7 +3691,7 @@ const Operation = () => {
                 </MenuItem>
                 {isAdminOrManager && (
                   <MenuItem disabled={exporting || jobGroups.length === 0} onClick={() => { setHeaderMenuAnchor(null); handleExportExcel(); }}>
-                    <ListItemIcon><FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#047857" }} /></ListItemIcon>
+                    <ListItemIcon><ExcelIcon /></ListItemIcon>
                     <ListItemText>ส่งออก Excel</ListItemText>
                   </MenuItem>
                 )}
@@ -3706,18 +3717,7 @@ const Operation = () => {
             <ToggleButton value="table" title="มุมมองตาราง"><TableChart sx={{ fontSize: 18 }} /></ToggleButton>
           </ToggleButtonGroup>
           {isAdminOrManager && (
-            <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
-              <span>
-                <IconButton onClick={handleExportExcel} disabled={exporting || jobGroups.length === 0}
-                  sx={{
-                    ...ICON_BTN_SX,
-                    borderColor: alpha("#047857", 0.25), color: "#047857",
-                    "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
-                  }}>
-                  <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16 }} />
-                </IconButton>
-              </span>
-            </Tooltip>
+            <ExportExcelButton onClick={handleExportExcel} loading={exporting} disabled={jobGroups.length === 0} count={jobGroups.length} unit="งาน" />
           )}
           </>)}
         </Stack>

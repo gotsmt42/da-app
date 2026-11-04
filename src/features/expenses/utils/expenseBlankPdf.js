@@ -143,9 +143,10 @@ const makePen = (doc, hasBold) => {
 const drawCompanyHeader = (doc, pen, style) => {
   pen.color(SLATE);
   pen.bold(true); pen.size(15);
-  doc.text(ISSUER.nameTh, W_PAGE / 2, 12.5, { align: "center" });
+  // 🔁 (4 พ.ย. 2569 ผู้ใช้: "หัวกระดาษทุกเมนูให้ชิดด้านซ้าย") ชิดขอบซ้ายแนวเดียวกับเนื้อหา
+  doc.text(ISSUER.nameTh, L, 12.5);
   pen.bold(false); pen.size(10);
-  doc.text(`${ISSUER.address}  ${ISSUER.taxId}`, W_PAGE / 2, 17, { align: "center" });
+  doc.text(`${ISSUER.address}  ${ISSUER.taxId}`, L, 17);
   doc.setDrawColor(...style.tint.main);
   doc.setLineWidth(0.8);
   doc.line(L, 19.5, R, 19.5);

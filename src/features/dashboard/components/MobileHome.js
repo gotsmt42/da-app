@@ -147,16 +147,16 @@ export default function MobileHome({ userData, rankText, dateText, summary = [],
         // ✅ (1 พ.ย. 2569 ผู้ใช้: "งานของฉันหายไปไหน") — ทุกคนยกเว้นเซลมี "งานของฉัน" (แอดมิน/ผู้จัดการก็รับผิดชอบงานได้)
         // 🔁 (1 พ.ย. 2569 ผู้ใช้: "ปุ่มดูไม่เข้าธีม") หน้าตาเดียวกับปุ่ม 4 ช่อง — ไอคอนในวงกลมสีอ่อน · ชื่อตัวหนา · สรุปใต้ชื่อ
         <Link to="/technician/jobs" className="mh-myjobs">
-          <span className="mh-myjobs-art" aria-hidden="true"><AppIcon.MyJobs className="mh-myjobs-icon" style={gradFill("#dc2626")} /></span>
+          <span className="mh-myjobs-art" aria-hidden="true"><AppIcon.MyJobs className="mh-myjobs-icon" style={{ color: "#fff", fill: "#fff" }} /></span>
           <span className="mh-myjobs-text">
             <span className="mh-myjobs-title">งานของฉัน</span>
             <span className="mh-myjobs-sum">
             {summary.map((s, i) => (
-              <span key={s.text} style={s.tone ? { color: s.tone, fontWeight: 700 } : undefined}>{i > 0 && <i aria-hidden="true">·</i>}{s.text}</span>
+              <span key={s.text}>{i > 0 && <i aria-hidden="true">·</i>}<b className={s.tone ? "mh-myjobs-flag" : undefined} style={s.tone ? { color: s.tone } : undefined}>{s.text}</b></span>
             ))}
             </span>
           </span>
-          <ChevronRightRounded className="mh-myjobs-go" aria-hidden="true" />
+          <span className="mh-myjobs-cta" aria-hidden="true">เปิด<ChevronRightRounded className="mh-myjobs-go" /></span>
         </Link>
       ) : summary.length > 0 && (
         <div className="mh-myjobs mh-myjobs--plain">

@@ -39,4 +39,17 @@ describe("workerLog", () => {
     expect(s.months).toEqual(["2026-10", "2026-11"]);
     expect(s.pivot.get("A").get("2026-10")).toEqual({ visits: 1, total: 1000 });
   });
+
+  it("ผูกการกดเข้างานรายคน (checkIns) — เทียบ userId หรือชื่อคำแรก", () => {
+    const att = [
+      { eventId: "1", userId: "u-a", userName: "A Lastname", checkIn: { at: "2026-10-03T02:00:00Z" } },
+      { eventId: "2", userId: "u-c", userName: "C", checkIn: { at: "2026-10-10T02:00:00Z" } },
+    ];
+    const withAtt = buildWorkerEntries(events, att);
+    expect(withAtt.find((r) => r.name === "A").checkIns).toHaveLength(1);
+    expect(withAtt.find((r) => r.name === "B" && r.date === "2026-10-03").checkIns).toHaveLength(0);
+    expect(withAtt.find((r) => r.name === "C").checkIns).toHaveLength(1);
+    const s2 = summarizeEntries(withAtt);
+    expect(s2.totals.checked).toBe(2);
+  });
 });
