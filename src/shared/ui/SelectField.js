@@ -84,6 +84,10 @@ export default function SelectField({ children, SelectProps = {}, InputLabelProp
           if (!pickedRef.current) onMenuClose?.();
         },
         MenuProps: {
+          // 🔁 (4 พ.ย. 2569 ผู้ใช้: "การเลือกหน้าแสดง ... ยังเพี้ยนๆ") เมนูเดิมเด้งทับช่องเลือก (MUI วางรายการที่เลือกไว้ตรงช่อง)
+          //    → เปิดลงด้านล่างช่องเสมอ ไม่บังช่อง · พื้นที่ด้านล่างไม่พอ MUI พลิกขึ้นบนให้เอง
+          anchorOrigin: { vertical: "bottom", horizontal: "left" },
+          transformOrigin: { vertical: "top", horizontal: "left" },
           ...MenuProps,
           PaperProps: {
             ...(MenuProps?.PaperProps || {}),

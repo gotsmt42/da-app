@@ -1,215 +1,305 @@
 /**
- * JobReport.js — รายงานงาน (คู่กับ "รายงานการเบิก" ของหมวดเบิกค่าใช้จ่าย)
+ * JobReport.js — สรุปผลการดำเนินงาน (แท็บใน "การดำเนินงาน" · เดิมชื่อ "รายงานงาน")
  *
- * ✅ ผู้ใช้สั่ง: "เพิ่มรายงานในแถบเมนูงาน ให้เหมือนกับแถบเบิกค่าใช้จ่าย"
- *    จึงใช้โครงเดียวกับ ExpenseReport.js — ตัวเลือกช่วงเวลา → แถบตัวเลขสรุป → แผงกราฟ → ตารางสรุป
- *    คนที่ใช้รายงานการเบิกเป็นอยู่แล้ว จะใช้หน้านี้ได้ทันทีโดยไม่ต้องเรียนรู้ใหม่
+ * 🔁 (4 พ.ย. 2569 ผู้ใช้: "รายงานงาน ดูแล้วไม่เข้าใจ ข้อมูลไม่สอดคล้อง ดูยาก และสับสน แก้ไขให้สมบูรณ์ และแก้ชื่อเมนูใหม่ให้มืออาชีพ")
+ *    • ตัวเลขทุกตัวใช้กติกาเดียวกับหน้าการดำเนินงาน (utils/jobSummary.js) — 1 งานอยู่สถานะเดียว ผลรวม = จำนวนงาน
+ *    • กดรายการงาน = เด้งรายละเอียดงานขึ้นมาในหน้านี้ (JobQuickView) ไม่ย้ายหน้า
+ *    • หน้าตาแบบหน้าแรก (Agoda) — components/ReportKit · ช่วงเวลาภาษาไทย (PeriodFilter)
  *
- * ⚠️ ไม่ได้ยิง endpoint ใหม่ — อ่านจาก /events/event-op ตัวเดียวกับหน้าการดำเนินงาน
- *    การมองเห็นจึงเท่ากับหน้านั้นเป๊ะโดยอัตโนมัติ (ช่างเห็นเฉพาะงานตัวเอง เซลเห็นของฝ่ายขาย)
- *    ถ้าแยกไปทำ endpoint ใหม่ จะต้องดูแลตัวกรองสิทธิ์สองชุดให้ตรงกันตลอดไป
- * ⚠️ "ค้างงาน" ใช้ buildDaysPastDueMap ตัวเดียวกับหน้าอื่น และต้องคำนวณจากงาน "ทั้งหมด"
- *    ก่อนกรองช่วงวันเสมอ — ไม่งั้นงานที่เข้าหลายวันจะถูกหั่นจนวันครบกำหนดเพี้ยน
+ * บนลงล่าง: ตัวกรอง → ภาพรวม (จำนวนงาน + 6 สถานะ) → งานค้างที่ต้องติดตาม → รายเดือน/รายปี → สรุปตามกลุ่ม → รายการงาน
+ * ⚠️ อ่านจาก /events/event-op (slim) ตัวเดียวกับหน้าการดำเนินงาน — การมองเห็นเท่ากันอัตโนมัติ
+ * ⚠️ "ค้างงาน" ต้องคิดจากงานทั้งหมดก่อนกรองช่วงวัน (buildDaysPastDueMap) — งานหลายวันจะไม่ถูกหั่น
  */
 import { useEffect, useMemo, useState } from "react";
-import SectionTabs from "@/shared/ui/SectionTabs";
-import {
-  Box, Stack, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, Tooltip,
-  Table, TableBody, TableCell, TableHead, TableRow, LinearProgress,
-} from "@mui/material";
-import { AssessmentRounded } from "@mui/icons-material";
 import moment from "moment";
+import { Box, Button, ButtonBase, CircularProgress, InputAdornment, Stack, TextField, Typography, useMediaQuery } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { AssessmentRounded, SearchRounded } from "@mui/icons-material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
+import SectionTabs from "@/shared/ui/SectionTabs";
+import SelectField from "@/shared/ui/SelectField";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
+import usePaged, { PageBar } from "@/shared/ui/usePaged";
+import usePermissions from "@/shared/hooks/usePermissions";
 import EventService from "@/shared/services/EventService";
+import AuthService from "@/shared/services/authService";
+import JobQuickView from "@/shared/ui/JobQuickView";
 import { buildDaysPastDueMap } from "@/shared/utils/overdueJobs";
 import { THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
-import { buildJobReport } from "../utils/jobReport";
-import { PAGE_SX, PageHeader, KpiRow, Kpi as PkKpi } from "@/shared/ui/PageKit";
+import { PAGE_SX, PageHeader, INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
+import PeriodFilter from "../components/PeriodFilter";
+import { ReportSection, Segmented, RankRow, TotalRow, Stat, TotalHero, FilterCard, BarRow, PersonAvatar, R_CARD, baht } from "../components/ReportKit";
+import { periodRange, periodText, monthLabel } from "../utils/reportPeriod";
+import { buildJobs, filterJobs, summarizeJobs, GROUP_BY_KEY } from "../utils/jobSummary";
 
-const ACCENT = "#8b5cf6";        // สีประจำหมวด "งาน" เดียวกับการ์ดเมนูหน้าแรก
-const BORDER = "#e6e9ef";
-const TEXT_SUB = "#64748b";
-
-/** ช่วงเวลาชุดเดียวกับรายงานการเบิก — คนใช้สองหน้านี้สลับกันจะได้ไม่ต้องจำคนละชุด */
-const PRESETS = [
-  { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
-  { value: "lastMonth", label: "เดือนที่แล้ว", range: () => [moment().subtract(1, "month").startOf("month"), moment().subtract(1, "month").endOf("month")] },
-  { value: "quarter", label: "ไตรมาสนี้", range: () => [moment().startOf("quarter"), moment()] },
-  { value: "year", label: "ปีนี้", range: () => [moment().startOf("year"), moment()] },
-  { value: "12m", label: "12 เดือนล่าสุด", range: () => [moment().subtract(11, "months").startOf("month"), moment()] },
-  { value: "all", label: "ทั้งหมด", range: () => [null, null] },
+const GROUP_DIMS = [
+  ["site", "โครงการ", "bySite"],
+  ["system", "ระบบงาน", "bySystem"],
+  ["title", "ประเภทงาน", "byTitle"],
+  ["responsible", "ผู้รับผิดชอบ", "byResponsible"],
 ];
 
-const monthLabel = (key) => {
-  const [y, m] = String(key).split("-");
-  return `${THAI_MONTHS_SHORT[Number(m) - 1]} ${String(Number(y) + 543).slice(-2)}`;
-};
-
-const Panel = ({ title, hint, children }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, p: { xs: 1.5, sm: 2 }, mb: 1.5, boxShadow: "none" }}>
-    <Typography sx={{ fontWeight: 900, fontSize: "0.95rem" }}>{title}</Typography>
-    {hint && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mb: 1.25 }}>{hint}</Typography>}
-    {children}
-  </Box>
-);
-
-/** แถบสัดส่วนขั้นของงาน — อ่าน "คิวงานกองอยู่ขั้นไหน" ได้ในแวบเดียว */
-const Pipeline = ({ rows, total }) => (
-  <Stack spacing={0.9}>
-    {rows.map((r) => (
-      <Box key={r.key}>
-        <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.25 }}>
-          <Typography variant="caption" sx={{ fontWeight: 700 }}>{r.label}</Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>{r.count} งาน</Typography>
-        </Stack>
-        <LinearProgress
-          variant="determinate" value={total ? (r.count / total) * 100 : 0}
-          sx={{ height: 7, borderRadius: 4, bgcolor: "#f1f5f9", "& .MuiLinearProgress-bar": { bgcolor: r.color, borderRadius: 4 } }}
-        />
-      </Box>
-    ))}
-  </Stack>
-);
-
-/**
- * กราฟแท่งรายเดือน — แท่งจาง = งานทั้งหมด · แท่งเข้ม = ที่ปิดแล้ว
- * ⚠️ ความสูงคิดเทียบกับเดือนที่มากที่สุดเสมอ ไม่ใช่ค่าคงที่ ไม่งั้นเดือนที่งานน้อยจะเตี้ยจนมองไม่เห็น
- */
-const MonthBars = ({ rows }) => {
-  const max = Math.max(1, ...rows.map((r) => r.total));
-  if (!rows.length) return <Typography variant="caption" sx={{ color: TEXT_SUB }}>ไม่มีงานในช่วงที่เลือก</Typography>;
+/** แถวงาน — ช่องวันที่ · โครงการ/งาน · คน · สถานะ/มูลค่า */
+function JobRow({ j, avatarOf, onClick, showValue }) {
+  const g = GROUP_BY_KEY[j.group];
+  const d = moment(j.start);
   return (
-    <Stack direction="row" alignItems="flex-end" spacing={0.75} sx={{ overflowX: "auto", pb: 0.5 }}>
-      {rows.map((r) => (
-        <Tooltip key={r.key} arrow title={`${monthLabel(r.key)} · ${r.total} งาน · ปิดแล้ว ${r.done} · ค้าง ${r.overdue}`}>
-          <Box sx={{ minWidth: 34, textAlign: "center" }}>
-            <Box sx={{ height: 90, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              <Box sx={{ width: 18, height: `${(r.total / max) * 100}%`, bgcolor: "#ede9fe", borderRadius: "4px 4px 0 0", position: "relative" }}>
-                <Box sx={{ position: "absolute", bottom: 0, left: 0, right: 0, height: r.total ? `${(r.done / r.total) * 100}%` : 0, bgcolor: ACCENT, borderRadius: "4px 4px 0 0" }} />
-              </Box>
-            </Box>
-            <Typography variant="caption" sx={{ color: TEXT_SUB, fontSize: "0.65rem" }}>{monthLabel(r.key)}</Typography>
-          </Box>
-        </Tooltip>
-      ))}
-    </Stack>
+    <ButtonBase onClick={onClick} component="div"
+      sx={{ display: "flex", alignItems: "center", gap: { xs: 1.25, sm: 2 }, width: "100%", px: { xs: 1.5, sm: 2 }, py: 1.5, textAlign: "left", fontFamily: "inherit",
+        borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, bgcolor: "#fff", "&:hover": { bgcolor: alpha(ACCENT, 0.035) } }}>
+      <Box sx={{ width: 54, flexShrink: 0, textAlign: "center", borderRadius: "12px", border: `1px solid ${LINE}`, overflow: "hidden" }}>
+        <Box sx={{ bgcolor: "#f1f5f9", fontSize: "0.68rem", fontWeight: 800, color: MUTED, py: 0.25 }}>{THAI_MONTHS_SHORT[d.month()]} {String(d.year() + 543).slice(-2)}</Box>
+        <Box sx={{ fontSize: "1.25rem", fontWeight: 900, color: INK, lineHeight: 1.35 }}>{d.date()}</Box>
+        {j.visits > 1 && <Box sx={{ fontSize: "0.64rem", color: MUTED, pb: 0.25 }}>{j.visits} ช่วง</Box>}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography noWrap sx={{ fontSize: "0.98rem", fontWeight: 800, color: INK }}>{j.site || j.company || "-"}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.82rem", color: MUTED }}>{[j.title, j.system, j.time ? `ครั้งที่ ${j.time}` : "", j.jobNo].filter(Boolean).join(" · ")}</Typography>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.6, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: "0.8rem", color: MUTED }}>
+            ผู้รับผิดชอบ <b style={{ color: j.responsible ? INK : "#d97706" }}>{j.responsible || "ยังไม่มอบหมาย"}</b>
+          </Typography>
+          {j.workers.length > 0 && (
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
+              <Stack direction="row" sx={{ "& > *:not(:first-of-type)": { ml: "-6px" } }}>
+                {j.workers.slice(0, 4).map((n) => <Box key={n} sx={{ border: "2px solid #fff", borderRadius: "50%" }}><PersonAvatar name={n} avatar={avatarOf(n)} size={20} /></Box>)}
+              </Stack>
+              <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{j.workers.join(", ")}</Typography>
+            </Stack>
+          )}
+        </Stack>
+      </Box>
+      <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+        <Box component="span" sx={{ display: "inline-block", fontSize: "0.76rem", fontWeight: 800, color: g.color, bgcolor: alpha(g.color, 0.1), borderRadius: "6px", px: 1, py: 0.3 }}>
+          {g.label}{j.overdueDays ? ` ${j.overdueDays} วัน` : ""}
+        </Box>
+        {showValue && (
+          <Typography sx={{ mt: 0.5, fontSize: "0.9rem", fontWeight: 800, color: j.value === null ? "#cbd5e1" : INK, fontVariantNumeric: "tabular-nums" }}>
+            {j.value === null ? "—" : baht(j.value)}
+          </Typography>
+        )}
+      </Box>
+    </ButtonBase>
   );
-};
-
-const SummaryTable = ({ rows, firstHeader }) => (
-  <Table size="small">
-    <TableHead>
-      <TableRow>
-        <TableCell sx={{ fontWeight: 800 }}>{firstHeader}</TableCell>
-        <TableCell align="right" sx={{ fontWeight: 800 }}>งาน</TableCell>
-        <TableCell align="right" sx={{ fontWeight: 800 }}>ปิดแล้ว</TableCell>
-        <TableCell align="right" sx={{ fontWeight: 800 }}>ค้าง</TableCell>
-      </TableRow>
-    </TableHead>
-    <TableBody>
-      {rows.slice(0, 15).map((r) => (
-        <TableRow key={r.key}>
-          <TableCell sx={{ maxWidth: 190, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.key}</TableCell>
-          <TableCell align="right">{r.total}</TableCell>
-          <TableCell align="right">{r.done}</TableCell>
-          <TableCell align="right" sx={{ color: r.overdue ? "#dc2626" : TEXT_SUB, fontWeight: r.overdue ? 800 : 400 }}>{r.overdue}</TableCell>
-        </TableRow>
-      ))}
-      {!rows.length && (
-        <TableRow><TableCell colSpan={4}><Typography variant="caption" sx={{ color: TEXT_SUB }}>ไม่มีข้อมูล</Typography></TableCell></TableRow>
-      )}
-    </TableBody>
-  </Table>
-);
+}
 
 export default function JobReport() {
+  const { can } = usePermissions();
+  const isDesktop = useMediaQuery("(min-width:900px)");
+  const showValue = can("approveJobs") || can("viewAllJobs");
+
   const [events, setEvents] = useState(null);
   const [error, setError] = useState("");
-  const [preset, setPreset] = useState("12m");
-  const [group, setGroup] = useState("customer");
+  const [employees, setEmployees] = useState([]);
+  const [period, setPeriod] = useState({
+    preset: "month", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
+    from: moment().startOf("month").format("YYYY-MM-DD"), to: moment().format("YYYY-MM-DD"),
+  });
+  const [responsible, setResponsible] = useState("all");
+  const [system, setSystem] = useState("all");
+  const [title, setTitle] = useState("all");
+  const [q, setQ] = useState("");
+  const [periodBy, setPeriodBy] = useState("month");
+  const [dim, setDim] = useState("site");
+  const [listGroup, setListGroup] = useState("all");
+  const [quickId, setQuickId] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    // ⚠️ endpoint นี้คืน { userEvents: [...] } ไม่ใช่อาร์เรย์ตรงๆ (เหมือนที่ OperationBoard ทำ)
-    // ⚠️ slim = ขอเฉพาะฟิลด์ที่ใช้สรุป — รายงานไม่ได้แสดงไฟล์แนบ/คอมเมนต์/ประวัติกิจกรรม
-    //    ที่ 1000 งาน แบบเต็มราว 3.6 MB ต่อการเปิดหนึ่งครั้ง แบบนี้เหลือราว 1 ใน 10
+    // ⚠️ slim = เฉพาะฟิลด์ที่ใช้สรุป (ไม่มีไฟล์แนบ/คอมเมนต์/ประวัติ) — รายละเอียดเต็มโหลดตอนเปิด JobQuickView
     EventService.getEventOp({ slim: true })
       .then((res) => { if (alive) setEvents(res?.userEvents || []); })
       .catch(() => { if (alive) { setEvents([]); setError("ดึงข้อมูลงานไม่สำเร็จ — ลองใหม่อีกครั้ง"); } });
+    AuthService.getAllUserData().then((r) => { if (alive) setEmployees(r?.allUser || []); }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
-  const report = useMemo(() => {
-    if (!events) return null;
-    const [a, b] = (PRESETS.find((p) => p.value === preset) || PRESETS[0]).range();
-    return buildJobReport(events, {
-      // ⚠️ คิดวันค้างจากงานทั้งหมดก่อนกรองช่วงเสมอ
-      daysPastDueMap: buildDaysPastDueMap(events),
-      from: a ? a.format("YYYY-MM-DD") : undefined,
-      to: b ? b.format("YYYY-MM-DD") : undefined,
-    });
-  }, [events, preset]);
+  const avatarOf = useMemo(() => {
+    const m = new Map(employees.map((e) => [e.fname, e.imageUrl]));
+    return (n) => m.get(n);
+  }, [employees]);
 
-  if (!events) {
-    return <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={26} /></Stack>;
-  }
+  // ⚠️ วันค้างคิดจากงานทั้งหมดก่อนกรอง
+  const allJobs = useMemo(() => (events ? buildJobs(events, buildDaysPastDueMap(events)) : []), [events]);
+  const [rFrom, rTo] = periodRange(period.preset, period);
+  const inPeriod = useMemo(() => filterJobs(allJobs, { from: rFrom, to: rTo }), [allJobs, rFrom, rTo]);
+  const jobs = useMemo(() => filterJobs(inPeriod, { responsible, system, title, q }), [inPeriod, responsible, system, title, q]);
+  const summary = useMemo(() => summarizeJobs(jobs), [jobs]);
+  const t = summary.totals;
+
+  // ตัวเลือกในตัวกรอง — นับจากงานในช่วงเวลา
+  const optionsOf = (keyOf) => {
+    const m = new Map();
+    inPeriod.forEach((j) => { const k = keyOf(j); if (k) m.set(k, (m.get(k) || 0) + 1); });
+    return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th"));
+  };
+  const respOptions = useMemo(() => optionsOf((j) => j.responsible || "__none__"), [inPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  const systemOptions = useMemo(() => optionsOf((j) => j.system), [inPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  const titleOptions = useMemo(() => optionsOf((j) => j.title), [inPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  const years = useMemo(() => [...new Set(allJobs.map((j) => j.start.slice(0, 4)))], [allJobs]);
+
+  const periodLabel = periodText(period.preset, rFrom, rTo);
+  const filterLabel = [
+    responsible !== "all" ? `ผู้รับผิดชอบ: ${responsible === "__none__" ? "ยังไม่มอบหมาย" : responsible}` : "",
+    system !== "all" ? `ระบบ: ${system}` : "",
+    title !== "all" ? `ประเภท: ${title}` : "",
+    q.trim() ? `ค้นหา: ${q.trim()}` : "",
+  ].filter(Boolean).join(" · ") || "ทุกงาน";
+
+  const periodRows = periodBy === "year" ? summary.byYear : summary.byMonth;
+  const periodMax = Math.max(1, ...periodRows.map((p) => p.total));
+  const dimMeta = GROUP_DIMS.find((d) => d[0] === dim);
+  const dimRows = summary[dimMeta[2]];
+  const listJobs = listGroup === "all" ? jobs : jobs.filter((j) => j.group === listGroup);
+
+  const overduePg = usePaged(summary.overdueJobs, 5);
+  const dimPg = usePaged(dimRows, 10);
+  const listPg = usePaged(listJobs, 20);
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const { exportJobSummary } = await import("../utils/jobSummaryExcel");
+      await exportJobSummary(jobs, summary, {
+        periodLabel, filterLabel, showValue,
+        fileName: `สรุปผลการดำเนินงาน ${periodLabel.replace(/[/\\:*?"<>|]/g, "-")}`,
+      });
+    } catch (err) {
+      setError(err?.message || "ส่งออก Excel ไม่สำเร็จ");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (!events) return <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={26} /></Stack>;
+
+  const exportBtn = (
+    <Button variant="outlined" onClick={doExport} disabled={exporting || !jobs.length}
+      startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />}
+      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: INK, borderColor: LINE, whiteSpace: "nowrap", "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
+      {exporting ? "กำลังส่งออก…" : isDesktop ? "ส่งออก Excel" : "Excel"}
+    </Button>
+  );
 
   return (
-    // 🔁 (26 ต.ค. 2569) กว้างเท่าหน้าการดำเนินงาน/งานใหม่ — สลับแท็บแล้วขอบไม่กระโดด
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
-      <PageHeader
-        icon={<AssessmentRounded />}
-        title="รายงานงาน"
-        subtitle="นับเป็น “งาน” — งานที่เข้าหลายวันไม่ติดกันนับเป็นงานเดียว ตรงกับการ์ดในหน้าการดำเนินงาน"
+      <PageHeader icon={<AssessmentRounded />} title="สรุปผลการดำเนินงาน"
+        subtitle="จำนวนงาน สถานะ งานค้าง และมูลค่างาน — ใช้กติกาเดียวกับหน้าการดำเนินงาน"
+        actions={exportBtn} />
+
+      {/* ── ตัวกรอง ── */}
+      <FilterCard footer={`${periodLabel} · ${filterLabel} · นับตามวันเริ่มงาน · งานที่เข้าหลายวันนับเป็น 1 งาน`}>
+        <PeriodFilter value={period} onChange={(patch) => setPeriod((p) => ({ ...p, ...patch }))} years={years} />
+        <PersonSelectField label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={responsible} onChange={setResponsible}
+          allLabel="ทุกคน" allCount={inPeriod.length} unit="งาน"
+          options={respOptions.map(([name, n]) => (name === "__none__"
+            ? { id: name, name: "ยังไม่มอบหมาย", count: n, unassigned: true }
+            : { id: name, name, count: n, avatar: avatarOf(name) }))}
+          sx={{ minWidth: { xs: "100%", md: 220 } }} />
+        <SelectField label="ระบบงาน" value={system} onChange={(e) => setSystem(e.target.value)} sx={{ minWidth: 150 }}>
+          <option value="all">ทุกระบบ</option>
+          {systemOptions.map(([k, n]) => <option key={k} value={k}>{k} ({n})</option>)}
+        </SelectField>
+        <SelectField label="ประเภทงาน" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ minWidth: 150 }}>
+          <option value="all">ทุกประเภท</option>
+          {titleOptions.map(([k, n]) => <option key={k} value={k}>{k} ({n})</option>)}
+        </SelectField>
+        <TextField size="small" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา โครงการ / บริษัท / เลขที่งาน / ชื่อช่าง"
+          InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 19, color: MUTED }} /></InputAdornment> }}
+          sx={{ flex: 1, minWidth: { md: 240 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }} />
+      </FilterCard>
+
+      {error && <Typography sx={{ color: "#dc2626", fontSize: "0.85rem", mb: 1 }}>{error}</Typography>}
+
+      {/* ── ภาพรวม ── */}
+      <TotalHero
+        label="งานทั้งหมดตามตัวกรอง"
+        value={`${t.total} งาน`}
+        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่างานรวม ${baht(t.value)}` : ""}`}
+        stats={summary.statusRows.map((g) => (
+          <Stat key={g.key} label={g.label} value={`${g.count} งาน`} tone={g.count ? g.color : undefined}
+            active={listGroup === g.key} onClick={() => setListGroup(listGroup === g.key ? "all" : g.key)} />
+        ))}
+        note={<>1 งานอยู่สถานะเดียว ผลรวมทุกสถานะ = {t.total} งาน · ค้างงาน = เลยวันเข้างานเกิน 1 สัปดาห์{t.severe ? <> (เกิน 2 สัปดาห์ <b style={{ color: "#dc2626" }}>{t.severe}</b> งาน)</> : ""} · กดสถานะเพื่อดูรายการ{showValue && t.missing ? ` · ยังไม่ใส่มูลค่า ${t.missing} งาน` : ""}</>}
       />
 
-      {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      {jobs.length === 0 ? (
+        <Box sx={{ ...R_CARD, textAlign: "center", py: 6 }}>
+          <Typography sx={{ fontWeight: 800, color: INK, fontSize: "1.05rem" }}>ไม่พบงานในช่วงที่เลือก</Typography>
+          <Typography sx={{ fontSize: "0.86rem", color: MUTED }}>ลองเปลี่ยนช่วงเวลา หรือล้างตัวกรอง</Typography>
+        </Box>
+      ) : (
+        <>
+          {/* ── งานค้างที่ต้องติดตาม ── */}
+          {summary.overdueJobs.length > 0 && (
+            <ReportSection title="งานค้างที่ต้องติดตาม" hint={`${summary.overdueJobs.length} งาน · เรียงจากค้างนานสุด · กดเพื่อดูรายละเอียด`}>
+              <Box sx={{ ...R_CARD, borderColor: alpha("#dc2626", 0.3) }}>
+                {overduePg.rows.map((j) => <JobRow key={j.key} j={j} avatarOf={avatarOf} showValue={showValue} onClick={() => setQuickId(j.eventId)} />)}
+              </Box>
+              <PageBar {...overduePg} unit="งาน" />
+            </ReportSection>
+          )}
 
-      <ToggleButtonGroup
-        exclusive size="small" value={preset} onChange={(e, v) => v && setPreset(v)}
-        sx={{ mb: 1.5, flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { border: `1px solid ${BORDER}`, borderRadius: "999px !important", px: 1.5, textTransform: "none" } }}
-      >
-        {PRESETS.map((p) => <ToggleButton key={p.value} value={p.value}>{p.label}</ToggleButton>)}
-      </ToggleButtonGroup>
+          {/* ── รายเดือน / รายปี ── */}
+          <ReportSection title={periodBy === "year" ? "สรุปรายปี" : "สรุปรายเดือน"} hint="จำนวนงาน · เสร็จสิ้น · ค้าง (ตามวันเริ่มงาน)"
+            right={<Segmented value={periodBy} onChange={setPeriodBy} options={[["month", "รายเดือน"], ["year", "รายปี"]]} />}>
+            <Box sx={R_CARD}>
+              {periodRows.map((p) => (
+                <BarRow key={p.key} label={periodBy === "year" ? `ปี ${Number(p.key) + 543}` : monthLabel(p.key)}
+                  pct={(p.total / periodMax) * 100} value={`${p.total} งาน`}
+                  sub={`เสร็จสิ้น ${p.closed} (${p.closeRate}%)${p.overdue ? ` · ค้าง ${p.overdue}` : ""}${showValue && p.value ? ` · ${baht(p.value)}` : ""}`} />
+              ))}
+              <TotalRow label="รวม" value={`${t.total} งาน`} valueSub={`เสร็จสิ้น ${t.closed} (${t.closeRate}%)${showValue ? ` · ${baht(t.value)}` : ""}`} />
+            </Box>
+          </ReportSection>
 
-      {/* ✅ ตัวเลขสรุปชุดเดียวกับทุกหน้า (PageKit) — ตัวเลขสีเข้ม · แดงเฉพาะค้างงาน (กฎ: สีไม่เยอะ) */}
-      <KpiRow columns={5}>
-        <PkKpi label="งานทั้งหมด" value={report.total} sub={`${report.visits} ครั้งเข้างาน`} />
-        <PkKpi label="ปิดแล้ว" value={report.done} sub={`${report.doneRate}% ของทั้งหมด`} />
-        <PkKpi label="กำลังดำเนินการ" value={report.inProgress} />
-        <PkKpi label="ใกล้ครบกำหนด" value={report.warning} sub="เลยกำหนด 1 สัปดาห์" />
-        <PkKpi label="ค้างงาน" value={report.overdue} sub="เลยกำหนด 2 สัปดาห์" alert={report.overdue > 0} />
-      </KpiRow>
+          {/* ── สรุปตามกลุ่ม ── */}
+          <ReportSection title={`สรุปตาม${dimMeta[1]}`} hint="เรียงตามจำนวนงาน · อัตราปิดงาน = เสร็จสิ้น ÷ งานทั้งหมด"
+            right={<Segmented value={dim} onChange={setDim} options={GROUP_DIMS.map(([k, label]) => [k, label])} />}>
+            <Box sx={R_CARD}>
+              {dimPg.rows.map((r, i) => (
+                <RankRow key={r.key} rank={(dimPg.page - 1) * dimPg.size + i + 1}
+                  leading={dim === "responsible" && r.key !== "ยังไม่มอบหมาย" ? <PersonAvatar name={r.key} avatar={avatarOf(r.key)} /> : null}
+                  title={r.key}
+                  sub={`เสร็จสิ้น ${r.closed} · ยังไม่ปิด ${r.open}${r.overdue ? ` · ค้าง ${r.overdue}` : ""} · ปิดแล้ว ${r.closeRate}%`}
+                  value={`${r.total} งาน`}
+                  valueSub={showValue && r.value ? baht(r.value) : ""} />
+              ))}
+              <TotalRow label={`รวม ${dimRows.length} รายการ`} value={`${t.total} งาน`} valueSub={showValue ? baht(t.value) : ""} />
+            </Box>
+            <PageBar {...dimPg} unit="รายการ" />
+          </ReportSection>
 
-      <Panel title="คิวงานกองอยู่ขั้นไหน" hint="รอยืนยัน → ยืนยันแล้ว → กำลังดำเนินการ → เสร็จสิ้น">
-        <Pipeline rows={report.pipeline} total={report.total} />
-      </Panel>
-
-      <Panel title="รายเดือน" hint="แท่งจาง = งานทั้งหมด · แท่งเข้ม = ที่ปิดแล้ว · นับตามวันเข้างานครั้งสุดท้ายของงานนั้น">
-        <MonthBars rows={report.byMonth} />
-      </Panel>
-
-      <Panel title="ตามระบบงาน" hint="ระบบไหนมีงานเข้ามากที่สุดในช่วงที่เลือก">
-        <SummaryTable rows={report.bySystem} firstHeader="ระบบงาน" />
-      </Panel>
-
-      <Panel
-        title={group === "customer" ? "สรุปตามลูกค้า/โครงการ" : "สรุปตามทีมช่าง"}
-        hint="แสดง 15 อันดับแรก · ช่องค้างเป็นสีแดงเมื่อมีงานเลยกำหนด 2 สัปดาห์"
-      >
-        <ToggleButtonGroup
-          exclusive size="small" value={group} onChange={(e, v) => v && setGroup(v)}
-          sx={{ mb: 1.25, "& .MuiToggleButton-root": { border: `1px solid ${BORDER}`, borderRadius: "999px !important", px: 1.5, textTransform: "none" } }}
-        >
-          <ToggleButton value="customer">ลูกค้า/โครงการ</ToggleButton>
-          <ToggleButton value="team">ทีมช่าง</ToggleButton>
-        </ToggleButtonGroup>
-        <SummaryTable
-          rows={group === "customer" ? report.byCustomer : report.byTeam}
-          firstHeader={group === "customer" ? "ลูกค้า/โครงการ" : "ทีมช่าง"}
-        />
-      </Panel>
+          {/* ── รายการงาน ── */}
+          <ReportSection title="รายการงาน" hint={`${listJobs.length} งาน · กดเพื่อดูรายละเอียดงาน`}
+            right={listGroup !== "all" ? <Button size="small" onClick={() => setListGroup("all")} sx={{ textTransform: "none", fontWeight: 800 }}>ดูทุกสถานะ</Button> : null}>
+            <Box sx={{ display: "flex", gap: 0.75, overflowX: "auto", pb: 1, mb: 0.5, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+              {[{ key: "all", label: "ทั้งหมด", count: t.total, color: ACCENT }, ...summary.statusRows].map((g) => {
+                const on = listGroup === g.key;
+                return (
+                  <ButtonBase key={g.key} onClick={() => setListGroup(g.key)}
+                    sx={{ flexShrink: 0, height: 36, px: 1.75, borderRadius: 99, fontFamily: "inherit", fontSize: "0.86rem", fontWeight: on ? 800 : 600,
+                      border: `1.5px solid ${on ? ACCENT : LINE}`, color: on ? ACCENT : INK, bgcolor: on ? alpha(ACCENT, 0.06) : "#fff", gap: 0.75 }}>
+                    {g.key !== "all" && <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: g.color }} />}
+                    {g.label}
+                    <Box component="span" sx={{ fontSize: "0.76rem", fontWeight: 800, color: MUTED }}>{g.count}</Box>
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+            <Box sx={R_CARD}>
+              {listPg.rows.map((j) => <JobRow key={j.key} j={j} avatarOf={avatarOf} showValue={showValue} onClick={() => setQuickId(j.eventId)} />)}
+              {!listJobs.length && <Typography sx={{ p: 3, textAlign: "center", color: MUTED }}>ไม่มีงานในสถานะนี้</Typography>}
+            </Box>
+            <PageBar {...listPg} unit="งาน" />
+          </ReportSection>
+        </>
+      )}
+      <JobQuickView eventId={quickId} onClose={() => setQuickId(null)} employees={employees} showValue={showValue} />
     </Box>
   );
 }

@@ -164,7 +164,7 @@ function injectAddStyles() {
       font-size: 12px; font-weight: 600; color: #374151;
       display: flex; align-items: center; gap: 4px;
     }
-    .ae-field label .req { color: #ef4444; font-size: 13px; }
+    .ae-field label .req, .ae-card-titles .req { color: #ef4444; font-size: 13px; }
     .ae-field select, .ae-field input, .ae-field textarea {
       width: 100%; box-sizing: border-box;
       border: 1.5px solid #e6e9ef; border-radius: 8px;
@@ -656,8 +656,8 @@ export const getAddEvent = async ({
   <div id="ae-header">
     <div id="ae-header-icon">➕</div>
     <div id="ae-header-info">
-      <h3>เพิ่มแผนงานใหม่</h3>
-      <small>กรอกข้อมูลให้ครบถ้วนแล้วกดบันทึก</small>
+      <h3>${isAdminOrManagerUser ? "ลงงานใหม่" : "ขอลงงาน"}</h3>
+      <small>${isAdminOrManagerUser ? "ลงตารางทันที — กรอกข้อมูลและรายละเอียดงานให้ครบแล้วกดลงงาน" : "ส่งคำขอให้แอดมินอนุมัติ — กรอกข้อมูลและรายละเอียดงานให้ครบแล้วกดส่งคำขอ"}</small>
     </div>
   </div>
 
@@ -920,7 +920,7 @@ export const getAddEvent = async ({
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
-        <div class="ae-card-titles"><h4>หมายเหตุงาน</h4><p>เลขที่อ้างอิง และข้อมูลประกอบของงานนี้</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
+        <div class="ae-card-titles"><h4>รายละเอียดงาน <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div><span class="ae-card-badge" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;">บังคับ</span>
       </div>
       <div class="ae-card-body">
     <div class="ae-field" style="margin-bottom:12px;">
@@ -928,8 +928,8 @@ export const getAddEvent = async ({
       <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
     </div>
     <div class="ae-field" style="margin-bottom:16px;">
-      <label>หมายเหตุงาน</label>
-      <textarea id="description" rows="4" placeholder="ข้อมูลประกอบ เช่น ต้องแลกบัตรที่ รปภ., ลูกค้าขอให้เข้าหลัง 10 โมง"></textarea>
+      <label><span class="req">*</span> รายละเอียดงานที่จะทำ <span class="ae-opt">อย่างน้อย 10 ตัวอักษร</span></label>
+      <textarea id="description" rows="5" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector ที่แจ้งเสีย 2 จุด · ลูกค้าขอเข้าหลัง 10 โมง"></textarea>
       <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
     </div>
@@ -944,7 +944,7 @@ export const getAddEvent = async ({
   <div id="ae-action-bar">
     <div class="ae-btn-spacer"></div>
     <button class="ae-btn ae-btn-ghost" id="ae-btnCancel">ยกเลิก</button>
-    <button class="ae-btn ae-btn-success" id="ae-btnConfirm">💾 บันทึกแผนงาน</button>
+    <button class="ae-btn ae-btn-success" id="ae-btnConfirm">${isAdminOrManagerUser ? "💾 ลงงาน" : "📨 ส่งคำขอลงงาน"}</button>
   </div>
 
 </div>
@@ -1366,6 +1366,15 @@ export const getAddEvent = async ({
 
         const jobType = document.querySelector('input[name="ae-jobType"]:checked')?.value || "general";
 
+        // ⛔ (4 พ.ย. 2569 ผู้ใช้: "ต้องบังคับให้กรอกรายละเอียดงานที่ทำทุกๆงานที่ขอลง ให้ละเอียดสมบูรณ์ ดูและเช็คได้ง่าย")
+        //    ทุกงานที่ลง/ขอลง ต้องมีรายละเอียดงาน (อย่างน้อย 10 ตัวอักษร) — ทั้งงานทั่วไปและงานตามสัญญา
+        const descText = getVal("description");
+        if (descText.replace(/\s+/g, "").length < 10) {
+          Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่จะทำ (อย่างน้อย 10 ตัวอักษร) — เช่น ทำอะไร จุดไหน อุปกรณ์อะไร");
+          document.getElementById("description")?.focus();
+          return;
+        }
+
         /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น เพิ่มครั้งถัดไป
            หรือ "ต่อวันที่ไม่ต่อเนื่อง" ให้ครั้งที่ลงตารางแล้วก็ได้ (ดู renderRoundGrid ด้านบน) ── */
         if (jobType === "contract") {
@@ -1611,7 +1620,7 @@ export const getAddEvent = async ({
 
           formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
           Swal.fire({
-            title: "บันทึกแผนงานสำเร็จ ✅",
+            title: isAdminOrManagerUser ? "ลงงานสำเร็จ ✅" : "ส่งคำขอลงงานแล้ว ✅",
             icon: "success",
             timer: 1200,
             showConfirmButton: false,

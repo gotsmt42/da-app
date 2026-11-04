@@ -8,10 +8,17 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SectionTabs from "@/shared/ui/SectionTabs";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import moment from "moment";
-import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip } from "@mui/material";
-import { PlaceRounded, RefreshRounded, TaskAltRounded, ChevronRightRounded, ViewAgendaRounded, TableRowsRounded } from "@mui/icons-material";
+import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip, Button, TextField, InputAdornment, useMediaQuery } from "@mui/material";
+import { SearchRounded } from "@mui/icons-material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
+import SelectField from "@/shared/ui/SelectField";
+import PeriodFilter from "@/features/operation/components/PeriodFilter";
+import { ReportSection, RankRow, TotalRow, Stat, TotalHero, FilterCard, PersonAvatar, R_CARD } from "@/features/operation/components/ReportKit";
+import { SHORT_PRESETS, PERIOD_PRESETS, periodRange, periodText } from "@/features/operation/utils/reportPeriod";
+import { PlaceRounded, RefreshRounded, ViewAgendaRounded, TableRowsRounded } from "@mui/icons-material";
 import AttendanceService from "@/shared/services/AttendanceService";
 import AuthService from "@/shared/services/authService";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -19,22 +26,14 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { formatThai } from "@/shared/utils/thaiDate";
-import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
-import { PageHeader, EmptyState, INK, INK_2, MUTED, FAINT, PAGE_SX, ICON_BTN_SX } from "@/shared/ui/PageKit";
-import { CARD } from "@/shared/ui/modernUi";
+import { PageHeader, EmptyState, INK, INK_2, MUTED, PAGE_SX, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import AttendanceList, { AttendanceTable } from "../components/AttendanceList";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { ON_SITE_M } from "../attendanceMeta";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 
 
-const PRESETS = [
-  { key: "today", label: "วันนี้", range: () => [moment(), moment()] },
-  { key: "7d", label: "7 วัน", range: () => [moment().subtract(6, "days"), moment()] },
-  { key: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
-  { key: "custom", label: "กำหนดเอง" },
-];
 const fmt = (m) => m.format("YYYY-MM-DD");
 
 /** ปุ่มสลับแบบ segmented control (พื้นเทา · ช่องที่เลือกเป็นการ์ดขาว) */
@@ -66,10 +65,18 @@ export default function AttendancePage() {
   const isApprover = can(userData, "approveJobs");
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "pending" && isApprover ? "pending" : "list";
-  const [preset, setPreset] = useState("7d");
-  const [from, setFrom] = useState(fmt(moment().subtract(6, "days")));
-  const [to, setTo] = useState(fmt(moment()));
+  // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ประวัติเข้างานด้วยทำให้ละเอียดและชัดเจนสมบูรณ์") ช่วงเวลาชุดเดียวกับหน้ารายงาน (ภาษาไทย)
+  const [period, setPeriod] = useState({
+    preset: "7d", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
+    from: fmt(moment().subtract(6, "days")), to: fmt(moment()),
+  });
+  const [from, to] = periodRange(period.preset, period);
   const [person, setPerson] = useState("all");
+  const [q, setQ] = useState("");
+  const [place, setPlace] = useState("all"); // all | on | off
+  const [includeClosed, setIncludeClosed] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const isDesktop = useMediaQuery("(min-width:900px)");
   const [rows, setRows] = useState(null);
   const [pendingRows, setPendingRows] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -83,7 +90,7 @@ export default function AttendancePage() {
   const load = useCallback(async () => {
     try {
       const [list, pend] = await Promise.all([
-        AttendanceService.list({ from, to, userId: person !== "all" ? person : undefined }),
+        AttendanceService.list({ from: from || undefined, to: to || undefined, userId: person !== "all" ? person : undefined, includeClosed: includeClosed ? 1 : undefined }),
         isApprover ? AttendanceService.list({ pending: 1 }) : Promise.resolve(null),
       ]);
       setRows(list?.attendance || []);
@@ -92,7 +99,7 @@ export default function AttendancePage() {
     } catch {
       setRows((p) => p || []);
     }
-  }, [from, to, person, isApprover]);
+  }, [from, to, person, isApprover, includeClosed]);
   useEffect(() => { load(); }, [load]);
   useRealtime("attendance", () => { load(); });
   useEffect(() => {
@@ -100,29 +107,55 @@ export default function AttendancePage() {
     AuthService.getAllUserData().then((r) => setEmployees(r?.allUser || [])).catch(() => {});
   }, [seeAll]);
 
-  const pickPreset = (key) => {
-    setPreset(key);
-    const p = PRESETS.find((x) => x.key === key);
-    if (!p?.range) return; // กำหนดเอง — ใช้ช่องวันที่ด้านล่าง
-    const [a, b] = p.range();
-    setFrom(fmt(a));
-    setTo(fmt(b));
-  };
+  // ตัวกรองฝั่งจอ — ค้นหา (ชื่อ/โครงการ/งาน/เลขที่งาน) · ตำแหน่ง
+  const isOff = (r) => r.checkIn?.gps !== "ok" || (r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M);
+  const view$ = useMemo(() => {
+    const kw = q.trim().toLowerCase();
+    return (rows || []).filter((r) => {
+      if (place === "on" && isOff(r)) return false;
+      if (place === "off" && !isOff(r)) return false;
+      if (kw && ![r.userName, r.job?.site, r.job?.company, r.job?.title, r.job?.system, r.jobLabel, r.jobNo, r.team?.head, ...(r.team?.members || [])]
+        .some((v) => String(v || "").toLowerCase().includes(kw))) return false;
+      return true;
+    });
+  }, [rows, q, place]);
 
   const stats = useMemo(() => {
-    const list = rows || [];
+    const list = view$;
     return {
       visits: list.length,
       jobs: new Set(list.map((r) => String(r.jobGroupId || r.eventId))).size,
-      far: list.filter((r) => r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M).length,
+      people: new Set(list.map((r) => String(r.userId))).size,
+      days: new Set(list.map((r) => moment(r.checkIn?.at).format("YYYY-MM-DD"))).size,
+      onSite: list.filter((r) => !isOff(r)).length,
+      far: list.filter((r) => r.checkIn?.gps === "ok" && r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M).length,
       noGps: list.filter((r) => r.checkIn?.gps !== "ok").length,
+      pending: list.filter((r) => r.hasPendingCorrection).length,
+      offSchedule: list.filter((r) => r.offSchedule).length,
     };
-  }, [rows]);
+  }, [view$]);
+
+  // สรุปรายคน (เรียงตามจำนวนครั้ง)
+  const byPerson = useMemo(() => {
+    const m = new Map();
+    view$.forEach((r) => {
+      const k = String(r.userId);
+      const x = m.get(k) || { id: k, name: r.userName || "-", visits: 0, jobs: new Set(), days: new Set(), far: 0, last: "" };
+      x.visits += 1;
+      x.jobs.add(String(r.jobGroupId || r.eventId));
+      x.days.add(moment(r.checkIn?.at).format("YYYY-MM-DD"));
+      if (isOff(r)) x.far += 1;
+      if (String(r.checkIn?.at || "") > x.last) x.last = r.checkIn?.at;
+      m.set(k, x);
+    });
+    return [...m.values()].map((x) => ({ ...x, jobs: x.jobs.size, days: x.days.size })).sort((a, b) => b.visits - a.visits || a.name.localeCompare(b.name, "th"));
+  }, [view$]);
+  const personPg = usePaged(byPerson, 8);
 
   // แบ่งหน้า — การ์ด 20 / ตาราง 30 รายการ (จัดกลุ่มตามวันเฉพาะรายการในหน้านั้น)
-  const pg = usePaged(rows || [], isTable ? 30 : 20);
+  const pg = usePaged(view$, isTable ? 30 : 20);
   const { setPage } = pg;
-  useEffect(() => { setPage(1); }, [from, to, person, isTable, setPage]);
+  useEffect(() => { setPage(1); }, [from, to, person, isTable, q, place, setPage]);
   const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   // จัดกลุ่มตามวันที่เช็คอิน (ใหม่ → เก่า)
@@ -145,6 +178,20 @@ export default function AttendancePage() {
     setPendingRows((prev) => (prev || []).map((x) => (x._id === r._id ? r : x)).filter((x) => x.hasPendingCorrection));
     refreshAppBadges();
     load();
+  };
+
+  const periodLabel = periodText(period.preset, from, to);
+  const personName = person !== "all" ? (people.find((p) => p.id === person)?.name || "") : "";
+  const filterLabel = [personName ? `ผู้บันทึก: ${personName}` : (seeAll ? "ทุกคน" : ""), q.trim() ? `ค้นหา: ${q.trim()}` : "",
+    place === "on" ? "เฉพาะตรงหน้างาน" : place === "off" ? "เฉพาะตำแหน่งไม่ตรง" : "", includeClosed ? "รวมงานที่ปิดแล้ว" : ""].filter(Boolean).join(" · ");
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const { exportAttendance } = await import("../utils/attendanceExcel");
+      await exportAttendance(view$, byPerson, { periodLabel, filterLabel, fileName: `ประวัติเข้างาน ${periodLabel.replace(/[/\\:*?"<>|]/g, "-")}` });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const setTab = (t) => setParams((p) => { const n = new URLSearchParams(p); if (t === "list") n.delete("tab"); else n.set("tab", t); return n; }, { replace: true });
@@ -170,6 +217,13 @@ export default function AttendancePage() {
                 ))}
               </Stack>
             )}
+            {tab === "list" && (
+              <Button variant="outlined" onClick={doExport} disabled={exporting || !view$.length}
+                startIcon={<FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#217346" }} />}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", color: INK, borderColor: "#e6e9ef", whiteSpace: "nowrap", height: 40, "&:hover": { borderColor: "#217346", bgcolor: "#f0fdf4" } }}>
+                {exporting ? "กำลังส่งออก…" : isDesktop ? "ส่งออก Excel" : "Excel"}
+              </Button>
+            )}
             <Tooltip title="โหลดใหม่"><IconButton onClick={load} sx={ICON_BTN_SX}><RefreshRounded fontSize="small" /></IconButton></Tooltip>
           </>
         )}
@@ -191,56 +245,74 @@ export default function AttendancePage() {
         )
       ) : (
         <>
-          {/* ตัวกรอง — ช่วงเวลาเป็นปุ่มสลับแถวเดียว · เลือก "กำหนดเอง" ค่อยมีช่องวันที่ */}
-          <Box sx={{ ...CARD, borderRadius: 3, mb: 1.5, p: 1 }}>
-            <Stack direction={{ xs: "column", md: "row" }} gap={0.75} alignItems={{ md: "center" }}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Segmented value={preset} onChange={pickPreset} items={PRESETS.map((p) => ({ key: p.key, label: p.label }))} />
-              </Box>
-              {seeAll && (
-                <PersonSelectField label="" title="เลือกช่าง" value={person} onChange={setPerson} allLabel="ช่างทุกคน"
-                  options={people} sx={{ width: { xs: "100%", md: 240 }, height: 38, borderRadius: "10px" }} />
-              )}
-            </Stack>
-            {preset === "custom" && (
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, mt: 1.25 }}>
-                <ThaiDatePicker label="ตั้งแต่" value={from} onChange={(v) => setFrom(v || fmt(moment()))} />
-                <ThaiDatePicker label="ถึง" value={to} onChange={(v) => setTo(v || fmt(moment()))} />
-              </Box>
+          {/* ── ตัวกรอง ── */}
+          <FilterCard footer={`${periodLabel}${filterLabel ? ` · ${filterLabel}` : ""}`}>
+            <PeriodFilter value={period} onChange={(patch) => setPeriod((p) => ({ ...p, ...patch }))} presets={[...SHORT_PRESETS, ...PERIOD_PRESETS]} />
+            {seeAll && (
+              <PersonSelectField label="ผู้บันทึกเข้างาน" title="เลือกช่าง" value={person} onChange={setPerson} allLabel="ทุกคน"
+                options={people} sx={{ minWidth: { xs: "100%", md: 230 } }} />
             )}
-            {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "จำนวนที่นับให้ตัดเหลือที่จำเป็นพอ ให้เหลือแถวเดียว ไม่ให้กินพื้นที่")
-                ช่วงวันที่ (ซ้าย) + ตัวเลขสรุปเป็นข้อความบรรทัดเดียว (ขวา) — เหลือ ครั้ง · งาน · ตำแหน่งไม่ตรง */}
-            <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1} flexWrap="wrap" sx={{ mt: 0.85, px: 0.5 }}>
-              <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
-                {preset === "custom" ? "" : from === to ? formatThai(moment(from), "D MMMM YYYY") : `${formatThai(moment(from), "D MMM")} – ${formatThai(moment(to), "D MMM YYYY")}`}
-              </Typography>
-              {rows?.length > 0 && (
-                <Typography sx={{ fontSize: "0.78rem", color: INK_2, whiteSpace: "nowrap" }}>
-                  <b style={{ fontWeight: 600 }}>{stats.visits}</b> ครั้ง · <b style={{ fontWeight: 600 }}>{stats.jobs}</b> งาน
-                  {stats.far + stats.noGps > 0 && (
-                    <Box component="span" sx={{ color: "#b45309" }}> · ตำแหน่งไม่ตรง <b style={{ fontWeight: 600 }}>{stats.far + stats.noGps}</b></Box>
-                  )}
-                </Typography>
-              )}
-            </Stack>
-          </Box>
+            <TextField size="small" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่อช่าง / โครงการ / งาน / เลขที่งาน"
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 19, color: MUTED }} /></InputAdornment> }}
+              sx={{ flex: 1, minWidth: { md: 240 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }} />
+            <SelectField label="ตำแหน่ง" value={place} onChange={(e) => setPlace(e.target.value)} sx={{ minWidth: 150 }}>
+              <option value="all">ทุกตำแหน่ง</option>
+              <option value="on">ตรงหน้างาน</option>
+              <option value="off">ไม่ตรง / ไม่มี GPS</option>
+            </SelectField>
+            <SelectField label="งานที่ปิดแล้ว" value={includeClosed ? "1" : "0"} onChange={(e) => setIncludeClosed(e.target.value === "1")} sx={{ minWidth: 150 }}>
+              <option value="0">ไม่รวม</option>
+              <option value="1">รวมงานที่ปิดแล้ว</option>
+            </SelectField>
+          </FilterCard>
 
-          {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "งานไหนเสร็จแล้วให้ดีดออกจากหน้านี้ ไปเก็บในการดำเนินงาน")
-              งานที่ปิดแล้วไม่อยู่ในหน้านี้ — บอกจำนวนไว้และพาไปดูที่หน้าการดำเนินงาน (บันทึกเข้า-ออกในการ์ดงาน) */}
-          {closedHidden > 0 && (
-            <ButtonBase component={Link} to="/operation?group=closed"
-              sx={{ width: "100%", mb: 1.5, px: 1.5, py: 1.1, gap: 1, justifyContent: "flex-start", borderRadius: "12px", bgcolor: "#eef2f6", fontFamily: "inherit", textDecoration: "none" }}>
-              <TaskAltRounded sx={{ fontSize: 18, color: MUTED }} />
-              <Typography sx={{ flex: 1, textAlign: "left", fontSize: "0.8rem", color: INK_2 }}>
-                งานที่ปิดแล้ว {closedHidden} รายการ — ดูบันทึกเข้างานได้ที่หน้าการดำเนินงาน
-              </Typography>
-              <ChevronRightRounded sx={{ fontSize: 20, color: FAINT }} />
-            </ButtonBase>
+          {/* ── ภาพรวม ── */}
+          {rows !== null && (
+            <TotalHero
+              label={personName ? `บันทึกเข้างานของ ${personName}` : "บันทึกเข้างานทั้งหมด"}
+              value={`${stats.visits} ครั้ง`}
+              sub={`${periodLabel} · ${stats.jobs} งาน · ${stats.days} วัน${seeAll ? ` · ${stats.people} คน` : ""}`}
+              stats={[
+                <Stat key="on" label="ตรงหน้างาน" value={`${stats.onSite} ครั้ง`} tone={stats.onSite ? "#059669" : undefined}
+                  active={place === "on"} onClick={() => setPlace(place === "on" ? "all" : "on")} />,
+                <Stat key="far" label="ห่างหน้างาน" value={`${stats.far} ครั้ง`} tone={stats.far ? "#b45309" : undefined}
+                  active={place === "off"} onClick={() => setPlace(place === "off" ? "all" : "off")} />,
+                <Stat key="gps" label="ไม่มี GPS" value={`${stats.noGps} ครั้ง`} tone={stats.noGps ? "#b45309" : undefined} />,
+                <Stat key="off" label="นอกวันที่ลงตาราง" value={`${stats.offSchedule} ครั้ง`} />,
+                <Stat key="pend" label="รอแก้เวลา" value={`${stats.pending} ครั้ง`} tone={stats.pending ? "#dc2626" : undefined} />,
+              ]}
+              note={!includeClosed && closedHidden > 0
+                ? <>ไม่รวมงานที่ปิดแล้ว {closedHidden} ครั้ง — <ButtonBase onClick={() => setIncludeClosed(true)} sx={{ fontFamily: "inherit", fontSize: "inherit", fontWeight: 800, color: "#2563eb", verticalAlign: "baseline" }}>แสดงด้วย</ButtonBase></>
+                : `ตรงหน้างาน = ห่างจากพิกัดหน้างานไม่เกิน ${ON_SITE_M} ม. · เวลาทั้งหมดจากเซิร์ฟเวอร์`}
+            />
           )}
+
+          {/* ── สรุปรายคน ── */}
+          {seeAll && person === "all" && byPerson.length > 1 && (
+            <ReportSection title="สรุปรายคน" hint="เรียงตามจำนวนครั้งที่เข้างาน · กดชื่อเพื่อดูเฉพาะคนนั้น">
+              <Box sx={R_CARD}>
+                {personPg.rows.map((p, i) => (
+                  <RankRow key={p.id} rank={(personPg.page - 1) * personPg.size + i + 1}
+                    leading={<PersonAvatar name={p.name} avatar={people.find((x) => x.id === p.id)?.avatar} />}
+                    title={p.name}
+                    sub={`${p.jobs} งาน · ${p.days} วัน · ล่าสุด ${p.last ? formatThai(moment(p.last), "D MMM YY HH:mm") : "-"}`}
+                    value={`${p.visits} ครั้ง`}
+                    valueSub={p.far ? <span style={{ color: "#b45309", fontWeight: 700 }}>ตำแหน่งไม่ตรง {p.far}</span> : "ตรงหน้างานทุกครั้ง"}
+                    onClick={() => setPerson(p.id)} />
+                ))}
+                <TotalRow label={`รวม ${byPerson.length} คน`} value={`${stats.visits} ครั้ง`} valueSub={`${stats.jobs} งาน`} />
+              </Box>
+              <PageBar {...personPg} unit="คน" />
+            </ReportSection>
+          )}
+
+          <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.18rem", sm: "1.3rem" }, color: INK, mb: 1.25, px: { xs: 0.5, sm: 0 } }}>
+            รายการเข้างาน <Box component="span" sx={{ fontSize: "0.86rem", fontWeight: 600, color: MUTED }}>{view$.length} ครั้ง</Box>
+          </Typography>
 
           {rows === null ? (
             <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={84} />)}</Stack>
-          ) : !rows.length ? (
+          ) : !view$.length ? (
             <EmptyState icon={<PlaceRounded />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="หัวหน้าทีมกดเข้างานได้จากการ์ดงานในหน้า “งานของฉัน”" />
           ) : isTable ? (
             <>

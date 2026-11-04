@@ -143,7 +143,8 @@ export const techSummary = (events) => {
 };
 
 /** หัวหน้าตารางงานช่าง */
-export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางงานช่าง", sub, canAdd = true, showKpis = true }) {
+// 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าตารางทำให้ชัดเจนในการลงงาน ขอลงงาน") addLabel = "ลงงาน" (ลงตารางทันที) | "ขอลงงาน" (ส่งรออนุมัติ)
+export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางงานช่าง", sub, canAdd = true, showKpis = true, addLabel = "ลงงาน" }) {
   const s = useMemo(() => techSummary(events), [events]);
   return (
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
@@ -166,8 +167,7 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
         )}
         {canAdd && (
           <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" }, flexShrink: 0, whiteSpace: "nowrap", minWidth: "auto", px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
-            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มงาน</Box>
-            <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
+            {addLabel}
           </Button>
         )}
       </Stack>
@@ -321,7 +321,7 @@ const nextDayOf = (r, today) => {
 const timeKey = (r) => (/^\d/.test(r.time) ? r.time.slice(0, 5) : "00:00");
 
 /** มุมมองรายการของตารางงานช่าง */
-export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, onTab }) {
+export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, onTab, addLabel = "ลงงาน" }) {
   const today = moment().startOf("day");
   const rows = useMemo(() => mergeGroups((events || []).filter(isTechRow).map(rowOf)), [events]);
   const { upcoming, follow, done } = useMemo(() => {
@@ -374,10 +374,10 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
             {cur.k === "follow" ? "ไม่มีงานที่ต้องติดตาม" : cur.k === "done" ? "ยังไม่มีงานที่เสร็จสิ้น" : "ไม่มีงานที่จะถึง"}
           </Typography>
           <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>
-            {cur.k === "follow" ? "ทุกงานปิดงานและได้รับอนุมัติเรียบร้อย" : canAdd ? "กด “เพิ่มงาน” เพื่อลงงานใหม่" : ""}
+            {cur.k === "follow" ? "ทุกงานปิดงานและได้รับอนุมัติเรียบร้อย" : canAdd ? `กด “${addLabel}” เพื่อ${addLabel === "ลงงาน" ? "ลงงานใหม่" : "ส่งคำขอให้แอดมินอนุมัติ"}` : ""}
           </Typography>
           {cur.k === "upcoming" && canAdd && (
-            <Button startIcon={<Add />} onClick={onAdd} sx={{ mt: 1.5, textTransform: "none", fontWeight: 800, color: RED }}>เพิ่มงาน</Button>
+            <Button startIcon={<Add />} onClick={onAdd} sx={{ mt: 1.5, textTransform: "none", fontWeight: 800, color: RED }}>{addLabel}</Button>
           )}
         </Box>
       ) : cur.k === "follow" ? (

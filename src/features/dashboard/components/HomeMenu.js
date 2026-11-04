@@ -113,7 +113,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ⚠️ เห็นเฉพาะคนที่เห็นหน้าการดำเนินงาน เพราะรายงานสรุปจากข้อมูลชุดเดียวกันเป๊ะ
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "เอกสารไม่ควรรวมกับใบเสนอราคา") ติดตามใบเสนอราคาเป็นขั้นต่อจากงาน — อยู่หมวดงาน
   if (canViewFinance) doWork.push(dest("finance"));
-  if (canViewOperation && !seesOperationBoard(userData)) doWork.push(dest("jobReport"));
+  if (canViewOperation && !seesOperationBoard(userData)) doWork.push(dest("jobReport"), dest("jobWorkers"));
 
   // ── เบิกค่าใช้จ่าย ────────────────────────────────────────────────────────
   // ✅ วางต่อจากหมวดงานทันที — ผู้ใช้เลือกใบ Advance/ใบเคลมเป็นเมนูหลักบนแถบล่างมือถือ = ใช้บ่อยรองจากงาน

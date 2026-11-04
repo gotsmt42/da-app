@@ -49,7 +49,8 @@ export const DEST = {
   jobIntake: { title: "งานเข้า", sub: "รับงาน · คำขอลงงาน", href: "/jobs/intake", icon: AppIcon.Intake, badgeKey: "jobsInbox" },
   // ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ของช่าง — รายการเข้า-ออกงาน · ชั่วโมงทำงาน · คำขอแก้เวลา
   attendance: { title: "ประวัติบันทึกการเข้างาน", sub: "เข้างาน · รูปหน้างาน · แก้เวลา", href: "/attendance", icon: AppIcon.Attendance, badgeKey: "attendanceFixes" },
-  jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: AppIcon.Report },
+  jobWorkers: { title: "ผลงานรายบุคคล", short: "รายบุคคล", sub: "ใครเข้างานไหน · มูลค่าต่อครั้ง · รายเดือน/ปี", href: "/jobs/workers", icon: AppIcon.Contractor },
+  jobReport: { title: "สรุปผลการดำเนินงาน", short: "สรุปงาน", sub: "สถานะ · งานค้าง · รายเดือน · มูลค่างาน", href: "/jobs/report", icon: AppIcon.Report },
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "Icon ให้สอดคล้อง สื่อความหมาย ไม่ใส่มั่ว") — คน + เครื่องหมายถูก = งานที่มอบหมายให้ฉัน
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: AppIcon.MyJobs, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: AppIcon.Contract, badgeKey: "contracts" },

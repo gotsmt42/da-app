@@ -2238,8 +2238,8 @@ export const getEditEvent = async ({
       <textarea id="editWorkNote" rows="5" placeholder="เช่น ตรวจระบบ FA ชั้น 3, เปลี่ยนหัวตรวจจับควัน 2 ตัว…" ${canEditWorkNote ? "" : "disabled"}>${attrHtml(eventWorkNote)}</textarea>
     </div>
     <div class="ee-field ee-note-field">
-      <label for="editDescription">หมายเหตุงาน <span class="ee-opt">ถ้ามี</span></label>
-      <textarea id="editDescription" rows="3" placeholder="ข้อมูลประกอบ เช่น ต้องแลกบัตรที่ รปภ., ลูกค้าขอให้เข้าหลัง 10 โมง" ${canEditDocFields ? "" : "disabled"}></textarea>
+      <label for="editDescription"><span style="color:#dc2626">*</span> รายละเอียดงาน (สิ่งที่ต้องทำ) <span class="ee-opt">กรอกตอนลงงาน · อย่างน้อย 10 ตัวอักษร</span></label>
+      <textarea id="editDescription" rows="3" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
@@ -3982,6 +3982,15 @@ export const getEditEvent = async ({
           // โดยไม่ตั้งใจ ซึ่งจะทำให้แก้สี/ชื่อโครงการ/รายละเอียดแค่วันเดียวไม่ทั้งกลุ่ม
           const isMultiMode = Boolean(multiToggle?.checked) || hasSiblings;
 
+          // ⛔ (4 พ.ย. 2569) รายละเอียดงาน (สิ่งที่ต้องทำ) บังคับเหมือนตอนลงงาน — เช็คเฉพาะคนที่แก้ช่องนี้ได้
+          {
+            const descEl = document.getElementById("editDescription");
+            if (descEl && !descEl.disabled && descEl.value.replace(/\s+/g, "").length < 10) {
+              Swal.showValidationMessage("กรุณากรอกรายละเอียดงาน (สิ่งที่ต้องทำ) อย่างน้อย 10 ตัวอักษร");
+              descEl.focus();
+              return;
+            }
+          }
           if (!isMultiMode) {
             const payload = buildPayload();
             // ✅ กันบันทึก end เป็น null/invalid เด็ดขาด (ทำให้ event กลายเป็น "ไม่มีวันจบ"

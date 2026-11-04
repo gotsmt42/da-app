@@ -29,8 +29,11 @@ const GROUPS = {
       show: (u) => seesOperationBoard(u) },
     { label: "ประวัติเข้างาน", href: "/attendance", match: (p) => p.startsWith("/attendance"), badge: "attendanceFixes",
       show: (u) => can(u, "viewAllJobs") || can(u, "approveJobs") },
-    { label: "รายงานงาน", href: "/jobs/report", match: (p) => p.startsWith("/jobs/report"),
+    { label: "สรุปผลการดำเนินงาน", href: "/jobs/report", match: (p) => p.startsWith("/jobs/report"),
       show: (u) => can(u, "editOperation") || can(u, "receiveDispatch") },
+    // ✅ (4 พ.ย. 2569) รายงานรายช่าง — ใครเข้างานไหน มูลค่าต่อครั้ง รวมรายเดือน/ปี (ช่างเห็นเฉพาะของตัวเอง)
+    { label: "ผลงานรายบุคคล", href: "/jobs/workers", match: (p) => p.startsWith("/jobs/workers"),
+      show: (u) => seesOperationBoard(u) || can(u, "editOperation") || can(u, "receiveDispatch") },
   ],
 };
 

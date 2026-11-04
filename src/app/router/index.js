@@ -46,6 +46,7 @@ const About = lazyWithRetry(() => import("@/features/settings/pages/Settings.js"
 // ⚠️ ต้องเป็น /jobs/report ไม่ใช่ /operation/report — เส้นทาง "operation/:id?" จะกลืน
 //    คำว่า report ไปเป็น id แล้วเปิดหน้าการดำเนินงานที่กรองหางานชื่อ report แทน
 const JobReport = lazyWithRetry(() => import("@/features/operation/pages/JobReport.js"));
+const WorkerReport = lazyWithRetry(() => import("@/features/operation/pages/WorkerReport.js"));
 const JobIntake = lazyWithRetry(() => import("@/features/operation/pages/JobIntake.js"));
 const AttendancePage = lazyWithRetry(() => import("@/features/attendance/pages/AttendancePage.js"));
 // ⚠️ ลบหน้า demo ของ template MaterialPro ออกแล้ว (Alerts/Badges/Buttons/Cards/Grid/Forms/
@@ -405,6 +406,15 @@ const ThemeRoutes = [
     </Suspense>
   ),
   title: "Job Report",
+},
+{
+  path: "jobs/workers",
+  element: (
+    <Suspense fallback={<PageLoader />}>
+      <WorkerReport />
+    </Suspense>
+  ),
+  title: "Worker Report",
 },
 {
   path: "operation/:id?",

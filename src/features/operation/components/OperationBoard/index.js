@@ -3105,7 +3105,7 @@ const Operation = () => {
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
   useEffect(() => {
     setPage(1);
-  }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab, statusGroup]);
+  }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab, statusGroup, filterResponsible, filterMember]);
 
   // ✅ เพจจิ้งอิงตาม "งาน" (jobGroups) ไม่ใช่ raw event — กันงานเดียวกันถูกตัดกระจายไปคนละหน้า
   const totalPages = Math.max(1, Math.ceil(jobGroups.length / pageSize));

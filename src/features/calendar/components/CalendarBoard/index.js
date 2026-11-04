@@ -306,6 +306,8 @@ function EventCalendar() {
     return String(dept || "") === DEPARTMENT.SALES;
   };
   const isAdminOrManager = can(userData, "editAnyJob");
+  // ✅ (4 พ.ย. 2569) ปุ่มบนหน้าตาราง: อนุมัติงานได้ = "ลงงาน" (ลงทันที) · คนอื่น = "ขอลงงาน" (รออนุมัติ) — ตรงกับฟอร์ม AddEvent
+  const addLabel = can(userData, "approveJobs") ? "ลงงาน" : "ขอลงงาน";
 
   const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
 
@@ -2641,6 +2643,7 @@ function EventCalendar() {
         <TechTopBar
           events={filteredCalendarEvents}
           canAdd={!isServiceObserver}
+          addLabel={addLabel}
           onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
           onTab={(t) => { setTechView("list"); setTechTab(t); }}
           onExport={handleExportExcel}
@@ -2772,6 +2775,7 @@ function EventCalendar() {
           onOpen={openTechFromList}
           onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
           canAdd={!isServiceObserver}
+          addLabel={addLabel}
           tab={techTab}
           onTab={setTechTab}
         />
