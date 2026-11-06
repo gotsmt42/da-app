@@ -436,9 +436,10 @@ const DocumentChecklistItem = ({
         <Typography sx={{ fontSize: "0.74rem", fontWeight: 600, color: state.fg, whiteSpace: "nowrap" }}>{state.text}</Typography>
       </Stack>
 
-      <Box sx={{ pl: "34px" }}>
+      {/* 🔁 (6 พ.ย. 2569) มือถือ: ไฟล์/ปุ่มเต็มความกว้างการ์ด (เดิมเยื้อง 34px ทำให้กล่องวางบิลแคบ ข้อความตกบรรทัด) · จอคอมเยื้องตรงชื่อเหมือนเดิม */}
+      <Box sx={{ pl: { xs: 0, sm: "34px" } }}>
         {sub && (
-          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mt: 0.25,
+          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mt: 0.25, pl: { xs: "34px", sm: 0 },
             display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{sub}</Typography>
         )}
 
@@ -473,7 +474,7 @@ const DocumentChecklistItem = ({
             </Box>
           </Box>
         ) : applicable === false ? (
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.25 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.25, pl: { xs: "34px", sm: 0 } }}>
             <Typography sx={{ fontSize: "0.78rem", color: MUTED }}>{noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}</Typography>
             {!isLocked && linkBtn("เปลี่ยน", () => onSetApplicable(type, true))}
           </Stack>
@@ -791,17 +792,29 @@ const TechnicianJobCard = ({
     if (event.workValue === null || event.workValue === undefined || event.workValue === "") {
       const wvAsk = await Swal.fire({
         title: "มูลค่างานครั้งนี้",
-        html: '<div style="font-size:.86rem;color:#64748b">ใส่มูลค่างานที่ทำในครั้งนี้ (บาท) — ไม่บังคับ<br/>งานที่ไม่มีมูลค่า กด “ไม่มีมูลค่างาน”</div>',
+        // 🔁 (6 พ.ย. 2569 ผู้ใช้: "แก้ไขหน้ามือถือ ให้ดูง่าย สะดวก สวยงามกว่านี้") ช่องตัวเลขใหญ่กลางกล่อง ใส่คอมม่าให้เอง
+        //    ปุ่มเรียงแนวตั้งเต็มความกว้าง (เดิม 3 ปุ่มในแถวเดียว ข้อความ "ไม่มีมูลค่างาน" ตกบรรทัด)
+        html: '<div style="font-size:.86rem;color:#64748b;line-height:1.55">ใส่ยอดเป็นบาท · ไม่บังคับ<br/>แก้ภายหลังได้ที่ช่อง “มูลค่างานครั้งนี้”</div>',
         input: "text",
-        inputPlaceholder: "เช่น 15,000",
-        inputAttributes: { inputmode: "decimal", autocomplete: "off" },
+        inputPlaceholder: "฿ 0",
+        inputAttributes: { inputmode: "decimal", autocomplete: "off", "aria-label": "มูลค่างาน (บาท)" },
+        customClass: { popup: "tt-swal", actions: "tt-swal-stack", input: "tt-wv-input" },
+        didOpen: () => {
+          const inp = Swal.getInput();
+          inp?.addEventListener("input", () => {
+            const raw = inp.value.replace(/[^\d.]/g, "");
+            const [i, ...rest] = raw.split(".");
+            const d = rest.length ? `.${rest.join("").slice(0, 2)}` : "";
+            inp.value = (i ? Number(i).toLocaleString("en-US") : rest.length ? "0" : "") + d;
+          });
+        },
         inputValidator: (v) => {
           if (!String(v || "").trim()) return undefined;
           const n = Number(String(v).replace(/[,\s฿]/g, ""));
           return !Number.isFinite(n) || n < 0 ? "ใส่เป็นตัวเลข 0 ขึ้นไป หรือเว้นว่าง" : undefined;
         },
         showCancelButton: true, showDenyButton: true,
-        confirmButtonText: "ถัดไป", denyButtonText: "ไม่มีมูลค่างาน", cancelButtonText: "ยกเลิก",
+        confirmButtonText: "ถัดไป", denyButtonText: "ข้าม · งานนี้ไม่มีมูลค่า", cancelButtonText: "ยกเลิก",
         confirmButtonColor: "#f59e0b", denyButtonColor: "#64748b",
       });
       if (wvAsk.isDismissed) return;
@@ -1430,16 +1443,38 @@ const TechnicianJobCard = ({
               {isLocked
                 ? "งานนี้ปิดแล้ว — ดูเอกสารได้อย่างเดียว"
                 : completedDocCount === DOCUMENT_TYPES.length
-                ? "ทำเอกสารทุกรายการเรียบร้อยแล้ว — กลับไปที่การ์ดงานเพื่อกด “ขอปิดงาน”"
+                ? "เอกสารครบทุกรายการแล้ว"
                 : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ จึงขอปิดงานได้ · * = ต้องมี`}
             </Typography>
           </Box>
           {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารประจำงานให้ขยายออกอีก ดูเล็กไป") — กล่องกว้างขึ้น (md) · จอคอมเรียงเอกสาร 2 คอลัมน์ */}
-          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2.5,
-            "& > .MuiStack-root": { display: { md: "grid" }, gridTemplateColumns: { md: "repeat(2, minmax(0, 1fr))" }, gap: { md: 1.5 }, alignItems: "start" },
+          {/* 🐛 (6 พ.ย. 2569 ผู้ใช้: "แก้ไขหน้ามือถือ ให้ดูง่าย สะดวก สวยงามกว่านี้") alignItems:start เดิมไม่แยกขนาดจอ
+              → มือถือ (flex แนวตั้ง) การ์ดหดตามเนื้อหา กว้างไม่เท่ากัน · ตอนนี้ start เฉพาะจอคอม (grid 2 คอลัมน์) */}
+          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.25, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 },
+            "& > .MuiStack-root": { display: { md: "grid" }, gridTemplateColumns: { md: "repeat(2, minmax(0, 1fr))" }, gap: { md: 1.5 }, alignItems: { md: "start" } },
             "& > .MuiStack-root > *": { mt: { md: "0 !important" } } }}>
             {docsContent}
           </DialogContent>
+          {/* ✅ ปุ่มล่างติดจอ: เอกสารครบ + ขอปิดได้ = กดขอปิดงานจากตรงนี้เลย ไม่ต้องปิดหน้าแล้วหาปุ่มเอง */}
+          <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${LINE}`, bgcolor: "#fff",
+            pb: { xs: "calc(10px + env(safe-area-inset-bottom))", sm: 1.25 }, display: "flex", gap: 1 }}>
+            {canRequestClose && !event.closeRequested && !isLocked ? (
+              <>
+                <Button variant="outlined" onClick={() => setDocsExpanded(false)}
+                  sx={{ ...MBTN.outline("#64748b"), flex: "0 0 auto", minHeight: 46, px: 2.5 }}>ปิด</Button>
+                <Button variant="contained" disableElevation disabled={requestingClose}
+                  onClick={() => { setDocsExpanded(false); handleRequestClose(); }}
+                  sx={{ ...MBTN.success, flex: 1, minHeight: 46 }}>
+                  {event.closeRejectReason ? "ขอปิดงานอีกครั้ง" : "เอกสารครบ · ขอปิดงาน"}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outlined" fullWidth onClick={() => setDocsExpanded(false)}
+                sx={{ ...MBTN.outline("#64748b"), minHeight: 46 }}>
+                {completedDocCount === DOCUMENT_TYPES.length ? "เสร็จแล้ว · กลับไปที่การ์ดงาน" : "ปิด"}
+              </Button>
+            )}
+          </Box>
         </Dialog>
       )}
     </Wrapper>

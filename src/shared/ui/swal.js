@@ -36,6 +36,7 @@ const CSS = `
 }
 .tt-swal .swal2-input { height: 42px !important; padding: 0 12px !important; }
 .tt-swal .swal2-textarea { min-height: 92px !important; padding: 10px 12px !important; }
+.tt-swal .swal2-input.tt-wv-input { height: 58px !important; margin-top: 14px !important; font-size: 1.6rem !important; font-weight: 800; text-align: center; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
 .tt-swal .swal2-input:focus, .tt-swal .swal2-textarea:focus, .tt-swal .swal2-select:focus { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.15) !important; }
 .tt-swal .swal2-validation-message { margin: 10px 0 0 !important; border-radius: 10px; background: #fef2f2 !important; color: #b91c1c !important; font-size: .82rem !important; }
 .tt-swal:not(.swal2-toast) .swal2-actions { width: 100%; margin: 20px 0 0 !important; gap: 8px; flex-wrap: nowrap; }

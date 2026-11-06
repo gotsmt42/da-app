@@ -840,7 +840,7 @@ export const FileUploadSection = ({
 
       {/* ✅ (4 พ.ย. 2569) ใบวางบิล: แนบแล้วบันทึกการวางบิล (เลขที่/ยอด) ต่อได้ทันที — เชื่อมหน้า "วางบิล / รับเงิน" */}
       {type === "invoice" && hasFiles && event?._id && (
-        <InvoiceBillingBar event={event} filesCount={fileList.length} zIndex={embedded ? 20030 : undefined} sx={{ mb: uploading || canEdit ? 1 : 0 }} />
+        <InvoiceBillingBar event={event} filesCount={fileList.length} zIndex={embedded ? 20030 : undefined} classic={embedded} sx={{ mb: uploading || canEdit ? 1 : 0 }} />
       )}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
