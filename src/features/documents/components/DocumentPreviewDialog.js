@@ -55,8 +55,11 @@ const DocumentPreviewDialog = ({
   headerTitle, headerSub,
   // ✅ ส่งทางอีเมล — { docType, refId, defaultTo, recipientName, project, audience, customerMatch } · ไม่ส่ง = ไม่มีปุ่ม
   email,
+  // 🔁 (6 พ.ย. 2569 ผู้ใช้: "เวลาออก PDF หน้ายังกระตุกเด้งๆวาบๆ") false = แสดงทีเดียวตอนวาดครบทุกหน้า
+  //    (เอกสารสั้น 1–2 หน้า — ไม่สลับ หมุนโหลด → หน้าแรก → ข้อความ "กำลังเปิดหน้าถัดไป" → ครบ ให้เห็นวาบหลายรอบ)
+  progressive = true,
 }) => {
-  const isMobile = useMediaQuery("(max-width:600px)");
+  const isMobile = useMediaQuery("(max-width:600px)", { noSsr: true });
   const imageMode = useMemo(() => prefersImagePrint(), []);
   const [pages, setPages] = useState(null);
   // ✅ (25 ต.ค. 2569 "แก้อาการกระตุก หน่วงแลค เวลาเปิดไฟล์ pdf") หน้าที่วาดเสร็จแล้วแสดงทันทีทีละหน้า — ปุ่มพิมพ์ยังรอ pages (ครบ + เตรียมพิมพ์แล้ว)
@@ -76,7 +79,7 @@ const DocumentPreviewDialog = ({
     setPages(null); setShown(null); setRasterFailed(false);
     (async () => {
       try {
-        const imgs = await renderPdfToImages(preview.blob, { startDelay: 260, isCancelled: () => !alive, onPage: (soFar) => { owned.pages = soFar; setShown(soFar); } });
+        const imgs = await renderPdfToImages(preview.blob, { startDelay: 260, isCancelled: () => !alive, onPage: (soFar) => { owned.pages = soFar; if (progressive) setShown(soFar); } });
         owned.pages = imgs;
         if (!alive) { revokePageImages(imgs); return; }
         const printer = await preparePagePrint(imgs, { title: preview.fileName });
@@ -95,7 +98,7 @@ const DocumentPreviewDialog = ({
       printerRef.current = null;
       revokePageImages(owned.pages);
     };
-  }, [open, imageMode, preview?.blob, preview?.fileName]);
+  }, [open, imageMode, preview?.blob, preview?.fileName, progressive]);
 
   const openTab = () => { if (preview?.url) window.open(preview.url, "_blank"); };
 
@@ -215,7 +218,8 @@ const DocumentPreviewDialog = ({
             )}
             <Button variant="contained" onClick={handlePrint} disabled={!printReady}
               startIcon={preparing ? <CircularProgress size={15} color="inherit" /> : <Print sx={{ fontSize: 18 }} />}
-              sx={{ ...PRIMARY_BTN_SX, px: 2.25 }}>
+              sx={{ ...PRIMARY_BTN_SX, px: 2.25, minWidth: 128 }}>
+              {/* ความกว้างคงที่ — ข้อความเปลี่ยนแล้วปุ่มข้างๆ ไม่ขยับ */}
               {preparing ? "กำลังเตรียม..." : "พิมพ์"}
             </Button>
           </>

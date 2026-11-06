@@ -52,39 +52,76 @@ const Bullets = ({ items, numbered }) => (
 );
 const ISSUE_TONE = { fixed: "#15803d", pending: "#b45309", need_quote: "#c2410c", unknown: MUTED };
 
-/** หน้าสรุปแบบอ่าน */
+const ISSUE_BG = { fixed: "#f0fdf4", pending: "#fffbeb", need_quote: "#fff7ed", unknown: "#f8fafc" };
+
+/** รายการเลขข้อแบบแถว — เลขในวงกลม · เส้นคั่นบาง · อ่านไล่ทีละข้อได้ง่ายกว่า <ol> บนมือถือ */
+const NumberedRows = ({ items }) => (
+  <Box>
+    {items.map((t, i) => (
+      <Stack key={i} direction="row" gap={1.1} sx={{ py: 0.85, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+        <Box sx={{ width: 22, height: 22, mt: "1px", borderRadius: 99, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: "#f1f5f9", color: INK_2, fontSize: "0.72rem", fontWeight: 800 }}>{i + 1}</Box>
+        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.88rem", color: INK, lineHeight: 1.55 }}>{t}</Typography>
+      </Stack>
+    ))}
+  </Box>
+);
+
+/** ตัวเลขสรุปบนสุด — เห็นภาพรวมก่อนอ่านรายละเอียด */
+const StatTile = ({ label, value, tone = INK, bg = "#fff" }) => (
+  <Box sx={{ flex: 1, minWidth: 0, px: 1.25, py: 1, borderRadius: 2.5, bgcolor: bg, border: `1px solid ${LINE}` }}>
+    <Typography sx={{ fontSize: "1.25rem", fontWeight: 900, color: tone, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
+    <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{label}</Typography>
+  </Box>
+);
+
+/**
+ * หน้าสรุปแบบอ่าน
+ * 🔁 (6 พ.ย. 2569 ผู้ใช้: "แก้ไขรายละเอียดให้ชัดเจนและมองง่ายกว่านี้ ให้มีประสิทธิภาพ")
+ *    ตัวเลขภาพรวม 3 ช่องบนสุด · สรุปสั้นเป็นกล่องเน้น · รายการงานเป็นแถวมีเลข/เส้นคั่น · ปัญหาแยกกลุ่มสีตามสิ่งที่ต้องทำต่อ
+ */
 function SummaryView({ d }) {
   const st = issueStats(d.issues);
+  const groups = groupIssues(d.issues);
   return (
     <>
+      <Stack direction="row" gap={0.75} sx={{ mt: 0.5 }}>
+        <StatTile label="งานที่ทำ (ข้อ)" value={d.workDone.length} />
+        <StatTile label="ปัญหาที่พบ" value={st.total} tone={st.total ? ISSUE_TONE.pending : ISSUE_TONE.fixed} />
+        <StatTile label="ต้องเสนอราคา" value={st.needQuote} tone={st.needQuote ? ISSUE_TONE.need_quote : MUTED} bg={st.needQuote ? ISSUE_BG.need_quote : "#fff"} />
+      </Stack>
+
       <Section n={1} title="รายละเอียดงานที่ทำ">
-        <Card>
-          {d.summary && <Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.7, mb: d.workDone.length ? 1 : 0 }}>{d.summary}</Typography>}
-          {d.workDone.length > 0 && <Bullets items={d.workDone} numbered />}
-          {!d.summary && !d.workDone.length && <Typography sx={{ fontSize: "0.86rem", color: FAINT }}>ไม่มีรายละเอียดในเอกสาร</Typography>}
+        <Card sx={{ p: 0, overflow: "hidden" }}>
+          {d.summary && (
+            <Typography sx={{ px: 1.5, py: 1.25, fontSize: "0.9rem", fontWeight: 600, color: INK, lineHeight: 1.65, bgcolor: ACCENT_SOFT, borderBottom: d.workDone.length ? `1px solid ${LINE}` : "none" }}>
+              {d.summary}
+            </Typography>
+          )}
+          {d.workDone.length > 0 && <Box sx={{ px: 1.5, py: 0.25 }}><NumberedRows items={d.workDone} /></Box>}
+          {!d.summary && !d.workDone.length && <Typography sx={{ p: 1.5, fontSize: "0.86rem", color: FAINT }}>ไม่มีรายละเอียดในเอกสาร</Typography>}
         </Card>
       </Section>
-      <Section n={2} title="สรุปปัญหาที่พบ"
-        right={st.total > 0 && (
-          <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end">
-            {st.pending > 0 && <Chip size="small" label={`ยังค้าง ${st.pending}`} sx={{ fontWeight: 800, bgcolor: "#fffbeb", color: ISSUE_TONE.pending }} />}
-            {st.needQuote > 0 && <Chip size="small" label={`ต้องเสนอราคา ${st.needQuote}`} sx={{ fontWeight: 800, bgcolor: "#fff7ed", color: ISSUE_TONE.need_quote }} />}
-            {st.fixed > 0 && <Chip size="small" label={`แก้แล้ว ${st.fixed}`} sx={{ fontWeight: 800, bgcolor: "#f0fdf4", color: ISSUE_TONE.fixed }} />}
-          </Stack>
-        )}>
+
+      <Section n={2} title="สรุปปัญหาที่พบ">
         {!st.total && !d.issueSummary ? (
-          <Card><Typography sx={{ fontSize: "0.88rem", color: ISSUE_TONE.fixed, fontWeight: 700 }}>ไม่พบปัญหา</Typography></Card>
+          <Card sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CheckCircleRounded sx={{ color: ISSUE_TONE.fixed, fontSize: 20 }} />
+            <Typography sx={{ fontSize: "0.9rem", color: ISSUE_TONE.fixed, fontWeight: 800 }}>ไม่พบปัญหา</Typography>
+          </Card>
         ) : (
-          <>
-            {d.issueSummary && <Card sx={{ mb: st.total ? 1 : 0 }}><Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.7 }}>{d.issueSummary}</Typography></Card>}
+          <Stack spacing={1}>
+            {d.issueSummary && <Card><Typography sx={{ fontSize: "0.9rem", color: INK, lineHeight: 1.65 }}>{d.issueSummary}</Typography></Card>}
             {/* 🔁 (25 ต.ค. 2569 "ถ้ามีระบุอุปกรณ์ ให้แยกเป็นข้อๆ ... อ่านง่าย และมืออาชีพ") ข้อๆ จัดกลุ่มตามสิ่งที่ต้องทำต่อ — ตรงกับ PDF */}
-            {groupIssues(d.issues).map((g) => (
-              <Card key={g.key} sx={{ mb: 1 }}>
-                <Typography sx={{ fontWeight: 900, fontSize: "0.84rem", color: ISSUE_TONE[g.key], mb: 0.5 }}>{g.title} ({g.items.length})</Typography>
-                <Bullets items={g.items.map(issueLine)} />
-              </Card>
+            {groups.map((g) => (
+              <Box key={g.key} sx={{ borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: `4px solid ${ISSUE_TONE[g.key]}`, overflow: "hidden" }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, py: 0.9, bgcolor: ISSUE_BG[g.key] }}>
+                  <Typography sx={{ fontWeight: 900, fontSize: "0.88rem", color: ISSUE_TONE[g.key] }}>{g.title}</Typography>
+                  <Box component="span" sx={{ px: 1, borderRadius: 99, fontSize: "0.74rem", fontWeight: 900, color: "#fff", bgcolor: ISSUE_TONE[g.key] }}>{g.items.length}</Box>
+                </Stack>
+                <Box sx={{ px: 1.5, py: 0.25 }}><NumberedRows items={g.items.map(issueLine)} /></Box>
+              </Box>
             ))}
-          </>
+          </Stack>
         )}
       </Section>
     </>
@@ -138,8 +175,10 @@ function SummaryEditor({ d, setD }) {
  * @param event  งาน (ใช้ _id + ข้อมูลประกอบ PDF: jobNo · company · site · system · title)
  */
 export default function ServiceReportSummaryDialog({ open, onClose, event, onChanged }) {
-  const isMobile = useMediaQuery("(max-width:600px)");
+  // 🐛 (6 พ.ย. 2569 ผู้ใช้: "หน้ายังกระตุกเด้งๆวาบๆ") noSsr — เดิมรอบแรกได้ false เสมอ กล่องเปิดแบบจอคอมก่อนแล้วค่อยเด้งเป็นเต็มจอ
+  const isMobile = useMediaQuery("(max-width:600px)", { noSsr: true });
   const [state, setState] = useState({ loading: true });
+  const [notesOpen, setNotesOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
@@ -207,6 +246,8 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
 
   const makePdf = async () => {
     setPdfBusy(true);
+    // 🐛 สร้าง PDF (ฟอนต์ไทย ~0.5MB) ทำงานหนักจนจอค้าง — รอให้จอวาด "กำลังสร้าง PDF…" ก่อน ไม่ให้ดูเหมือนค้าง/กระตุก
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
     try {
       const [{ jsPDF }, { default: thSarabunFont }, { generateServiceReportSummaryPdf }] = await Promise.all([
         import("jspdf"), import("@/assets/fonts/THSarabunNew_base64"), import("../utils/serviceReportSummaryPdf"),
@@ -288,20 +329,29 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
             </Card>
           ) : (
             <>
+              {/* 🔁 (6 พ.ย. 2569) กล่องจุดที่ควรตรวจ: ย่อเป็นแถบเดียว แตะเพื่อดูทั้งหมด — ไม่กินครึ่งจอเหมือนเดิม */}
               {(data.reviewNotes.length > 0 || lowConfidence || !data.found) && !confirmed && (
-                <Alert severity="warning" icon={<WarningAmberRounded />} sx={{ mb: 1.5, borderRadius: 2.5, "& .MuiAlert-message": { width: "100%" } }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", mb: 0.25 }}>
-                    {!data.found ? "AI ไม่แน่ใจว่าไฟล์เป็น Service Report" : lowConfidence ? "AI อ่านได้ไม่ชัดหลายจุด — ตรวจกับต้นฉบับก่อนยืนยัน" : "จุดที่ควรตรวจกับต้นฉบับ"}
-                  </Typography>
-                  {data.reviewNotes.length > 0 && <Bullets items={data.reviewNotes} />}
-                </Alert>
+                <Box sx={{ mb: 1.25, borderRadius: 2.5, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+                  <Stack direction="row" alignItems="center" gap={1} role={data.reviewNotes.length ? "button" : undefined}
+                    onClick={data.reviewNotes.length ? () => setNotesOpen((v) => !v) : undefined}
+                    sx={{ px: 1.5, py: 1, cursor: data.reviewNotes.length ? "pointer" : "default" }}>
+                    <WarningAmberRounded sx={{ fontSize: 20, color: "#b45309", flexShrink: 0 }} />
+                    <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: "0.86rem", color: "#92400e", lineHeight: 1.4 }}>
+                      {!data.found ? "AI ไม่แน่ใจว่าไฟล์เป็น Service Report" : lowConfidence ? "AI อ่านได้ไม่ชัดหลายจุด — ตรวจกับต้นฉบับ" : "ควรตรวจกับต้นฉบับ"}
+                      {data.reviewNotes.length > 0 && ` (${data.reviewNotes.length} จุด)`}
+                    </Typography>
+                    {data.reviewNotes.length > 0 && (
+                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#b45309", whiteSpace: "nowrap" }}>{notesOpen ? "ซ่อน" : "ดู"}</Typography>
+                    )}
+                  </Stack>
+                  {notesOpen && data.reviewNotes.length > 0 && (
+                    <Box sx={{ px: 1.5, pb: 1, "& li": { fontSize: "0.82rem !important", color: "#78350f !important" } }}><Bullets items={data.reviewNotes} /></Box>
+                  )}
+                </Box>
               )}
-              <Typography sx={{ fontSize: "0.74rem", color: FAINT, mb: 1 }}>
-                อ่านจาก {meta.fileCount} ไฟล์ · {fmtAt(summary.scannedAt)}{summary.scannedBy ? ` โดย ${summary.scannedBy}` : ""}
-                {/* 💰 ค่า AI ที่ใช้จริง (25 ต.ค. 2569 ผู้ใช้: "ทำให้ประหยัดขึ้น 2 เท่า") — อ่านใหม่ = จ่ายเพิ่ม จึงบอกยอดสะสมด้วย */}
-                {summary.usage?.costUsd > 0 ? ` · ค่า AI ~$${summary.usage.costUsd.toFixed(3)}` : ""}
-                {summary.scanCount > 1 ? ` (รวม $${(summary.totalCostUsd || 0).toFixed(3)} จาก ${summary.scanCount} ครั้ง)` : ""}
-                {summary.editedAt ? ` · แก้ไขล่าสุด ${fmtAt(summary.editedAt)} ${summary.editedBy}` : ""}
+              <Typography sx={{ fontSize: "0.74rem", color: FAINT, mb: 0.75 }}>
+                อ่านจาก {meta.fileCount} ไฟล์ · {fmtAt(summary.scannedAt)}{summary.scannedBy ? ` · ${summary.scannedBy}` : ""}
+                {summary.editedAt ? ` · แก้ไข ${fmtAt(summary.editedAt)}` : ""}
                 {confirmed ? ` · ยืนยันโดย ${summary.confirmedBy} ${fmtAt(summary.confirmedAt)}` : ""}
               </Typography>
               {/* ⛔ (25 ต.ค. 2569 ผู้ใช้: "ไฟล์ไหนที่ AI อ่านไม่ได้ ... บอกมาตรงๆ ไม่เดา · และไม่สามารถออกเอกสารให้ได้") */}
@@ -319,6 +369,12 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
                   <summary>AI ตรวจ {fileChecks.length} ไฟล์ · อ่านได้ครบ {fileChecks.filter((x) => x.status === "ok").length} — ดูรายไฟล์</summary>
                   <Box sx={{ mt: 0.5, "& li": { fontSize: "0.78rem !important" } }}>
                     <Bullets items={fileChecks.map((x) => `ไฟล์ที่ ${x.no}${fileNameOf(x.no) ? ` (${fileNameOf(x.no)})` : ""} · ${{ ok: "อ่านได้", partial: "อ่านได้ไม่ครบ", unreadable: "อ่านไม่ได้" }[x.status]}${x.note ? ` · ${x.note}` : ""}`)} />
+                    {/* 💰 ค่า AI ที่ใช้จริง (25 ต.ค. 2569 ผู้ใช้: "ทำให้ประหยัดขึ้น 2 เท่า") — ย้ายมาไว้ในรายละเอียด ไม่รกบรรทัดบน */}
+                    {summary.usage?.costUsd > 0 && (
+                      <Typography sx={{ fontSize: "0.74rem", color: FAINT, mt: 0.5 }}>
+                        ค่า AI ~${summary.usage.costUsd.toFixed(3)}{summary.scanCount > 1 ? ` (รวม $${(summary.totalCostUsd || 0).toFixed(3)} จาก ${summary.scanCount} ครั้ง)` : ""}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               )}
@@ -358,6 +414,14 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
             )}
           </DialogActions>
         )}
+        {/* ✅ ระหว่างสร้าง PDF: ม่านบางพร้อมข้อความ — จอไม่ดูค้าง และกดซ้ำไม่ได้ */}
+        {pdfBusy && (
+          <Stack alignItems="center" justifyContent="center" spacing={1.25}
+            sx={{ position: "absolute", inset: 0, zIndex: 2, bgcolor: "rgba(248,250,252,.82)" }}>
+            <CircularProgress size={30} />
+            <Typography sx={{ fontWeight: 800, color: INK, fontSize: "0.9rem" }}>กำลังสร้าง PDF…</Typography>
+          </Stack>
+        )}
       </Dialog>
 
       <DocumentPreviewDialog
@@ -368,6 +432,7 @@ export default function ServiceReportSummaryDialog({ open, onClose, event, onCha
         docNumber={event?.jobNo || ""}
         headerTitle="สรุปรายงานบริการ (PDF)"
         headerSub={[event?.jobNo, confirmed ? "ฉบับยืนยันแล้ว" : "ฉบับร่าง — ยังไม่ได้ยืนยันสรุป"].filter(Boolean).join(" · ")}
+        progressive={false}
         onClose={() => setPreview(null)}
         onBack={() => setPreview(null)}
       />

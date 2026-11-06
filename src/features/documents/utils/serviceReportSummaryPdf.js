@@ -21,6 +21,8 @@ const beYear = (m) => m.year() + 543;
 const INK = [30, 41, 59];
 const SUB = [100, 116, 139];
 const ACCENT = [37, 99, 235];
+// สีกลุ่มปัญหา — ตรงกับหน้าจอ (ISSUE_TONE ใน ServiceReportSummaryDialog)
+const GROUP_RGB = { fixed: [21, 128, 61], pending: [180, 83, 9], need_quote: [194, 65, 12], unknown: SUB };
 
 /** ฟอนต์ TH Sarabun ไม่มีลูกศร (→ ⇒ ➜ ←) — AI ชอบใช้ เช่น "291 → 174" ทำให้ใน PDF หายเป็นช่องว่าง จึงแทนเป็น "->" */
 const pdfSafe = (v) => {
@@ -42,8 +44,9 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
   const headerY = drawLetterheadModern(doc);
   const d = pdfSafe(data || {});
   const title = "สรุปรายงานบริการ";
-  const fs = 13.5;
-  const lh = 6.1;
+  // 🔁 (6 พ.ย. 2569 ผู้ใช้: "แก้ไขรายละเอียดให้ชัดเจนและมองง่ายกว่านี้") ตัวอักษรใหญ่ขึ้น (13.5 → 15) อ่านง่ายทั้งจอและกระดาษ
+  const fs = 15;
+  const lh = 6.7;
   const f = createFlow(doc, { draw: true, fs, lh, y: 0, title, docNumber: info.jobNo || "-", headerY });
   // 🔁 (25 ต.ค. 2569 ผู้ใช้: "หัวกระดาษสรุปรายงาน ไม่ต้องมีภาษาอังกฤษ" · "ตรงบริษัทยังต้องมีนะ")
   //    ตัดเฉพาะชื่อเอกสารภาษาอังกฤษ (SERVICE REPORT SUMMARY) — หัวกระดาษบริษัทคงครบเหมือนเอกสารอื่น
@@ -72,21 +75,37 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
     wrapText(doc, t, CW - indent).forEach((ln) => { f.need(0); doc.text(ln, LM + indent, f.y); f.y += lh; });
     doc.setFontSize(fs); color(INK);
   };
+  /** กล่องสรุปสั้น (พื้นฟ้าอ่อน) — ยาวเกินที่เหลือในหน้าก็ขึ้นหน้าใหม่ทั้งกล่อง · ยาวเกินครึ่งหน้า = ย่อหน้าธรรมดา */
+  const leadBox = (text) => {
+    const t = spaceThaiLatin(text);
+    if (!t) return;
+    const lines = wrapText(doc, t, CW - 8);
+    const h = lines.length * lh + 3.2;
+    if (h > 120) { para(text); return; }
+    f.y += 1.2;
+    f.need(h);
+    const top = f.y - lh + 1.6;
+    doc.setFillColor(239, 246, 255); doc.setDrawColor(219, 234, 254); doc.setLineWidth(0.3);
+    doc.roundedRect(LM, top, CW, h, 1.6, 1.6, "FD");
+    doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]); doc.rect(LM, top, 1.1, h, "F");
+    lines.forEach((ln) => { doc.text(ln, LM + 4.5, f.y + 0.8); f.y += lh; });
+    f.y += 4.5;
+  };
   /** รายการเลขข้อ — บรรทัดที่ตัดต่อเยื้องตรงกับข้อความ */
   const list = (items) => {
     items.filter(Boolean).forEach((it, i) => {
       const lines = wrapText(doc, spaceThaiLatin(it), CW - 8);
       f.need(lh * Math.min(lines.length, 2) - lh);
-      doc.text(`${i + 1}.`, LM + 1, f.y);
+      setBold(doc, true); color(ACCENT); doc.text(`${i + 1}.`, LM + 1, f.y); setBold(doc, false); color(INK);
       lines.forEach((ln) => { f.need(0); doc.text(ln, LM + 8, f.y); f.y += lh; });
     });
   };
   /** รายการแบบจุด (•) — ปัญหาที่พบแต่ละข้อ */
-  const bullets = (items) => {
+  const bullets = (items, rgb = INK) => {
     items.filter(Boolean).forEach((it) => {
       const lines = wrapText(doc, spaceThaiLatin(it), CW - 9);
       f.need(lh * Math.min(lines.length, 2) - lh);
-      doc.text("•", LM + 4, f.y);
+      color(rgb); doc.text("•", LM + 4, f.y); color(INK);
       lines.forEach((ln) => { f.need(0); doc.text(ln, LM + 9, f.y); f.y += lh; });
     });
   };
@@ -98,7 +117,7 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
   // ── 1. รายละเอียดงานที่ทำ ─────────────────────────────────────────────────
   const work = d.workDone || [];
   section("รายละเอียดงานที่ทำ");
-  if (d.summary) { para(d.summary); f.y += lh * 0.25; }
+  if (d.summary) leadBox(d.summary);
   if (work.length) list(work);
   if (!d.summary && !work.length) para("- ไม่มีรายละเอียดในเอกสาร -", { sub: true });
 
@@ -111,10 +130,12 @@ export const generateServiceReportSummaryPdf = async ({ jsPDF, thSarabunFont, da
     if (d.issueSummary) { para(d.issueSummary); f.y += lh * 0.2; }
     // 🔁 (25 ต.ค. 2569 ผู้ใช้: "ถ้ามีระบุอุปกรณ์ ให้แยกเป็นข้อๆ ... อ่านง่าย และมืออาชีพ") — ข้อๆ จัดกลุ่มตามสิ่งที่ต้องทำต่อ แทนตาราง
     groupIssues(issues).forEach((g) => {
+      const rgb = GROUP_RGB[g.key] || INK;
       f.need(lh * 2);
-      setBold(doc, true); doc.text(`${g.title} (${g.items.length} รายการ)`, LM + 1, f.y); setBold(doc, false);
+      doc.setFillColor(rgb[0], rgb[1], rgb[2]); doc.rect(LM, f.y - lh + 2, 1.1, lh - 0.6, "F");
+      setBold(doc, true); color(rgb); doc.text(`${g.title} (${g.items.length} รายการ)`, LM + 3.5, f.y); setBold(doc, false); color(INK);
       f.y += lh;
-      bullets(g.items.map(issueLine));
+      bullets(g.items.map(issueLine), rgb);
       f.y += lh * 0.25;
     });
   }
