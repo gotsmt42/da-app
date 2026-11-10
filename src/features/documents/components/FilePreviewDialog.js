@@ -13,11 +13,12 @@ import { useEffect, useState } from "react";
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 
 export default function FilePreviewDialog({ file, files, caption, onClose }) {
-  const [cur, setCur] = useState(file);
-  useEffect(() => { setCur(file); }, [file]);
-  if (!file || !cur) return null;
+  // จำลำดับด้วย — ไฟล์ชื่อซ้ำได้ลิงก์เดียวกัน เลื่อนดูต้องรู้ว่าอยู่ใบไหน
+  const [cur, setCur] = useState({ f: file, i: null });
+  useEffect(() => { setCur({ f: file, i: (files || []).indexOf(file) >= 0 ? (files || []).indexOf(file) : null }); }, [file, files]);
+  if (!file || !cur.f) return null;
   return (
-    <FileGalleryDialog previewUrl={cur.fileUrl} previewFileName={cur.fileName || "ไฟล์แนบ"} caption={caption}
-      gallery={files} onNavigate={(f) => setCur(f)} onClose={onClose} />
+    <FileGalleryDialog previewUrl={cur.f.fileUrl} previewFileName={cur.f.fileName || "ไฟล์แนบ"} previewIndex={cur.i} caption={caption}
+      gallery={files} onNavigate={(f, i) => setCur({ f, i: Number.isInteger(i) ? i : null })} onClose={onClose} />
   );
 }

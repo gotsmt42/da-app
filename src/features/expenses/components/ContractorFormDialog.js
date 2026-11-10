@@ -38,6 +38,7 @@ import {
 import { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
+import FileKindThumb from "@/shared/ui/FileKindThumb";
 import { useAttendanceByDay, AttendanceDayStrip } from "./AttendanceRefs";
 
 const META = KIND_META.contractor;
@@ -888,8 +889,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
           </Box>
           <Stack spacing={0.75} sx={{ mt: 1 }}>
             {files.map((f) => (
-              <Stack key={f.key} direction="row" alignItems="center" spacing={1} sx={{ p: 0.75, pl: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
-                <AttachFile sx={{ fontSize: 17, color: TEXT_SUB }} />
+              <Stack key={f.key} direction="row" alignItems="center" spacing={1} sx={{ p: 0.75, pl: 1, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
+                {/* 🔁 (10 พ.ย. 2569) ป้ายชนิดไฟล์ชุดกลางของแอป (PDF/XLS/DOC/รูป) */}
+                <FileKindThumb name={f.file.name} size={34} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{f.file.name}</Typography>
                   <Typography variant="caption" sx={{ color: TEXT_SUB }}>{formatBytes(f.file.size)}</Typography>

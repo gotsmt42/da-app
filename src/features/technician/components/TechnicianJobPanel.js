@@ -12,7 +12,7 @@
  */
 
 import { isDocRequired, isDocComplete } from "@/shared/utils/jobDocTypes";
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import Swal from "@/shared/ui/swal";
@@ -27,7 +27,7 @@ import {
   Dialog, DialogContent, useMediaQuery, ButtonBase,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
-import { BuildRounded as Build, AssignmentRounded as Assignment, VisibilityRounded as Visibility, WarningRounded as Warning, DescriptionRounded as Description, EditRounded as Edit, CloudUploadRounded as CloudUpload, CheckCircleRounded as CheckCircle, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, ChevronRightRounded as ChevronRight, HistoryRounded as History, PictureAsPdfRounded as PictureAsPdf, ImageRounded as Image, ArticleRounded as Article, InsertDriveFileRounded as InsertDriveFile, AttachFileRounded as AttachFile, DeleteRounded as Delete, DownloadRounded as Download, TaskAltRounded as TaskAlt, HourglassTopRounded as HourglassTop, NoteAddRounded as NoteAdd, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, CloseRounded as Close, CancelRounded as Cancel, SendRounded as Send, ChatRounded as Chat, LinkRounded as LinkIcon, MoreVertRounded as MoreVert, PrintRounded as Print, ShareRounded as Share, CalendarMonthRounded as CalendarMonth, LockRounded as Lock, RemoveCircleOutlineRounded as RemoveCircleOutline, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, RadioButtonUncheckedRounded as RadioButtonUnchecked } from "@mui/icons-material";
+import { BuildRounded as Build, AssignmentRounded as Assignment, VisibilityRounded as Visibility, WarningRounded as Warning, DescriptionRounded as Description, EditRounded as Edit, CloudUploadRounded as CloudUpload, CheckCircleRounded as CheckCircle, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, ChevronRightRounded as ChevronRight, HistoryRounded as History, DeleteRounded as Delete, DownloadRounded as Download, TaskAltRounded as TaskAlt, HourglassTopRounded as HourglassTop, NoteAddRounded as NoteAdd, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, CloseRounded as Close, CancelRounded as Cancel, SendRounded as Send, ChatRounded as Chat, LinkRounded as LinkIcon, PrintRounded as Print, ShareRounded as Share, CalendarMonthRounded as CalendarMonth, LockRounded as Lock, RemoveCircleOutlineRounded as RemoveCircleOutline, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, RadioButtonUncheckedRounded as RadioButtonUnchecked } from "@mui/icons-material";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
@@ -47,6 +47,7 @@ import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { confirmDelete } from "@/shared/ui/swal";
 import { closeCheckHtml } from "@/shared/utils/closeCheckHtml";
 import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
+import AttachmentList from "@/shared/ui/AttachmentList";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -206,77 +207,17 @@ const downloadFile = async (url, fileName) => {
   }
 };
 
-const getFileType = (fileName = "") => {
-  const lower = (fileName || "").toLowerCase();
-  if ([".jpg", ".jpeg", ".png", ".webp"].some(e => lower.endsWith(e))) return "image";
-  if (lower.endsWith(".pdf")) return "pdf";
-  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
-  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
-  return "unknown";
-};
 
-const fileTypeIcon = (fileName) => {
-  const t = getFileType(fileName);
-  if (t === "image") return <Image sx={{ color: "#10b981", fontSize: 16 }} />;
-  if (t === "pdf")   return <PictureAsPdf sx={{ color: "#ef4444", fontSize: 16 }} />;
-  if (t === "word")  return <Article sx={{ color: "#3b82f6", fontSize: 16 }} />;
-  if (t === "excel") return <InsertDriveFile sx={{ color: "#10b981", fontSize: 16 }} />;
-  return <AttachFile sx={{ color: "#6b7280", fontSize: 16 }} />;
-};
-
-// ✅ perf: แยกแถวไฟล์ออกมาเป็นคอมโพเนนต์ของตัวเอง + React.memo — เดิมแถวไฟล์อยู่ใน .map() ในตัว
-// DocumentFileList เอง พอ auto-refresh ทุก 15 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่ (แม้ข้อมูลจริง
-// ไม่เปลี่ยน) ทุกแถวไฟล์ต้อง re-render ใหม่หมด — งานที่มีไฟล์เยอะ (เช่น 9 ไฟล์ตามภาพที่ผู้ใช้ส่งมา)
-// นี่คือส่วนที่หนักที่สุด เทียบด้วยค่าจริง (_id/fileUrl/fileName) ไม่ใช่ reference ของ object ไฟล์
-// (เปลี่ยนทุก poll อยู่แล้วแม้เนื้อหาเดิม) — onPreview/onOpenMenu ต้องเป็น stable reference จากต้นทาง
-const FileRow = React.memo(
-  ({ file: f, onPreview, onOpenMenu, tag }) => (
-    <Stack direction="row" alignItems="center" gap={1} sx={{
-      pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, opacity: tag?.old ? 0.78 : 1,
-    }}>
-      {fileTypeIcon(f.fileName)}
-      <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
-        <Typography noWrap title={f.fileName} sx={{ fontSize: "0.82rem", fontWeight: 600, color: INK_2 }}>
-          {f.fileName}
-        </Typography>
-        {/* ✅ (26 ต.ค. 2569) ฉบับของใบเสนอราคา — ฉบับเดิมที่ส่งลูกค้าแล้ว 🔒 ลบไม่ได้ */}
-        {tag && (
-          <Box component="span" sx={{ display: "inline-block", mt: 0.25, px: 0.75, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, color: tag.color, bgcolor: tag.bg, lineHeight: 1.6 }}>
-            {tag.old ? "🔒 " : ""}{tag.text}
-          </Box>
-        )}
-      </Box>
-      <Tooltip title="ดูไฟล์">
-        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 0.9, color: MUTED }}>
-          <Visibility sx={{ fontSize: 18 }} />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title="ดาวน์โหลด/พิมพ์/แชร์/ลบ">
-        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 0.9, color: MUTED }}>
-          <MoreVert sx={{ fontSize: 18 }} />
-        </IconButton>
-      </Tooltip>
-    </Stack>
-  ),
-  (prev, next) =>
-    prev.file._id === next.file._id &&
-    prev.file.fileUrl === next.file.fileUrl &&
-    prev.file.fileName === next.file.fileName &&
-    prev.tag?.text === next.tag?.text &&
-    prev.onPreview === next.onPreview &&
-    prev.onOpenMenu === next.onOpenMenu,
-);
 
 // ─── DocumentFileList ─────────────────────────────────────────────────
 // รายการไฟล์ที่แนบ (แนบได้หลายไฟล์) + ปุ่มเพิ่มไฟล์อีก (ใช้ร่วมกันทั้ง required เสมอ และ "มี")
 const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked }) => {
   const fileRef = useRef();
   const isQuote = type === "quotation";
-  const fileList = isQuote ? sortQuoteFiles(files) : files || [];
-  // 🔁 (21 ต.ค. 2569) ส่งไฟล์ทั้งช่องให้กล่องดูไฟล์ เลื่อนดูไฟล์อื่นได้เลย (reference คงที่ — FileRow memo)
-  const listRef = useRef(fileList);
-  listRef.current = fileList;
-  const previewInSection = useCallback((url, name) => onPreview?.(url, name, listRef.current), [onPreview]);
+  const fileList = useMemo(() => (isQuote ? sortQuoteFiles(files) : files || []), [isQuote, files]);
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ต่อใน แผงงานของช่างและหน้างานของฉัน" — โมดูลไฟล์ชุดเดียวทั้งแอป)
+  //    รายการไฟล์ = AttachmentList (ภาพย่อ/ป้ายชนิดไฟล์ · ผู้แนบ · เวลา · ⋮ เมนูเดิม · แถวกำลังอัปโหลด %) · เปิดดูส่งลำดับไปด้วย (ไฟล์ชื่อซ้ำก็เลื่อนได้)
+  const listFiles = useMemo(() => fileList.map((f) => ({ ...f, tag: isQuote ? quoteFileTag(f, fileList) : null })), [fileList, isQuote]);
 
   // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดู/ดาวน์โหลด/ลบ เรียงเป็นไอคอนแยกทุกแถว ดูรกเวลามีหลายไฟล์
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" ที่มีดาวน์โหลด/พิมพ์/แชร์ LINE/ลบ
@@ -293,12 +234,12 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
   // ไปเรื่อยๆ) เทียบ pattern เดียวกับ FileUploadSection ในหน้า Operation
   return (
     <Box>
-      {fileList.length > 0 && (
-        <Stack spacing={0.75} sx={{ mb: 1, maxHeight: 260, overflowY: "auto" }}>
-          {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={isQuote ? quoteFileTag(f, fileList) : null} />
-          ))}
-        </Stack>
+      {(fileList.length > 0 || isUploading) && (
+        <AttachmentList files={listFiles} readOnly emptyText={null}
+          onOpen={(f, i, list) => onPreview?.(f.fileUrl, f.fileName, list, i)}
+          onRowMenu={(el, f) => handleOpenFileMenu(el, fileList.find((x) => (x._id && x._id === f._id) || x.fileUrl === f.fileUrl) || f)}
+          uploading={isUploading ? { progress: uploadProgress || 0 } : null}
+          sx={{ mb: 1, maxHeight: 320, overflowY: "auto", px: 0.25 }} />
       )}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์ LINE/แชร์อื่น/ลบ รวมไว้ที่เดียว */}
@@ -339,9 +280,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
         ]}
       </Menu>
 
-      {isLocked ? null : isUploading ? (
-        <LinearProgress variant="determinate" value={uploadProgress || 0} sx={{ borderRadius: 2, height: 6 }} />
-      ) : (
+      {isLocked || isUploading ? null : (
         <>
           <input ref={fileRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
           {/* ✅ ปุ่มแนบไฟล์แบบกล่องเส้นประ — บอกชนิดไฟล์ที่รับได้ในตัว ไม่ต้องเดา */}

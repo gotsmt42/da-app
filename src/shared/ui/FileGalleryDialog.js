@@ -72,18 +72,22 @@ function PdfView({ url, onDownload }) {
 const STRIP_H = 76;
 
 /** @param zIndex เปิดซ้อนบนกล่อง SweetAlert/แผ่นเอกสารในฟอร์มแก้ไขงาน — ส่งค่าสูงกว่า (เช่น 20020) */
-export default function FileGalleryDialog({ previewUrl, previewFileName, gallery, onNavigate, onClose, caption, zIndex }) {
+export default function FileGalleryDialog({ previewUrl, previewFileName, previewIndex, gallery, onNavigate, onClose, caption, zIndex }) {
   const list = useMemo(() => {
     const g = (gallery || []).filter((f) => f?.fileUrl);
     return g.some((f) => f.fileUrl === previewUrl) ? g : (previewUrl ? [{ fileUrl: previewUrl, fileName: previewFileName }] : []);
   }, [gallery, previewUrl, previewFileName]);
-  const idx = Math.max(0, list.findIndex((f) => f.fileUrl === previewUrl));
+  // 🐛 (10 พ.ย. 2569 ผู้ใช้: "กดเลื่อนรูปที่มีมากกว่า 1 ไม่ได้ เลื่อนไม่ไป") — ไฟล์ชื่อเดียวกันอัปโหลด 2 ครั้งได้ลิงก์เดียวกัน
+  //    เดิมหาตำแหน่งจากลิงก์ → เจอใบแรกเสมอ กดถัดไปก็กลับมาที่เดิม · ตอนนี้จำ "ลำดับ" ที่เปิดอยู่ (previewIndex) ถ้ามี
+  const idx = Number.isInteger(previewIndex) && list[previewIndex]?.fileUrl === previewUrl
+    ? previewIndex
+    : Math.max(0, list.findIndex((f) => f.fileUrl === previewUrl));
   const multi = list.length > 1;
   const type = fileKind(previewFileName || previewUrl || "");
   const go = useCallback((d) => {
     if (!multi) return;
-    const n = list[(idx + d + list.length) % list.length];
-    if (n) onNavigate?.(n);
+    const ni = (idx + d + list.length) % list.length;
+    if (list[ni]) onNavigate?.(list[ni], ni);
   }, [multi, list, idx, onNavigate]);
 
   // คีย์บอร์ด ← →
@@ -142,7 +146,7 @@ export default function FileGalleryDialog({ previewUrl, previewFileName, gallery
       <DialogContent sx={{ p: 0, position: "relative", bgcolor: type === "image" ? "#0f172a" : undefined }}>
         {multi && arrow(-1)}
         {multi && arrow(1)}
-        {type === "image" && <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} reserve={multi ? STRIP_H : 0} onSwipe={multi ? go : undefined} />}
+        {type === "image" && <ImagePreview key={`${idx}-${previewUrl}`} url={previewUrl} name={previewFileName} reserve={multi ? STRIP_H : 0} onSwipe={multi ? go : undefined} />}
         {type === "pdf" && <PdfView key={previewUrl} url={previewUrl} onDownload={() => downloadFile(previewUrl, previewFileName)} />}
         {(type === "word" || type === "excel") && <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`} width="100%" height="780px" style={{ border: "none" }} title="Office" />}
         {type === "unknown" && <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}><FolderOpen sx={{ fontSize: 48 }} /><Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography></Box>}
@@ -154,7 +158,7 @@ export default function FileGalleryDialog({ previewUrl, previewFileName, gallery
             const on = i === idx;
             const img = fileKind(f.fileName || f.fileUrl) === "image";
             return (
-              <Box key={f.fileUrl} data-on={on ? "1" : "0"} role="button" title={f.fileName} onClick={() => onNavigate?.(f)}
+              <Box key={`${i}-${f.fileUrl}`} data-on={on ? "1" : "0"} role="button" title={f.fileName} onClick={() => onNavigate?.(f, i)}
                 sx={{ width: 56, height: 56, flexShrink: 0, borderRadius: 1.5, overflow: "hidden", cursor: "pointer", display: "grid", placeItems: "center",
                   bgcolor: "#1e293b", outline: on ? "2px solid #60a5fa" : "1px solid rgba(255,255,255,.12)", outlineOffset: on ? 1 : 0, opacity: on ? 1 : 0.65,
                   transition: "opacity .15s", "&:hover": { opacity: 1 } }}>
@@ -170,12 +174,13 @@ export default function FileGalleryDialog({ previewUrl, previewFileName, gallery
 
 /** ตัวช่วย state ของกล่องดูไฟล์ — open(url, name, list) · dialog = JSX ที่ต้องวางไว้ในหน้า */
 export function useFileGallery() {
-  const [st, setSt] = useState({ url: null, name: "", list: null });
-  const open = useCallback((url, name, list) => setSt({ url, name: name || "", list: Array.isArray(list) ? list : null }), []);
-  const close = useCallback(() => setSt({ url: null, name: "", list: null }), []);
+  const [st, setSt] = useState({ url: null, name: "", list: null, idx: null });
+  /** @param idx ลำดับในรายการ (ส่งมาเมื่อมีไฟล์ลิงก์ซ้ำกันได้) */
+  const open = useCallback((url, name, list, idx) => setSt({ url, name: name || "", list: Array.isArray(list) ? list : null, idx: Number.isInteger(idx) ? idx : null }), []);
+  const close = useCallback(() => setSt({ url: null, name: "", list: null, idx: null }), []);
   const dialog = (
-    <FileGalleryDialog previewUrl={st.url} previewFileName={st.name} gallery={st.list}
-      onNavigate={(f) => setSt((p) => ({ ...p, url: f.fileUrl, name: f.fileName || "" }))} onClose={close} />
+    <FileGalleryDialog previewUrl={st.url} previewFileName={st.name} previewIndex={st.idx} gallery={st.list}
+      onNavigate={(f, i) => setSt((p) => ({ ...p, url: f.fileUrl, name: f.fileName || "", idx: Number.isInteger(i) ? i : null }))} onClose={close} />
   );
   return { open, close, dialog, previewUrl: st.url };
 }

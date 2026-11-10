@@ -103,6 +103,7 @@ import WorkValueField from "@/shared/ui/WorkValueField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
+import AttachmentList from "@/shared/ui/AttachmentList";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton, { ExcelIcon } from "@/shared/ui/ExportExcelButton";
 import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
@@ -734,12 +735,16 @@ export const FileUploadSection = ({
 
   // ✅ (26 ต.ค. 2569) ใบเสนอราคา: ฉบับปัจจุบันขึ้นก่อน · ฉบับเดิมที่ส่งลูกค้าแล้วติดป้าย 🔒 (ลบไม่ได้)
   const isQuote = type === "quotation";
-  const fileList = isQuote ? sortQuoteFiles(files) : files || [];
+  const fileList = useMemo(() => (isQuote ? sortQuoteFiles(files) : files || []), [isQuote, files]);
   const hasFiles = fileList.length > 0;
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "เลื่อนดูรูปอื่นในช่องเดียวกันได้เลย") ส่งไฟล์ทั้งช่องไปให้กล่องดูไฟล์ — reference คงที่ (FileRow memo)
   const listRef = useRef(fileList);
   listRef.current = fileList;
   const previewInSection = useCallback((url, name) => onPreview?.(url, name, listRef.current), [onPreview]);
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ทำต่อใน เอกสารในหน้าดำเนินงาน" — โมดูลไฟล์ชุดเดียวทั้งแอป) รายการไฟล์ + แถวกำลังอัปโหลด ใช้ AttachmentList
+  //    (ภาพย่อ/ป้ายชนิดไฟล์ · ผู้แนบ · เวลา · ⋮ เมนูเดิม) · ⚠️ embedded (หน้า Event) คงหน้าตาเดิมตามที่ผู้ใช้สั่ง
+  const sharedList = !embedded;
+  const listFiles = useMemo(() => (sharedList ? fileList.map((f) => ({ ...f, tag: isQuote ? quoteFileTag(f, fileList) : null })) : []), [sharedList, fileList, isQuote]);
 
   const handleDrop = e => {
     e.preventDefault();
@@ -827,7 +832,14 @@ export const FileUploadSection = ({
 
       {/* ✅ ถ้ามีไฟล์เยอะ (เช่น 6+ ไฟล์) จำกัดความสูงแล้วเลื่อนดูแทน ไม่ให้รายการยาวจนดันเนื้อหา
           ส่วนอื่นไปไกล ทำให้หน้าดูไม่เป็นระบบเวลาไฟล์เยอะ */}
-      {hasFiles && (
+      {sharedList && (hasFiles || uploading) && (
+        <AttachmentList files={listFiles} readOnly emptyText={null}
+          onOpen={(f, i, list) => onPreview?.(f.fileUrl, f.fileName, list, i)}
+          onRowMenu={(el, f) => handleOpenFileMenu(el, fileList.find((x) => (x._id && x._id === f._id) || x.fileUrl === f.fileUrl) || f)}
+          uploading={uploading ? { progress, sizeText: uploading_size } : null}
+          sx={{ mb: canEdit && !card ? 1 : 0, maxHeight: 320, overflowY: "auto", px: 0.25 }} />
+      )}
+      {!sharedList && hasFiles && (
         <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
             <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={isQuote ? quoteFileTag(f, fileList) : null} />
@@ -881,7 +893,7 @@ export const FileUploadSection = ({
         ]}
       </Menu>
 
-      {uploading ? (
+      {uploading && sharedList ? null : uploading ? (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "primary.main" }}>
           <Stack direction="row" gap={1} alignItems="center" mb={0.5}>
             <CloudUpload fontSize="small" color="primary" />
@@ -2716,7 +2728,9 @@ const Operation = () => {
   // memo ไว้ (เทียบ props ด้วย reference) bail out re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้ง
   // ทำให้ memo ไม่มีผลอะไรเลย
   const [previewList, setPreviewList] = useState(null);
-  const handlePreviewFile = useCallback((url, name, list) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); }, []);
+  // index = ลำดับในรายการ (ไฟล์ชื่อซ้ำได้ลิงก์เดียวกัน — เลื่อนดูต้องจำลำดับ ไม่ใช่ลิงก์)
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const handlePreviewFile = useCallback((url, name, list, index) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); setPreviewIndex(Number.isInteger(index) ? index : null); }, []);
   const [confirmOpen,      setConfirmOpen]        = useState(false);
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
@@ -4090,8 +4104,8 @@ const Operation = () => {
 
       {/* File Preview */}
       <FilePreviewDialog
-        previewUrl={previewUrl} previewFileName={previewFileName} gallery={previewList}
-        onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); }}
+        previewUrl={previewUrl} previewFileName={previewFileName} previewIndex={previewIndex} gallery={previewList}
+        onNavigate={(f, i) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); setPreviewIndex(Number.isInteger(i) ? i : null); }}
         onClose={() => { setPreviewUrl(null); setPreviewFileName(""); setPreviewList(null); }}
       />
 

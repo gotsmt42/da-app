@@ -1,4 +1,5 @@
 import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
+import FileKindThumb from "@/shared/ui/FileKindThumb";
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -15,8 +16,7 @@ import {
   Divider, LinearProgress, Pagination,
   Menu, MenuItem, ListItemIcon, ListItemText, Avatar,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { DownloadRounded as Download, VisibilityRounded as Visibility, InsertDriveFileRounded as InsertDriveFile, FolderOpenRounded as FolderOpen, OpenInNewRounded as OpenInNew, RefreshRounded as Refresh, MoreVertRounded as MoreVert, PrintRounded as Print, ShareRounded as Share, DescriptionRounded as Description, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn } from "@mui/icons-material";
+import { DownloadRounded as Download, VisibilityRounded as Visibility, FolderOpenRounded as FolderOpen, OpenInNewRounded as OpenInNew, RefreshRounded as Refresh, MoreVertRounded as MoreVert, PrintRounded as Print, ShareRounded as Share } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
 import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
@@ -36,13 +36,6 @@ const DOC_TYPE_COLOR = {
   quotation: "#d97706",
   invoice: "#0891b2",
   completion: "#059669",
-};
-
-const DOC_TYPE_ICON = {
-  report: Description,
-  quotation: RequestQuote,
-  invoice: ReceiptLong,
-  completion: AssignmentTurnedIn,
 };
 
 const DOC_TYPES = [
@@ -98,6 +91,7 @@ const ServiceReportFiles = () => {
   const [pageSize, setPageSize] = useState(5);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewFileName, setPreviewFileName] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(null);
   const [fileMenu, setFileMenu] = useState(null); // { el, file }
   const closeFileMenu = () => setFileMenu(null);
 
@@ -187,15 +181,13 @@ const ServiceReportFiles = () => {
   //    โครงการ/งาน 1 บรรทัด · ชนิด/สถานะ/วันที่ 1 บรรทัด · ปุ่ม) แทนการ์ดสูงที่มีรายการ "ไอคอน ป้าย : ค่า" 5 บรรทัด
   const renderFileRow = (f, i) => {
     const color = DOC_TYPE_COLOR[f.docType] || "#6b7280";
-    const DocIcon = DOC_TYPE_ICON[f.docType] || InsertDriveFile;
     const place = [f.site || f.company, f.system, f.time ? `ครั้งที่ ${formatRoundLabel(f.time, f.visitCount, f)}` : ""].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ";
-    const open = () => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); };
+    const open = () => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); setPreviewIndex(filtered.indexOf(f)); };
     return (
       <Stack key={f.fileId} direction="row" alignItems="center" spacing={1.5} onClick={open} role="button"
         sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, borderTop: i ? `1px solid ${LINE}` : "none", cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
-        <Box sx={{ width: 38, height: 38, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(color, 0.1), color }}>
-          <DocIcon sx={{ fontSize: 20 }} />
-        </Box>
+        {/* 🔁 (10 พ.ย. 2569) ภาพย่อ/ป้ายชนิดไฟล์ชุดกลางของแอป — ชนิดเอกสาร (Service Report/ใบเสนอราคา…) บอกด้วยสีในบรรทัดล่าง */}
+        <FileKindThumb name={f.fileName} url={f.fileUrl} size={40} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography noWrap title={f.fileName} sx={{ fontWeight: 700, fontSize: "0.88rem", color: INK }}>{f.fileName}</Typography>
           <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2 }}>{place}</Typography>
@@ -321,8 +313,9 @@ const ServiceReportFiles = () => {
       <FilePreviewDialog
         previewUrl={previewUrl}
         previewFileName={previewFileName}
+        previewIndex={previewIndex}
         gallery={filtered}
-        onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); }}
+        onNavigate={(f, i) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); setPreviewIndex(Number.isInteger(i) ? i : null); }}
         onClose={() => { setPreviewUrl(null); setPreviewFileName(null); }}
       />
     </Box>

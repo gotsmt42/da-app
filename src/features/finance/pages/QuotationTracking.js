@@ -31,6 +31,7 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import { FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
+import AttachmentList from "@/shared/ui/AttachmentList";
 import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup, QUOTE_STATUS, quoteRevOf, revLabel, currentFollowUps } from "@/shared/utils/quotationTracking";
 import DateCell from "@/shared/ui/DateCell";
@@ -45,7 +46,6 @@ import SelectField from "@/shared/ui/SelectField";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PAGE_SX } from "@/shared/ui/PageKit";
-import { confirmDelete } from "@/shared/ui/swal";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 const TEXT_MAIN = "#0f172a";
@@ -800,19 +800,16 @@ const ResultDocs = ({ a, k, onUpload, onDelete, onPreview, uploading, progress }
       <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.5 }}>
         เอกสารผลลัพธ์ <Box component="span" sx={{ fontWeight: 600, color: "#94a3b8" }}>· {k === "approved" ? "PO / หนังสือตอบรับ" : "อีเมล / หนังสือแจ้งไม่รับ"} (ถ้ามี)</Box>
       </Typography>
+      {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "Module การจัดการไฟล์และรูปภาพ รูปแบบเดียวกันทั้งแอพ") — แถวไฟล์ชุดกลาง */}
+      {(files.length > 0 || uploading) && (
+        <Box sx={{ mb: 0.75, px: 1.25, py: 0.25, border: `1px solid ${BORDER}`, borderRadius: 2, bgcolor: "#fff" }}>
+          <AttachmentList files={files} emptyText={null}
+            onOpen={(f) => onPreview(f.fileUrl, f.fileName)}
+            onDelete={async (f) => { await onDelete(a._id, "quotationResult", f._id); }}
+            uploading={uploading ? { progress: progress || 0 } : null} />
+        </Box>
+      )}
       <Stack direction="row" gap={0.75} alignItems="center" sx={{ flexWrap: "wrap" }}>
-        {files.map((f) => (
-          <Stack key={f._id} direction="row" alignItems="center" sx={{ height: 30, pl: 1, pr: 0.25, borderRadius: 99, border: `1px solid ${BORDER}`, bgcolor: "#fff", maxWidth: 260 }}>
-            <Box component="button" type="button" onClick={() => onPreview(f.fileUrl, f.fileName)} title={f.fileName}
-              sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, border: 0, bgcolor: "transparent", cursor: "pointer", font: "inherit", minWidth: 0, color: "#1d4ed8", fontSize: "0.76rem", fontWeight: 800 }}>
-              <AttachFile sx={{ fontSize: 14 }} />
-              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</Box>
-            </Box>
-            <IconButton size="small" aria-label="ลบไฟล์" onClick={async () => { if (await confirmDelete({ name: f.fileName })) onDelete(a._id, "quotationResult", f._id); }} sx={{ p: 0.4, color: "#94a3b8" }}>
-              <Close sx={{ fontSize: 14 }} />
-            </IconButton>
-          </Stack>
-        ))}
         <input ref={ref} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { const fl = e.target.files; if (fl?.length) onUpload(fl, a._id, "quotationResult"); e.target.value = ""; }} />
         <Button size="small" startIcon={<AttachFile sx={{ fontSize: 15 }} />} onClick={() => ref.current?.click()} disabled={uploading}
           sx={{ height: 30, px: 1.25, textTransform: "none", fontWeight: 800, borderRadius: 99, border: "1px dashed #94a3b8", color: "#334155", whiteSpace: "nowrap", flexShrink: 0 }}>

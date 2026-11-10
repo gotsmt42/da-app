@@ -15,7 +15,7 @@ import {
   Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CloseRounded as Close, PrintRounded as Print, EditRounded as Edit, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, AttachFileRounded as AttachFile, OpenInNewRounded as OpenInNew, DeleteOutlineRounded as DeleteOutline, LinkRounded as LinkIcon, HistoryRounded as History, TaskAltRounded as TaskAlt, WarningAmberRounded as WarningAmber, ImageRounded as ImageIcon, DescriptionRounded as Description, ExpandMoreRounded as ExpandMore, AccountBalanceWalletRounded as AccountBalanceWallet, ContentCopyRounded as ContentCopy, CheckRounded as Check, HistoryEduRounded as HistoryEdu, FactCheckRounded as FactCheck, DoneAllRounded as DoneAll, EngineeringRounded as Engineering, CalendarMonthRounded as CalendarMonth, BuildRounded as Build } from "@mui/icons-material";
+import { CloseRounded as Close, PrintRounded as Print, EditRounded as Edit, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, AttachFileRounded as AttachFile, OpenInNewRounded as OpenInNew, LinkRounded as LinkIcon, HistoryRounded as History, TaskAltRounded as TaskAlt, WarningAmberRounded as WarningAmber, DescriptionRounded as Description, ExpandMoreRounded as ExpandMore, AccountBalanceWalletRounded as AccountBalanceWallet, ContentCopyRounded as ContentCopy, CheckRounded as Check, HistoryEduRounded as HistoryEdu, FactCheckRounded as FactCheck, DoneAllRounded as DoneAll, EngineeringRounded as Engineering, CalendarMonthRounded as CalendarMonth, BuildRounded as Build } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL } from "@/shared/utils/fileUpload";
@@ -38,9 +38,9 @@ import {
 } from "../expenseMeta";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
 import { bankMeta, formatAccountNo } from "../bankMeta";
-import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import BankLogo from "./BankLogo";
 import { confirmDelete } from "@/shared/ui/swal";
+import AttachmentList from "@/shared/ui/AttachmentList";
 
 /**
  * บัญชีรับเงินของผู้เบิกที่ระบุไว้ในใบ
@@ -1295,29 +1295,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                           <Chip size="small" label={`${group.files.length} ไฟล์`}
                             sx={{ height: 18, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(group.color, 0.12), color: group.color }} />
                         </Stack>
-                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
-                          {group.files.map((f) => {
-                            const isImg = String(f.fileType || "").startsWith("image/");
-                            return (
-                              <Stack key={f._id} direction="row" spacing={1} alignItems="center"
-                                sx={{ p: 0.75, border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${alpha(group.color, 0.55)}`, borderRadius: 2, minWidth: 0 }}>
-                                <Box component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{
-                                  width: 44, height: 44, borderRadius: 1.5, flexShrink: 0, overflow: "hidden", bgcolor: "#f1f5f9",
-                                  display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_SUB,
-                                }}>
-                                  {isImg ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
-                                    : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{ fontSize: "0.82rem", fontWeight: 700, color: TEXT_MAIN, textDecoration: "none", display: "block" }} noWrap>{f.fileName}</Typography>
-                                  <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{fileKindLabel(f.kind)} · {f.uploadedBy} · {thaiDate(f.uploadedAt)}</Typography>
-                                </Box>
-                                {canRemoveFile && (
-                                  <Tooltip title="ลบไฟล์"><IconButton size="small" disabled={busy} onClick={() => removeFile(f)}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
-                                )}
-                              </Stack>
-                            );
-                          })}
+                        {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "Module การจัดการไฟล์และรูปภาพ รูปแบบเดียวกันทั้งแอพ") — แถวไฟล์ชุดกลาง (ภาพย่อ/ป้ายชนิด · ประเภท · ผู้แนบ · เวลา · ลบ) */}
+                        <Box sx={{ px: 1.25, py: 0.25, border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${alpha(group.color, 0.55)}`, borderRadius: 2 }}>
+                          <AttachmentList emptyText={null} readOnly={!canRemoveFile || busy} confirmDelete={false}
+                            files={group.files.map((f) => ({ ...f, tag: fileKindLabel(f.kind) }))}
+                            onDelete={canRemoveFile ? (f) => removeFile(f) : undefined} />
                         </Box>
                       </Box>
                     ))}

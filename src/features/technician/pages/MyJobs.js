@@ -339,7 +339,9 @@ export default function MyJobs() {
   // ✅ perf: reference คงที่ — จำเป็นให้แถวไฟล์ที่ memo ไว้ (เทียบ props ด้วย reference) bail out
   // re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้งที่ MyJobs re-render ทำให้ memo ไม่มีผลอะไรเลย
   const [previewList, setPreviewList] = useState(null);
-  const handlePreviewFile = useCallback((url, name, list) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); }, []);
+  // index = ลำดับในรายการ (ไฟล์ชื่อซ้ำได้ลิงก์เดียวกัน — เลื่อนดูต้องจำลำดับ)
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const handlePreviewFile = useCallback((url, name, list, index) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); setPreviewIndex(Number.isInteger(index) ? index : null); }, []);
 
   const [uploadingState, setUploadingState] = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState, setUploadProgressState] = useState({ quotation: 0, report: 0, invoice: 0, completion: 0 });
@@ -885,7 +887,8 @@ export default function MyJobs() {
       <FilePreviewDialog
         previewUrl={previewUrl}
         previewFileName={previewFileName}
-        gallery={previewList} onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); }}
+        previewIndex={previewIndex}
+        gallery={previewList} onNavigate={(f, i) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); setPreviewIndex(Number.isInteger(i) ? i : null); }}
         onClose={() => { setPreviewUrl(null); setPreviewFileName(""); setPreviewList(null); }}
       />
 

@@ -47,7 +47,7 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { PageHeader, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE, PAGE_SX } from "@/shared/ui/PageKit";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/components/EventForms/AddDraftEvent";
-import FileKindThumb from "@/shared/ui/FileKindThumb";
+import AttachmentList from "@/shared/ui/AttachmentList";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
@@ -55,7 +55,6 @@ import { can, rankLabel } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
-import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
@@ -917,65 +916,26 @@ const FileLinks = ({ files, label = "เอกสารรับงาน" }) =>
  *    ไฟล์ตอนบันทึก · ไฟล์ที่แนบเพิ่ม · ใบเสนอราคา (+ สถานะติดตาม กดอัปเดตผลได้) · แนบเพิ่มได้ · เลื่อนดูไฟล์ต่อกันได้
  */
 const NOTE_FILE_TYPES = [["quotation", "ใบเสนอราคา", RequestQuoteRounded], ["sitePhoto", "ไฟล์อื่น", AttachFileRounded]];
+// 🔁 (10 พ.ย. 2569 ผู้ใช้: "ทำเป็น Module การจัดการไฟล์ และรูปภาพ ให้ใช้รูปแบบเดียวกันทั้งแอพ" · "อัพรูปแล้วเด้งกระพริบ ให้โหลดเบื้องหลัง")
+//    ใช้ AttachmentList (shared/ui) — แถวไฟล์ชุดเดียวทั้งแอป · อัปโหลดเบื้องหลังมีแถวชั่วคราว + % · เลื่อนดูรูปได้แม้ชื่อซ้ำ · ลบไฟล์ได้
 function NoteFiles({ job, outcome, readOnly, onChanged }) {
-  const gal = useFileGallery();
-  const inputRef = useRef(null);
-  const [pickType, setPickType] = useState("quotation");
-  const [busy, setBusy] = useState(0);
   const items = [
-    ...(job.sitePhotoFiles || []).map((f) => ({ ...f, tag: f.source === "intake" ? "ตอนบันทึก" : "แนบเพิ่ม", tone: MUTED })),
-    ...(job.quotationFiles || []).map((f) => ({ ...f, tag: "ใบเสนอราคา", tone: ACCENT })),
+    ...(job.sitePhotoFiles || []).map((f) => ({ ...f, _type: "sitePhoto", tag: f.source === "intake" ? "ตอนบันทึก" : "แนบเพิ่ม" })),
+    ...(job.quotationFiles || []).map((f) => ({ ...f, _type: "quotation", tag: "ใบเสนอราคา", tagColor: ACCENT })),
   ];
-  const pick = (t) => { setPickType(t); setTimeout(() => inputRef.current?.click(), 0); };
-  const onPick = async (e) => {
-    const files = [...(e.target.files || [])]; e.target.value = "";
-    if (!files.length) return;
-    let failed = 0;
-    setBusy(files.length);
-    for (const f of files) { try { await EventService.Upload(job._id, f, pickType); } catch { failed += 1; } setBusy((n) => n - 1); }
-    if (failed) Swal.fire({ icon: "warning", title: "อัปโหลดไม่ครบ", text: `ไม่สำเร็จ ${failed} ไฟล์` });
-    onChanged?.();
-  };
-  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ให้แสดงรูปแบบไฟล์ด้วย ให้สวยงามเช่น PDF Excel หรือรูปภาพ พร้อมจัดวางให้ดูไม่รก")
-  //    แถวไฟล์: ภาพย่อ/ป้ายชนิดไฟล์ · ชื่อไฟล์ · บรรทัดรอง (ที่มา · วันเวลา) · ปุ่มแนบอยู่ท้ายรายการ แบ่งครึ่งเท่ากัน
   return (
     <Box sx={{ mt: 1, px: 1.5, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-      <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>ไฟล์แนบ{items.length ? <Box component="span" sx={{ color: MUTED, fontWeight: 600 }}> · {items.length} ไฟล์</Box> : ""}</Typography>
-      <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
-      {items.length ? (
-        <Box sx={{ mt: 0.75 }}>
-          {items.map((f, i) => (
-            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={1.25} onClick={() => gal.open(f.fileUrl, f.fileName, items)}
-              sx={{ py: 0.85, cursor: "pointer", borderTop: i ? `1px solid ${LINE}` : 0, "&:hover .fn": { color: ACCENT } }}>
-              <FileKindThumb name={f.fileName} url={f.fileUrl} size={40} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography className="fn" noWrap sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK, lineHeight: 1.35 }}>{f.fileName || "ไฟล์"}</Typography>
-                <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.35 }}>
-                  <Box component="span" sx={{ color: f.tone, fontWeight: 700 }}>{f.tag}</Box>
-                  {f.uploadedAt ? ` · ${formatThai(moment(f.uploadedAt), "D MMM HH:mm")}` : ""}
-                </Typography>
-              </Box>
-              <ChevronRight sx={{ fontSize: 20, color: "#cbd5e1", flexShrink: 0 }} />
-            </Stack>
-          ))}
-        </Box>
-      ) : <Typography sx={{ mt: 0.5, fontSize: "0.78rem", color: "#94a3b8" }}>ยังไม่มีไฟล์แนบ</Typography>}
-      {busy > 0 && <Typography sx={{ mt: 0.5, fontSize: "0.74rem", color: ACCENT, fontWeight: 700 }}>กำลังอัปโหลด {busy} ไฟล์…</Typography>}
-      {!readOnly && (
-        <Box sx={{ mt: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-          {NOTE_FILE_TYPES.map(([t, label, Icon]) => (
-            <Button key={t} size="small" disabled={Boolean(busy)} onClick={() => pick(t)} startIcon={<Icon sx={{ fontSize: "17px !important" }} />}
-              sx={{ ...BTN, height: 40, color: ACCENT, border: `1px dashed ${alpha(ACCENT, 0.45)}`, bgcolor: alpha(ACCENT, 0.03), "&:hover": { bgcolor: alpha(ACCENT, 0.07) } }}>แนบ{label}</Button>
-          ))}
-        </Box>
-      )}
+      <AttachmentList title="ไฟล์แนบ" files={items} readOnly={readOnly}
+        actions={NOTE_FILE_TYPES.map(([key, label, icon]) => ({ key, label: `แนบ${label}`, icon }))}
+        upload={(file, type, onProgress) => EventService.Upload(job._id, file, type, { onUploadProgress: (e) => e.total && onProgress(e.loaded / e.total) })}
+        onUploaded={async () => { await onChanged?.(); }}
+        onDelete={readOnly ? undefined : async (f) => { await EventService.DeleteFile(job._id, f._type, f._id); await onChanged?.(); }} />
       {outcome && (outcome.files || []).length > 0 && (
         <Box sx={{ mt: 1, pt: 1, borderTop: `1px dashed ${LINE}` }}>
           <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.5 }}>ติดตามใบเสนอราคา · กดเพื่ออัปเดตผล</Typography>
           <QuoteCell oc={outcome} compact={false} />
         </Box>
       )}
-      {gal.dialog}
     </Box>
   );
 }
@@ -1214,17 +1174,6 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     ].filter(Boolean);
     const hasRef = Boolean(job.intakeDocNo || intakeDocs.length);
     const refLabel = job.intakeDocType ? ({ po: "ใบสั่งซื้อ (PO)", quotation: "ใบเสนอราคา", other: "เอกสารอื่น" }[job.intakeDocType] || "เอกสาร") : "ไฟล์แนบ";
-    const fileRow = (f, i, tag) => (
-      <Stack key={f._id || f.fileUrl || i} component="a" href={f.fileUrl} target="_blank" rel="noreferrer" direction="row" alignItems="center" gap={1.25}
-        sx={{ py: 0.75, textDecoration: "none", borderTop: `1px solid ${LINE}`, "&:hover .fn": { color: ACCENT } }}>
-        <FileKindThumb name={f.fileName} url={f.fileUrl} size={36} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography className="fn" noWrap sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK }}>{f.fileName || "ไฟล์"}</Typography>
-          {tag && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>{tag}</Typography>}
-        </Box>
-        <ChevronRight sx={{ fontSize: 18, color: "#cbd5e1" }} />
-      </Stack>
-    );
     return (
       <Stack spacing={1}>
         {/* ① สถานะ */}
@@ -1294,7 +1243,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 {hasRef ? `${refLabel}${job.intakeDocNo ? ` · ${job.intakeDocNo}` : ""}` : "ไม่มี"}
               </Typography>
             </Stack>
-            {intakeDocs.map((f, i) => fileRow(f, i, "เอกสารอ้างอิง"))}
+            {intakeDocs.length > 0 && <AttachmentList files={intakeDocs.map((f) => ({ ...f, tag: "เอกสารอ้างอิง" }))} readOnly emptyText={null} thumbSize={36} sx={{ mt: 0.25, pt: 0.25, borderTop: `1px solid ${LINE}` }} />}
           </Box>
           {outcome && (
             <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${LINE}` }}>
@@ -1319,7 +1268,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           {job.noVisit && invoiceFiles.length > 0 && (
             <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${LINE}` }}>
               <Typography sx={{ fontSize: "0.78rem", color: MUTED, mb: 0.25 }}>เอกสารการเงิน</Typography>
-              {invoiceFiles.map((f, i) => fileRow(f, i, "ใบวางบิล"))}
+              <AttachmentList files={invoiceFiles.map((f) => ({ ...f, tag: "ใบวางบิล" }))} readOnly emptyText={null} thumbSize={36} />
             </Box>
           )}
         </Box>
