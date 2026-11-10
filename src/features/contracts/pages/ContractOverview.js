@@ -58,7 +58,7 @@ import BillingChip from "@/features/finance/components/BillingChip";
 import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
 import ContractValuePanel from "@/features/contracts/components/ContractValuePanel";
-import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote } from "@mui/icons-material";
+import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, ContactPhoneRounded as ContactPhone, EventAvailableRounded as EventAvailable } from "@mui/icons-material";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
 import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
 import ColumnSettings from "@/features/contracts/components/ColumnSettings";
@@ -186,7 +186,7 @@ const STATUS_COLOR = {
  * ดำเนินงานของใคร (departmentScope ฝั่ง server) ติดป้ายว่าเป็นของฝ่ายขายแล้วช่างยังเห็นงานครบเหมือนเดิม
  */
 const DEPARTMENT_META = {
-  [DEPARTMENT.SERVICE]: { label: DEPARTMENT_LABEL[DEPARTMENT.SERVICE], short: "บริการ", color: "#dc2626", bg: "rgba(220,38,38,0.10)" },
+  [DEPARTMENT.SERVICE]: { label: DEPARTMENT_LABEL[DEPARTMENT.SERVICE], short: "บริการ", color: "#0369a1", bg: "rgba(3,105,161,0.08)" },
   [DEPARTMENT.SALES]: { label: DEPARTMENT_LABEL[DEPARTMENT.SALES], short: "ขาย", color: "#8b5cf6", bg: "rgba(139,92,246,0.12)" },
 };
 // ⚠️ งานเก่าที่ยังไม่เคยติดป้ายไม่มีค่าเก็บไว้ — ถือเป็น "ฝ่ายบริการ" ตามที่ผู้ใช้สั่งให้ตั้งต้นเป็น Services
@@ -506,10 +506,24 @@ const ModernDialogTitle = ({ icon, color = "#2563eb", title, sub, onClose }) => 
  * ✅ (10 พ.ย. 2569) ป้ายใต้มูลค่าสัญญา: ก่อน VAT / รวม VAT / "ระบุ VAT" (ยังไม่ระบุ) + จำนวนใบเสนอราคาที่แนบ
  *    กดแล้วเปิดกล่อง "มูลค่าสัญญา · ใบเสนอราคา" (ระบุ VAT · แนบไฟล์ · ให้ AI อ่านยอด)
  */
-const ContractVatTag = ({ c, onOpen, align = "center" }) => {
+const ContractVatTag = ({ c, onOpen, align = "center", variant = "text" }) => {
   const vat = c.jobValueVatIncluded;
   const n = (c.contractQuotationFiles || []).length;
   const unset = vat !== true && vat !== false;
+  if (variant === "pill") {
+    return (
+      <Box component={onOpen ? "button" : "span"} type={onOpen ? "button" : undefined} title={onOpen ? "ระบุ VAT · แนบใบเสนอราคาของสัญญา" : undefined}
+        onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(); } : undefined}
+        sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 999, border: "1px solid", cursor: onOpen ? "pointer" : "inherit", font: "inherit",
+          fontSize: "0.68rem", fontWeight: 700, whiteSpace: "nowrap",
+          ...(unset ? { bgcolor: "#fffbeb", borderColor: "#fde68a", color: "#92400e" } : { bgcolor: "#eff6ff", borderColor: "#dbeafe", color: "#1d4ed8" }),
+          "&:hover": { borderColor: unset ? "#f59e0b" : "#2563eb" } }}>
+        {unset ? "ระบุ VAT" : vat ? "รวม VAT" : "ก่อน VAT"}
+        {n > 0 && (<><Box component="span" sx={{ opacity: 0.5 }}>·</Box><AttachFileIcon sx={{ fontSize: 12, transform: "rotate(45deg)" }} />{n}</>)}
+        {onOpen && <ChevronRight sx={{ fontSize: 14, ml: -0.25, opacity: 0.7 }} />}
+      </Box>
+    );
+  }
   return (
     <Box component="button" type="button" title="ระบุ VAT · แนบใบเสนอราคาของสัญญา"
       onClick={(e) => { e.stopPropagation(); onOpen?.(); }}
@@ -524,6 +538,8 @@ const ContractVatTag = ({ c, onOpen, align = "center" }) => {
     </Box>
   );
 };
+
+const SHEET_ACTION_SX = { height: 36, borderRadius: 2, textTransform: "none", fontWeight: 700, fontSize: "0.78rem", bgcolor: "#fff", borderColor: "#e2e8f0", color: "#334155", "&:hover": { borderColor: "#2563eb", bgcolor: "#eff6ff" } };
 
 const ContractSummaryCard = ({ ct, chips = [] }) => (
   <Box sx={{ p: 1.75, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
@@ -1218,44 +1234,60 @@ const EditableCell = ({
 // ซ้าย-ขวาหาข้อมูลเหมือนตารางเดิมบนจอแคบ)
 // ✅ (5 ต.ค. 2569) ผู้ใช้: "รายละเอียดดูยาก" — ตัวอักษรค่าเล็กลงให้เท่ากันทุกแถว · ป้ายสีเทาอ่อน
 //    เส้นคั่นเฉพาะระหว่างแถว (แถวสุดท้ายของกลุ่มไม่มีเส้น) ใช้คู่กับ DetailSection ด้านล่าง
+const EditHint = () => <EditOutlinedIcon sx={{ fontSize: 14, color: "#cbd5e1", flexShrink: 0 }} />;
 const FieldRow = ({ label, hideIfEmptyReadOnly, ...cellProps }) => {
   if (hideIfEmptyReadOnly && !cellProps.editable && !cellProps.value) return null;
+  const tapToEdit = cellProps.editable && !cellProps.editing;
+  const editingNow = Boolean(cellProps.editable && cellProps.editing);
   return (
     <Stack
-      direction="row" alignItems="center" spacing={1}
-      sx={{ py: 0.5, minHeight: 36, borderBottom: "1px solid", borderColor: alpha("#0f172a", 0.06), "&:last-of-type": { borderBottom: 0 } }}
+      direction={editingNow ? "column" : "row"} alignItems={editingNow ? "stretch" : "center"} gap={editingNow ? 0.6 : 1}
+      onClick={tapToEdit ? () => cellProps.onStartEdit?.() : undefined}
+      sx={{ py: editingNow ? 1.1 : 0.75, minHeight: 48, cursor: tapToEdit ? "pointer" : "default", borderBottom: "1px solid #f1f5f9", "&:last-of-type": { borderBottom: 0 } }}
     >
-      <Typography sx={{ width: 92, flexShrink: 0, color: TEXT_SUB, fontWeight: 600, fontSize: "0.74rem" }}>{label}</Typography>
-      <Box sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", color: "#0f172a", fontWeight: 600 }}>
+      <Typography sx={{ width: editingNow ? "auto" : 100, flexShrink: 0, color: editingNow ? "#1d4ed8" : "#64748b", fontWeight: editingNow ? 700 : 500, fontSize: "0.78rem" }}>{label}</Typography>
+      <Box sx={{ flex: 1, minWidth: 0, fontSize: "0.88rem", color: "#0f172a", fontWeight: 600 }}>
         <EditableCell Wrapper={Box} width="100%" {...cellProps} />
       </Box>
+      {tapToEdit && <EditHint />}
     </Stack>
   );
 };
 
-// ✅ กลุ่มข้อมูลในการ์ดมือถือ: หัวข้อเล็ก (+ ปุ่มด้านขวาถ้ามี) แล้วตามด้วยพื้นเทาอ่อนห่อแถวข้อมูล
-//    แบ่งเป็นก้อนให้กวาดตาหาเรื่องที่ต้องการได้ทันที แทนรายการยาวเหยียดแถวเดียว
-const DetailSection = ({ title, action, children, sx }) => (
-  <Box sx={{ mt: 1.5, ...sx }}>
-    <Stack direction="row" alignItems="center" sx={{ mb: 0.5, px: 0.25, minHeight: 22 }}>
-      <Typography sx={{ flex: 1, fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: "0.02em" }}>{title}</Typography>
+// 🔁 (10 พ.ย. 2569 ผู้ใช้: "การจัดวาง สีสัน ช่องฟอร์มยังดูยาก ไม่สวย icon ไม่มี ไม่ชัดเจน")
+//    กลุ่มละการ์ดขาวบนพื้นเทาอ่อน · หัวการ์ดมีไอคอนในกรอบฟ้า · bare = มีแต่หัวข้อ (เนื้อหามีการ์ดของตัวเอง)
+const DetailSection = ({ title, icon, action, children, sx, bare = false }) => (
+  <Box sx={{ mt: 1.5, ...(bare ? {} : { bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }), ...sx }}>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ px: bare ? 0.25 : 1.5, pt: bare ? 0 : 1.25, pb: bare ? 0.75 : 0.5, minHeight: 30 }}>
+      {icon && (
+        <Box sx={{ width: 28, height: 28, borderRadius: 2, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0, "& svg": { fontSize: 17 } }}>
+          {icon}
+        </Box>
+      )}
+      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>{title}</Typography>
       {action}
     </Stack>
-    <Box sx={{ px: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${alpha("#0f172a", 0.05)}` }}>
-      {children}
-    </Box>
+    <Box sx={bare ? {} : { px: 1.5, pb: 0.5 }}>{children}</Box>
   </Box>
 );
 
 // ✅ ช่องข้อมูลแบบ "ป้ายอยู่บน ค่าอยู่ล่าง" — ใช้วางตาราง 2 คอลัมน์ (วันเริ่ม/สิ้นสุด/รอบเข้า/จำนวนครั้ง)
-const GridField = ({ label, ...cellProps }) => (
-  <Box sx={{ minWidth: 0, py: 0.75 }}>
-    <Typography sx={{ color: TEXT_SUB, fontWeight: 600, fontSize: "0.7rem", mb: 0.15 }}>{label}</Typography>
-    <Box sx={{ fontSize: "0.84rem", color: "#0f172a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-      <EditableCell Wrapper={Box} width="100%" {...cellProps} />
+const GridField = ({ label, ...cellProps }) => {
+  const tapToEdit = cellProps.editable && !cellProps.editing;
+  const editingNow = Boolean(cellProps.editable && cellProps.editing);
+  return (
+    <Box onClick={tapToEdit ? () => cellProps.onStartEdit?.() : undefined}
+      sx={{ position: "relative", minWidth: 0, px: 1.1, py: 0.9, borderRadius: 2, border: "1px solid", cursor: tapToEdit ? "pointer" : "default",
+        borderColor: editingNow ? "#93c5fd" : "#eef2f7", bgcolor: editingNow ? "#fff" : "#f8fafc", ...(editingNow ? { gridColumn: "1 / -1" } : {}),
+        "&:hover": tapToEdit ? { borderColor: "#cbd5e1" } : {} }}>
+      {tapToEdit && <Box sx={{ position: "absolute", top: 8, right: 8, display: "flex" }}><EditHint /></Box>}
+      <Typography sx={{ color: editingNow ? "#1d4ed8" : "#64748b", fontWeight: editingNow ? 700 : 500, fontSize: "0.72rem", mb: 0.25, pr: 2.5, lineHeight: 1.35 }}>{label}</Typography>
+      <Box sx={{ fontSize: "0.92rem", color: "#0f172a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+        <EditableCell Wrapper={Box} width="100%" {...cellProps} />
+      </Box>
     </Box>
-  </Box>
-);
+  );
+};
 
 // ✅ ค่าเริ่มต้นของ "ฟอร์มสร้างสัญญา" — ใช้ร่วมกันทั้งไดอะล็อก "เพิ่มสัญญาใหม่" และแถวร่างในตาราง
 // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
@@ -1989,18 +2021,7 @@ export default function ContractOverview() {
   const selectGroup = (group) => setSelectedIds(new Set(group.map((c) => c.key)));
   const clearSelection = () => setSelectedIds(new Set());
 
-  // ✅ การ์ดมือถือ — พับไว้เป็นค่าเริ่มต้นเสมอ โชว์แค่ข้อมูลจำเป็น (บริษัท/โครงการ/สถานะ/คืบหน้า) กดเพื่อ
-  // กางดูรายละเอียดทีหลัง (เทียบ pattern เดียวกับการ์ดงานในหน้า "การดำเนินงาน" — Operation/index.js
-  // expanded state ต่อการ์ด) กันหน้าจอแคบยาวเกินไปจนต้องเลื่อนหาข้อมูลที่ต้องการทุกครั้ง
-  const [expandedCards, setExpandedCards] = useState(new Set());
-  const toggleCardExpand = (key) => {
-    setExpandedCards((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  // 🔁 (10 พ.ย. 2569) การ์ดมือถือไม่กางในรายการแล้ว — กด "รายละเอียด" เปิดการ์ดรายละเอียดเต็มจอ (ดู openRowEditor)
   // ✅ ซ้อนอีกชั้นเฉพาะส่วน "ครั้งที่เข้างาน" ในการ์ด — สัญญาที่มีหลายครั้ง (สูงสุด 12) ทำให้การ์ดที่กาง
   // อยู่แล้วยาวมากถ้าโชว์ทุกครั้งตลอด พับไว้เป็นสรุปย่อก่อนเสมอ กดดูทั้งหมดทีหลังได้ตามต้องการ
   const [expandedRounds, setExpandedRounds] = useState(new Set());
@@ -3113,10 +3134,10 @@ export default function ContractOverview() {
     return (
       <Tooltip title="เปิดใบเสนอราคาต่อสัญญา (หน้าติดตามใบเสนอราคา)">
         <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); navigate(`/finance?tab=quotations&jobId=${q._id}`); }}
-          sx={{ display: "inline-flex", alignItems: "center", justifyContent: block ? "center" : "flex-start", gap: 0.5, height: block ? 36 : 22, px: block ? 1.5 : 0.9, width: block ? "100%" : "auto",
+          sx={{ display: "inline-flex", alignItems: "center", justifyContent: block ? "center" : "flex-start", gap: 0.5, height: block ? 38 : 22, overflow: "hidden", px: block ? 1.5 : 0.9, width: block ? "100%" : "auto",
             border: `1px solid ${alpha(st.color, 0.3)}`, borderRadius: block ? 2 : 99, cursor: "pointer", font: "inherit", whiteSpace: "nowrap",
             bgcolor: alpha(st.color, 0.08), color: st.color, fontSize: block ? "0.82rem" : "0.68rem", fontWeight: 800, "&:hover": { bgcolor: alpha(st.color, 0.14) } }}>
-          <Description sx={{ fontSize: block ? 16 : 13 }} />เสนอราคาต่อสัญญา · {st.short || st.label}<ChevronRight sx={{ fontSize: block ? 17 : 14, ml: -0.25 }} />
+          <Description sx={{ fontSize: block ? 16 : 13 }} />{block ? "ใบเสนอราคาต่อ" : "เสนอราคาต่อสัญญา"} · {st.short || st.label}<ChevronRight sx={{ fontSize: block ? 17 : 14, ml: -0.25 }} />
         </Box>
       </Tooltip>
     );
@@ -3133,23 +3154,23 @@ export default function ContractOverview() {
       const won = q && q.quotationStatus === "approved";
       const amount = q ? (q.quotationApprovedAmount != null ? q.quotationApprovedAmount : q.quotationAmount) : null;
       return (
-        <Stack direction={block ? "column" : "row"} gap={0.75} sx={{ flexWrap: "wrap", alignItems: block ? "stretch" : "center" }}>
+        <Stack direction="row" gap={0.75} sx={{ flexWrap: block ? "nowrap" : "wrap", alignItems: block ? "stretch" : "center", "& > *": block ? { flex: "1 1 0", minWidth: 0 } : {} }}>
           {q && quoteChip(q, { block })}
           {!q && due && canQuote && (
             <Button variant="outlined" fullWidth={block} startIcon={<Description sx={{ fontSize: block ? "18px !important" : "15px !important" }} />}
               onClick={(e) => { e.stopPropagation(); navigate(`/finance?tab=quotations&newQuote=contract:${c.key}`); }}
-              sx={{ height: block ? 40 : 30, px: block ? 2 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.86rem" : "0.74rem", fontWeight: 800, whiteSpace: "nowrap",
+              sx={{ height: block ? 38 : 30, px: block ? 1.25 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.8rem" : "0.74rem", fontWeight: 800, whiteSpace: "nowrap",
                 color: "#2563eb", borderColor: "#bfdbfe", bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: "#eff6ff" } }}>
-              เสนอราคาต่อสัญญา
+              {block ? "เสนอราคาต่อ" : "เสนอราคาต่อสัญญา"}
             </Button>
           )}
           {isAdminOrManager && due && (!q || won) && (
             <Button variant="contained" disableElevation fullWidth={block}
               startIcon={<Autorenew sx={{ fontSize: block ? "19px !important" : "16px !important" }} />}
               onClick={(e) => { e.stopPropagation(); openRenewDialog(c, won ? { ...(amount != null ? { jobValue: String(amount) } : {}), ...(q.quotationNo ? { quotationNo: q.quotationNo } : {}) } : null); }}
-              sx={{ height: block ? 40 : 30, px: block ? 2 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.88rem" : "0.76rem", fontWeight: 800, whiteSpace: "nowrap",
+              sx={{ height: block ? 38 : 30, px: block ? 1.25 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.8rem" : "0.76rem", fontWeight: 800, whiteSpace: "nowrap",
                 bgcolor: "#2563eb", color: "#fff", boxShadow: "0 1px 2px rgba(37,99,235,.35)", "&:hover": { bgcolor: "#1d4ed8" } }}>
-              {won ? "ได้งานแล้ว · ต่อสัญญา" : "ต่อสัญญาปีถัดไป"}
+              {won ? (block ? "ต่อสัญญา" : "ได้งานแล้ว · ต่อสัญญา") : (block ? "ต่อสัญญา" : "ต่อสัญญาปีถัดไป")}
             </Button>
           )}
         </Stack>
@@ -5049,10 +5070,23 @@ export default function ContractOverview() {
   const rowEditorRow = rowEditorKey ? contracts.find((x) => x.key === rowEditorKey) || null : null;
   const valueDialogRow = valueDialogKey ? contracts.find((x) => x.key === valueDialogKey) || null : null;
   const openRowEditor = (c) => {
-    // กล่องแก้ไขใช้การ์ดรายละเอียดตัวเดียวกับจอมือถือ (ทุกช่องแก้ได้ในที่เดียว) — กางรายละเอียดไว้ให้เลย
-    setExpandedCards((prev) => new Set(prev).add(c.key));
+    // การ์ดรายละเอียดเต็มจอ (มือถือกด "รายละเอียด" · เดสก์ท็อปเมนู "แก้ไขข้อมูล") — ทุกช่องแก้ได้ในที่เดียว
     setRowEditorKey(c.key);
   };
+  // ✅ (10 พ.ย. 2569) ลิงก์ /contracts?contract=<contractGroupId> (จาก "ดูสัญญา" ในฟอร์มแก้ไขงาน) → เปิดการ์ดสัญญานั้นเลย
+  const contractParam = searchParams.get("contract");
+  useEffect(() => {
+    if (!contractParam || loading) return;
+    const row = contracts.find((x) => x.key === contractParam);
+    if (row) {
+      setRowEditorKey(row.key);
+    } else {
+      Swal.fire({ icon: "info", title: "ไม่พบสัญญานี้ในรายการของคุณ", timer: 2500, showConfirmButton: false });
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("contract");
+    setSearchParams(next, { replace: true });
+  }, [contractParam, loading, contracts, searchParams, setSearchParams]);
   const closeClassifyMenu = () => { setClassifyMenuAnchor(null); setClassifyMenuTarget(null); };
 
   // ── ออกใบส่งมอบงานจากแถวในตาราง ────────────────────────────────────────
@@ -5190,7 +5224,9 @@ export default function ContractOverview() {
   // เดียวกันทั้งหมดใหม่เป็นการ์ดแนวตั้งแทน (ไม่มีข้อมูลไหนหายไป แค่เปลี่ยนทิศทางการอ่าน) ใช้ FieldRow/
   // EditableCell(Wrapper={Box}) ตัวเดียวกับตารางเดสก์ท็อปทุกจุดที่แก้ไขได้ ให้พฤติกรรม/สิทธิ์ตรงกันเป๊ะๆ
   // ไม่ต้องดูแลตรรกะ 2 ชุดแยกกัน
-  const renderMobileCard = (c) => {
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ให้ทำแบบการ์ดเปิดแทนการเลื่อนลงดูข้อมูลแบบเดิม")
+  //    รายการ = การ์ดสรุปอย่างเดียว · กด "รายละเอียด" = เปิดการ์ดรายละเอียดเต็มจอ (sheet) แทนการกางยาวในรายการ
+  const renderMobileCard = (c, { sheet = false } = {}) => {
     const nextOpenRound = c.isRealContract
       ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
       : null;
@@ -5220,7 +5256,6 @@ export default function ContractOverview() {
     // จุดที่ 2 แบบนี้ซ้ำอีกในอนาคต (ไฟล์ Excel ที่ส่งออกก็เรียกตัวนี้อยู่แล้ว ดู progressLabel ด้านบนไฟล์)
     const { label: progressLabel, color: progressColor } = progressInfo(c, countUsedRounds);
 
-    const isExpanded = expandedCards.has(c.key);
 
     // ✅ (5 ต.ค. 2569) ผู้ใช้: "ภาพรวมงานในมือถือ ดูข้อมูลยาก จัดวางไม่สวย ไม่มืออาชีพ"
     //    เดิม: ป้าย 3 อันซ้อนแนวตั้งทางขวาเบียดชื่อโครงการ · ปุ่มแผนที่เต็มความกว้างทุกใบ · กล่องสรุป 3 ช่อง
@@ -5243,125 +5278,163 @@ export default function ContractOverview() {
     const progressNums = String(progressLabel).match(/(\d+)\s*\/\s*(\d+)/);
     const pct = progressNums && Number(progressNums[2]) > 0 ? Math.min(100, (Number(progressNums[1]) / Number(progressNums[2])) * 100) : null;
 
-    return (
-      <Paper key={c.key} variant="outlined" sx={{ position: "relative", overflow: "hidden", borderRadius: 3, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)" }}>
+    // 🔁 (10 พ.ย. 2569 ผู้ใช้: "หน้าแรกไม่ควรให้กดแก้ข้อมูลเลย ให้กดเข้าไปแก้ข้างในแทน" · "จัดวางให้ลงตัว")
+    //    รายการ = การ์ดดูอย่างเดียว แตะที่ไหนก็ได้ = เปิดการ์ดรายละเอียด · แก้ไขได้เฉพาะในการ์ดรายละเอียด (sheet)
+    //    การ์ดสรุป: ชื่องาน + ป้ายสถานะ (มุมขวา) → ตัวเลขหลัก 2 ช่อง → ผู้รับผิดชอบ → สิ่งที่ต้องทำ → ล่าสุด
+    const ed = (can) => sheet && Boolean(can);
+    const openSheet = () => { if (!sheet) openRowEditor(c); };
+    const [progMain, ...progRest] = String(progressLabel).split(" · ");
+    const canEditValue = ed(isAdminOrManager && canEditField(c, "jobValue"));
+    const canEditResp = ed(isAdminOrManager && canEditField(c, "responsiblePerson"));
+    const respFp = fp("responsiblePerson");
+    const statLabelSx = { fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB };
+    const summaryCard = (
+      <Paper key={c.key} variant="outlined" onClick={sheet ? undefined : openSheet}
+        sx={{ position: "relative", overflow: "hidden", borderRadius: 3, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)",
+          ...(sheet ? {} : { cursor: "pointer", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 12px rgba(15,23,42,.08)" }, "&:active": { borderColor: "#93c5fd" } }) }}>
         <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: edge }} />
-        <Box sx={{ pl: 2.25, pr: 1.75, pt: 1.5, pb: 1.25 }}>
-          <Stack direction="row" alignItems="flex-start" spacing={1}>
-            {showCheckboxes && isSelectableForMerge(c) && (
+
+        {/* ชื่องาน + ป้ายสถานะ */}
+        <Box sx={{ pl: 2.25, pr: 1.75, pt: 1.5 }}>
+          <Stack direction="row" alignItems="flex-start" gap={1}>
+            {showCheckboxes && !sheet && isSelectableForMerge(c) && (
               <Checkbox
-                size="small" checked={selectedIds.has(c.key)} onChange={() => toggleSelect(c)}
+                size="small" checked={selectedIds.has(c.key)} onChange={() => toggleSelect(c)} onClick={(e) => e.stopPropagation()}
                 sx={{ p: 0.5, mt: -0.5, "&.Mui-checked": { color: ACCENT } }}
               />
             )}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <EditableCell
-                Wrapper={Box} editable={canEditBasicField(c, "site")} value={c.site} width="100%"
+                Wrapper={Box} editable={ed(canEditBasicField(c, "site"))} value={c.site} width="100%" noClip
                 formatDisplay={(v) => <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3, color: "#0f172a", wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
                 {...fp("site")}
               />
               <EditableCell
-                Wrapper={Box} editable={canEditBasicField(c, "company")} value={c.company} width="100%"
-                formatDisplay={(v) => <Typography sx={{ fontSize: "0.78rem", color: v ? "text.secondary" : "text.disabled", lineHeight: 1.4, wordBreak: "break-word" }}>{v || "ไม่ระบุบริษัท"}</Typography>}
+                Wrapper={Box} editable={ed(canEditBasicField(c, "company"))} value={c.company} width="100%"
+                formatDisplay={(v) => <Typography noWrap sx={{ fontSize: "0.78rem", color: v ? "#64748b" : "#94a3b8", lineHeight: 1.45 }}>{v || "ไม่ระบุบริษัท"}</Typography>}
                 {...fp("company")}
               />
+              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.15, minWidth: 0 }}>
+                <Box sx={{ minWidth: 0, maxWidth: "45%" }}>
+                  <EditableCell
+                    Wrapper={Box} width="100%" editable={ed(canEditBasicField(c, "title"))} editType="autocomplete" editOptions={titleOptions}
+                    value={c.title} title={c.title}
+                    formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#334155" }}>{v || <Dash />}</Typography>}
+                    {...fp("title")}
+                  />
+                </Box>
+                <Typography sx={{ color: "#cbd5e1", flexShrink: 0, fontSize: "0.78rem" }}>·</Typography>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <EditableCell
+                    Wrapper={Box} width="100%" editable={ed(canEditBasicField(c, "system"))} editType="autocomplete" editOptions={systemOptions}
+                    value={c.system} title={c.system}
+                    formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.78rem", color: v ? "#475569" : undefined }}>{v || <Dash />}</Typography>}
+                    {...fp("system")}
+                  />
+                </Box>
+              </Stack>
             </Box>
-            {/* มูลค่างาน — ตัวเลขที่คนเปิดหน้านี้มาดู วางมุมขวาบนให้กวาดตาลงมาเทียบกันได้ */}
-            <Box sx={{ flexShrink: 0, textAlign: "right", minWidth: 84 }}>
-              <EditableCell
-                Wrapper={Box} width="100%" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue}
-                formatDisplay={(v) => (hasMoney(v)
-                  ? <Typography component="span" sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums" }}>{formatBaht(v)}</Typography>
-                  : <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ระบุมูลค่า</Typography>)}
-                {...fp("jobValue")}
-              />
-              {c.isRealContract && <ContractVatTag c={c} align="flex-end" onOpen={() => setValueDialogKey(c.key)} />}
-            </Box>
-          </Stack>
-
-          {/* ประเภทงาน · ระบบ — แตะแก้ได้เหมือนเดิม */}
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.6, minWidth: 0 }}>
-            <Box sx={{ minWidth: 0, maxWidth: "45%" }}>
-              <EditableCell
-                Wrapper={Box} width="100%" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions}
-                value={c.title} title={c.title}
-                formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.84rem", fontWeight: 800, color: "#334155" }}>{v || <Dash />}</Typography>}
-                {...fp("title")}
-              />
-            </Box>
-            <Typography sx={{ color: "#cbd5e1", flexShrink: 0 }}>·</Typography>
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-              <EditableCell
-                Wrapper={Box} width="100%" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions}
-                value={c.system} title={c.system}
-                formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.84rem", color: v ? "#475569" : undefined }}>{v || <Dash />}</Typography>}
-                {...fp("system")}
-              />
-            </Box>
-          </Stack>
-
-          {/* ป้ายสถานะเรียงแถวเดียว (ตัดบรรทัดได้) แทนการซ้อนแนวตั้งทางขวา */}
-          <Stack direction="row" spacing={0.6} useFlexGap sx={{ mt: 0.9, flexWrap: "wrap", rowGap: 0.6 }}>
             {sd.kind !== "none" && (
-              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 22, px: 0.9, borderRadius: 999, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap", color: sd.color, bgcolor: sd.bg, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <Box component="span" title={sd.label} sx={{ flexShrink: 0, maxWidth: "44%", display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, px: 1, borderRadius: 999, fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: sd.color, bgcolor: sd.bg }}>
                 <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: sd.color, flexShrink: 0 }} />
-                {sd.label}
+                <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{sd.label}</Box>
               </Box>
             )}
-            {tag(jobTypeLabel, jobTypeColor)}
-            {bs && bs.state !== "not_invoiced" && tag(bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label, bs.color)}
           </Stack>
-          {/* ✅ เตือนรอบเข้างาน — แถบเต็มความกว้างใต้ป้าย (สัญลักษณ์ + ครั้งที่ + เดือนที่ต้องเข้า + ปุ่มลงครั้งถัดไป) */}
-          {overdueInfo && (
-            <Box sx={{ mt: 1.1 }}>
-              <RoundDueBadge info={overdueInfo} onAdd={isAdminOrManager ? () => openAddVisitDialog(c) : undefined} />
-            </Box>
+          {(!c.isRealContract || (bs && bs.state !== "not_invoiced")) && (
+            <Stack direction="row" spacing={0.6} useFlexGap sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.6 }}>
+              {!c.isRealContract && tag(jobTypeLabel, jobTypeColor)}
+              {bs && bs.state !== "not_invoiced" && tag(bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label, bs.color)}
+            </Stack>
           )}
-          {/* ✅ ต่อสัญญา — แถวของตัวเองใต้ป้าย (ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่มเต็มความกว้าง) */}
-          {renewWidget(c, { block: true }) && <Box sx={{ mt: 1.1 }}>{renewWidget(c, { block: true })}</Box>}
-          {doneChip(c) && <Box sx={{ mt: 1.1 }}>{doneChip(c)}</Box>}
         </Box>
 
-        {/* แถบล่าง: ความคืบหน้า · ล่าสุด · แผนที่ · รายละเอียด */}
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 2.25, pr: 1, py: 0.75, bgcolor: "#f8fafc", borderTop: `1px solid ${BORDER_MAIN}` }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" spacing={0.75}>
-              <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: progressColor, whiteSpace: "nowrap" }}>
-                {c.isRealContract ? `ครั้งที่ ${progressLabel}` : progressLabel}
-              </Typography>
-              {pct !== null && (
-                <Box sx={{ flex: 1, maxWidth: 90, height: 5, borderRadius: 9, bgcolor: alpha(progressColor, 0.15), overflow: "hidden" }}>
-                  <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: progressColor, borderRadius: 9 }} />
-                </Box>
-              )}
-            </Stack>
-            <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB, mt: 0.1 }}>
-              {latestVisit ? `ล่าสุด ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · ${latestVisit.team}` : ""}` : "ยังไม่ลงตารางจริง"}
+        {/* ตัวเลขหลัก: มูลค่า | ความคืบหน้า */}
+        <Box sx={{ ml: 2.25, mr: 1.75, mt: 1.25, display: "grid", gridTemplateColumns: "1fr 1fr", borderRadius: 2.5, bgcolor: "#f8fafc", border: "1px solid #eef2f7", overflow: "hidden" }}>
+          <Box sx={{ px: 1.25, py: 1, minWidth: 0 }}>
+            <Typography sx={statLabelSx}>{c.isRealContract ? "มูลค่าสัญญา" : "มูลค่างาน"}</Typography>
+            <EditableCell
+              Wrapper={Box} width="100%" editable={canEditValue} editType="number" value={c.jobValue}
+              formatDisplay={(v) => (hasMoney(v)
+                ? <Typography component="span" noWrap sx={{ display: "block", fontSize: "1.08rem", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums", lineHeight: 1.4 }}>{formatBaht(v)}</Typography>
+                : <Typography component="span" sx={{ display: "block", fontSize: "0.86rem", fontWeight: 700, color: canEditValue ? "#2563eb" : "#b45309", lineHeight: 1.65 }}>{canEditValue ? "+ ใส่มูลค่า" : "ยังไม่ระบุ"}</Typography>)}
+              {...fp("jobValue")}
+            />
+            {c.isRealContract && (
+              <Box sx={{ mt: 0.4 }}>
+                <ContractVatTag c={c} variant="pill" onOpen={sheet ? () => setValueDialogKey(c.key) : undefined} />
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ px: 1.25, py: 1, minWidth: 0, borderLeft: "1px solid #eef2f7" }}>
+            <Typography sx={statLabelSx}>{c.isRealContract ? "ความคืบหน้า" : "สถานะงาน"}</Typography>
+            <Typography noWrap sx={{ fontSize: "1.02rem", fontWeight: 800, color: progressColor, lineHeight: 1.45 }}>
+              {c.isRealContract ? `${progMain} ครั้ง` : progressLabel}
             </Typography>
+            {pct !== null && (
+              <Box sx={{ mt: 0.4, height: 6, borderRadius: 9, bgcolor: alpha(progressColor, 0.15), overflow: "hidden" }}>
+                <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: progressColor, borderRadius: 9 }} />
+              </Box>
+            )}
+            {c.isRealContract && progRest.length > 0 && (
+              <Typography noWrap sx={{ mt: 0.4, fontSize: "0.68rem", color: TEXT_SUB }}>ปีสัญญา {progRest.join(" · ")}</Typography>
+            )}
           </Box>
-          <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
-            <SiteMapLink company={c.company} site={c.site} canEdit={isAdminOrManager} compact />
+        </Box>
+
+        {/* ผู้รับผิดชอบ — เห็นชัดในทุกการ์ด · แก้ได้ในการ์ดรายละเอียด */}
+        <Stack direction="row" alignItems="center" gap={1}
+          onClick={canEditResp && !respFp.editing ? (e) => { e.stopPropagation(); respFp.onStartEdit(); } : undefined}
+          sx={{ ml: 2.25, mr: 1.75, mt: 1, minHeight: 34, cursor: canEditResp ? "pointer" : "inherit" }}>
+          <Typography sx={{ ...statLabelSx, flexShrink: 0, width: 72 }}>ผู้รับผิดชอบ</Typography>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <EditableCell Wrapper={Box} width="100%" editable={canEditResp} editType="select" editOptions={teamOptions}
+              value={c.responsiblePerson} formatDisplay={responsibleDisplay} {...respFp} />
           </Box>
-          <Button
-            size="small" onClick={() => toggleCardExpand(c.key)}
-            endIcon={isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
-            sx={{ flexShrink: 0, textTransform: "none", fontSize: "0.74rem", fontWeight: 800, color: "#2563eb", minWidth: 0, px: 1, borderRadius: 2, "&:hover": { bgcolor: "#eff6ff" } }}
-          >
-            {isExpanded ? "ย่อ" : "รายละเอียด"}
-          </Button>
+          {canEditResp && !respFp.editing && <EditHint />}
         </Stack>
 
-        <Box sx={{ px: 1.75, pb: isExpanded ? 1.5 : 0 }}>
-        <Collapse in={isExpanded}>
-        <Box sx={{ pt: 0.25 }}>
+        {/* สิ่งที่ต้องทำ: เตือนรอบเข้างาน · ต่อสัญญา · เสร็จสิ้น (ปุ่มกดได้ — ไม่เปิดการ์ด) */}
+        {(overdueInfo || renewWidget(c, { block: true }) || doneChip(c)) && (
+          <Stack gap={0.9} onClick={(e) => e.stopPropagation()} sx={{ ml: 2.25, mr: 1.75, mt: 1.1 }}>
+            {overdueInfo && <RoundDueBadge info={overdueInfo} onAdd={isAdminOrManager ? () => openAddVisitDialog(c) : undefined} />}
+            {renewWidget(c, { block: true })}
+            {doneChip(c)}
+          </Stack>
+        )}
+
+        {/* ล่าสุด · แผนที่ · รายละเอียด */}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.25, pl: 2.25, pr: 1, py: 0.6, bgcolor: "#f8fafc", borderTop: `1px solid ${BORDER_MAIN}` }}>
+          <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.72rem", color: TEXT_SUB }}>
+            {latestVisit ? `ล่าสุด ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · ${latestVisit.team}` : ""}` : "ยังไม่ลงตารางจริง"}
+          </Typography>
+          <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
+            <SiteMapLink company={c.company} site={c.site} canEdit={sheet && isAdminOrManager} compact />
+          </Box>
+          {!sheet && (
+            <Box component="span" sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.25, height: 30, pl: 1.25, pr: 0.75, borderRadius: 2, bgcolor: "#eff6ff", color: "#2563eb", fontSize: "0.76rem", fontWeight: 800 }}>
+              {isAdminOrManager ? "ดู / แก้ไข" : "รายละเอียด"}<ChevronRight sx={{ fontSize: 17 }} />
+            </Box>
+          )}
+        </Stack>
+      </Paper>
+    );
+    if (!sheet) return summaryCard;
+    return (
+      <Box key={c.key}>
+        {summaryCard}
+        <Box>
         {/* ⚠️ "ประเภทงาน"/"ระบบ" ไม่ได้อยู่ตรงนี้แล้ว — ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดที่เห็นตลอดโดยไม่ต้อง
             กางการ์ด (ดูคอมเมนต์ที่แถบสรุป) แก้ไขได้เหมือนเดิมทุกประการที่ตำแหน่งใหม่ */}
 
+        {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "อะไรควรเด่น ควรมาก่อน ให้วิเคราะห์และแก้ไข")
+              🔁 (11 พ.ย. 2569 ผู้ใช้: "เอกสาร สถานะควรอยู่บนสุด") เอกสาร/สถานะ → ครั้งที่เข้างาน → ระยะสัญญา → มูลค่า/ใบเสนอราคา → การวางบิล → สถานที่/ผู้ติดต่อ
+              (ผู้รับผิดชอบ · สถานะ · ช่องที่ยังไม่กรอก · มูลค่า · ความคืบหน้า อยู่ในการ์ดสรุปด้านบนแล้ว) */}
         {/* เอกสาร: เลขที่สัญญา/ใบเสนอราคา (สัญญาจริง) หรือเลขที่เอกสาร (งานทั่วไป/โปรเจค) */}
         {/* ✅ (5 ต.ค. 2569) ผู้ใช้: "หน้าภาพรวม ตรงนี้ด้วย ดูยาก" — จัดเป็นกลุ่ม: ข้อมูลงาน · ระยะสัญญา ·
             ครั้งที่เข้างาน · การวางบิล · ผู้ติดต่อ แทนรายการยาวแถวเดียว · เลขที่สัญญาไม่ใช้สีแดงแล้ว
             (แดงสงวนไว้ให้เรื่องผิดปกติจริงเท่านั้น) */}
-        <DetailSection title="ข้อมูลงาน">
+        <DetailSection title="เอกสารและสถานะ" icon={<Assignment />}>
         {c.isRealContract ? (
           <>
             <FieldRow label="เลขที่สัญญา" editable={isAdminOrManager} value={c.contractNo} formatDisplay={(v) => (v ? <span style={{ fontWeight: 700 }}>{v}</span> : <Dash />)} {...fp("contractNo")} />
@@ -5420,54 +5493,10 @@ export default function ContractOverview() {
 
         </DetailSection>
 
-        {/* ✅ (10 พ.ย. 2569) มูลค่าสัญญา · รวม VAT หรือไม่ · ใบเสนอราคาของสัญญา (งานรายครั้งใช้ค่านี้) */}
-        {c.isRealContract && (
-          <DetailSection title="มูลค่าสัญญา · ใบเสนอราคา">
-            <Box sx={{ py: 1.25 }}>
-              <ContractValuePanel contract={c} canEdit={isAdminOrManager} onPatch={(f) => patchContractRows(c.key, f)} />
-            </Box>
-          </DetailSection>
-        )}
-
-        {/* ระยะเวลา/จำนวนครั้ง/ค่าคอม — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้)
-            วาง 2 คอลัมน์ ป้ายบน-ค่าล่าง อ่านทีเดียวเห็นครบทั้งช่วงสัญญา */}
-        {c.isRealContract && (
-          <DetailSection title="ระยะสัญญา">
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 1.5, borderBottom: "1px solid", borderColor: alpha("#0f172a", 0.06) }}>
-              <GridField label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
-              <GridField label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
-              <GridField
-                label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
-                formatDisplay={(v) => (v ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}` : <Dash />)}
-                title={c.intervalMonths && visitsPerYear(c.intervalMonths) ? `ปีละ ${visitsPerYear(c.intervalMonths)} ครั้ง` : undefined}
-                {...fp("intervalMonths")}
-              />
-              {/* ✅ ตรงกับตาราง: สัญญากี่ปี (คำนวณจากวันที่ แก้ได้) · จำนวนครั้ง = ปีละ N × ปี */}
-              <GridField label="สัญญากี่ปี" editable={isAdminOrManager} editType="number" value={contractYearsOf(c)}
-                formatDisplay={(v) => `${v} ปี`} {...fp("contractYears")} />
-              <GridField label="จำนวนครั้งทั้งหมด" editable={isAdminOrManager} editType="number" value={c.visitCount}
-                formatDisplay={(v) => (v
-                  ? (contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} × ${contractYearsOf(c)} ปี = ${v} ครั้ง` : `${v} ครั้ง`)
-                  : <Dash />)}
-                {...fp("visitCount")} />
-              <GridField label="ประมาณการวันเข้างานต่อครั้ง" editable={isAdminOrManager} editType="number" value={c.estimatedDaysPerVisit}
-                formatDisplay={(v) => (v ? `${v} วัน` : <Dash />)} {...fp("estimatedDaysPerVisit")} />
-            </Box>
-            <FieldRow
-              label="ค่าคอมลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
-              value={c.commission}
-              formatDisplay={(v) => (hasMoney(v)
-                ? <Box component="span">{formatBaht(v)}{commissionPct(c) ? <Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 500, ml: 0.5 }}>({commissionPct(c)})</Box> : null}</Box>
-                : <Dash />)}
-              {...fp("commission")}
-            />
-          </DetailSection>
-        )}
-
         {/* ครั้งที่เข้างาน — แสดง/แก้ไขทีมของแต่ละครั้งแยกกัน (canEditRoundTeam) — พับ/กางแยกอีกชั้นจาก
             การ์ดหลัก (expandedRounds) เพราะสัญญาที่มีหลายครั้ง (สูงสุด 12) ทำให้ยาวเกินไปถ้าโชว์ตลอด
             เริ่มพับไว้ โชว์แค่สรุปย่อ (จำนวนครั้ง + ครั้งล่าสุด) กดดูทั้งหมดทีหลังได้ตามต้องการ */}
-        <DetailSection
+        <DetailSection icon={<EventAvailable />}
           title={c.isRealContract
             ? `ครั้งที่เข้างาน · ${contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} ครั้ง × ${contractYearsOf(c)} ปี` : `${rowMaxRound(c)} ครั้ง`}`
             : "วันที่เข้างาน"}
@@ -5606,6 +5635,48 @@ export default function ContractOverview() {
         </Box>
         </DetailSection>
 
+        {/* ระยะเวลา/จำนวนครั้ง/ค่าคอม — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้)
+            วาง 2 คอลัมน์ ป้ายบน-ค่าล่าง อ่านทีเดียวเห็นครบทั้งช่วงสัญญา */}
+        {c.isRealContract && (
+          <DetailSection title="ระยะสัญญา" icon={<CalendarMonth />}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, pt: 0.5, pb: 1 }}>
+              <GridField label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
+              <GridField label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
+              <GridField
+                label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
+                formatDisplay={(v) => (v ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}` : <Dash />)}
+                title={c.intervalMonths && visitsPerYear(c.intervalMonths) ? `ปีละ ${visitsPerYear(c.intervalMonths)} ครั้ง` : undefined}
+                {...fp("intervalMonths")}
+              />
+              {/* ✅ ตรงกับตาราง: สัญญากี่ปี (คำนวณจากวันที่ แก้ได้) · จำนวนครั้ง = ปีละ N × ปี */}
+              <GridField label="สัญญากี่ปี" editable={isAdminOrManager} editType="number" value={contractYearsOf(c)}
+                formatDisplay={(v) => `${v} ปี`} {...fp("contractYears")} />
+              <GridField label="จำนวนครั้งทั้งหมด" editable={isAdminOrManager} editType="number" value={c.visitCount}
+                formatDisplay={(v) => (v
+                  ? (contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} × ${contractYearsOf(c)} ปี = ${v} ครั้ง` : `${v} ครั้ง`)
+                  : <Dash />)}
+                {...fp("visitCount")} />
+              <GridField label="วันเข้างานต่อครั้ง (ประมาณ)" editable={isAdminOrManager} editType="number" value={c.estimatedDaysPerVisit}
+                formatDisplay={(v) => (v ? `${v} วัน` : <Dash />)} {...fp("estimatedDaysPerVisit")} />
+            </Box>
+            <FieldRow
+              label="ค่าคอมลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
+              value={c.commission}
+              formatDisplay={(v) => (hasMoney(v)
+                ? <Box component="span">{formatBaht(v)}{commissionPct(c) ? <Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 500, ml: 0.5 }}>({commissionPct(c)})</Box> : null}</Box>
+                : <Dash />)}
+              {...fp("commission")}
+            />
+          </DetailSection>
+        )}
+
+        {/* ✅ (10 พ.ย. 2569) มูลค่าสัญญา · รวม VAT หรือไม่ · ใบเสนอราคาของสัญญา (งานรายครั้งใช้ค่านี้) */}
+        {c.isRealContract && (
+          <DetailSection title="มูลค่าสัญญา · ใบเสนอราคา" icon={<RequestQuote />}>
+            <ContractValuePanel flat contract={c} canEdit={isAdminOrManager} onPatch={(f) => patchContractRows(c.key, f)} />
+          </DetailSection>
+        )}
+
         {/* ⚠️ "มูลค่างาน" ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดแล้วเช่นกัน (แสดงทุกแท็บเหมือนเดิม ไม่ได้จำกัดแค่
             สัญญาจริง เพราะงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้ ตรงกับคอลัมน์ฝั่งเดสก์ท็อป) */}
 
@@ -5615,7 +5686,7 @@ export default function ContractOverview() {
           const bs = contractBillingSummary(c.visits);
           if (!bs || bs.invoicedCount === 0) return null;
           return (
-            <DetailSection
+            <DetailSection icon={<ReceiptLong />}
               title={`การวางบิล · ${bs.invoicedCount}/${bs.totalCount} ครั้ง`}
               action={(
                 <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, fontSize: "0.68rem", fontWeight: 800, color: bs.color }}>
@@ -5641,10 +5712,9 @@ export default function ContractOverview() {
         })()}
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
-        <DetailSection title="ผู้รับผิดชอบและผู้ติดต่อ">
+        <DetailSection title="สถานที่และผู้ติดต่อ" icon={<ContactPhone />}>
         <FieldRow label="จังหวัด" editable={isAdminOrManager && canEditField(c, "province")} editType="select" editOptions={provinceOptionsFor(c.province)} allowEmpty value={c.province} placeholder="ระบุจังหวัด" {...fp("province")} />
         <FieldRow label="เมือง" editable={isAdminOrManager && canEditField(c, "city")} value={c.city} placeholder="ระบุเมือง" {...fp("city")} />
-        <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={responsibleDisplay} {...fp("responsiblePerson")} />
         {/* ✅ ผู้ติดต่อหน้างาน — เบอร์กดโทรออกได้ทันที ซึ่งเป็นเหตุผลหลักที่ต้องมีบนมือถือ
             (ช่างเปิดจากรถ/หน้างานแล้วโทรได้เลย ไม่ต้องจดเบอร์แล้วไปพิมพ์ในแอปโทรศัพท์เอง) */}
         <FieldRow
@@ -5677,50 +5747,34 @@ export default function ContractOverview() {
         />
         </DetailSection>
 
-        {/* ปุ่มจัดการ — เฉพาะแอดมิน/manager เทียบ pattern เดียวกับคอลัมน์ actions ในตารางเดสก์ท็อป */}
+        {/* ปุ่มจัดการ — เฉพาะแอดมิน/manager · 🔁 (10 พ.ย. 2569) มีข้อความกำกับทุกปุ่ม (เดิมไอคอนเปล่าไม่รู้ว่าปุ่มอะไร) */}
         {isAdminOrManager && (
-          <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1 }}>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: "wrap", rowGap: 1 }}>
             {!c.isRealContract && (
-              <Tooltip title="จัดหมวดหมู่งาน (ทั่วไป/โปรเจค)">
-                <IconButton
-                  size="small" onClick={(e) => openClassifyMenu(e, c)}
-                  sx={{ color: c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "text.disabled" }}
-                >
-                  {c.isConfirmedGeneral ? <Build fontSize="small" /> : c.isConfirmedProject ? <Engineering fontSize="small" /> : <HourglassEmpty fontSize="small" />}
-                </IconButton>
-              </Tooltip>
+              <Button size="small" variant="outlined" onClick={(e) => openClassifyMenu(e, c)} sx={SHEET_ACTION_SX}
+                startIcon={c.isConfirmedGeneral ? <Build /> : c.isConfirmedProject ? <Engineering /> : <HourglassEmpty />}>
+                จัดหมวดหมู่
+              </Button>
             )}
             {!c.isRealContract && (
-              <Tooltip title="ย้ายเข้างานสัญญา / งานรายปี">
-                <IconButton size="small" onClick={() => openAttachDialog(c)} sx={{ color: "text.disabled" }}>
-                  <AddLink fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <Button size="small" variant="outlined" onClick={() => openAttachDialog(c)} startIcon={<AddLink />} sx={SHEET_ACTION_SX}>
+                ย้ายเข้างานสัญญา
+              </Button>
             )}
             {c.isRealContract && (
-              <Tooltip title="ประวัติการแก้ไขข้อมูลสัญญา">
-                <span>
-                  <IconButton
-                    size="small" onClick={() => setHistoryContract(c)}
-                    disabled={contractEditHistory(c).length === 0}
-                    sx={{ color: "text.disabled" }}
-                  >
-                    <History fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
+              <Button size="small" variant="outlined" onClick={() => setHistoryContract(c)} disabled={contractEditHistory(c).length === 0}
+                startIcon={<History />} sx={SHEET_ACTION_SX}>
+                ประวัติการแก้ไข
+              </Button>
             )}
-            <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
-              <IconButton size="small" onClick={() => handleDeleteContract(c)} sx={{ color: "text.disabled" }}>
-                <DeleteOutline fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Button size="small" variant="outlined" onClick={() => handleDeleteContract(c)} startIcon={<DeleteOutline />}
+              sx={{ ...SHEET_ACTION_SX, ml: "auto", color: "#dc2626", borderColor: "#fecaca", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>
+              {c.isRealContract ? "ลบสัญญา" : "ลบงาน"}
+            </Button>
           </Stack>
         )}
         </Box>
-        </Collapse>
-        </Box>
-      </Paper>
+      </Box>
     );
   };
 
@@ -7254,16 +7308,25 @@ export default function ContractOverview() {
         >
           <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}`, py: 1.5 }}>
             <Box sx={{ width: 36, height: 36, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
-              <EditOutlinedIcon sx={{ fontSize: 20 }} />
+              <Assignment sx={{ fontSize: 20 }} />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography noWrap sx={{ fontWeight: 800, fontSize: "1.02rem", lineHeight: 1.3 }}>แก้ไขข้อมูล · {rowEditorRow.site || rowEditorRow.company || "งาน"}</Typography>
-              <Typography sx={{ fontSize: "0.75rem", color: TEXT_SUB }}>คลิกที่ช่องเพื่อแก้ไข — บันทึกทันทีเมื่อออกจากช่อง</Typography>
+              <Typography noWrap sx={{ fontWeight: 800, fontSize: "1.02rem", lineHeight: 1.3 }}>รายละเอียดงาน</Typography>
+              <Typography sx={{ fontSize: "0.75rem", color: TEXT_SUB }}>{[rowEditorRow.contractNo || rowEditorRow.docNo, "แตะช่องที่มี ✎ เพื่อแก้ไข"].filter(Boolean).join(" · ")}</Typography>
             </Box>
             <IconButton size="small" onClick={() => setRowEditorKey(null)} aria-label="ปิด"><Close fontSize="small" /></IconButton>
           </DialogTitle>
           <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
-            <Box sx={{ pt: { xs: 1.5, sm: 2.5 } }}>{renderMobileCard(rowEditorRow)}</Box>
+            {/* 🔁 (11 พ.ย. 2569 ผู้ใช้: "ฟอร์มกรอกดูแก้ยาก ช่องดูเล็ก ไม่มืออาชีพ แอพมือถือ") ช่องกรอกทุกช่องในการ์ดนี้
+                  สูง 44px · ตัวอักษร 16px (มือถือไม่ซูมเอง) · ขอบมน พื้นขาว — ทับขนาดเล็กแบบเซลล์ตารางของ EditableCell */}
+            <Box sx={{ pt: { xs: 1.5, sm: 2.5 },
+              "& .MuiOutlinedInput-root": { minHeight: 44, borderRadius: "10px !important", bgcolor: "#fff", fontSize: "1rem !important" },
+              "& .MuiOutlinedInput-input, & .MuiSelect-select": { py: "10px !important", px: "12px !important", fontSize: "1rem !important", lineHeight: "1.5 !important" },
+              "& .MuiAutocomplete-input": { py: "4px !important" },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+              "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb !important", borderWidth: "2px !important" } }}>
+              {renderMobileCard(rowEditorRow, { sheet: true })}
+            </Box>
           </DialogContent>
           <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}` }}>
             <Button onClick={() => setRowEditorKey(null)} variant="contained" disableElevation

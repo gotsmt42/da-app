@@ -68,7 +68,8 @@ describe("contractVatInfo (งานสัญญา = VAT ตามมูลค�
     expect(contractVatInfo({ contractGroupId: "C", jobValue: 1000, jobValueVatIncluded: true })).toMatchObject({ vatIncluded: true, set: true, hasValue: true });
     const unset = contractVatInfo({ contractGroupId: "C", jobValue: 1000, jobValueVatIncluded: null });
     expect(unset).toMatchObject({ vatIncluded: false, set: false });
-    expect(unset.text).toMatch(/ยังไม่ระบุ VAT/);
-    expect(contractVatInfo({ contractGroupId: "C" }).text).toMatch(/ยังไม่ได้ใส่มูลค่าสัญญา/);
+    expect(unset.text).toMatch(/ยังไม่ระบุ/);
+    expect(unset.vatText).toMatch(/ยังไม่ระบุ VAT/);
+    expect(contractVatInfo({ contractGroupId: "C" }).text).toMatch(/ยังไม่มีมูลค่าสัญญา/);
   });
 });

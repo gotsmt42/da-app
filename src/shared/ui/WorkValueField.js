@@ -9,6 +9,7 @@
  *    • ยังไม่เคยใส่ + มีข้อมูลพอ (สัญญา ÷ ครั้ง / มูลค่างานรวม / ใบเสนอราคาที่ได้งาน) → เปิดช่องมาพร้อมค่าแนะนำ บอกที่มา
  */
 import React, { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { Box, Button, IconButton, Stack, TextField, Typography, InputAdornment, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { EditRounded as Edit, PaymentsRounded as Payments, AutoAwesomeRounded as AutoAwesome } from "@mui/icons-material";
 import { suggestWorkValue, vatParts, vatLabel, hasWorkValue, contractVatInfo } from "@/shared/utils/workValue";
@@ -78,7 +79,16 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
         </Stack>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
           {ct ? (
-            <Typography sx={{ fontSize: "0.74rem", lineHeight: 1.45, color: ct.set && ct.hasValue ? "#475569" : "#92400e", flex: "1 1 100%" }}>{ct.text}</Typography>
+            <Stack direction="row" alignItems="center" gap={1} sx={{ flex: "1 1 100%", px: 1.25, py: 0.75, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#1d4ed8" }}>งานสัญญา{ct.hasValue ? ` · มูลค่าสัญญา ฿${fmt(ct.jobValue)}` : ""}</Typography>
+                <Typography sx={{ fontSize: "0.74rem", lineHeight: 1.4, color: ct.set && ct.hasValue ? "#64748b" : "#b45309" }}>{ct.text}</Typography>
+              </Box>
+              <Button component={RouterLink} to={`/contracts?contract=${encodeURIComponent(event.contractGroupId)}`} size="small" variant="outlined"
+                sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, fontSize: "0.74rem", borderRadius: 2, borderColor: "#bfdbfe", color: "#2563eb", px: 1.25, minWidth: 0 }}>
+                ดูสัญญา ›
+              </Button>
+            </Stack>
           ) : (
           <ToggleButtonGroup size="small" exclusive value={vat ? "1" : "0"} onChange={(_, v) => v !== null && setVat(v === "1")}
             sx={{ bgcolor: "#f1f5f9", p: 0.25, borderRadius: 2, "& .MuiToggleButton-root": { border: 0, borderRadius: "7px !important", px: 1.25, py: 0.25, textTransform: "none", fontSize: "0.76rem", fontWeight: 600, color: "#64748b" },

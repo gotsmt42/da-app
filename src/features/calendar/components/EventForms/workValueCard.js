@@ -11,6 +11,7 @@
  *    สูตร/ค่าแนะนำอยู่ที่ shared/utils/workValue.js ที่เดียว (ใช้ร่วมกับหน้างานช่าง · หน้าการดำเนินงาน · วางบิล)
  */
 import { suggestWorkValue, vatParts, hasWorkValue, contractVatInfo } from "@/shared/utils/workValue";
+import { baht } from "@/shared/utils/billing";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -44,9 +45,16 @@ export const WORK_VALUE_CSS = `
   .ee-wv-ai-use button { flex: 1 1 140px; min-height: 34px; padding: 4px 10px; border-radius: 9px; border: 1px solid #bfdbfe; background: #fff; color: #1d4ed8; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; line-height: 1.25; }
   .ee-wv-ai-use button:hover { background: #eff6ff; }
   .ee-wv-ai-use button small { display: block; font-weight: 500; color: #64748b; font-size: 11px; }
-  .ee-wv-contract { margin-top: 10px; display: flex; gap: 6px; align-items: flex-start; padding: 8px 10px; border-radius: 9px; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; font-size: 12px; line-height: 1.45; }
-  .ee-wv-contract b { color: #1e293b; font-weight: 600; }
-  .ee-wv-contract.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  .ee-wv-ct { margin-top: 10px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .ee-wv-ct-main { flex: 1; min-width: 0; }
+  .ee-wv-ct-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ee-wv-ct-tag { font-size: 11px; font-weight: 700; color: #1d4ed8; background: #eff6ff; border-radius: 999px; padding: 2px 8px; }
+  .ee-wv-ct-auto { font-size: 11px; font-weight: 600; color: #64748b; }
+  .ee-wv-ct-line { margin-top: 4px; font-size: 12.5px; color: #334155; font-variant-numeric: tabular-nums; line-height: 1.4; }
+  .ee-wv-ct-vat { margin-top: 1px; font-size: 12px; color: #64748b; line-height: 1.4; }
+  .ee-wv-ct-vat.warn { color: #b45309; }
+  .ee-wv-ct-link { flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #bfdbfe; background: #fff; color: #2563eb; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .ee-wv-ct-link:hover { background: #eff6ff; }
   .ee-wv-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid #c7d2fe; border-top-color: #4338ca; animation: ee-boot-spin .8s linear infinite; }
 `;
 
@@ -76,9 +84,30 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
   const amount = disabled ? init.savedValue : init.amount;
   const vat = disabled && !init.contract ? init.savedVat : init.vat;
   const ct = init.contract;
-  const vatHtml = ct
-    ? `<div id="ee-wv-contract" class="ee-wv-contract${ct.set && ct.hasValue ? "" : " warn"}" data-no-draft><span aria-hidden="true">ⓘ</span><span>${esc(ct.text)}</span></div>`
-    : `<div class="ee-vat-seg" role="radiogroup" aria-label="ยอดนี้คือ">
+  const inputHtml = `
+    <div class="ee-value-box">
+      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
+        value="${amount === null ? "" : fmt(amount)}" ${dis}>
+      <span class="ee-value-unit">บาท</span>
+    </div>`;
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ให้กระชับเข้าใจง่าย · ตรงมูลค่างานสัญญาให้กดลิงก์ไปดูงานนั้นที่หน้าภาพรวมได้")
+  //    งานสัญญา = แถบเดียว: ป้ายงานสัญญา · ที่มาของยอด · VAT ตามสัญญา · ปุ่ม "ดูสัญญา"
+  if (ct) {
+    const line = init.suggest && !disabled
+      ? init.suggest.hint
+      : ct.hasValue ? `มูลค่าสัญญา ${baht(ct.jobValue)}` : ct.text;
+    return `${inputHtml}
+    <div id="ee-wv-break" class="ee-wv-break" aria-live="polite"></div>
+    <div id="ee-wv-contract" class="ee-wv-ct" data-no-draft>
+      <div class="ee-wv-ct-main">
+        <div class="ee-wv-ct-top"><span class="ee-wv-ct-tag">งานสัญญา</span>${init.suggest && !disabled ? `<span id="ee-wv-auto" class="ee-wv-ct-auto">✦ เติมให้อัตโนมัติ — กดบันทึกเพื่อยืนยัน</span>` : ""}</div>
+        <div class="ee-wv-ct-line">${esc(line)}</div>
+        ${ct.hasValue ? `<div class="ee-wv-ct-vat${ct.set ? "" : " warn"}">${esc(ct.set ? `VAT ตามสัญญา · ${ct.vatText}` : ct.vatText)}</div>` : ""}
+      </div>
+      <button type="button" class="ee-wv-ct-link" data-open-contract hidden>ดูสัญญา ›</button>
+    </div>`;
+  }
+  const vatHtml = `<div class="ee-vat-seg" role="radiogroup" aria-label="ยอดนี้คือ">
       <label><input type="radio" name="editWorkValueVat" value="0" ${vat ? "" : "checked"} ${dis}><span>ก่อน VAT (Net)</span></label>
       <label><input type="radio" name="editWorkValueVat" value="1" ${vat ? "checked" : ""} ${dis}><span>รวม VAT 7%</span></label>
     </div>`;
@@ -98,9 +127,14 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
  * ผูกการทำงาน (หลังเปิดฟอร์ม)
  * @returns {{ read: () => object }} read() = ฟิลด์ที่ต้องส่งไปบันทึก (ส่งเฉพาะที่เปลี่ยน · ตัวเลขผิด = ไม่ส่ง)
  */
-export function bindWorkValueCard(root, { init, eventId, EventService, allowAi = true }) {
+export function bindWorkValueCard(root, { init, eventId, EventService, allowAi = true, onOpenContract = null }) {
   const inp = root.querySelector("#editWorkValue");
   if (!inp) return { read: () => ({}) };
+  const ctLink = root.querySelector("[data-open-contract]");
+  if (ctLink && typeof onOpenContract === "function") {
+    ctLink.hidden = false;
+    ctLink.addEventListener("click", () => onOpenContract());
+  }
   let source = init.source || "";
   const radios = [...root.querySelectorAll('input[name="editWorkValueVat"]')];
   const vatOn = init.contract

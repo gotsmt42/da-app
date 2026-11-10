@@ -15,7 +15,8 @@ describe("การ์ดมูลค่างานครั้งนี้", (
   it("งานสัญญาที่ยังไม่ใส่ → เติมมูลค่าสัญญา ÷ ครั้ง ให้เลย และบันทึกพร้อมแหล่งที่มา", () => {
     const { root, ctl, inp } = mount({ contractGroupId: "C1", jobValue: 41600, visitCount: 4, time: "3" });
     expect(inp.value).toBe("10,400");
-    expect(root.querySelector("#ee-wv-auto").textContent).toMatch(/÷ 4 ครั้ง/);
+    expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/÷ 4 ครั้ง/);
+    expect(root.querySelector("#ee-wv-auto")).not.toBeNull();
     expect(ctl.read()).toEqual({ workValue: 10400, workValueVatIncluded: false, workValueSource: "contract" });
   });
 
@@ -23,6 +24,7 @@ describe("การ์ดมูลค่างานครั้งนี้", (
     const { root, ctl } = mount({ contractGroupId: "C1", jobValue: 42800, jobValueVatIncluded: true, visitCount: 4, time: "1" });
     expect(root.querySelector('input[name="editWorkValueVat"]')).toBeNull();
     expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/รวม VAT 7%/);
+    expect(root.querySelector("[data-open-contract]").hidden).toBe(true); // ไม่ส่งตัวเปิดลิงก์ = ซ่อนปุ่ม
     expect(root.querySelector("#ee-wv-break").textContent).toMatch(/ก่อน VAT/);
     expect(ctl.read()).toEqual({ workValue: 10700, workValueVatIncluded: true, workValueSource: "contract" });
   });
@@ -30,6 +32,19 @@ describe("การ์ดมูลค่างานครั้งนี้", (
   it("งานสัญญาที่บันทึกค่าไว้แล้ว แต่ธง VAT ไม่ตรงกับสัญญา → ส่งธงของสัญญาไปซิงก์", () => {
     const { ctl } = mount({ contractGroupId: "C1", jobValue: 40000, jobValueVatIncluded: true, workValue: 10000, workValueVatIncluded: false });
     expect(ctl.read()).toEqual({ workValueVatIncluded: true });
+  });
+
+  it("งานสัญญา: ปุ่ม 'ดูสัญญา' เรียกตัวเปิดหน้าภาพรวมงาน", () => {
+    const init = workValueInitial({ contractGroupId: "C9", jobValue: 1000, visitCount: 1, time: "1" });
+    const root = document.createElement("div");
+    root.innerHTML = workValueCardHtml(init);
+    document.body.appendChild(root);
+    let opened = 0;
+    bindWorkValueCard(root, { init, eventId: "E1", EventService: null, onOpenContract: () => { opened += 1; } });
+    const btn = root.querySelector("[data-open-contract]");
+    expect(btn.hidden).toBe(false);
+    btn.click();
+    expect(opened).toBe(1);
   });
 
   it("งานสัญญาที่ยังไม่มีมูลค่าสัญญา → บอกให้ไปใส่ที่หน้าภาพรวมงาน", () => {
