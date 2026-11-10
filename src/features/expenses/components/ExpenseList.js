@@ -119,11 +119,11 @@ const Requester = ({ e, avatars, size = 34 }) => {
   return (
     <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
       <Avatar src={avatars?.get(String(e.requester?.userId || "")) || undefined}
-        sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>
+        sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 700, bgcolor: personColor(name), flexShrink: 0 }}>
         {personInitial(name)}
       </Avatar>
       <Box sx={{ minWidth: 0 }}>
-        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: TEXT_MAIN, lineHeight: 1.3 }}>{name}</Typography>
+        <Typography noWrap sx={{ fontWeight: 600, fontSize: "0.875rem", color: "#1e293b", lineHeight: 1.35 }}>{name}</Typography>
         {e.requester?.position && (
           <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB, lineHeight: 1.3 }}>{e.requester.position}</Typography>
         )}
@@ -143,8 +143,8 @@ const amountNote = (e) => {
 
 const AmountCell = ({ e }) => (
   <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-    <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN, whiteSpace: "nowrap" }}>{baht(e.total)}</Typography>
-    {amountNote(e) && <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600, whiteSpace: "nowrap" }}>{amountNote(e)}</Typography>}
+    <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#1e293b", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{baht(e.total)}</Typography>
+    {amountNote(e) && <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 500, whiteSpace: "nowrap" }}>{amountNote(e)}</Typography>}
   </Box>
 );
 
@@ -169,26 +169,26 @@ const ContractorCard = ({ e, onOpen }) => {
       boxShadow: "none", "&:active": { bgcolor: "#f8fafc" },
     }}>
       <Stack direction="row" spacing={1.25} alignItems="center">
-        <Avatar sx={{ width: 38, height: 38, fontSize: "1rem", fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
+        <Avatar sx={{ width: 38, height: 38, fontSize: "1rem", fontWeight: 700, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN }}>{name}</Typography>
+          <Typography noWrap sx={{ fontWeight: 600, fontSize: "0.9rem", color: "#1e293b" }}>{name}</Typography>
           <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{c.isCompany ? "นิติบุคคล" : "บุคคลธรรมดา"} · {e.docNo}</Typography>
         </Box>
         <StatusText e={e} />
       </Stack>
       {jobsShortText(e) && (
-        <Typography sx={{ mt: 1, fontSize: "0.84rem", fontWeight: 600, color: "#334155", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+        <Typography sx={{ mt: 1, fontSize: "0.84rem", fontWeight: 400, color: "#475569", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {jobsShortText(e)}
         </Typography>
       )}
       <Stack direction="row" alignItems="flex-end" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${BORDER_MAIN}` }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#475569" }}>{meta}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 500, color: "#475569" }}>{meta}</Typography>
           <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{thaiDate(e.docDate)}{e.requester?.name ? ` · จัดทำโดย ${personFullName(e.requester) || e.requester.name}` : ""}</Typography>
         </Box>
         <Box sx={{ textAlign: "right", flexShrink: 0 }}>
           <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, lineHeight: 1.2 }}>จ่ายสุทธิ</Typography>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, lineHeight: 1.25, whiteSpace: "nowrap" }}>{baht(net)}</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", lineHeight: 1.25, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{baht(net)}</Typography>
           {money(e.total) !== net && <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, whiteSpace: "nowrap" }}>ค่าจ้าง {baht(e.total)}</Typography>}
         </Box>
       </Stack>
@@ -206,7 +206,7 @@ const MobileCard = ({ e, onOpen, avatars }) => (slipKind(e) === "contractor" ? <
       <AmountCell e={e} />
     </Stack>
     <Typography sx={{
-      mt: 1, fontWeight: 600, fontSize: "0.88rem", color: TEXT_MAIN, lineHeight: 1.4,
+      mt: 1, fontWeight: 400, fontSize: "0.86rem", color: "#334155", lineHeight: 1.45,
       display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
     }}>
       {e.subject}
@@ -224,7 +224,7 @@ const MobileCard = ({ e, onOpen, avatars }) => (slipKind(e) === "contractor" ? <
 
 const DesktopTable = ({ rows, onOpen, avatars }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "none" }}>
-    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
+    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 600, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
       <TableHead>
         <TableRow>
           <TableCell>ผู้เบิก</TableCell>
@@ -242,9 +242,9 @@ const DesktopTable = ({ rows, onOpen, avatars }) => (
               {/* ใบค่าจ้างผู้รับเหมา: ผู้รับเงิน = ผู้รับเหมา (เด่น) · ผู้จัดทำเป็นบรรทัดรอง */}
               {slipKind(e) === "contractor" ? (
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                  <Avatar sx={{ width: 34, height: 34, fontSize: "0.9rem", fontWeight: 800, bgcolor: personColor(e.contractor?.name || "-"), flexShrink: 0 }}>{personInitial(e.contractor?.name || "-")}</Avatar>
+                  <Avatar sx={{ width: 34, height: 34, fontSize: "0.9rem", fontWeight: 700, bgcolor: personColor(e.contractor?.name || "-"), flexShrink: 0 }}>{personInitial(e.contractor?.name || "-")}</Avatar>
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{e.contractor?.name || "-"}</Typography>
+                    <Typography noWrap sx={{ fontWeight: 600, fontSize: "0.86rem", color: "#1e293b" }}>{e.contractor?.name || "-"}</Typography>
                     <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>จัดทำโดย {personFullName(e.requester) || e.requester?.name || "-"}</Typography>
                   </Box>
                 </Stack>
@@ -253,12 +253,12 @@ const DesktopTable = ({ rows, onOpen, avatars }) => (
             <TableCell sx={{ whiteSpace: "nowrap" }}>
               <Stack direction="row" spacing={0.75} alignItems="center">
                 <KindBadge kind={slipKind(e)} variant="soft" />
-                <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: TEXT_MAIN }}>{e.docNo}</Typography>
+                <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: "#334155" }}>{e.docNo}</Typography>
               </Stack>
               <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
             </TableCell>
             <TableCell sx={{ maxWidth: 380 }}>
-              <Typography sx={{ fontWeight: 600, fontSize: "0.86rem" }} noWrap>{e.subject}</Typography>
+              <Typography sx={{ fontWeight: 400, fontSize: "0.86rem", color: "#334155" }} noWrap>{e.subject}</Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
                 {[refLabel(e), jobsShortText(e), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
               </Typography>

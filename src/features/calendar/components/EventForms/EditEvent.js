@@ -1027,12 +1027,29 @@ function injectStyles() {
     .ee-pick-btn[aria-expanded="true"] .ee-pick-caret { transform: rotate(180deg); }
     .ee-pick-btn--status { height: 36px; border-radius: 10px; background: var(--ee-status-soft, #fff); border-color: var(--ee-status-line, #cbd5e1); }
     .ee-pick-btn--person { width: auto; max-width: 100%; }
+    /* 🔁 (10 พ.ย. 2569 ผู้ใช้: "จัดรูปแบบการเลือกผู้รับผิดชอบ ผู้ปฏิบัติงาน ให้สวยงามดูง่าย ไม่เพี้ยน") —
+       ช่องเลือกคนกว้างเต็มคอลัมน์ค่าเท่ากันทุกแถว · ข้อความ "ยังไม่บันทึก" ข้างช่องเคยบีบช่องจนชื่อหาย → ซ่อน
+       (บอกด้วยขอบส้มที่ช่อง + แถบ "แก้ไขแล้ว N รายการ" ด้านล่างแทน) */
+    .ee-hm-value--edit > .ee-pick-btn--person { flex: 1 1 auto; width: auto; min-width: 0; }
+    #ee-respMsg.pending, .ee-hm-msg.pending { display: none; }
     .ee-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ee-pick-text--muted { color: #94a3b8; font-weight: 600; }
     .ee-pick-ico { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
     .ee-pick-ico svg { width: 14px; height: 14px; }
     .ee-av { flex-shrink: 0; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; line-height: 1; box-sizing: border-box; }
     .ee-av--empty { background: #fff; color: #94a3b8; border: 1.5px dashed #cbd5e1; }
+    .swal2-popup.ee-pop-in { animation: ee-pop-in .22s cubic-bezier(.2,.8,.2,1); }
+    @keyframes ee-pop-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    .swal2-popup.ee-pop-out { animation: ee-pop-out .15s ease-in forwards; }
+    @keyframes ee-pop-out { to { opacity: 0; transform: translateY(10px); } }
+    #ee-modal-inner #ee-body > *, #ee-modal-inner #ee-head-meta, #ee-modal-inner #ee-head-status { transition: opacity .2s ease; }
+    #ee-modal-inner.ee-booting #ee-body > *, #ee-modal-inner.ee-booting #ee-head-meta, #ee-modal-inner.ee-booting #ee-head-status { opacity: 0; }
+    #ee-modal-inner.ee-booting #ee-body { position: relative; }
+    #ee-modal-inner.ee-booting #ee-body::before {
+      content: ""; position: absolute; left: 50%; top: 80px; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%;
+      border: 3px solid #dbeafe; border-top-color: #2563eb; animation: ee-boot-spin .8s linear infinite; z-index: 2;
+    }
+    @keyframes ee-boot-spin { to { transform: rotate(360deg); } }
     .ee-av-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
     .ee-av-wrap .ee-av--img { position: absolute; inset: 0; background: #fff; object-fit: cover; opacity: 0; transition: opacity .2s ease; }
     .ee-av-wrap .ee-av--img.is-ready { opacity: 1; }
@@ -1201,7 +1218,8 @@ function injectStyles() {
       .ee-hm-item + .ee-hm-item { border-top: 1px solid #eef2f7; }
       /* ✅ กระชับ (ผู้ใช้: "เล็กและกระชับกว่านี้ ยังกินพื้นที่เยอะ") */
       .ee-hm-item { align-items: center; padding: 5px 10px; min-height: 34px; }
-      .ee-hm-label { flex: 0 0 122px; font-size: 12px; gap: 5px; }
+      .ee-hm-label { flex: 0 0 116px; font-size: 12px; gap: 5px; white-space: normal; line-height: 1.3; }
+      .ee-hm-label .ee-hm-count { white-space: nowrap; }
       .ee-hm-label i { font-size: 13px; width: 16px; }
       .ee-hm-value { font-size: 13px; }
       .swal-edit-event #ee-status-header { row-gap: 8px; }
@@ -2056,7 +2074,7 @@ export const getEditEvent = async ({
     .join("");
 
   const html = `
-<div id="ee-modal-inner">
+<div id="ee-modal-inner" class="ee-booting">
 
   <!-- ── Header ── -->
   <div id="ee-status-header" style="--ee-status:${cfg0.color};--ee-status-soft:${cfg0.soft};--ee-status-line:${cfg0.line}">
@@ -2789,6 +2807,11 @@ export const getEditEvent = async ({
     showCancelButton: false,
     showCloseButton: false,
     customClass: { popup: "swal-edit-event" },
+    // 🐛 (10 พ.ย. 2569 ผู้ใช้: "เวลาเปิดหน้า editEvent หน้าจอกะพริบเด้งเด้งแปลกๆ เหมือนโหลดข้อมูลพื้นหลังไม่เสร็จ")
+    //    เดิมใช้แอนิเมชันมาตรฐานของ Swal (ขยาย 0.7 → 1.05 → 1 = เด้ง) + เนื้อหาจัดตัวทีละส่วนให้เห็น (ช่องเลือก/ปฏิทิน/แผงรูป/เอกสาร)
+    //    ✅ เลื่อนขึ้นจางเข้าแบบนุ่ม · เนื้อหาซ่อนไว้จนส่วนต่างๆ จัดตัวเสร็จ (ee-booting) แล้วค่อยแสดงทีเดียว
+    showClass: { popup: "ee-pop-in", backdrop: "swal2-backdrop-show" },
+    hideClass: { popup: "ee-pop-out", backdrop: "swal2-backdrop-hide" },
     // ✅ กันคลิกนอกกล่อง/กด ESC แล้วปิดโดยไม่ตั้งใจ ข้อมูลที่แก้ไว้ทั้งหมดหายหมด
     // ต้องกดปุ่ม "ปิด" (✕) หรือ "ยกเลิก" อย่างชัดเจนเท่านั้น
     allowOutsideClick: false,
@@ -2819,6 +2842,8 @@ export const getEditEvent = async ({
         //    • แก้ช่องไหน = ขอบส้ม + แถบ "แก้ไขแล้ว N รายการ ยังไม่บันทึก" + ปุ่มบันทึกบอกจำนวน · ยกเลิกการแก้ไขได้
         //    • กดปิดทั้งที่ยังไม่บันทึก = ถามก่อน (ทิ้งการแก้ไข / กลับไปแก้ต่อ / บันทึก)
         const popupEl = Swal.getPopup();
+        // แสดงเนื้อหาเมื่อช่องเลือก/ปฏิทิน/แผงต่างๆ จัดตัวเสร็จ (หลังร่างข้อมูลเริ่มทำงาน 300ms + เฟรมถัดไป) — ไม่เห็นการจัดตัวทีละส่วน
+        setTimeout(() => requestAnimationFrame(() => popupEl?.querySelector("#ee-modal-inner")?.classList.remove("ee-booting")), 360);
         const labelOf = (el) => (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
         const renderDirty = (keys) => {
           popupEl.querySelectorAll(".ee-dirty-mark").forEach((n) => n.classList.remove("ee-dirty-mark"));

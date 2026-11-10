@@ -40,7 +40,7 @@ export default function StatusBadge({ status, kind, size = "small", sx }) {
         display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0, maxWidth: "100%",
         px: big ? 1 : 0.8, height: big ? 26 : 22, borderRadius: 1.5,
         bgcolor: st.bg, color: st.color, border: `1px solid ${st.border}`,
-        fontSize: big ? "0.78rem" : "0.72rem", fontWeight: 800, lineHeight: 1, whiteSpace: "nowrap",
+        fontSize: big ? "0.78rem" : "0.72rem", fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap",
         ...sx,
       }}
     >

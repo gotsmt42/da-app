@@ -25,7 +25,7 @@ export default function KindBadge({ kind, size = "small", variant = "solid", sx 
         display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0,
         px: big ? 1 : 0.75, height: big ? 24 : 20, borderRadius: 999,
         bgcolor: soft ? m.soft : m.color, color: soft ? m.dark : "#fff",
-        fontSize: big ? "0.72rem" : "0.64rem", fontWeight: soft ? 800 : 900, letterSpacing: soft ? "0.02em" : "0.06em", lineHeight: 1,
+        fontSize: big ? "0.72rem" : "0.64rem", fontWeight: soft ? 600 : 700, letterSpacing: soft ? 0 : "0.04em", lineHeight: 1,
         ...sx,
       }}
     >

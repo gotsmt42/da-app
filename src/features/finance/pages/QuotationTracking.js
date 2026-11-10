@@ -1131,6 +1131,7 @@ const QuoteScanBox = ({ a }) => {
   const quotes = Array.isArray(info.quotations) ? info.quotations : [];
   const [enabled, setEnabled] = useState(scanAvailability);
   const [state, setState] = useState({ status: "idle", count: null, error: "" });
+  const [showNote, setShowNote] = useState(false);
   useEffect(() => {
     if (scanAvailability !== null) return;
     EventService.BillingScanAvailability().then((r) => { scanAvailability = Boolean(r?.enabled); setEnabled(scanAvailability); }).catch(() => { scanAvailability = false; setEnabled(false); });
@@ -1185,51 +1186,45 @@ const QuoteScanBox = ({ a }) => {
   const stale = info.fileCount && info.fileCount !== files.length;
   const sum = quotes.reduce((s, q) => s + (Number(q.grandTotal) || 0), 0);
   const allTotals = quotes.length > 0 && quotes.every((q) => Number(q.grandTotal) > 0);
+  const warn = Boolean(info.note) || (info.confidence && info.confidence !== "high") || quotes.some((q) => q.issues?.length);
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ตรง AI ไม่ต้องให้ความยาวแบบนี้ ให้กระชับ ไม่กินพื้นที่ และเข้าใจง่าย")
+  //    หัวบรรทัดเดียว (จำนวนใบ · ยอดรวม · อ่านใหม่) → แถวละใบ (เลขที่ · ยอด) → จุดที่ควรตรวจพับไว้ ("ควรตรวจ ▾" กดดูรายละเอียด)
   return (
-    <Box sx={box}>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ flexWrap: "wrap" }}>
-        <Typography sx={{ flex: 1, minWidth: 200, fontSize: "0.84rem", fontWeight: 900, color: "#6d28d9" }}>
-          ✦ AI อ่านแล้ว: {quotes.length ? `ใบเสนอราคา ${quotes.length} ใบ` : "ไม่พบใบเสนอราคา"} จาก {info.fileCount || files.length} ไฟล์
+    <Box sx={{ ...box, p: 1.25 }}>
+      <Stack direction="row" alignItems="center" gap={1}>
+        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 800, color: "#6d28d9" }}>
+          ✦ AI อ่าน {quotes.length ? `${quotes.length} ใบ` : "ไม่พบใบเสนอราคา"}{quotes.length > 1 && allTotals ? <Box component="span" sx={{ color: TEXT_MAIN }}> · รวม {baht(sum)}</Box> : ""}
         </Typography>
-        {info.confidence && info.confidence !== "high" && (
-          <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#b45309" }}>ความมั่นใจ{info.confidence === "low" ? "ต่ำ" : "ปานกลาง"} — ควรตรวจ</Typography>
-        )}
-        <Button size="small" onClick={run} sx={{ textTransform: "none", fontWeight: 800, color: "#7c3aed", minWidth: 0 }}>อ่านใหม่</Button>
+        <Button size="small" onClick={run} sx={{ textTransform: "none", fontWeight: 800, color: "#7c3aed", minWidth: 0, py: 0 }}>อ่านใหม่</Button>
       </Stack>
       {quotes.length > 0 && (
-        <Box sx={{ mt: 1, borderRadius: 2, border: "1px solid #e9d5ff", bgcolor: "#fff", overflow: "hidden" }}>
+        <Box sx={{ mt: 0.75, borderRadius: 2, border: "1px solid #ede9fe", bgcolor: "#fff", overflow: "hidden" }}>
           {quotes.map((q, i) => (
-            <Stack key={`${q.quotationNo}-${i}`} direction="row" alignItems="center" gap={1.25}
-              sx={{ px: 1.25, py: 0.9, borderTop: i ? "1px solid #f3e8ff" : 0, flexWrap: "wrap" }}>
-              <Box sx={{ width: 22, height: 22, borderRadius: 99, bgcolor: "#f3e8ff", color: "#7c3aed", fontSize: "0.72rem", fontWeight: 900, display: "grid", placeItems: "center", flexShrink: 0 }}>{i + 1}</Box>
-              <Box sx={{ flex: 1, minWidth: 140 }}>
-                <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: q.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{q.quotationNo || "อ่านเลขที่ไม่ได้"}</Typography>
-                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>
-                  {q.quotationDate ? `${thaiDate(q.quotationDate)} · ` : ""}{q.files?.length ? `ไฟล์ที่ ${q.files.join(", ")}` : ""}
-                </Typography>
-              </Box>
-              <Box sx={{ textAlign: "right" }}>
-                {Number(q.grandTotal) > 0
-                  ? <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{baht(q.grandTotal)}</Typography>
-                  : <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: "#b45309" }}>ไม่ได้เติมยอด</Typography>}
-                {q.issues?.length > 0 && <Typography sx={{ fontSize: "0.7rem", color: "#b45309" }}>{q.issues.join(" · ")}</Typography>}
-              </Box>
+            <Stack key={`${q.quotationNo}-${i}`} direction="row" alignItems="center" gap={1} sx={{ px: 1.1, py: 0.65, borderTop: i ? "1px solid #f5f3ff" : 0, minWidth: 0 }}>
+              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: q.quotationNo ? TEXT_MAIN : "#94a3b8" }}>
+                {q.quotationNo || "อ่านเลขที่ไม่ได้"}
+                {q.quotationDate && <Box component="span" sx={{ fontWeight: 500, color: TEXT_SUB, fontSize: "0.72rem" }}> · {thaiDate(q.quotationDate)}</Box>}
+              </Typography>
+              {Number(q.grandTotal) > 0
+                ? <Typography sx={{ flexShrink: 0, fontSize: "0.86rem", fontWeight: 800, color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{baht(q.grandTotal)}</Typography>
+                : <Typography sx={{ flexShrink: 0, fontSize: "0.74rem", fontWeight: 700, color: "#b45309" }}>ไม่ทราบยอด</Typography>}
             </Stack>
           ))}
-          {quotes.length > 1 && (
-            <Stack direction="row" justifyContent="space-between" sx={{ px: 1.25, py: 0.9, borderTop: "1px solid #e9d5ff", bgcolor: "#faf5ff" }}>
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_SUB }}>รวม {quotes.length} ใบ</Typography>
-              <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: allTotals ? TEXT_MAIN : "#b45309", fontVariantNumeric: "tabular-nums" }}>
-                {allTotals ? baht(sum) : "ยอดไม่ครบทุกใบ — ไม่ได้เติมมูลค่า"}
-              </Typography>
-            </Stack>
+        </Box>
+      )}
+      {(warn || stale) && (
+        <Box sx={{ mt: 0.6 }}>
+          <Box component="button" type="button" onClick={() => setShowNote((v) => !v)}
+            sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, p: 0, border: 0, bgcolor: "transparent", font: "inherit", cursor: "pointer", fontSize: "0.74rem", fontWeight: 700, color: "#b45309" }}>
+            ⚠ {stale ? `ไฟล์เปลี่ยน (ตอนนี้ ${files.length} ไฟล์) — กด "อ่านใหม่"` : "มีจุดที่ควรตรวจ"} {!stale && (showNote ? "▴" : "▾")}
+          </Box>
+          {showNote && !stale && (
+            <Typography sx={{ mt: 0.4, fontSize: "0.72rem", color: "#92400e", lineHeight: 1.5 }}>
+              {[...quotes.filter((q) => q.issues?.length).map((q) => `${q.quotationNo || "ใบ"}: ${q.issues.join(" · ")}`), info.note].filter(Boolean).join(" — ")}
+            </Typography>
           )}
         </Box>
       )}
-      {info.note && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: "#9a3412" }}>หมายเหตุ: {info.note}</Typography>}
-      <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>
-        {stale ? `มีไฟล์เปลี่ยนไป (ตอนนี้ ${files.length} ไฟล์) — กด "อ่านใหม่"` : "ช่องที่มีป้าย AI ตรวจแล้วแก้ได้ที่ปุ่มแก้ไข · ช่องที่คนกรอกเอง AI จะไม่ทับ"}
-      </Typography>
     </Box>
   );
 };
