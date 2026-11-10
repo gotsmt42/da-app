@@ -1250,7 +1250,7 @@ const DetailDialog = ({
           <Section title={`ใบเสนอราคา${quoteRevOf(a) ? ` · ฉบับปัจจุบัน ${revLabel(quoteRevOf(a))}` : ""}`} icon={<Description />}>
             <Box ref={filesRef} />
             <FileUploadSection
-              eventId={a._id} type="quotation" label="ไฟล์ใบเสนอราคา"
+              eventId={a._id} type="quotation" label="ไฟล์ใบเสนอราคา" permEvent={a}
               files={a.quotationFiles} applicable={a.quotationApplicable}
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
               uploading={upload.busy && upload.eventId === a._id && upload.type === "quotation"} progress={upload.progress} currentUser={currentUser}

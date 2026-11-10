@@ -104,6 +104,7 @@ import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
 import AttachmentList from "@/shared/ui/AttachmentList";
+import { canEditJobFiles, canDeleteJobFile } from "@/shared/utils/jobDocPermissions";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton, { ExcelIcon } from "@/shared/ui/ExportExcelButton";
 import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
@@ -719,11 +720,15 @@ export const FileUploadSection = ({
   // ✅ (26 ต.ค. 2569) embedded = อยู่ในฟอร์ม Swal (editEvent บนปฏิทิน) — ห้ามเปิด Swal ซ้อน (จะปิดฟอร์มทิ้ง)
   //    → ยืนยันลบด้วย window.confirm · ไม่แสดงแถบสรุป Service Report ด้วย AI (กล่องนั้นใช้ Swal)
   embedded = false,
+  // งานที่ใช้เช็คสิทธิ์ เมื่อไม่ได้ส่ง event มา (เช่น หน้าติดตามใบเสนอราคา — ไม่อยากให้ป้าย/สถานะเปลี่ยน)
+  permEvent = null,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
   const overrideInputRef = React.useRef();
-  const canEdit  = can(currentUser, "editOperation");
+  // 🐛 (10 พ.ย. 2569 ผู้ใช้: "ช่างไม่มีปุ่มให้อัพโหลดไฟล์เอกสารงาน ใน Event · ตรวจสอบสิทธิ์ของผู้ใช้ต่างๆ")
+  //    เดิม can(editOperation) ไม่มีช่าง → ช่างในงานแนบไม่ได้ · ตอนนี้ใช้กติกาเดียวกับ server (shared/utils/jobDocPermissions)
+  const canEdit  = canEditJobFiles(currentUser, event || permEvent, type);
 
   // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดาวน์โหลด/ลบเรียงเป็นไอคอนแยกทุกแถว ดูรกตาเวลามีหลายไฟล์
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" แยกต่างหาก
@@ -884,7 +889,7 @@ export const FileUploadSection = ({
             </MenuItem>
           </>
         )}
-        {canEdit && !isOldQuoteFile(fileMenu?.file) && [
+        {canDeleteJobFile(currentUser, event || permEvent, type, fileMenu?.file) && [
           <Divider key="file-menu-divider" />,
           <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await (embedded ? Promise.resolve(window.confirm(`ลบไฟล์ "${f.fileName}"?`)) : confirmDelete({ name: f.fileName }))) onDelete(eventId, type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>

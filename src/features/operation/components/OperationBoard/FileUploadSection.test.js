@@ -36,4 +36,21 @@ describe("FileUploadSection (operation page documents) — shared file module", 
     expect(screen.getByText("report.pdf")).toBeTruthy();
     expect(screen.queryByText("PDF")).toBeNull();
   });
+
+  // 🐛 (10 พ.ย. 2569) ช่างในงานไม่มีปุ่ม "แนบ" ในหน้า Event (embedded)
+  it("Event page: a technician on the job sees the attach button · a technician not on the job doesn't", () => {
+    const ev = { _id: "e1", status: "กำลังดำเนินการ", team: "ภูริต", reportFiles: [] };
+    const tech = { role: "technician", userId: "u1", fname: "ภูริต" };
+    const other = { role: "technician", userId: "u9", fname: "สมชาย" };
+    const { unmount } = wrap(<FileUploadSection card embedded event={ev} eventId="e1" type="report" label="Service Report" files={[]} onUpload={() => {}} onDelete={() => {}} onPreview={() => {}} currentUser={tech} />);
+    expect(screen.getByRole("button", { name: /แนบ/ })).toBeTruthy();
+    unmount();
+    wrap(<FileUploadSection card embedded event={ev} eventId="e1" type="report" label="Service Report" files={[]} onUpload={() => {}} onDelete={() => {}} onPreview={() => {}} currentUser={other} />);
+    expect(screen.queryByRole("button", { name: /แนบ/ })).toBeNull();
+  });
+  it("closed job: a technician can't attach a Service Report", () => {
+    const ev = { _id: "e1", status: "ดำเนินการเสร็จสิ้น", team: "ภูริต", reportFiles: [] };
+    wrap(<FileUploadSection card embedded event={ev} eventId="e1" type="report" label="Service Report" files={[]} onUpload={() => {}} onDelete={() => {}} onPreview={() => {}} currentUser={{ role: "technician", userId: "u1", fname: "ภูริต" }} />);
+    expect(screen.queryByRole("button", { name: /แนบ/ })).toBeNull();
+  });
 });
