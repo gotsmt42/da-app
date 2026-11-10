@@ -3802,6 +3802,15 @@ const Operation = () => {
                   ไม่ต้องเปิดแผ่นตัวกรองก่อน · เลื่อนแนวนอนได้ถ้ามีหลายสถานะ */}
               {!id && (
                 <Box sx={{ display: "flex", gap: 0.75, overflowX: "auto", mx: -1.5, px: 1.5, pb: 0.5, mb: 1, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+                  {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "หน้าดำเนินงานในมือถือยังดูรก") เดือนที่ดูอยู่ = ชิปแรกของแถบ (แตะเปิดตัวกรอง) · ไม่ต้องมีแถวแยก */}
+                  <Box component="button" type="button" onClick={() => setMobileSheetOpen(true)}
+                    sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.5, height: 36, pl: 1.1, pr: 0.75, borderRadius: 999, cursor: "pointer",
+                      font: "inherit", fontSize: "0.84rem", fontWeight: 800, whiteSpace: "nowrap", border: "1px solid #e6e9ef", bgcolor: "#f8fafc", color: "#334155" }}>
+                    <CalendarMonth sx={{ fontSize: 17, color: "#64748b" }} />
+                    {showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")}
+                    <ExpandMore sx={{ fontSize: 18, color: "#94a3b8" }} />
+                  </Box>
+                  <Box sx={{ width: "1px", flexShrink: 0, my: 0.75, bgcolor: "#e6e9ef" }} />
                   {/* ⚠️ ค้างงานอยู่ถัดจาก "ทั้งหมด" เสมอ — เห็นได้โดยไม่ต้องเลื่อนแถบ */}
                   {[...statusTileGroups[0].items].sort((x, y) => ({ all: -3, today: -2, overdue: -1 }[x.value] || 0) - ({ all: -3, today: -2, overdue: -1 }[y.value] || 0)).map((it) => {
                     const on = effectiveGroup === it.value;
@@ -3830,8 +3839,8 @@ const Operation = () => {
               {isAdminOrManager && !id && activeTab !== 1 && responsibleOptions.total > 0 && (
                 <Box sx={{ mb: 1, display: "flex", gap: 1, "& > *": { flex: 1, minWidth: 0 } }}>{personSelect}{memberSelect}</Box>
               )}
-              <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
-                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e6e9ef", color: "#334155" }} />
+              <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5, "&:empty": { display: "none" } }}>
+                {id && <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e6e9ef", color: "#334155" }} />}
                 {search.trim() && <Chip size="small" label={`ค้นหา: ${search.trim()}`} onDelete={() => setSearch("")} sx={{ fontWeight: 700 }} />}
                 {filterOP && <Chip size="small" label={`สถานะ: ${filterOP}`} onDelete={() => setFilterOP("")} sx={{ fontWeight: 700 }} />}
                 {filterType && <Chip size="small" label={`ประเภท: ${filterType}`} onDelete={() => setFilterType("")} sx={{ fontWeight: 700 }} />}
@@ -3871,17 +3880,18 @@ const Operation = () => {
 
           {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ค้นหาว่าช่างคนนั้นๆ มีมูลค่างานรวมทั้งหมดเท่าไร") — รวมตามตัวกรองปัจจุบัน (รวมงานที่ปิดแล้ว) · แอดมิน/manager */}
           {isAdminOrManager && !loading && !id && activeTab !== 1 && effectiveGroup !== "today" && valueSummary.jobs > 0 && (
-            <Box sx={{ mb: 1.5, px: 2, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: "wrap" }}>
-              <Box sx={{ minWidth: 0 }}>
+            // 🔁 (10 พ.ย. 2569) มือถือ: ยอดซ้าย · จำนวนงานขวา แถวเดียว ไม่สูงเกิน (เฉลี่ยต่องานแสดงเฉพาะจอคอม)
+            <Box sx={{ mb: 1.5, px: { xs: 1.75, sm: 2 }, py: { xs: 1.1, sm: 1.25 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: { xs: "nowrap", sm: "wrap" } }}>
+              <Box sx={{ minWidth: 0, flex: { xs: 1, sm: "0 1 auto" } }}>
                 <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>
                   มูลค่างานรวม{filterMember !== "all" && filterMember !== "noteam" ? ` · ${filterMember}` : ""}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
                 </Typography>
-                <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, color: "#0f172a", lineHeight: 1.2 }}>{baht(valueSummary.total)}</Typography>
+                <Typography noWrap sx={{ fontSize: { xs: "1.25rem", sm: "1.35rem" }, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{baht(valueSummary.total)}</Typography>
               </Box>
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", fontSize: "0.8rem", color: "#334155" }}>
-                <span><b>{valueSummary.withValue}</b> งานใส่มูลค่าแล้ว</span>
-                {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> งานยังไม่ใส่</span>}
-                {valueSummary.withValue > 0 && <span>เฉลี่ย <b>{baht(valueSummary.total / valueSummary.withValue)}</b> / งาน</span>}
+              <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-end", sm: "center" }, gap: { xs: 0.25, sm: 2 }, flexWrap: "wrap", flexShrink: 0, fontSize: { xs: "0.76rem", sm: "0.8rem" }, color: "#334155", textAlign: "right" }}>
+                <span><b>{valueSummary.withValue}</b> ใส่มูลค่าแล้ว</span>
+                {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> ยังไม่ใส่</span>}
+                {valueSummary.withValue > 0 && <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เฉลี่ย <b>{baht(valueSummary.total / valueSummary.withValue)}</b> / งาน</Box>}
               </Box>
             </Box>
           )}
@@ -3992,7 +4002,7 @@ const Operation = () => {
                     {daysPastDue !== null && daysPastDue !== undefined && (
                       <Stack direction="row" alignItems="center" gap={0.75}
                         sx={{
-                          mb: -1.25, pb: 1.75, pt: 0.75, px: 1.5, borderRadius: "14px 14px 0 0",
+                          mb: -1.25, pb: { xs: 1.6, sm: 1.75 }, pt: { xs: 0.5, sm: 0.75 }, px: 1.5, borderRadius: "14px 14px 0 0",
                           bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
                         }}>
                         <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />

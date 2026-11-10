@@ -25,8 +25,9 @@ const FOLLOWER = { primary: false };
 /** sx ของกรอบการ์ดกลุ่ม (ใส่ให้ Card/Box ภายนอก) */
 export const multiDayCardSx = (statusColor = "#94a3b8") => ({
   mb: 3, borderRadius: 4, bgcolor: "background.paper", overflow: "visible",
-  border: "1px solid #e6e9ef", borderLeft: `4px solid ${statusColor}`,
-  boxShadow: "0 5px 0 -1px #fff, 0 5px 0 0 #cbd5e1, 0 10px 0 -2px #fff, 0 10px 0 -1px #e6e9ef, 0 1px 3px rgba(15,23,42,.06)",
+  border: "1px solid #e6e9ef", borderLeft: { xs: "1px solid #e6e9ef", sm: `4px solid ${statusColor}` },
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "หน้าดำเนินงานในมือถือยังดูรก") มือถือ: ไม่มีแถบสีซ้าย · ปึกซ้อนเหลือชั้นเดียว
+  boxShadow: { xs: "0 5px 0 -1px #fff, 0 5px 0 0 #e2e8f0, 0 1px 3px rgba(15,23,42,.05)", sm: "0 5px 0 -1px #fff, 0 5px 0 0 #cbd5e1, 0 10px 0 -2px #fff, 0 10px 0 -1px #e6e9ef, 0 1px 3px rgba(15,23,42,.06)" },
 });
 
 const bkk = (d) => moment(d).utcOffset(7);
@@ -122,9 +123,9 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
   const focus = now[0] || next[0];
 
   return (
-    <Box onClick={onToggle} sx={{ px: 2, py: 1.5, cursor: "pointer", bgcolor: "#f8fafc", borderRadius: "14px 14px 0 0", borderBottom: expanded ? "1px solid #e6e9ef" : "none" }}>
+    <Box onClick={onToggle} sx={{ px: 2, py: 1.5, cursor: "pointer", bgcolor: { xs: "#fff", sm: "#f8fafc" }, borderRadius: "14px 14px 0 0", borderBottom: expanded ? "1px solid #e6e9ef" : "none" }}>
       <Stack direction="row" alignItems="center" gap={1}>
-        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, pl: 0.75, pr: 1, borderRadius: 999, bgcolor: "#2563eb", color: "#fff", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap" }}>
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, pl: 0.75, pr: 1, borderRadius: 999, bgcolor: { xs: "#eff6ff", sm: "#2563eb" }, color: { xs: "#1d4ed8", sm: "#fff" }, fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap" }}>
           <DateRange sx={{ fontSize: 15 }} /> งานหลายช่วงวัน · {sessions.length} ช่วง
         </Box>
         <Box sx={{ flex: 1 }} />
@@ -132,7 +133,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
           {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
         </IconButton>
       </Stack>
-      <Typography sx={{ mt: 0.5, fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", lineHeight: 1.35 }}>{title}</Typography>
+      <Typography sx={{ mt: 0.75, fontWeight: 800, fontSize: { xs: "1rem", sm: "0.95rem" }, color: "#0f172a", lineHeight: 1.4 }}>{title}</Typography>
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.5 }}>
         <Box component="span" sx={{ display: "inline-flex", alignItems: "center", height: 22, px: 1, borderRadius: 999, bgcolor: "#eff6ff", color: "#1d4ed8", fontSize: "0.72rem", fontWeight: 800 }}>
           เข้างาน {totalWorkDays} วัน{recordedTotal !== null ? ` · บันทึกแล้ว ${recordedTotal}` : ""}
@@ -151,7 +152,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
           <Typography noWrap sx={{ fontSize: "0.74rem", color: "#475569", minWidth: 0 }}>· {focus.st.label}</Typography>
         </Stack>
       )}
-      <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 1 }}>
+      <Stack direction="row" gap={0.5} sx={{ mt: 1, flexWrap: { xs: "nowrap", sm: "wrap" }, overflowX: { xs: "auto", sm: "visible" }, mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 }, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, "& > *": { flexShrink: 0 } }}>
         {sorted.map((s, i) => {
           const st = sessionStateOf(s, recOf(att, s));
           const solid = st.key === "today";
@@ -170,7 +171,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
           );
         })}
       </Stack>
-      <Stack direction="row" gap={1.25} flexWrap="wrap" sx={{ mt: 0.75 }}>
+      <Stack direction="row" gap={1.25} flexWrap="wrap" sx={{ mt: 0.75, display: { xs: "none", sm: "flex" } }}>
         {[["#16a34a", "บันทึกครบ"], ["#d97706", "บันทึกไม่ครบ"], ["#2563eb", "วันนี้"], ["#94a3b8", "ยังไม่ถึง"]].map(([c, l]) => (
           <Typography key={l} sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, fontSize: "0.66rem", color: "#94a3b8" }}>
             <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: c }} />{l}
