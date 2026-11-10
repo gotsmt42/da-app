@@ -6,6 +6,7 @@ import { can } from "@/shared/utils/roles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
+import { fileKindOf, fileSizeText } from "@/shared/utils/fileKind";
 // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
 let formDraftCtl = null;
 
@@ -130,6 +131,24 @@ function injectAddDraftStyles() {
     .ade-file:hover { border-color: #2563eb; color: #1d4ed8; }
     .ade-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .ade-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* ✅ (10 พ.ย. 2569 ผู้ใช้: "ไฟล์ไม่ขึ้นแสดงให้ตรงตามจริง · แสดงรูปแบบไฟล์ PDF Excel รูปภาพ ไม่รก")
+       รายการไฟล์: ภาพย่อ/ป้ายชนิด · ชื่อ · ที่มา · ปุ่มลบ — ไฟล์ที่แนบไว้แล้ว (ทุกที่) + ไฟล์ที่เพิ่งเลือก (รออัปโหลดตอนบันทึก) */
+    .ade-flist { display: flex; flex-direction: column; border: 1px solid #e6e9ef; border-radius: 10px; background: #fff; overflow: hidden; }
+    .ade-flist:empty { display: none; }
+    .ade-frow { display: flex; align-items: center; gap: 10px; padding: 9px 10px; min-width: 0; }
+    .ade-frow + .ade-frow { border-top: 1px solid #eef1f5; }
+    .ade-fthumb { width: 38px; height: 38px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 900; letter-spacing: .02em; overflow: hidden; }
+    .ade-fthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ade-finfo { flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+    .ade-fname { font-size: 13.5px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+    a.ade-finfo:hover .ade-fname { color: #1d4ed8; }
+    .ade-fsub { font-size: 11.5px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+    .ade-fsub b { font-weight: 700; }
+    .ade-fdel { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: 0; background: transparent; color: #94a3b8; font-size: 16px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+    .ade-fdel:hover { background: #fef2f2; color: #dc2626; }
+    .ade-fdel:disabled { opacity: .4; cursor: default; }
+    .ade-file-add { justify-content: center; gap: 6px; min-height: 44px; margin-top: 8px; border-color: #bfdbfe; background: #f8fbff; color: #1d4ed8; }
+    .ade-flist:empty + .ade-file-add { margin-top: 0; }
     /* ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้าจอมือถือให้แสดงเต็มหน้า ให้สวยงาม จัดวางให้ทำง่ายๆ")
        มือถือ: เต็มจอ ไม่มีขอบมน · ตัวเลือกเป็นตาราง 2–3 ช่องกดง่าย · ปุ่มล่างเต็มความกว้าง เว้นขอบล่างของ iPhone */
     @media(max-width:600px) {
@@ -218,6 +237,37 @@ function injectAddDraftStyles() {
     /* ⚠️ TomSelect z-index เริ่มต้น (10) ต่ำกว่า SweetAlert2 container (1060) มาก — พอ dropdown ย้ายไป
        แปะที่ <body> จะกลายเป็น sibling กับ popup ของ Swal เอง ต้องดันให้สูงกว่าเสมอไม่งั้นโดนซ่อนอยู่หลัง modal */
     .ts-dropdown { z-index: 100000 !important; }
+
+    /* 🔁 (10 พ.ย. 2569 ผู้ใช้: "ฟอร์มรับงานใหม่ยังดูเทอะทะ รก ลงข้อมูลยาก สับสน · สีสันยังไม่สวย อันไหนควรเน้น")
+       • "งานนี้ต้องทำอะไร" (ตัดสินใจแรก · เปลี่ยนทั้งฟอร์ม) = แถบ 3 ช่องเท่ากัน ช่องที่เลือกพื้นน้ำเงินทึบ — เด่นที่สุด
+       • ตัวเลือกอื่น (รับงานจาก · เอกสาร) = เม็ดยาเรียงต่อกันตามความยาวคำ ไม่บังคับเป็นตาราง 2×2 · เลือกแล้วน้ำเงินทึบ
+       • ป้ายช่องตัวหนาเข้ม · ผู้ติดต่อ/เบอร์โทรคู่กันบนมือถือ · ตัดป้าย "แผนเข้างาน" ด้านบน (ซ้ำกับช่องเดือนท้ายฟอร์ม) */
+    .ade-intake .ade-month-badge { display: none; }
+    .ade-intake .ade-field > label:not(.ade-file) { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .ade-intake .ade-seg { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; background: transparent; border: 0; border-radius: 0; }
+    .ade-intake .ade-field .ade-seg label { flex: 0 0 auto; }
+    .ade-intake .ade-seg span {
+      min-height: 38px; padding: 0 15px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff; color: #334155;
+      flex-direction: row; transition: background .15s, border-color .15s, color .15s;
+    }
+    .ade-intake .ade-seg span b { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+    .ade-intake .ade-seg label:hover span { border-color: #93c5fd; color: #1d4ed8; }
+    .ade-intake .ade-seg input:checked + span { background: #2563eb; border-color: #2563eb; color: #fff; box-shadow: 0 3px 8px -3px rgba(37,99,235,.55); }
+    .ade-intake .ade-seg input:checked + span b { font-weight: 700; }
+    .ade-intake .ade-seg.ade-seg-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; background: #f1f5f9; border-radius: 12px; }
+    .ade-intake .ade-seg.ade-seg-3 span { border: 0; border-radius: 9px; background: transparent; min-height: 44px; padding: 4px 6px; }
+    .ade-intake .ade-seg.ade-seg-3 span b { white-space: normal; font-size: 13.5px; }
+    .ade-intake .ade-seg.ade-seg-3 input:checked + span { background: #2563eb; color: #fff; }
+    .ade-intake #adeDescription { min-height: 104px; }
+    @media(max-width:600px) {
+      .ade-intake #ade-generalSection, .ade-intake #ade-intakeSection, .ade-intake #ade-monthBlock, .ade-intake .ade-card { padding: 12px 14px 4px; margin-bottom: 12px; }
+      .ade-intake .ade-card { padding-bottom: 14px; }
+      .ade-intake .ade-section-label { margin: 0 -14px 12px; padding: 0 14px 10px; }
+      .ade-intake .ade-seg.ade-seg-3 span { min-height: 46px; flex-direction: row; }
+      .ade-intake .ade-seg span b { font-size: 13px; }
+      .ade-intake #ade-contactGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+      .ade-intake .ade-gap { margin-top: 14px; }
+    }
 
     /* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงงานใหม่ด้วย ยังดูไม่สมบูรณ์") ฟอร์มรับงาน = การ์ดขาวมีหัวข้อเลขลำดับทุกส่วน
        ① ข้อมูลงาน ② ลูกค้า/โครงการ ③ รายละเอียดงาน ④ แผนเข้างาน · ตัดอีโมจิออกจากป้ายทั้งหมด (ดูเป็นทางการ) */
@@ -456,7 +506,7 @@ export const getAddDraftEvent = async ({
       <div class="ade-field">
         <label><span class="req">*</span> งานนี้ต้องทำอะไร</label>
         <div class="ade-seg ade-seg-3">
-          ${[["visit", "", "ส่งช่างเข้างาน"], ["novisit", "", "ส่งของ / ขายของ"], ["note", "", "บันทึกงาน (โน้ตกันลืม)"]].map(([v, ic, l]) => `<label><input type="radio" name="adeVisitMode" value="${v}" ${(existingDraft?.intakeNote ? "note" : existingDraft?.noVisit ? "novisit" : "visit") === v ? "checked" : ""}><span><i>${ic}</i><b>${l}</b></span></label>`).join("")}
+          ${[["visit", "", "ส่งช่างเข้างาน"], ["novisit", "", "ส่งของ / ขายของ"], ["note", "", "จดบันทึก"]].map(([v, ic, l]) => `<label><input type="radio" name="adeVisitMode" value="${v}" ${(existingDraft?.intakeNote ? "note" : existingDraft?.noVisit ? "novisit" : "visit") === v ? "checked" : ""}><span><i>${ic}</i><b>${l}</b></span></label>`).join("")}
         </div>
         <span id="ade-modeDesc" class="ade-hint"></span>
       </div>
@@ -475,24 +525,16 @@ export const getAddDraftEvent = async ({
         </div>
       </div>
 
-      <div class="ade-field ade-gap">
+      <div class="ade-field ade-gap" id="ade-docTypeField">
         <label>เอกสารที่ได้รับมากับงาน <span class="ade-hint">· ไม่บังคับ</span></label>
         <div class="ade-seg ade-seg-4">
           ${[["", "ไม่มีเอกสาร"], ["po", "ใบสั่งซื้อ (PO)"], ["quotation", "ใบเสนอราคา"], ["other", "เอกสารอื่น"]].map(([v, l]) => `<label><input type="radio" name="adeIntakeDocType" value="${v}" ${(existingDraft?.intakeDocType || "") === v ? "checked" : ""}><span><b>${l}</b></span></label>`).join("")}
         </div>
       </div>
-      <div id="ade-docFields" class="ade-grid ade-grid-2" style="margin:12px 0 0;${existingDraft?.intakeDocType ? "" : "display:none;"}">
+      <div id="ade-docFields" class="ade-grid" style="margin:12px 0 0;${existingDraft?.intakeDocType ? "" : "display:none;"}">
         <div class="ade-field">
-          <label>เลขที่เอกสาร <span class="ade-hint">· ถ้ามี</span></label>
+          <label>เลขที่เอกสาร <span class="ade-hint">· ถ้ามี · แนบไฟล์ได้ที่ "ไฟล์แนบ" ด้านล่าง</span></label>
           <input id="adeIntakeDocNo" type="text" placeholder="เช่น PO-2569-0123" value="${attr(existingDraft?.intakeDocNo)}">
-        </div>
-        <div class="ade-field" data-no-draft>
-          <label>แนบไฟล์เอกสาร</label>
-          <label class="ade-file">
-            <input id="adeIntakeFiles" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
-            <span id="ade-fileText">แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel</span>
-          </label>
-          ${(existingDraft?.sitePhotoFiles || []).some((f) => f.source === "intake") ? `<span class="ade-hint">แนบไว้แล้ว ${(existingDraft.sitePhotoFiles || []).filter((f) => f.source === "intake").length} ไฟล์ · เลือกเพิ่มได้</span>` : ""}
         </div>
       </div>
     </div>` : ""}
@@ -611,6 +653,15 @@ export const getAddDraftEvent = async ({
         <label><span style="color:#ef4444">*</span> รายละเอียดงานที่ทำ <span style="font-weight:500;color:#94a3b8">อาการเสีย / ขอบเขตงาน · อย่างน้อย 10 ตัวอักษร</span></label>
         <textarea id="adeDescription" rows="5" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
       </div>
+      ${isIntakeForm ? `
+      <div class="ade-field" id="ade-filesBlock" data-no-draft style="margin-top:14px;">
+        <label>ไฟล์แนบ <span class="ade-hint" id="ade-fileCount">· รูป, PDF, Word, Excel · ไม่บังคับ</span></label>
+        <div class="ade-flist" id="ade-fileList"></div>
+        <label class="ade-file ade-file-add">
+          <input id="adeIntakeFiles" type="file" multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx">
+          <span>＋ เพิ่มไฟล์</span>
+        </label>
+      </div>` : ""}
       <div id="ade-jobInfoBlock">${jobInfoSectionHtml(existingDraft || {}, "ade")}</div>
     </div>
 
@@ -644,6 +695,9 @@ export const getAddDraftEvent = async ({
 </div>
 `;
 
+  // ไฟล์ที่เลือกไว้รออัปโหลดตอนกดบันทึก (ลบไฟล์เดิม = ลบทันที · หน้ารายการรีเฟรชเองผ่าน realtime)
+  const pendingFiles = [];
+
   return new Promise((resolve) => {
     Swal.fire({
       html,
@@ -667,7 +721,8 @@ export const getAddDraftEvent = async ({
           const docFields = document.getElementById("ade-docFields");
           const syncDoc = () => {
             const v = document.querySelector('input[name="adeIntakeDocType"]:checked')?.value || "";
-            if (docFields) docFields.style.display = v ? "" : "none";
+            const note = document.querySelector('input[name="adeVisitMode"]:checked')?.value === "note";
+            if (docFields) docFields.style.display = v && !note ? "" : "none";
           };
           document.querySelectorAll('input[name="adeIntakeDocType"]').forEach((r) => r.addEventListener("change", syncDoc));
           // บันทึกงาน: บอกว่ากรอกแค่สิ่งที่ต้องทำก็พอ · เปลี่ยนหัวช่องรายละเอียดให้ตรงความหมาย
@@ -687,6 +742,9 @@ export const getAddDraftEvent = async ({
                   : "รับงานไว้ก่อน แล้วกด “ส่งลงตาราง” เลือกวันและช่างที่จะเข้างาน";
             }
             show("ade-sourceField", !note);
+            // 🔁 (10 พ.ย. 2569 ผู้ใช้: "จัดการได้ง่าย ไม่สับสน") บันทึกงาน: ไม่ถามชนิดเอกสาร — แนบไฟล์ที่ "ไฟล์แนบ" ช่องเดียว
+            show("ade-docTypeField", !note);
+            syncDoc();
             // 🔁 (15 ต.ค. 2569 ผู้ใช้: "รูปแบบส่งของ ขายของ ไม่ควรมีรายละเอียดเยอะ ให้ง่ายๆ")
             //    ส่งของ/ขายของ: ไม่ถามประเภทงาน · ระบบงาน · ความเร่งด่วน/อุปกรณ์ · เดือนเข้างาน
             show("ade-jobTypeField", mode === "visit");
@@ -711,7 +769,7 @@ export const getAddDraftEvent = async ({
                 : mode === "novisit" ? "รายการสินค้า / สิ่งที่ต้องส่ง" : "อาการเสีย / ขอบเขตงาน";
             }
             if (descArea) {
-              descArea.rows = note ? 8 : 5; // จดงาน = ช่องเดียวในฟอร์ม ให้กว้างพอเขียนได้สบาย
+              descArea.rows = note ? 6 : 5; // จดงาน = ช่องเดียวในฟอร์ม ให้กว้างพอเขียนได้สบาย
               descArea.placeholder = note ? "เช่น โทรตามลูกค้าเรื่องใบเสนอราคา · เตรียมเอกสารส่งมอบงาน"
                 : mode === "novisit" ? "เช่น อุปกรณ์ Smoke Detector 10 ตัว · ส่งที่ห้องเครื่อง ชั้น B1"
                   : "เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง";
@@ -724,11 +782,86 @@ export const getAddDraftEvent = async ({
           //    จัดฟอร์มตามรูปแบบงานทันทีตอนเปิด (เดิมรอ 350ms → เห็นฟอร์มเต็มก่อนแล้วค่อยหด) · รอบหลังสำหรับข้อมูลที่กู้คืน
           syncDoc(); syncMode();
           setTimeout(() => { syncDoc(); syncMode(); }, 350); // หลังกู้คืนข้อมูลที่กรอกค้าง
+          // ✅ (10 พ.ย. 2569 ผู้ใช้: "แก้ไขเวลากด + ไฟล์นอกปุ่มแก้ไข แต่ไฟล์ไม่ขึ้นแสดงให้ตรงตามจริง")
+          //    เดิมแสดงแค่ "แนบไว้แล้ว N ไฟล์" นับเฉพาะไฟล์ตอนรับงาน — ไฟล์ที่แนบเพิ่มภายหลัง/ใบเสนอราคาไม่ขึ้น
+          //    ตอนนี้: รายการไฟล์จริงทุกไฟล์ของงาน (ดึงล่าสุดจากเซิร์ฟเวอร์) กดเปิดดู/ลบได้ · ไฟล์ที่เลือกใหม่ขึ้นในรายการ เอาออกได้ก่อนบันทึก
           const fileInput = document.getElementById("adeIntakeFiles");
+          const listEl = document.getElementById("ade-fileList");
+          const countEl = document.getElementById("ade-fileCount");
+          let saved = [];
+          const fromJob = (j) => [
+            ...(j?.sitePhotoFiles || []).map((f) => ({ ...f, _type: "sitePhoto", _tag: f.source === "intake" ? "ตอนรับงาน" : "แนบเพิ่ม" })),
+            ...(j?.quotationFiles || []).map((f) => ({ ...f, _type: "quotation", _tag: "ใบเสนอราคา" })),
+          ];
+          const thumb = (name, url, objUrl) => {
+            const k = fileKindOf(name, url);
+            const src = objUrl || url;
+            if (k.isImage && src) return `<span class="ade-fthumb" style="background:#f1f5f9;color:${k.color}"><img src="${attr(src)}" alt="" loading="lazy" data-fallback="1"></span>`;
+            return `<span class="ade-fthumb" style="background:${k.color}1a;color:${k.color}">${escapeHtml(k.label)}</span>`;
+          };
+          const render = () => {
+            if (!listEl) return;
+            const rows = saved.map((f, i) => `
+              <div class="ade-frow">
+                ${thumb(f.fileName, f.fileUrl)}
+                <a class="ade-finfo" href="${attr(f.fileUrl)}" target="_blank" rel="noopener">
+                  <div class="ade-fname">${escapeHtml(f.fileName || "ไฟล์")}</div>
+                  <div class="ade-fsub"><b style="color:${f._type === "quotation" ? "#1d4ed8" : "#475569"}">${f._tag}</b>${f.uploadedAt ? ` · ${escapeHtml(formatThai(moment(f.uploadedAt), "D MMM YY HH:mm"))}` : ""}</div>
+                </a>
+                <button type="button" class="ade-fdel" data-del-saved="${i}" aria-label="ลบไฟล์" title="ลบไฟล์">✕</button>
+              </div>`);
+            const rowsNew = pendingFiles.map((f, i) => `
+              <div class="ade-frow">
+                ${thumb(f.name, "", f.__url)}
+                <div class="ade-finfo">
+                  <div class="ade-fname">${escapeHtml(f.name)}</div>
+                  <div class="ade-fsub"><b style="color:#1d4ed8">ไฟล์ใหม่</b>${fileSizeText(f.size) ? ` · ${fileSizeText(f.size)}` : ""} · อัปโหลดเมื่อกดบันทึก</div>
+                </div>
+                <button type="button" class="ade-fdel" data-del-new="${i}" aria-label="เอาไฟล์ออก" title="เอาออก">✕</button>
+              </div>`);
+            listEl.innerHTML = [...rows, ...rowsNew].join("");
+            listEl.querySelectorAll("img[data-fallback]").forEach((img) => {
+              img.addEventListener("error", () => { const b = img.parentNode; if (b) b.textContent = "รูป"; }, { once: true });
+            });
+            const n = saved.length + pendingFiles.length;
+            if (countEl) countEl.textContent = n ? `· ${n} ไฟล์ · กดชื่อเพื่อเปิดดู` : "· รูป, PDF, Word, Excel · ไม่บังคับ";
+          };
+          if (isEditMode) {
+            saved = fromJob(existingDraft);
+            render();
+            // ดึงข้อมูลล่าสุด — ไฟล์ที่เพิ่งแนบจากหน้ารายละเอียดก่อนกดแก้ไขต้องขึ้นครบ
+            Promise.resolve(EventService.GetEventById?.(existingDraft._id))
+              .then((j) => { const ev = j?.event || j; if (ev?._id) { saved = fromJob(ev); render(); } })
+              .catch(() => {});
+          }
           fileInput?.addEventListener("change", () => {
-            const n = fileInput.files?.length || 0;
-            const t = document.getElementById("ade-fileText");
-            if (t) t.textContent = n ? `${n === 1 ? fileInput.files[0].name : `เลือกแล้ว ${n} ไฟล์`}` : "แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel";
+            const picked = [...(fileInput.files || [])];
+            fileInput.value = "";
+            picked.forEach((f) => { if (fileKindOf(f.name).isImage) { try { f.__url = URL.createObjectURL(f); } catch { /* ไม่มีภาพย่อ */ } } });
+            pendingFiles.push(...picked);
+            render();
+          });
+          listEl?.addEventListener("click", async (e) => {
+            const nb = e.target.closest("[data-del-new]");
+            if (nb) {
+              const [f] = pendingFiles.splice(Number(nb.dataset.delNew), 1);
+              if (f?.__url) URL.revokeObjectURL(f.__url);
+              render();
+              return;
+            }
+            const sb = e.target.closest("[data-del-saved]");
+            if (!sb) return;
+            const f = saved[Number(sb.dataset.delSaved)];
+            if (!f || !window.confirm(`ลบไฟล์ "${f.fileName || "ไฟล์"}" ออกจากงานนี้?`)) return;
+            sb.disabled = true;
+            try {
+              await EventService.DeleteFile(existingDraft._id, f._type, f._id);
+              saved = saved.filter((x) => x !== f);
+              render();
+            } catch {
+              sb.disabled = false;
+              window.alert("ลบไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง");
+            }
           });
         }
         // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
@@ -1002,7 +1135,7 @@ export const getAddDraftEvent = async ({
           }
           if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่จะเข้างาน"); return; }
           if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
-          const intakeFiles = isIntakeForm && radioVal("adeIntakeDocType") ? [...(document.getElementById("adeIntakeFiles")?.files || [])] : [];
+          const intakeFiles = isIntakeForm ? pendingFiles.slice() : [];
 
           isSavingDraft = true;
           const btn = clickEvt.currentTarget;

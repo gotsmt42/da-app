@@ -129,11 +129,12 @@ export const FadeIn = ({ children }) => (
 
 /**
  * @param title / subtitle  หัวแผ่น · actions = ปุ่มข้างหัว (เช่น "ดูในปฏิทิน")
+ * @param footer            แถบปุ่มดำเนินการติดล่างแผ่น (ไม่เลื่อนตามเนื้อหา · เว้นขอบล่าง iPhone) — แนว Lineman/Agoda
  * @param maxWidth          ความกว้าง Dialog บนจอใหญ่
  * @param zIndex            เปิดซ้อนบนกล่อง SweetAlert (ฟอร์มแก้ไขงาน z 20000) — ส่ง 20010 ขึ้นไป · ปิดการล็อกโฟกัสของ MUI ให้ด้วย
  *                          (ไม่งั้นแย่งโฟกัสกับ Swal จนพิมพ์/กดไม่ได้)
  */
-export default function MobileSheet({ open, onClose, title, subtitle, actions, children, maxWidth = "md", bodySx, zIndex }) {
+export default function MobileSheet({ open, onClose, title, subtitle, actions, footer, children, maxWidth = "md", bodySx, zIndex }) {
   const layer = zIndex ? { sx: { zIndex }, disableEnforceFocus: true, disableAutoFocus: true } : {};
   const isMobile = useMediaQuery("(max-width:599.95px)");
   const stage = useStagedOpen(open && isMobile);
@@ -155,6 +156,12 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
       {!isMobile || stage.mounted ? children : null}
     </Box>
   );
+  const foot = footer ? (
+    <Box sx={{ flexShrink: 0, bgcolor: "#fff", borderTop: "1px solid #e6e9ef", boxShadow: "0 -6px 16px -12px rgba(15,23,42,.18)",
+      px: 2, pt: 1.25, pb: isMobile ? "calc(12px + env(safe-area-inset-bottom))" : 1.5 }}>
+      {footer}
+    </Box>
+  ) : null;
 
   if (isMobile) {
     return (
@@ -169,6 +176,7 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
           PaperProps={{ className: "tt-swipe-native", sx: SHEET_PAPER_SX }}>
           {head}
           {body}
+          {foot}
         </SwipeableDrawer>
       </>
     );
@@ -178,6 +186,7 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
       PaperProps={{ sx: { borderRadius: 3, overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "90vh" } }}>
       {head}
       {body}
+      {foot}
     </Dialog>
   );
 }
