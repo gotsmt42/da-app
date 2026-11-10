@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { hardReload } from "@/shared/utils/lazyWithRetry";
 
 const CHECK_MS = 5 * 60_000;
 const ENTRY_RE = /\/assets\/index-[\w-]+\.js/;
@@ -56,6 +57,7 @@ export default function useNewBuildReload() {
   // เปลี่ยนหน้า + มีรุ่นใหม่ → โหลดหน้าปลายทางใหม่ทั้งหน้า (ได้ไฟล์รุ่นล่าสุด)
   useEffect(() => {
     if (first.current) { first.current = false; return; }
-    if (stale.current) window.location.reload();
+    // 🔁 (10 พ.ย. 2569) hardReload (?_r=) แทน reload() — WebView บางรุ่น reload() แล้วได้หน้าแรกรุ่นเก่าจากหน่วยความจำ
+    if (stale.current) hardReload();
   }, [location.pathname]);
 }
