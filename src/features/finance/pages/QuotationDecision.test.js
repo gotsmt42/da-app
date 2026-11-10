@@ -48,6 +48,9 @@ describe('"won" dialog — multiple quotations', () => {
     expect(screen.getAllByText("฿19,340.25")).toHaveLength(2); // card + auto-computed won amount — no typing needed
     fireEvent.click(screen.getByText("บันทึก · ได้งาน"));
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ approvedNos: ["QT2026090027"], approvedAmount: 19340.25 }));
+    // the unpicked quotation is split off to keep being tracked (not closed with the won one)
+    expect(onConfirm.mock.calls[0][0].split).toMatchObject({ nos: ["QT2026090028"], amount: 24556.5 });
+    expect(screen.queryByText(/แยกไปติดตามต่อ/)).toBeTruthy();
   });
 
   it("approving every quotation at full amount = no partial fields sent", () => {
@@ -55,6 +58,7 @@ describe('"won" dialog — multiple quotations', () => {
     wrap(<DecisionDialog mode="approve" a={a} onClose={() => {}} onConfirm={onConfirm} />);
     fireEvent.click(screen.getByText("บันทึก · ได้งาน"));
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ approvedNos: [], approvedAmount: null }));
+    expect(onConfirm.mock.calls[0][0].split).toBeNull(); // every quotation won = nothing to split
   });
 
   it("unchecking every quotation = can't save (should press 'not won' instead)", () => {
@@ -123,5 +127,15 @@ describe('"won" dialog — multiple quotations', () => {
     expect(screen.getByText(/ให้ AI อ่านยอดใบที่เลือก \(1 ไฟล์\)/)).toBeTruthy(); // only unknown.pdf
     fireEvent.click(screen.getByText("unknown.pdf")); // untick the unknown one
     expect(screen.queryByText(/ให้ AI อ่านยอด/)).toBeNull(); // QT9 already has a price — no re-read
+  });
+
+  it("split carries the files of the unpicked quotations (moved to the new standalone quotation)", () => {
+    const onConfirm = vi.fn();
+    const f1 = { _id: "F1", fileUrl: "u1", fileName: "QT69.pdf" }, f2 = { _id: "F2", fileUrl: "u2", fileName: "QT70.pdf" };
+    const a3 = { _id: "e7", quotationFiles: [f1, f2], quotationAiFilled: { quotations: [{ quotationNo: "QT69", grandTotal: 160500, files: [1] }, { quotationNo: "QT70", grandTotal: 128400, files: [2] }] } };
+    wrap(<DecisionDialog mode="approve" a={a3} onClose={() => {}} onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByText("QT70"));
+    fireEvent.click(screen.getByText("บันทึก · ได้งาน"));
+    expect(onConfirm.mock.calls[0][0]).toMatchObject({ approvedNos: ["QT69"], approvedAmount: 160500, split: { fileIds: ["F2"], nos: ["QT70"], amount: 128400 } });
   });
 });

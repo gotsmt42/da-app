@@ -484,6 +484,11 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
   const pickedSum = Math.round(pickedQ.reduce((t, q) => t + (q.amount || 0), 0) * 100) / 100;
   const partial = multi && picked.length < eq.length;
   const togglePick = (no) => setPicked((p) => (p.includes(no) ? p.filter((x) => x !== no) : [...p, no]));
+  // ✅ (10 พ.ย. 2569 ผู้ใช้: "ให้ตัดเฉพาะใบที่ติ๊กได้งาน ไม่ใช่ตัดรวมทั้งหมด แบบนี้จะติดตามใบที่เหลือไม่ได้")
+  //    ใบที่ไม่ได้ติ๊ก → แยกไปเป็นใบเสนอราคาแยก (อิงงานนี้) ติดตามต่อได้ · งานนี้เหลือเฉพาะใบที่ได้งาน + ยอดของใบนั้น
+  const restQ = partial ? eq.filter((q) => !picked.includes(q.no)) : [];
+  const restAmount = restQ.length && restQ.every((q) => q.amount != null) ? Math.round(restQ.reduce((t, q) => t + q.amount, 0) * 100) / 100 : null;
+  const split = restQ.length ? { fileIds: restQ.flatMap((q) => q.files.map((f) => f._id)).filter(Boolean), nos: restQ.map((q) => q.no), amount: restAmount } : null;
   // ยอดอัตโนมัติ: รู้ยอดทุกใบที่ติ๊ก = ผลรวม · ได้ทุกใบ = มูลค่าเต็มที่กรอกไว้ · นอกนั้น = ไม่ทราบ
   const autoAmount = pickedKnown ? pickedSum : !partial && a?.quotationAmount != null ? Number(a.quotationAmount) : null;
   // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ถ้าไม่ทราบยอดต้องบังคับให้กรอกด้วย · เฉพาะตรงบันทึกได้งาน") ไม่ทราบยอด = ต้องกรอกยอดที่ลูกค้าอนุมัติ
@@ -671,6 +676,14 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
                 </Stack>
               )}
               {quotes.length > 0 && picked.length === 0 && <Typography sx={{ mt: 0.5, fontSize: "0.76rem", color: "#b91c1c", fontWeight: 700 }}>เลือกอย่างน้อย 1 ใบ — ถ้าลูกค้าไม่รับทุกใบ ให้กด “ไม่ได้งาน”</Typography>}
+              {split && (
+                <Stack direction="row" gap={1} alignItems="flex-start" sx={{ mt: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                  <Autorenew sx={{ fontSize: 18, color: "#2563eb", mt: 0.1, flexShrink: 0 }} />
+                  <Typography sx={{ fontSize: "0.78rem", color: "#1e3a8a", lineHeight: 1.5 }}>
+                    <b>ได้งาน {picked.length} ใบ</b> · อีก {restQ.length} ใบ ({restQ.map((q) => q.no).join(", ")}{restAmount != null ? ` · ${baht(restAmount)}` : ""}) <b>แยกไปติดตามต่อ</b> เป็นใบเสนอราคาแยกที่อิงงานนี้ — ไม่ปิดทิ้ง ประวัติการติดตามติดไปด้วย
+                  </Typography>
+                </Stack>
+              )}
               {/* สรุปยอดได้งาน (คำนวณให้) · พิมพ์เองเฉพาะต่อรองราคา */}
               {!useManual && (
                 <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
@@ -715,6 +728,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
           ...(poMode ? {
             approvedNos: partial ? picked : [],
             approvedAmount: finalAmount !== null && (partial || finalAmount !== Number(a?.quotationAmount)) ? finalAmount : null,
+            split,
           } : {}),
         })}
           sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.color, filter: "brightness(.92)" } }}>
@@ -1317,13 +1331,13 @@ const DetailDialog = ({
 
   const req = reqOf(a);
   const isRequester = req && String(req.byId) === String(currentUser?.userId || currentUser?._id || "");
-  const confirmDecision = async ({ date, po, note, files = [], approvedNos = [], approvedAmount = null }) => {
+  const confirmDecision = async ({ date, po, note, files = [], approvedNos = [], approvedAmount = null, split = null }) => {
     setBusy(true);
     const action = decision === "resend" || decision === "send" ? "send" : decision;
     const isApprove = action === "approve" || (action === "approveRequest" && req?.action === "approve");
     const body = action === "reset" ? { action }
       : action === "rejectRequest" ? { action, reason: note }
-      : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note, ...(isApprove ? { approvedNos, approvedAmount } : {}) }) };
+      : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note, ...(isApprove ? { approvedNos, approvedAmount, ...(split ? { split } : {}) } : {}) }) };
     const ok = await onQuotation(job, body);
     // ✅ (10 พ.ย. 2569) หลักฐานผลลัพธ์ (PO / อีเมล) — อัปโหลดหลังบันทึกผลสำเร็จ เข้าช่อง "เอกสารผลลัพธ์"
     if (ok && files.length) await onFileUpload(files, a._id, "quotationResult");
@@ -1560,6 +1574,16 @@ const DetailDialog = ({
                     {k === "approved" && a.quotationApprovedAmount != null && <MiniStat label="ยอดที่อนุมัติ" value={baht(a.quotationApprovedAmount)} />}
                     <MiniStat label="บันทึกโดย" value={a.quotationDecisionBy} />
                   </Box>
+                  {/* ✅ (10 พ.ย. 2569) ได้งานบางใบ → ใบที่เหลือแยกไปติดตามต่อ · กดไปที่ใบนั้น */}
+                  {k === "approved" && a.quotationSplitTo && (
+                    <Box component="button" type="button" onClick={() => navigate(`/finance?tab=quotations&jobId=${a.quotationSplitTo}`)}
+                      sx={{ mt: 1, display: "flex", alignItems: "center", gap: 0.75, width: "100%", textAlign: "left", font: "inherit", cursor: "pointer",
+                        px: 1.25, py: 0.9, borderRadius: 2, border: "1px solid #bfdbfe", bgcolor: "#eff6ff", color: "#1d4ed8", "&:hover": { bgcolor: "#dbeafe" } }}>
+                      <Autorenew sx={{ fontSize: 18, flexShrink: 0 }} />
+                      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 800 }}>ใบที่ยังไม่ได้งาน แยกไปติดตามต่อแล้ว — เปิดดู</Typography>
+                      <ChevronRight sx={{ fontSize: 18 }} />
+                    </Box>
+                  )}
                   {k === "approved" && a.quotationApprovedNos?.length > 0 && (
                     <Typography sx={{ fontSize: "0.84rem", color: "#b45309", fontWeight: 700, mt: 1 }}>
                       ได้งานบางใบ: {a.quotationApprovedNos.join(", ")}{quoteListOf(a).length ? ` (จาก ${quoteListOf(a).length} ใบ)` : ""}

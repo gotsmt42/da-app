@@ -74,6 +74,8 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "vat", header: "VAT", width: 10, group: "ใบเสนอราคา", align: "center" },
     { key: "validUntil", header: "ยืนราคาถึง", width: 14, group: "ใบเสนอราคา", align: "center" },
     { key: "contact", header: "ผู้ติดต่อลูกค้า", width: 26, group: "ใบเสนอราคา", wrap: true },
+    // ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก — อ้างอิงงาน/สัญญา (ว่าง = ใบของงานนั้นเอง)
+    { key: "ref", header: "อ้างอิง", width: 26, group: "ข้อมูลงาน", wrap: true },
     { key: "company", header: "บริษัท", width: 24, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 24, group: "ข้อมูลงาน" },
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
@@ -176,6 +178,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
       decisionNote: a.quotationDecisionNote || "",
       // ✅ ส่งเป็นตัวเลขจริง (ไม่ใช่ข้อความ) — รวมยอด/ทำ pivot ใน Excel ได้ทันที
       amount: a.quotationAmount != null && a.quotationAmount !== "" ? Number(a.quotationAmount) : "",
+      ref: a.quoteOnly ? (a.quoteRef ? `ใบเสนอราคาแยก · อิง${a.quoteRef.kind === "contract" ? "สัญญา" : "งาน"} ${a.quoteRef.label || ""}` : "ใบเสนอราคาแยก · ไม่ได้อิงงาน") : "",
       company: a.company || "",
       site: a.site || "",
       title: a.title || "",
