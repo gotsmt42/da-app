@@ -113,15 +113,15 @@ const scopeOf = (userData) => ({
 });
 
 let lastUser = null;
-let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
+let store = { userId: "", data: { events: [], drafts: [], quotes: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
 const subscribers = new Set();
 let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase", "attendance", "stock"];
+const ALL_PARTS = ["events", "drafts", "quotes", "expense", "dispatch", "leads", "ot", "purchase", "attendance", "stock"];
 /** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
-const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"], attendance: ["attendance"], stock: ["stock"] };
+const PARTS_BY_TOPIC = { events: ["events", "drafts", "quotes"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"], attendance: ["attendance"], stock: ["stock"] };
 let queuedParts = null;
 
 /** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
@@ -134,9 +134,11 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   }
   store.loading = true;
   const want = new Set(parts);
-  const [events, drafts, expense, dispatch, leads, ot, purchase, attendance, stock] = await Promise.all([
+  const [events, drafts, quotes, expense, dispatch, leads, ot, purchase, attendance, stock] = await Promise.all([
     scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
     scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
+    // ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก (quoteOnly) — ไม่อยู่ใน event-op · นับรวมในป้าย "ใบเสนอราคาที่ต้องติดตาม"
+    scope.quotations && want.has("quotes") ? EventService.GetDraftEvents({ quotes: "only" }).then((r) => (r?.drafts || []).filter((d) => !d.cancelledAt)).catch(() => null) : null,
     scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
     (scope.dispatchQueue || scope.dispatchMine) && want.has("dispatch") ? DispatchService.summary().catch(() => null) : null,
     scope.webLeads && want.has("leads") ? WebsiteService.leadSummary().catch(() => null) : null,
@@ -151,6 +153,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   store.data = {
     events: events ?? store.data.events,
     drafts: drafts ?? store.data.drafts,
+    quotes: quotes ?? store.data.quotes,
     expense: expense ?? store.data.expense,
     dispatch: dispatch ?? store.data.dispatch,
     leads: leads ?? store.data.leads,
@@ -204,7 +207,7 @@ const start = (userData) => {
   const uid = String(userData?.userId || "");
   // เปลี่ยนบัญชี = ทิ้งของเก่าทั้งหมด ห้ามให้ป้ายของคนก่อนหน้าค้างอยู่
   if (store.userId !== uid) {
-    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
+    store = { userId: uid, data: { events: [], drafts: [], quotes: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null, stock: null }, at: 0, loading: false };
     emit();
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
@@ -232,7 +235,7 @@ const computeBadges = (userData, data) => {
   let quotations = 0;
   if (scope.quotations) {
     const heads = new Map();
-    events.forEach((e) => {
+    [...events, ...(data.quotes || [])].forEach((e) => {
       if (e.quotationStatus !== "sent" || !e.quotationSentAt) return;
       const key = getOverdueGroupKey(e);
       if (!heads.has(key)) heads.set(key, e);

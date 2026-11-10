@@ -24,7 +24,7 @@
 
 import { Children, Fragment, cloneElement, createContext, isValidElement, memo, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
-import { Navigate, Link, useSearchParams } from "react-router-dom";
+import { Navigate, Link, useSearchParams, useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import Swal from "@/shared/ui/swal";
@@ -85,6 +85,7 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import TelLink from "@/shared/components/TelLink";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
+import { resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
 // ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
@@ -1518,6 +1519,11 @@ export default function ContractOverview() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState([]);
+  // ✅ (10 พ.ย. 2569 ผู้ใช้: "สัญญาที่หมดอายุแล้วต้องเสนอราคาใหม่ ... ในหน้าภาพรวมงานให้มีสถานะบอกให้รับรู้ · ลิงก์มาดูได้ตลอด")
+  //    ใบเสนอราคาแยกที่อิงสัญญา (quoteOnly + quoteRef.contract) — ใบล่าสุดของแต่ละสัญญา
+  const [refQuotes, setRefQuotes] = useState([]);
+  const navigate = useNavigate();
+  const canQuote = can(userData, "viewQuotations") || can(userData, "editFinance");
   // ✅ งานรายครั้งที่กำลังเปิดกล่อง "วางบิล / รับเงิน" — จัดการได้จากตารางนี้เลย ไม่ต้องข้ามไปหน้า /billing
   // ⚠️ เก็บเป็น id ไม่ใช่ object — ตัว object จะเก่าค้างทันทีที่ events ถูกอัปเดตหลังบันทึก ทำให้กล่อง
   // ยังโชว์ยอดเดิมทั้งที่บันทึกไปแล้ว (ต้องปิดเปิดใหม่ถึงจะเห็น) ซึ่งดูเหมือนบันทึกไม่ติด
@@ -1594,6 +1600,7 @@ export default function ContractOverview() {
         EventService.GetDraftEvents(scopeOpts).catch(() => ({ drafts: [] })),
       ]);
       setEvents([...(res?.userEvents || []), ...(draftsRes?.drafts || [])]);
+      EventService.GetDraftEvents({ quotes: "only" }).then((r) => setRefQuotes((r?.drafts || []).filter((d) => !d.cancelledAt && d.quoteRef?.kind === "contract"))).catch(() => {});
     } catch (err) {
       console.error("Error fetching contract overview:", err);
       if (!silent) setEvents([]);
@@ -3015,7 +3022,7 @@ export default function ContractOverview() {
     const m = String(oldNo || "").trim().match(CONTRACT_NO_PATTERN);
     return m ? `${m[1]}${m[2]}-${Number(m[3]) + 1}` : suggestNextContractNo();
   };
-  const openRenewDialog = (c) => {
+  const openRenewDialog = (c, over = null) => {
     const oldStart = c.contractStart ? moment(c.contractStart) : null;
     const oldEnd = c.contractEnd ? moment(c.contractEnd) : null;
     const start = oldEnd ? oldEnd.clone().add(1, "day") : moment().startOf("day");
@@ -3036,6 +3043,8 @@ export default function ContractOverview() {
       contractYears: String(contractYearsOf(c)),
       estimatedDaysPerVisit: c.estimatedDaysPerVisit ? String(c.estimatedDaysPerVisit) : "",
       jobValue: c.jobValue != null && c.jobValue !== "" ? String(c.jobValue) : "",
+      // ✅ (10 พ.ย. 2569) ต่อจากใบเสนอราคาต่อสัญญาที่ได้งาน — มูลค่า/เลขที่ใบเสนอราคาตามใบนั้น
+      ...(over || {}),
     });
     setRenewFrom(c);
     setCustomRounds(Boolean(c.intervalMonths) && !visitsPerYear(c.intervalMonths));
@@ -3060,10 +3069,63 @@ export default function ContractOverview() {
       </Box>
     );
   };
-  /** ป้าย/ปุ่มต่อสัญญา ใต้สถานะสัญญา — ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่ม "ต่อสัญญาปีถัดไป" */
+  const quoteByContract = useMemo(() => {
+    const m = new Map();
+    refQuotes.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).forEach((q) => {
+      const k = q.quoteRef?.contractGroupId;
+      if (k && !m.has(k)) m.set(k, q);
+    });
+    return m;
+  }, [refQuotes]);
+  /** ป้ายสถานะใบเสนอราคาต่อสัญญา — กดไปที่ใบนั้นในหน้าติดตามใบเสนอราคา */
+  const quoteChip = (q, { block = false } = {}) => {
+    const key = resolveQuotationGroup(q) || "waiting_file";
+    const st = QUOTE_STATUS[key] || QUOTE_STATUS.waiting_file;
+    return (
+      <Tooltip title="เปิดใบเสนอราคาต่อสัญญา (หน้าติดตามใบเสนอราคา)">
+        <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); navigate(`/finance?tab=quotations&jobId=${q._id}`); }}
+          sx={{ display: "inline-flex", alignItems: "center", justifyContent: block ? "center" : "flex-start", gap: 0.5, height: block ? 36 : 22, px: block ? 1.5 : 0.9, width: block ? "100%" : "auto",
+            border: `1px solid ${alpha(st.color, 0.3)}`, borderRadius: block ? 2 : 99, cursor: "pointer", font: "inherit", whiteSpace: "nowrap",
+            bgcolor: alpha(st.color, 0.08), color: st.color, fontSize: block ? "0.82rem" : "0.68rem", fontWeight: 800, "&:hover": { bgcolor: alpha(st.color, 0.14) } }}>
+          <Description sx={{ fontSize: block ? 16 : 13 }} />เสนอราคาต่อสัญญา · {st.short || st.label}<ChevronRight sx={{ fontSize: block ? 17 : 14, ml: -0.25 }} />
+        </Box>
+      </Tooltip>
+    );
+  };
+  /** ป้าย/ปุ่มต่อสัญญา ใต้สถานะสัญญา — ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = "เสนอราคาต่อสัญญา" + "ต่อสัญญาปีถัดไป"
+   *  🔁 (10 พ.ย. 2569) มีใบเสนอราคาต่อสัญญา = ป้ายสถานะ (รอตอบ/ได้งาน/ไม่ได้งาน) กดไปดูได้ · ได้งานแล้ว = ปุ่มต่อสัญญาเติมยอด/เลขที่ใบเสนอราคาให้ */
   const renewWidget = (c, { block = false } = {}) => {
     if (!c.isRealContract) return null;
     const next = renewalOf.get(c.key);
+    const q = quoteByContract.get(c.key);
+    const stRaw = contractStatusInfo(c)?.state;
+    const due = stRaw === "expired" || stRaw === "expiring";
+    if (!next && (q || (due && canQuote))) {
+      const won = q && q.quotationStatus === "approved";
+      const amount = q ? (q.quotationApprovedAmount != null ? q.quotationApprovedAmount : q.quotationAmount) : null;
+      return (
+        <Stack direction={block ? "column" : "row"} gap={0.75} sx={{ flexWrap: "wrap", alignItems: block ? "stretch" : "center" }}>
+          {q && quoteChip(q, { block })}
+          {!q && due && canQuote && (
+            <Button variant="outlined" fullWidth={block} startIcon={<Description sx={{ fontSize: block ? "18px !important" : "15px !important" }} />}
+              onClick={(e) => { e.stopPropagation(); navigate(`/finance?tab=quotations&newQuote=contract:${c.key}`); }}
+              sx={{ height: block ? 40 : 30, px: block ? 2 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.86rem" : "0.74rem", fontWeight: 800, whiteSpace: "nowrap",
+                color: "#2563eb", borderColor: "#bfdbfe", bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: "#eff6ff" } }}>
+              เสนอราคาต่อสัญญา
+            </Button>
+          )}
+          {isAdminOrManager && due && (!q || won) && (
+            <Button variant="contained" disableElevation fullWidth={block}
+              startIcon={<Autorenew sx={{ fontSize: block ? "19px !important" : "16px !important" }} />}
+              onClick={(e) => { e.stopPropagation(); openRenewDialog(c, won ? { ...(amount != null ? { jobValue: String(amount) } : {}), ...(q.quotationNo ? { quotationNo: q.quotationNo } : {}) } : null); }}
+              sx={{ height: block ? 40 : 30, px: block ? 2 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none", fontSize: block ? "0.88rem" : "0.76rem", fontWeight: 800, whiteSpace: "nowrap",
+                bgcolor: "#2563eb", color: "#fff", boxShadow: "0 1px 2px rgba(37,99,235,.35)", "&:hover": { bgcolor: "#1d4ed8" } }}>
+              {won ? "ได้งานแล้ว · ต่อสัญญา" : "ต่อสัญญาปีถัดไป"}
+            </Button>
+          )}
+        </Stack>
+      );
+    }
     if (next) {
       return (
         <Tooltip title={`สัญญาฉบับใหม่เริ่ม ${formatThai(next.contractStart, "D MMM YYYY")}${next.contractEnd ? ` – ${formatThai(next.contractEnd, "D MMM YYYY")}` : ""}`}>

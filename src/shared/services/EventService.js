@@ -304,6 +304,15 @@ const EventService = {
     return res.data;
   },
 
+  /** ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก (ไม่ผูกงานเข้างาน) — { company, site, title, system?, description?, quoteRef?: { kind: "event"|"contract", eventId?, contractGroupId? } } */
+  async CreateQuoteOnly(body) {
+    return (await API.post(`/events/quotation-only`, body)).data;
+  },
+  /** แก้ข้อมูล/การอ้างอิงของใบเสนอราคาแยก · { cancel: true, reason } = ยกเลิก */
+  async UpdateQuoteRef(id, body) {
+    return (await API.put(`/events/${id}/quote-ref`, body)).data;
+  },
+
   /** ข้อมูล/สถานะใบเสนอราคา — PUT /events/:id/quotation (บันทึกทุกวันของงานเดียวกันพร้อมกัน) */
   /** ✅ (26 ต.ค. 2569) ตรวจเอกสารประจำงานด้วย AI ก่อนขอปิดงาน — ไฟล์ไม่เปลี่ยน = ได้ผลเดิมทันที (ไม่เสีย AI) */
   async CloseCheck(id, force = false) {
@@ -372,6 +381,8 @@ const EventService = {
       if (opts.scope) params.scope = opts.scope;
       // ✅ หน้า "รับงาน" ขอรวมงานที่ยกเลิกแล้วด้วย (แท็บ "ยกเลิก") — ที่อื่นไม่ส่ง = server ตัดออกให้
       if (opts.includeCancelled) params.includeCancelled = "1";
+      // ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก — "1" = รวมด้วย · "only" = เฉพาะใบเสนอราคาแยก (ค่าเริ่มต้น server ตัดออก)
+      if (opts.quotes) params.quotes = opts.quotes;
       // ✅ คำขอเดียวกันที่กำลังรออยู่ ใช้คำตอบเดียวกัน (ดู getEventOp)
       const key = JSON.stringify(params);
       if (!inflightDrafts.has(key)) {

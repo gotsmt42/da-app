@@ -93,6 +93,9 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "decidedAt", header: "วันที่ลูกค้าตอบ", width: 14, group: "ผลลัพธ์", align: "center" },
     { key: "decidedBy", header: "ผู้บันทึกผล", width: 16, group: "ผลลัพธ์" },
     { key: "poNo", header: "เลขที่ PO ลูกค้า", width: 16, group: "ผลลัพธ์" },
+    // ✅ (10 พ.ย. 2569) ได้งานบางใบ — ยอดที่ลูกค้าอนุมัติจริง + เลขที่ใบที่อนุมัติ (ว่าง = ทุกใบ/ยอดเต็ม)
+    { key: "approvedAmount", header: "ยอดที่อนุมัติ (฿)", width: 16, group: "ผลลัพธ์", align: "right", numFmt: MONEY_FMT },
+    { key: "approvedNos", header: "ใบที่อนุมัติ", width: 22, group: "ผลลัพธ์" },
     { key: "decisionNote", header: "เหตุผล / หมายเหตุ", width: 30, group: "ผลลัพธ์", wrap: true },
     { key: "team", header: "ทีมที่เข้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
     { key: "responsible", header: "ผู้รับผิดชอบงาน", width: 18, group: "ผู้เกี่ยวข้อง" },
@@ -168,6 +171,8 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
       validUntil: a.quotationValidUntil ? new Date(a.quotationValidUntil) : "",
       contact: [a.quotationContact?.name || a.contactName, a.quotationContact?.phone || a.contactTel, a.quotationContact?.email].filter(Boolean).join(" · "),
       poNo: a.quotationPoNo || "",
+      approvedAmount: job.groupKey === "approved" ? (a.quotationApprovedAmount != null ? Number(a.quotationApprovedAmount) : (a.quotationAmount != null && a.quotationAmount !== "" ? Number(a.quotationAmount) : "")) : "",
+      approvedNos: job.groupKey === "approved" ? ((a.quotationApprovedNos || []).length ? a.quotationApprovedNos.join(", ") : "ทุกใบ") : "",
       decisionNote: a.quotationDecisionNote || "",
       // ✅ ส่งเป็นตัวเลขจริง (ไม่ใช่ข้อความ) — รวมยอด/ทำ pivot ใน Excel ได้ทันที
       amount: a.quotationAmount != null && a.quotationAmount !== "" ? Number(a.quotationAmount) : "",

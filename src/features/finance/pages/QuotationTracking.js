@@ -32,6 +32,8 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import { FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
 import AttachmentList from "@/shared/ui/AttachmentList";
+import FileKindThumb from "@/shared/ui/FileKindThumb";
+import { fileKindOf } from "@/shared/utils/fileKind";
 import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup, QUOTE_STATUS, quoteRevOf, revLabel, currentFollowUps } from "@/shared/utils/quotationTracking";
 import DateCell from "@/shared/ui/DateCell";
@@ -47,6 +49,9 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PAGE_SX } from "@/shared/ui/PageKit";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
+import QuoteOnlyDialog from "@/features/finance/components/QuoteOnlyDialog";
+import Swal from "@/shared/ui/swal";
+import AddRounded from "@mui/icons-material/AddRounded";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -95,6 +100,74 @@ const missingInfo = (a) => !a.quotationAmount || !a.quotationNo;
  *    คำขอบันทึกผลที่รอแอดมิน (ผู้มีสิทธิ์ editFinance) อนุมัติ — null = ไม่มี
  */
 const reqOf = (a) => (a?.quotationDecisionRequest?.action ? a.quotationDecisionRequest : null);
+/**
+ * ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก — ป้าย "ใบเสนอราคาแยก" + อ้างอิง (สัญญา/งาน) กดไปดูต้นทางได้
+ *    สัญญา → หน้าภาพรวมงาน (ค้นด้วยเลขที่สัญญา) · งาน → หน้างานนั้น
+ */
+const refHref = (r) => (r?.kind === "contract" ? `/contracts?q=${encodeURIComponent(r.label || "")}${r.contractEnd && moment(r.contractEnd).isBefore(moment(), "day") ? "&view=expired" : ""}`
+  : r?.kind === "event" && r.eventId ? `/operation/${r.eventId}` : null);
+const QuoteRefLine = ({ a, dense = false }) => {
+  const navigate = useNavigate();
+  if (!a?.quoteOnly) return null;
+  const r = a.quoteRef;
+  const href = refHref(r);
+  return (
+    <Stack direction="row" alignItems="center" gap={0.5} sx={{ flexWrap: "wrap", minWidth: 0 }}>
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", height: 20, px: 0.75, borderRadius: 99, bgcolor: "#eff6ff", color: "#1d4ed8", fontSize: "0.66rem", fontWeight: 800, whiteSpace: "nowrap" }}>ใบเสนอราคาแยก</Box>
+      {r ? (
+        <Box component={href ? "button" : "span"} type={href ? "button" : undefined}
+          onClick={href ? (e) => { e.stopPropagation(); navigate(href); } : undefined}
+          title={href ? "เปิดดูต้นทาง" : undefined}
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.3, minWidth: 0, maxWidth: "100%", border: 0, p: 0, bgcolor: "transparent", font: "inherit", cursor: href ? "pointer" : "default",
+            fontSize: dense ? "0.72rem" : "0.76rem", fontWeight: 700, color: href ? "#2563eb" : TEXT_SUB, "&:hover": href ? { textDecoration: "underline" } : {} }}>
+          <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>อิง{r.kind === "contract" ? "สัญญา" : "งาน"} {r.label}</Box>
+          {href && <ChevronRight sx={{ fontSize: 15 }} />}
+        </Box>
+      ) : <Typography component="span" sx={{ fontSize: "0.72rem", color: "#94a3b8" }}>ไม่ได้อิงงาน</Typography>}
+    </Stack>
+  );
+};
+/**
+ * ✅ (10 พ.ย. 2569 ผู้ใช้: "งานที่มีใบเสนอราคา 2 ใบ แต่อนุมัติแค่ใบเดียว ให้กดบันทึกได้งานแยกได้ · ยอดจะไม่ตรงและผิดพลาด")
+ *    ใบเสนอราคาในงาน (จาก AI อ่านไฟล์ — เลขที่ + ยอด) · ไม่มีผล AI = แยกจากเลขที่ที่กรอกไว้ (ไม่มียอดรายใบ)
+ */
+// 🔁 (10 พ.ย. 2569 ผู้ใช้: "ให้อิง และแสดงตามไฟล์ที่แนบ และสามารถกดดูไฟล์ได้ด้วย")
+//    รายการอิงไฟล์ใบเสนอราคาที่แนบ (ฉบับปัจจุบัน): AI อ่านแล้ว = 1 ใบต่อใบเสนอราคา + ไฟล์ของใบนั้น · ไฟล์ที่ AI ไม่ได้จับคู่ = การ์ดของไฟล์นั้นเอง
+//    ไม่มีผล AI = 1 การ์ดต่อไฟล์ (เลขที่ตามลำดับถ้าจำนวนตรงกัน) · ไม่มีไฟล์เลย = ตามเลขที่ที่กรอกไว้
+//    ⚠️ เลขไฟล์ของ AI (เริ่ม 1) นับเฉพาะรูป/PDF ฉบับปัจจุบัน ไม่เกิน 8 ไฟล์ล่าสุด — ตรงกับ server (services/QuotationScan.js)
+const quoteListOf = (a) => {
+  const cur = (a?.quotationFiles || []).filter((f) => f?.fileUrl && !f.supersededAt);
+  const scannable = cur.filter((f) => { const k = fileKindOf(f.fileName, f.fileUrl); return k.isImage || k.key === "pdf"; }).slice(-8);
+  const ai = Array.isArray(a?.quotationAiFilled?.quotations) ? a.quotationAiFilled.quotations : [];
+  const nos = quoteNos(a);
+  const used = new Set();
+  const list = [];
+  ai.forEach((q, i) => {
+    const files = (Array.isArray(q.files) ? q.files : []).map((n) => scannable[n - 1]).filter(Boolean);
+    files.forEach((f) => used.add(f));
+    const no = String(q.quotationNo || "").trim() || (files[0]?.fileName || `ใบที่ ${i + 1}`);
+    list.push({ no, amount: Number(q.grandTotal) > 0 ? Number(q.grandTotal) : null, files });
+  });
+  const rest = cur.filter((f) => !used.has(f));
+  if (!ai.length && rest.length) {
+    rest.forEach((f, i) => list.push({ no: nos.length === rest.length ? nos[i] : nos.length === 1 && rest.length === 1 ? nos[0] : f.fileName || `ไฟล์ที่ ${i + 1}`, amount: null, files: [f] }));
+  } else if (ai.length) {
+    rest.forEach((f) => list.push({ no: f.fileName || "ไฟล์แนบ", amount: null, files: [f] }));
+  } else {
+    nos.forEach((no) => list.push({ no, amount: null, files: [] }));
+  }
+  // เลขที่ซ้ำ (เช่น AI อ่านเลขเดียวกันจาก 2 ไฟล์) → รวมการ์ด
+  const merged = [];
+  list.forEach((q) => {
+    const m = merged.find((x) => x.no === q.no);
+    if (m) { m.files = [...m.files, ...q.files]; if (m.amount == null) m.amount = q.amount; } else merged.push({ ...q });
+  });
+  // ใบเดียวที่ยังไม่รู้ยอด = ใช้มูลค่าที่กรอกไว้
+  if (merged.length === 1 && merged[0].amount == null && Number(a?.quotationAmount) > 0) merged[0].amount = Number(a.quotationAmount);
+  return merged;
+};
+/** ยอดที่ได้งานจริง — ได้บางใบ = ยอดที่อนุมัติ · ไม่ระบุ = ยอดเต็มใบเสนอราคา */
+const wonAmountOf = (a) => (a?.quotationApprovedAmount != null ? Number(a.quotationApprovedAmount) : Number(a?.quotationAmount) || 0);
 const REQ_COLOR = "#c2410c";
 const reqLabel = (r) => (r?.action === "approve" ? "ได้งาน" : "ไม่ได้งาน");
 const ReqPill = ({ r, sx }) => (
@@ -110,7 +183,7 @@ const DueChip = ({ info }) => {
   if (!info) return null;
   const d = info.daysUntilDue;
   const [label, color] = d < 0 ? [`เลยกำหนด ${-d} วัน`, "#dc2626"] : d === 0 ? ["ตามวันนี้", "#d97706"] : [`ตามอีก ${d} วัน`, TEXT_SUB];
-  return <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color, whiteSpace: "nowrap" }}>{label}</Typography>;
+  return <Typography component="span" sx={{ fontSize: "0.74rem", fontWeight: 700, color, whiteSpace: "nowrap" }}>{label}</Typography>;
 };
 
 const Owner = ({ name, size = 30 }) => (
@@ -175,7 +248,8 @@ const Field = ({ label, children, warn, danger, sub, big, ai }) => {
 //    คอลัมน์: วันที่งาน · งาน (ประเภท) · ลูกค้า/โครงการ · ใบเสนอราคา · มูลค่า · การติดตาม · ผู้รับผิดชอบ · สถานะ · ปุ่ม (ผู้ใช้: ย้ายผู้รับผิดชอบไว้ก่อนสถานะ)
 //    หัวตาราง/ระยะ/ป้ายชุดเดียวกับตารางหน้าอื่น (การดำเนินงาน · งานเข้า · วางบิล)
 const ACTION = {
-  follow_up: { label: "บันทึกติดตาม", primary: true, color: "#dc2626" },
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "สีสันหน้านี้ดูเข้มไป ไม่เข้าธีม ไม่แมทกัน") ปุ่มทุกแถวใช้น้ำเงินธีมหลัก — แดงเหลือเฉพาะป้ายเตือน
+  follow_up: { label: "บันทึกติดตาม", primary: true },
   sent: { label: "อัปเดตผล", primary: true },
   revising: { label: "แนบฉบับแก้ไข", primary: true },
   not_sent: { label: "เปิด" },
@@ -206,10 +280,11 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
             const actColor = act.color || "#2563eb";
             return (
               <Box component="tr" key={a._id} onClick={() => onOpen(job)}
-                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" }, "&:last-child td": { borderBottom: 0 }, boxShadow: `inset 3px 0 0 ${m.color}` }}>
+                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" }, "&:last-child td": { borderBottom: 0 },
+                  boxShadow: req ? `inset 3px 0 0 ${REQ_COLOR}` : job.groupKey === "follow_up" ? `inset 3px 0 0 ${alpha(m.color, 0.55)}` : "none" }}>
                 <Box component="td" sx={{ ...td, width: 96 }}><DateCell start={a.start} end={a.end} allDay={a.allDay} /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 180, maxWidth: 230 }}>
-                  <JobKindTag event={a} />
+                  {a.quoteOnly ? <QuoteRefLine a={a} dense /> : <JobKindTag event={a} />}
                   <Typography sx={{ mt: 0.5, fontSize: "0.86rem", fontWeight: 800, color: TEXT_MAIN }}>{jobText(a) || "งาน"}</Typography>
                   {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
                 </Box>
@@ -259,7 +334,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                 <Box component="td" sx={{ ...td, minWidth: 150 }}><Owner name={ownerOf(a)} size={30} /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 140 }}>
                   <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 26, px: 1.1, borderRadius: 99, whiteSpace: "nowrap",
-                    bgcolor: alpha(m.color, 0.12), color: m.color, border: `1px solid ${alpha(m.color, 0.35)}`, fontSize: "0.76rem", fontWeight: 800 }}>
+                    bgcolor: alpha(m.color, 0.09), color: m.color, fontSize: "0.76rem", fontWeight: 700 }}>
                     <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color }} />{m.label}
                   </Box>
                   {req && <ReqPill r={req} sx={{ mt: 0.5 }} />}
@@ -268,7 +343,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                   <Stack direction="row" alignItems="center" gap={0.5} justifyContent="flex-end">
                     <Button size="small" onClick={(e) => { e.stopPropagation(); onOpen(job); }}
                       sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none",
-                        ...(act.primary ? { bgcolor: actColor, color: "#fff", "&:hover": { bgcolor: actColor, filter: "brightness(.92)" } } : { color: actColor, border: `1px solid ${alpha(actColor, 0.4)}` }) }}>
+                        ...(act.primary ? { bgcolor: alpha(actColor, 0.1), color: actColor, "&:hover": { bgcolor: alpha(actColor, 0.18) } } : { color: TEXT_SUB, border: `1px solid ${BORDER}`, "&:hover": { bgcolor: "#f8fafc" } }) }}>
                       {act.label}
                     </Button>
                     <ChevronRight sx={{ color: "#cbd5e1", fontSize: 20 }} />
@@ -296,7 +371,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
   const info = job.info;
   return (
     <Box onClick={() => onOpen(job)} role="button"
-      sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${m.color}`, borderRadius: 3, cursor: "pointer", overflow: "hidden", "&:active": { bgcolor: "#f8fafc" } }}>
+      sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: req ? `3px solid ${REQ_COLOR}` : job.groupKey === "follow_up" ? `3px solid ${alpha(m.color, 0.55)}` : `1px solid ${BORDER}`, borderRadius: 3, cursor: "pointer", overflow: "hidden", "&:active": { bgcolor: "#f8fafc" } }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5, py: 1, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}` }}>
         <Box sx={{ flex: 1, minWidth: 0 }}><Owner name={ownerOf(a)} size={24} /></Box>
         <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, px: 1, borderRadius: 99, whiteSpace: "nowrap", flexShrink: 0,
@@ -308,7 +383,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
       <Box sx={{ px: 1.5, pt: 1.1, pb: 1.25 }}>
         <Stack direction="row" gap={1} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <JobKindTag event={a} />
+            {a.quoteOnly ? <QuoteRefLine a={a} dense /> : <JobKindTag event={a} />}
             <Typography sx={{ mt: 0.5, fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{a.company || a.site || "ไม่ระบุลูกค้า"}</Typography>
             <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
               {[a.site && a.site !== a.company ? a.site : "", jobText(a), formatEventDateRange(a)].filter(Boolean).join(" · ")}
@@ -345,7 +420,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
           </Box>
           <Button size="small" onClick={(e) => { e.stopPropagation(); onOpen(job); }}
             sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none",
-              ...(act.primary ? { bgcolor: actColor, color: "#fff", "&:hover": { bgcolor: actColor } } : { color: actColor, border: `1px solid ${alpha(actColor, 0.4)}` }) }}>
+              ...(act.primary ? { bgcolor: alpha(actColor, 0.1), color: actColor, "&:hover": { bgcolor: alpha(actColor, 0.18) } } : { color: TEXT_SUB, border: `1px solid ${BORDER}` }) }}>
             {act.label}
           </Button>
         </Stack>
@@ -355,9 +430,24 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
 };
 
 // ─── กล่องยืนยันการตัดสินใจของลูกค้า (อนุมัติ = เลข PO · ปฏิเสธ = เหตุผลบังคับ · ส่ง = วันที่ส่ง) ─────
-const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest = false, req = null }) => {
+const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest = false, req = null, a = null, onPreview }) => {
   const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
   const [po, setPo] = useState("");
+  // ✅ (10 พ.ย. 2569) ได้งานบางใบ + ยอดที่อนุมัติจริง · แนบหลักฐาน (PO / อีเมล / หนังสือตอบรับ) ได้ในกล่องเดียว
+  const quotes = useMemo(() => quoteListOf(a), [a]);
+  const [picked, setPicked] = useState([]);
+  const [amount, setAmount] = useState("");
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ยอดที่ลูกค้าอนุมัติ ให้เลือกใบเสนอราคาได้เลย ไม่ต้องพิมพ์เอง ทำได้ง่ายๆ ดูง่าย")
+  //    ติ๊กใบที่ได้ = ยอดคำนวณให้เอง · พิมพ์ยอดเองเฉพาะกรณีต่อรองราคา (กด "ระบุยอดเอง")
+  const [manual, setManual] = useState(false);
+  const [files, setFiles] = useState([]);
+  const fileRef = useRef(null);
+  const phone = useMediaQuery("(max-width:600px)");
+  // ✅ (10 พ.ย. 2569 ผู้ใช้: "ถ้ามียอดอยู่แล้วไม่ต้องให้กรอกอีก ดึงมาได้เลย" · "ให้ AI อ่านต้องติ๊กเลือกไฟล์ก่อน · ไฟล์ที่มีราคาแล้วไม่ต้องอ่านซ้ำ")
+  //    AI อ่านเฉพาะไฟล์ของใบที่ติ๊กและยังไม่รู้ยอด (ทีละไฟล์ · ไม่บันทึกทับผลอ่านเดิมของงาน) → ยอดเติมในกล่องนี้ทันที
+  const [aiAmt, setAiAmt] = useState({}); // { fileKey: number | null(อ่านไม่ได้) }
+  const [scan, setScan] = useState({ busy: false, error: "" });
+  const fileKey = (f) => String(f?._id || f?.fileUrl || "");
   const [note, setNote] = useState("");
   useEffect(() => {
     if (!mode) return;
@@ -366,9 +456,58 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
     setDate(fromReq && req.decidedAt ? moment(req.decidedAt).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD"));
     setPo(fromReq ? req.poNo || "" : "");
     setNote(fromReq ? req.note || "" : "");
+    const all = quotes.map((q) => q.no);
+    setPicked(fromReq && req.approvedNos?.length ? req.approvedNos.filter((n) => all.includes(n)) : all);
+    const reqAmount = fromReq && req.approvedAmount != null ? Number(req.approvedAmount) : null;
+    setAmount(reqAmount != null ? String(reqAmount) : "");
+    // คำขอระบุยอดที่ไม่ตรงกับผลรวมใบที่เลือก = ยอดต่อรอง → เปิดช่องพิมพ์ให้เห็น
+    const sel = fromReq && req.approvedNos?.length ? req.approvedNos : all;
+    const sum = quotes.length && quotes.every((q) => q.amount != null) ? quotes.filter((q) => sel.includes(q.no)).reduce((t, q) => t + q.amount, 0) : null;
+    setManual(reqAmount != null && (sum == null || Math.abs(sum - reqAmount) > 0.005));
+    setFiles([]);
+    setScan({ busy: false, error: "" });
+    setAiAmt({});
+    // ⚠️ ตั้งค่าเริ่มต้นตอนเปิดกล่องเท่านั้น — ข้อมูลงานอัปเดต (เช่น AI อ่านยอดเสร็จ) ต้องไม่ล้างใบที่ผู้ใช้เลือกไว้
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, req]);
   if (!mode) return null;
   const reqIsApprove = req?.action === "approve";
+  // ยอดรายใบ: จากใบเสนอราคา/ผลอ่านเดิม · ไม่มี = ผลที่ AI เพิ่งอ่านในกล่องนี้ (ทุกไฟล์ของใบต้องอ่านได้)
+  const eq = quotes.map((q) => {
+    if (q.amount != null || !q.files.length) return q;
+    const vals = q.files.map((f) => aiAmt[fileKey(f)]);
+    return vals.every((v) => typeof v === "number") ? { ...q, amount: Math.round(vals.reduce((t, v) => t + v, 0) * 100) / 100, ai: true } : q;
+  });
+  const multi = eq.length > 1;
+  const pickedQ = eq.filter((q) => picked.includes(q.no));
+  const pickedKnown = pickedQ.length > 0 && pickedQ.every((q) => q.amount != null);
+  const pickedSum = Math.round(pickedQ.reduce((t, q) => t + (q.amount || 0), 0) * 100) / 100;
+  const partial = multi && picked.length < eq.length;
+  const togglePick = (no) => setPicked((p) => (p.includes(no) ? p.filter((x) => x !== no) : [...p, no]));
+  // ยอดอัตโนมัติ: รู้ยอดทุกใบที่ติ๊ก = ผลรวม · ได้ทุกใบ = มูลค่าเต็มที่กรอกไว้ · นอกนั้น = ไม่ทราบ
+  const autoAmount = pickedKnown ? pickedSum : !partial && a?.quotationAmount != null ? Number(a.quotationAmount) : null;
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ถ้าไม่ทราบยอดต้องบังคับให้กรอกด้วย · เฉพาะตรงบันทึกได้งาน") ไม่ทราบยอด = ต้องกรอกยอดที่ลูกค้าอนุมัติ
+  const needManual = autoAmount == null;
+  // ใบที่ติ๊กแต่ยังไม่รู้ยอด และมีไฟล์ให้ AI อ่าน (ไฟล์ที่มีราคาแล้วไม่อ่านซ้ำ)
+  const scanTargets = pickedQ.filter((q) => q.amount == null && q.files.length).flatMap((q) => q.files).filter((f) => aiAmt[fileKey(f)] === undefined && f._id);
+  const runScan = async () => {
+    setScan({ busy: true, error: "" });
+    let failed = 0;
+    for (const f of scanTargets) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- อ่านทีละไฟล์
+        const r = (await EventService.ScanQuotation(a._id, f._id, false))?.result || {};
+        const qs = (r.quotations || []).map((q) => Number(q.grandTotal) || 0).filter((n) => n > 0);
+        const amt = qs.length ? qs.reduce((t, n) => t + n, 0) : Number(r.grandTotal) > 0 ? Number(r.grandTotal) : null;
+        setAiAmt((m) => ({ ...m, [fileKey(f)]: amt }));
+        if (amt == null) failed += 1;
+      } catch {
+        failed += 1;
+        setAiAmt((m) => ({ ...m, [fileKey(f)]: null }));
+      }
+    }
+    setScan({ busy: false, error: failed ? `AI อ่านยอดไม่ได้ ${failed} ไฟล์ — กรอกยอดเองด้านล่าง` : "" });
+  };
   const meta = {
     send: { title: "ส่งใบเสนอราคาให้ลูกค้าแล้ว · เริ่มนับติดตาม", color: "#2563eb", btn: "เริ่มนับติดตาม", dateLabel: "วันที่ส่งให้ลูกค้า" },
     resend: { title: "ส่งใบเสนอราคาฉบับแก้ไขให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึก · เริ่มนับใหม่", dateLabel: "วันที่ส่งฉบับแก้ไข" },
@@ -389,15 +528,56 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
   const poMode = mode === "approve" || (mode === "approveRequest" && reqIsApprove);
   const noteMode = mode === "approve" || mode === "reject" || mode === "approveRequest" || mode === "rejectRequest";
   const noteRequired = mode === "reject" || mode === "rejectRequest" || (mode === "approveRequest" && !reqIsApprove);
-  const invalid = noteRequired && !note.trim();
+  const useManual = manual || (poMode && needManual);
+  const amountNum = amount === "" ? null : Number(amount);
+  const amountBad = useManual && amountNum !== null && (!Number.isFinite(amountNum) || amountNum < 0);
+  const finalAmount = useManual ? amountNum : autoAmount;
+  const invalid = (noteRequired && !note.trim()) || (poMode && quotes.length > 0 && picked.length === 0) || (poMode && amountBad) || (poMode && needManual && (amountNum === null || amountBad));
+  const evidenceMode = mode === "approve" || mode === "reject" || mode === "approveRequest";
+  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "แนบไฟล์ และเลขที่ PO ควรอยู่ใกล้กัน ไม่ให้งง") หลักฐานจากลูกค้าอยู่กล่องเดียว: เลขที่ PO + ไฟล์
+  const evidence = (
+            <Box sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: "#fff" }}>
+              <input ref={fileRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx"
+                onChange={(e) => { const fl = Array.from(e.target.files || []); e.target.value = ""; if (fl.length) setFiles((x) => [...x, ...fl].slice(0, 10)); }} />
+              <Typography sx={{ display: "flex", alignItems: "center", gap: 0.6, fontSize: "0.84rem", fontWeight: 800, color: TEXT_MAIN }}>
+                <AttachFile sx={{ fontSize: 18, color: "#2563eb" }} />
+                {poMode ? "หลักฐานการสั่งซื้อจากลูกค้า" : "หลักฐานจากลูกค้า"} <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}>· ไม่บังคับ</Box>
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, mb: 1 }}>{poMode ? "เลขที่ PO และไฟล์ PO / หนังสือตอบรับ / อีเมลยืนยัน" : "อีเมล / หนังสือแจ้งไม่รับ"}</Typography>
+              {poMode && (
+                <TextField size="small" fullWidth label="เลขที่ PO / ใบสั่งซื้อของลูกค้า" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} sx={{ mb: 1 }} />
+              )}
+              {files.length > 0 && (
+                <Box sx={{ mb: 0.75, px: 1.25, border: `1px solid ${BORDER}`, borderRadius: 2 }}>
+                  {files.map((f, i) => (
+                    <Stack key={`${f.name}-${i}`} direction="row" alignItems="center" gap={1.25} sx={{ py: 0.75, borderTop: i ? "1px solid #f1f5f9" : 0, minWidth: 0 }}>
+                      <FileKindThumb name={f.name} size={34} />
+                      <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: TEXT_MAIN }}>{f.name}</Typography>
+                      <IconButton size="small" aria-label="เอาไฟล์ออก" onClick={() => setFiles((x) => x.filter((_, j) => j !== i))} sx={{ color: "#94a3b8" }}><Close sx={{ fontSize: 17 }} /></IconButton>
+                    </Stack>
+                  ))}
+                </Box>
+              )}
+              <Button size="small" fullWidth startIcon={<AttachFile sx={{ fontSize: 16 }} />} onClick={() => fileRef.current?.click()} disabled={busy}
+                sx={{ height: 40, textTransform: "none", fontWeight: 800, borderRadius: 2, border: "1px dashed #93c5fd", color: "#2563eb", bgcolor: "#f8fbff", "&:hover": { bgcolor: "#eff6ff" } }}>
+                {files.length ? "แนบไฟล์เพิ่ม" : "แนบไฟล์หลักฐาน"}
+              </Button>
+            </Box>
+  );
   const noteLabel = mode === "rejectRequest" ? "เหตุผลที่ไม่อนุมัติ * (ส่งกลับให้ผู้ขอ)"
     : (mode === "reject" || (mode === "approveRequest" && !reqIsApprove)) ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)";
   return (
     // 🔁 (26 ต.ค. 2569 ผู้ใช้: "หน้าอื่นๆด้วยที่มีขนาดเล็กไป") กว้างขึ้น (sm) — วันที่กับเลข PO อยู่แถวเดียวกัน
-    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
-      <DialogTitle sx={{ fontWeight: 900, fontSize: "1.05rem", color: meta.color, pb: 1 }}>{title}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+    // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ขยายออกอีก และไม่ให้เลยขอบ จัดวางให้สมบูรณ์") กว้างขึ้น (720) · ชื่อไฟล์ยาวตัดคำ ไม่ล้นแนวนอน · มือถือเต็มจอ ปุ่มติดล่าง
+    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="md" fullScreen={phone}
+      PaperProps={{ sx: { borderRadius: phone ? 0 : 3, maxWidth: phone ? "100%" : 720 } }}>
+      <DialogTitle sx={{ display: "flex", alignItems: "flex-start", gap: 1, fontWeight: 900, fontSize: "1.05rem", color: meta.color, pb: 1, pr: 1.5, borderBottom: phone ? `1px solid ${BORDER}` : 0 }}>
+        <Box component="span" sx={{ flex: 1, minWidth: 0, pt: 0.5 }}>{title}</Box>
+        <IconButton size="small" aria-label="ปิด" onClick={onClose} disabled={busy} sx={{ flexShrink: 0, color: TEXT_SUB }}><Close fontSize="small" /></IconButton>
+      </DialogTitle>
+      <DialogContent sx={{ overflowX: "hidden", pt: "14px !important" }}>
+        {/* 🐛 (10 พ.ย. 2569 ผู้ใช้: "สระหาย") เว้นบนให้ป้ายลอยของช่องวันที่ (สระบน ที่/ตอบ) ไม่ถูกตัด */}
+        <Stack spacing={1.5} sx={{ pt: 1.25 }}>
           {requesting && (
             <Alert severity="info" icon={<HourglassTop />} sx={{ borderRadius: 2, "& .MuiAlert-message": { fontSize: "0.82rem" } }}>
               ผลจะยังไม่เปลี่ยนจนกว่าแอดมิน (ฝ่ายบริหาร/การเงิน) อนุมัติ — ระบบแจ้งเตือนแอดมินให้ทันที
@@ -424,22 +604,119 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo, asRequest =
               </Typography>
             </Box>
           )}
-          {(!meta.noDate || poMode) && (
-            <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: poMode && !meta.noDate ? "1fr 1fr" : "1fr" } }}>
-              {!meta.noDate && <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />}
-              {poMode && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
+          {!meta.noDate && (
+            <Box sx={{ maxWidth: { sm: 320 } }}>
+              <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />
             </Box>
           )}
+          {poMode && (
+            <Box>
+              <Typography sx={{ display: "flex", alignItems: "center", gap: 0.6, fontSize: "0.84rem", fontWeight: 800, color: TEXT_MAIN, mb: 0.75 }}>
+                <RequestQuote sx={{ fontSize: 18, color: "#2563eb" }} />
+                {quotes.length ? "ลูกค้าอนุมัติใบไหน?" : "ยอดที่ลูกค้าอนุมัติ"}
+                {multi && <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · แตะเพื่อเลือก ({picked.length}/{quotes.length} ใบ)</Box>}
+              </Typography>
+              {quotes.length > 0 && (
+                // 🐛 (10 พ.ย. 2569 ผู้ใช้: "จอมือถือ จัดวางให้ดี") ชื่อไฟล์ยาวดันการ์ดล้นจอ — คอลัมน์ minmax(0,1fr) ให้ตัด "…" แทน
+                <Box sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 0.75 }}>
+                  {eq.map((q) => {
+                    const on = picked.includes(q.no);
+                    return (
+                      <Box key={q.no} role="checkbox" tabIndex={0} aria-checked={on} onClick={() => togglePick(q.no)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePick(q.no); } }}
+                        sx={{ display: "flex", alignItems: "center", gap: 1.25, width: "100%", textAlign: "left", font: "inherit", cursor: "pointer", boxSizing: "border-box",
+                          px: 1.25, py: 1, borderRadius: 2, transition: "all .15s",
+                          border: `1.5px solid ${on ? "#16a34a" : BORDER}`, bgcolor: on ? "#f0fdf4" : "#fff", "&:hover": { borderColor: on ? "#16a34a" : "#94a3b8" } }}>
+                        {on
+                          ? <CheckCircle sx={{ fontSize: 24, color: "#16a34a", flexShrink: 0 }} />
+                          : <Box sx={{ width: 20, height: 20, m: "2px", borderRadius: "50%", flexShrink: 0, border: "2px solid #cbd5e1" }} />}
+                        {q.files.length > 0 && (
+                          <Stack direction="row" gap={0.5} sx={{ flexShrink: 0 }}>
+                            {q.files.slice(0, 2).map((f, fi) => (
+                              <Box key={fi} role="button" tabIndex={0} title={`ดูไฟล์ ${f.fileName || ""}`}
+                                onClick={(e) => { e.stopPropagation(); onPreview?.(f.fileUrl, f.fileName); }}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onPreview?.(f.fileUrl, f.fileName); } }}
+                                sx={{ borderRadius: 1.5, cursor: "zoom-in", "&:hover": { boxShadow: "0 0 0 2px #93c5fd" } }}>
+                                <FileKindThumb name={f.fileName} url={f.fileUrl} size={40} />
+                              </Box>
+                            ))}
+                          </Stack>
+                        )}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: on ? TEXT_MAIN : TEXT_SUB }}>{q.no}</Typography>
+                          {q.files.length > 0 && (
+                            <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>
+                              {q.files[0].fileName !== q.no ? q.files[0].fileName : "แตะรูปเพื่อดูไฟล์"}{q.files.length > 1 ? ` +${q.files.length - 1} ไฟล์` : ""}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Typography sx={{ fontSize: "0.9rem", fontWeight: q.amount != null ? 900 : 700, color: on ? (q.amount != null ? TEXT_MAIN : "#b45309") : "#94a3b8", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                          {q.ai && <AiTag title="AI อ่านยอดจากไฟล์ — ตรวจก่อนบันทึก" />} {q.amount != null ? baht(q.amount) : q.files.some((f) => aiAmt[fileKey(f)] === null) ? "อ่านยอดไม่ได้" : "ไม่ทราบยอด"}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+              {(scanTargets.length > 0 || scan.busy || scan.error) && (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.75, flexWrap: "wrap" }}>
+                  <Typography sx={{ fontSize: "0.74rem", color: scan.error ? "#b45309" : TEXT_SUB }}>
+                    {scan.busy ? `AI กำลังอ่านยอด ${scanTargets.length || ""} ไฟล์…` : scan.error || "ใบที่เลือกยังไม่รู้ยอด"}
+                  </Typography>
+                  {!scan.busy && scanTargets.length > 0 && (
+                    <Button size="small" onClick={runScan} sx={{ textTransform: "none", fontWeight: 800, color: "#7c3aed", py: 0, minHeight: 0 }}>
+                      ✦ ให้ AI อ่านยอดใบที่เลือก ({scanTargets.length} ไฟล์)
+                    </Button>
+                  )}
+                </Stack>
+              )}
+              {quotes.length > 0 && picked.length === 0 && <Typography sx={{ mt: 0.5, fontSize: "0.76rem", color: "#b91c1c", fontWeight: 700 }}>เลือกอย่างน้อย 1 ใบ — ถ้าลูกค้าไม่รับทุกใบ ให้กด “ไม่ได้งาน”</Typography>}
+              {/* สรุปยอดได้งาน (คำนวณให้) · พิมพ์เองเฉพาะต่อรองราคา */}
+              {!useManual && (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 700 }}>ยอดได้งาน{partial ? ` · ${picked.length} จาก ${quotes.length} ใบ` : ""}</Typography>
+                    <Typography sx={{ fontSize: "1.1rem", fontWeight: 900, color: autoAmount != null ? "#15803d" : "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
+                      {autoAmount != null ? baht(autoAmount) : "ไม่ทราบยอด"}
+                    </Typography>
+                  </Box>
+                  <Button size="small" onClick={() => { setManual(true); setAmount(autoAmount != null ? String(autoAmount) : ""); }}
+                    sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, color: "#2563eb" }}>ระบุยอดเอง</Button>
+                </Stack>
+              )}
+              {useManual && (
+                <Box sx={{ mt: 1 }}>
+                  <TextField size="small" fullWidth autoFocus={manual} label="ยอดที่ลูกค้าอนุมัติ (บาท)" type="number" value={amount}
+                    onChange={(e) => setAmount(e.target.value)} error={amountBad || (needManual && amountNum === null)} inputProps={{ min: 0, step: "any" }}
+                    helperText={needManual ? `ไม่ทราบยอด — กรอกยอดที่ลูกค้าอนุมัติ *${a?.quotationAmount != null ? ` (มูลค่ารวมทุกใบ ${baht(a.quotationAmount)})` : ""}` : `ต่อรองราคา / ยอดไม่ตรงใบเสนอราคา${autoAmount != null ? ` · ยอดตามใบที่เลือก ${baht(autoAmount)}` : ""}`} />
+                  {manual && !needManual && (
+                    <Button size="small" onClick={() => { setManual(false); setAmount(""); }} sx={{ mt: 0.25, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ใช้ยอดตามใบที่เลือก</Button>
+                  )}
+                </Box>
+              )}
+            </Box>
+          )}
+          {evidenceMode && poMode && evidence}
           {noteMode && (
             <TextField size="small" multiline minRows={3} label={noteLabel} value={note}
               onChange={(e) => setNote(e.target.value)} error={invalid && note !== ""} inputProps={{ maxLength: 500 }}
               placeholder={mode === "rejectRequest" ? "เช่น ยังไม่มี PO ยืนยัน / ลูกค้ายังไม่ได้ตอบจริง" : noteRequired ? "เช่น ราคาสูงกว่าเจ้าอื่น / เลื่อนโครงการ / ใช้ผู้รับเหมาเดิม" : ""} />
           )}
+          {evidenceMode && !poMode && evidence}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, borderTop: `1px solid ${BORDER}`, pb: phone ? "calc(12px + env(safe-area-inset-bottom))" : 1.5, "& > button": { flex: phone ? 1 : "0 0 auto", minHeight: 44 } }}>
         <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
-        <Button variant="contained" disabled={busy || invalid} onClick={() => onConfirm({ date, po: po.trim(), note: note.trim() })}
+        <Button variant="contained" disabled={busy || invalid}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : poMode || mode === "approve" ? <CheckCircle /> : mode === "reject" ? <Cancel /> : null}
+          onClick={() => onConfirm({
+          date, po: po.trim(), note: note.trim(), files,
+          // ส่งเฉพาะตอนได้งาน: เลือกไม่ครบทุกใบ = ระบุใบ · ยอดต่างจากยอดเต็ม/ได้บางใบ = ระบุยอด
+          ...(poMode ? {
+            approvedNos: partial ? picked : [],
+            approvedAmount: finalAmount !== null && (partial || finalAmount !== Number(a?.quotationAmount)) ? finalAmount : null,
+          } : {}),
+        })}
           sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.color, filter: "brightness(.92)" } }}>
           {busy ? "กำลังบันทึก..." : btn}
         </Button>
@@ -715,7 +992,7 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
                 return (
                   <Box key={c.value} component="button" type="button" onClick={() => setChannel(c.value)}
                     sx={{ height: 28, px: 1.25, border: 0, borderRadius: 1.5, cursor: "pointer", font: "inherit", fontSize: "0.78rem", fontWeight: on ? 800 : 600,
-                      bgcolor: on ? "#fff" : "transparent", color: on ? "#dc2626" : "#475569", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
+                      bgcolor: on ? "#fff" : "transparent", color: on ? "#1d4ed8" : "#475569", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
                     {c.label}
                   </Box>
                 );
@@ -755,9 +1032,9 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
           <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: TEXT_SUB, mb: 1 }}>ประวัติการติดตาม (ล่าสุดอยู่บน)</Typography>
           <Stack spacing={1}>
             {followUps.slice().reverse().map((x, i) => (
-              <Box key={x._id || i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: i === 0 ? "#fff" : "#fcfdfe", boxShadow: i === 0 ? "inset 3px 0 0 #dc2626" : "none" }}>
+              <Box key={x._id || i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: i === 0 ? "#fff" : "#fcfdfe", boxShadow: i === 0 ? "inset 3px 0 0 #2563eb" : "none" }}>
                 <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
-                  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#dc2626" : "#e6e9ef", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
+                  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#2563eb" : "#e6e9ef", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
                     ครั้งที่ {x.attemptNumber}
                   </Box>
                   {rev > 0 && (
@@ -771,10 +1048,15 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
                 </Stack>
                 {x.note && <Typography sx={{ fontSize: "0.88rem", color: "#1e293b", whiteSpace: "pre-wrap", mt: 0.6, lineHeight: 1.6 }}>{x.note}</Typography>}
                 {x.evidenceFileUrl && (
+                  // 🔁 (10 พ.ย. 2569 ผู้ใช้: "หลักฐานให้แสดงรูปแบบไฟล์ด้วย ให้สวยงาม") ภาพย่อ/ป้ายชนิดไฟล์ + ชื่อไฟล์ · กดดู
                   <Box component="button" type="button" onClick={() => onPreview(x.evidenceFileUrl, x.evidenceFileName)}
-                    sx={{ mt: 0.6, display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 0.9, border: 0, borderRadius: 99, cursor: "pointer", font: "inherit",
-                      bgcolor: alpha("#2563eb", 0.08), color: "#2563eb", fontSize: "0.72rem", fontWeight: 800 }}>
-                    <AttachFile sx={{ fontSize: 14 }} />ดูหลักฐาน
+                    sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 1, maxWidth: "100%", p: 0.6, pr: 1.25, border: `1px solid ${BORDER}`, borderRadius: 2, cursor: "pointer", font: "inherit",
+                      bgcolor: "#fff", textAlign: "left", "&:hover": { borderColor: "#93c5fd", bgcolor: "#f8fbff" } }}>
+                    <FileKindThumb name={x.evidenceFileName} url={x.evidenceFileUrl} size={36} />
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 700, color: TEXT_MAIN }}>{x.evidenceFileName || "หลักฐาน"}</Typography>
+                      <Typography sx={{ fontSize: "0.7rem", color: "#2563eb", fontWeight: 700 }}>หลักฐานการติดตาม · แตะเพื่อดู</Typography>
+                    </Box>
                   </Box>
                 )}
               </Box>
@@ -939,15 +1221,22 @@ const QuoteScanBox = ({ a }) => {
 };
 
 /** แก้/เติมรายละเอียดผลลัพธ์ภายหลัง — วันที่ลูกค้าตอบ · เลข PO (ได้งาน) · หมายเหตุ/เหตุผล (เปิดจากปุ่มมุมขวาบน) */
-const ResultDetails = ({ a, k, onSave, open, onClose }) => {
+const ResultDetails = ({ a, k, onSave, open, onClose, isFinance = false }) => {
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({});
-  useEffect(() => { if (open) setF({ date: ymd(a.quotationDecisionAt), po: a.quotationPoNo || "", note: a.quotationDecisionNote || "" }); }, [open, a.quotationDecisionAt, a.quotationPoNo, a.quotationDecisionNote]);
+  // ✅ (10 พ.ย. 2569) ฝ่ายบริหาร/การเงินแก้ "ยอดที่ลูกค้าอนุมัติ" ภายหลังได้ (ได้งานบางใบ/ต่อรองราคา) · ว่าง = ยอดเต็มใบเสนอราคา
+  useEffect(() => { if (open) setF({ date: ymd(a.quotationDecisionAt), po: a.quotationPoNo || "", note: a.quotationDecisionNote || "", amount: a.quotationApprovedAmount != null ? String(a.quotationApprovedAmount) : "" }); }, [open, a.quotationDecisionAt, a.quotationPoNo, a.quotationDecisionNote, a.quotationApprovedAmount]);
+  const amountBad = f.amount !== "" && f.amount != null && (!Number.isFinite(Number(f.amount)) || Number(f.amount) < 0);
   const setOpen = (v) => { if (!v) onClose(); };
-  const invalid = k === "rejected" && !String(f.note || "").trim();
+  const invalid = (k === "rejected" && !String(f.note || "").trim()) || amountBad;
   const save = async () => {
     setBusy(true);
-    const ok = await onSave({ quotationDecisionAt: f.date || "", quotationDecisionNote: f.note, ...(k === "approved" ? { quotationPoNo: f.po } : {}) });
+    const amountChanged = isFinance && k === "approved" && String(f.amount ?? "") !== (a.quotationApprovedAmount != null ? String(a.quotationApprovedAmount) : "");
+    const ok = await onSave({
+      quotationDecisionAt: f.date || "", quotationDecisionNote: f.note,
+      ...(k === "approved" ? { quotationPoNo: f.po } : {}),
+      ...(amountChanged ? { quotationApprovedAmount: f.amount === "" ? null : Number(f.amount) } : {}),
+    });
     setBusy(false);
     if (ok) setOpen(false);
   };
@@ -957,6 +1246,11 @@ const ResultDetails = ({ a, k, onSave, open, onClose }) => {
       <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: k === "approved" ? "1fr 1fr" : "1fr" } }}>
         <ThaiDatePicker label="วันที่ลูกค้าตอบ" value={f.date} onChange={(v) => setF((x) => ({ ...x, date: v || "" }))} />
         {k === "approved" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า" value={f.po} onChange={(e) => setF((x) => ({ ...x, po: e.target.value }))} inputProps={{ maxLength: 60 }} />}
+        {k === "approved" && isFinance && (
+          <TextField size="small" type="number" label="ยอดที่ลูกค้าอนุมัติ (บาท)" value={f.amount ?? ""} error={amountBad}
+            onChange={(e) => setF((x) => ({ ...x, amount: e.target.value }))} inputProps={{ min: 0, step: "any" }}
+            helperText={a.quotationAmount != null ? `เว้นว่าง = ยอดเต็ม ${baht(a.quotationAmount)}` : "เว้นว่าง = ยอดเต็มใบเสนอราคา"} />
+        )}
       </Box>
       <TextField size="small" fullWidth multiline minRows={2} sx={{ mt: 1.25 }} label={k === "rejected" ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)"}
         value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} error={invalid} inputProps={{ maxLength: 500 }} />
@@ -997,7 +1291,7 @@ const MiniStat = ({ label, value, color }) => (
 );
 
 const DetailDialog = ({
-  job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload, onRevise,
+  job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload, onRevise, onEditQuote, onCancelQuote,
 }) => {
   const fullScreen = useMediaQuery("(max-width:600px)");
   const navigate = useNavigate();
@@ -1023,13 +1317,16 @@ const DetailDialog = ({
 
   const req = reqOf(a);
   const isRequester = req && String(req.byId) === String(currentUser?.userId || currentUser?._id || "");
-  const confirmDecision = async ({ date, po, note }) => {
+  const confirmDecision = async ({ date, po, note, files = [], approvedNos = [], approvedAmount = null }) => {
     setBusy(true);
     const action = decision === "resend" || decision === "send" ? "send" : decision;
+    const isApprove = action === "approve" || (action === "approveRequest" && req?.action === "approve");
     const body = action === "reset" ? { action }
       : action === "rejectRequest" ? { action, reason: note }
-      : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
+      : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note, ...(isApprove ? { approvedNos, approvedAmount } : {}) }) };
     const ok = await onQuotation(job, body);
+    // ✅ (10 พ.ย. 2569) หลักฐานผลลัพธ์ (PO / อีเมล) — อัปโหลดหลังบันทึกผลสำเร็จ เข้าช่อง "เอกสารผลลัพธ์"
+    if (ok && files.length) await onFileUpload(files, a._id, "quotationResult");
     setBusy(false);
     if (ok) setDecision(null);
   };
@@ -1074,14 +1371,13 @@ const DetailDialog = ({
     }
     return null;
   })();
-  const tone = next?.tone || m.color;
 
   return (
     <Dialog open onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: "#f8fafc" } }}>
       {/* ── หัว: ลูกค้า/โครงการ · งาน · มูลค่า ── */}
       <Box sx={{ px: { xs: 1.75, sm: 2.5 }, pt: 1.75, pb: 1.5, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <Box sx={{ width: 42, height: 42, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(m.color, 0.1), color: m.color }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
             <RequestQuote />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1090,8 +1386,23 @@ const DetailDialog = ({
               {siteText(a)}
             </Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : "", formatEventDateRange(a), ownerOf(a) ? `ผู้รับผิดชอบ ${ownerOf(a)}` : ""].filter(Boolean).join(" · ")}
+              {a.quoteOnly
+                ? [jobText(a), `เพิ่มเมื่อ ${thaiDate(a.createdAt || a.start)}`, ownerOf(a) ? `ผู้รับผิดชอบ ${ownerOf(a)}` : ""].filter(Boolean).join(" · ")
+                : [jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : "", formatEventDateRange(a), ownerOf(a) ? `ผู้รับผิดชอบ ${ownerOf(a)}` : ""].filter(Boolean).join(" · ")}
             </Typography>
+            {a.quoteOnly && (
+              <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                <QuoteRefLine a={a} />
+                {onEditQuote && (
+                  <Button size="small" startIcon={<Edit sx={{ fontSize: 15 }} />} onClick={() => onEditQuote(a)}
+                    sx={{ textTransform: "none", fontWeight: 800, py: 0, minHeight: 0, fontSize: "0.74rem", color: "#2563eb" }}>แก้ไข / เปลี่ยนการอ้างอิง</Button>
+                )}
+                {onCancelQuote && k !== "approved" && (
+                  <Button size="small" onClick={() => onCancelQuote(a)}
+                    sx={{ textTransform: "none", fontWeight: 700, py: 0, minHeight: 0, fontSize: "0.74rem", color: TEXT_SUB }}>ยกเลิกใบนี้</Button>
+                )}
+              </Stack>
+            )}
           </Box>
           <Box sx={{ textAlign: "right", flexShrink: 0, display: { xs: "none", sm: "block" } }}>
             <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB }}>มูลค่า</Typography>
@@ -1106,7 +1417,8 @@ const DetailDialog = ({
             const final = i === 3 && step === 3;
             const done = i < step;
             const cur = i === step && !final;
-            const color = final ? m.color : done ? "#16a34a" : cur ? m.color : "#cbd5e1";
+            // 🔁 (10 พ.ย. 2569) ขั้นปัจจุบันใช้น้ำเงินธีมหลัก (เดิมสีสถานะ = แดงทั้งแถบ ดูเข้ม) · สีผลลัพธ์เฉพาะขั้นสุดท้าย
+            const color = final ? m.color : done ? "#16a34a" : cur ? "#2563eb" : "#cbd5e1";
             const FinalIcon = k === "approved" ? CheckCircle : Cancel;
             const lineColor = i <= step ? (i < step || final ? "#16a34a" : color) : "#e6e9ef";
             return (
@@ -1118,7 +1430,8 @@ const DetailDialog = ({
                   border: `2px solid ${color}`, boxShadow: cur ? `0 0 0 4px ${alpha(color, 0.18)}` : "none" }}>
                   {final ? <FinalIcon sx={{ fontSize: 18 }} /> : done ? <Check sx={{ fontSize: 17 }} /> : i + 1}
                 </Box>
-                <Typography noWrap sx={{ mt: 0.5, fontSize: { xs: "0.7rem", sm: "0.78rem" }, fontWeight: cur || final ? 900 : 700, color: cur || final ? color : done ? TEXT_MAIN : "#94a3b8" }}>
+                {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "หน้ามือถือให้จัดวางให้ดูง่าย") มือถือ: ชื่อขั้นตัดบรรทัดได้ ไม่ถูกตัด "…" */}
+                <Typography sx={{ mt: 0.5, fontSize: { xs: "0.66rem", sm: "0.78rem" }, lineHeight: 1.25, whiteSpace: { xs: "normal", sm: "nowrap" }, overflow: "hidden", textOverflow: "ellipsis", fontWeight: cur || final ? 900 : 700, color: cur || final ? color : done ? TEXT_MAIN : "#94a3b8" }}>
                   {final ? m.label : s.label}
                 </Typography>
                 <Typography noWrap sx={{ fontSize: "0.66rem", color: "#94a3b8", display: { xs: "none", sm: "block" } }}>{s.hint}</Typography>
@@ -1132,9 +1445,17 @@ const DetailDialog = ({
         <Stack spacing={1.5}>
           {/* ── ② ขั้นตอนถัดไป ── */}
           {next && (
-            <Box sx={{ p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${alpha(tone, 0.35)}`, boxShadow: `inset 4px 0 0 ${tone}` }}>
+            // 🔁 (10 พ.ย. 2569 ผู้ใช้: "สีดูเข้มไป ไม่เข้าธีม") กล่องขาวขอบเทา · แถบซ้ายน้ำเงิน · เลยกำหนด = ป้ายแดงเล็ก (ไม่ระบายทั้งกล่อง)
+            <Box sx={{ p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, boxShadow: `inset 4px 0 0 ${next.tone && next.tone !== "#dc2626" ? next.tone : "#2563eb"}` }}>
               <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>ขั้นตอนถัดไป</Typography>
-              <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: next.tone || TEXT_MAIN, mt: 0.15 }}>{next.title}</Typography>
+              <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.15, flexWrap: "wrap" }}>
+                {next.tone === "#dc2626" && (
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 99, bgcolor: "#fef2f2", color: "#b91c1c", fontSize: "0.72rem", fontWeight: 800 }}>
+                    <WarningAmber sx={{ fontSize: 14 }} />ต้องติดตาม
+                  </Box>
+                )}
+                <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: next.tone && next.tone !== "#dc2626" ? next.tone : TEXT_MAIN }}>{next.title}</Typography>
+              </Stack>
               {next.text && <Typography sx={{ fontSize: "0.8rem", color: "#475569", mt: 0.25 }}>{next.text}</Typography>}
               {next.stats && info && (
                 <Box sx={{ display: "grid", gap: 0.75, mt: 1.25, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, minmax(0, 1fr))" } }}>
@@ -1145,7 +1466,8 @@ const DetailDialog = ({
                 </Box>
               )}
               {(next.primary || next.decide) && (
-                <Box sx={{ display: "grid", gap: 1, mt: 1.5, gridTemplateColumns: { xs: "1fr", sm: next.decide ? "1.2fr 1fr 1fr" : "auto" }, justifyContent: "start" }}>
+                <Box sx={{ display: "grid", gap: 1, mt: 1.5, gridTemplateColumns: { xs: next.decide ? "1fr 1fr" : "1fr", sm: next.decide ? "1.2fr 1fr 1fr" : "auto" }, justifyContent: "start",
+                  "& > .MuiButton-contained": { gridColumn: { xs: next.decide ? "1 / -1" : "auto", sm: "auto" } } }}>
                   {next.primary && (
                     <Button variant="contained" startIcon={next.primary.icon} onClick={next.primary.onClick}
                       sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", height: 42, px: 2.5, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
@@ -1154,10 +1476,11 @@ const DetailDialog = ({
                   )}
                   {next.decide && (
                     <>
-                      <Button variant="outlined" startIcon={<CheckCircle />} onClick={() => setDecision("approve")}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>{isFinance ? "ได้งาน" : "ขอบันทึก ได้งาน"}</Button>
-                      <Button variant="outlined" startIcon={<Cancel />} onClick={() => setDecision("reject")}
-                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>{isFinance ? "ไม่ได้งาน" : "ขอบันทึก ไม่ได้งาน"}</Button>
+                      {/* ปุ่มรองโทนเทา · สีเฉพาะไอคอน — ไม่แย่งสายตาปุ่มหลัก */}
+                      <Button variant="outlined" startIcon={<CheckCircle sx={{ color: "#16a34a" }} />} onClick={() => setDecision("approve")}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: TEXT_MAIN, borderColor: BORDER, bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>{isFinance ? "ได้งาน" : "ขอบันทึก ได้งาน"}</Button>
+                      <Button variant="outlined" startIcon={<Cancel sx={{ color: "#dc2626" }} />} onClick={() => setDecision("reject")}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: TEXT_MAIN, borderColor: BORDER, bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>{isFinance ? "ไม่ได้งาน" : "ขอบันทึก ไม่ได้งาน"}</Button>
                     </>
                   )}
                 </Box>
@@ -1234,13 +1557,19 @@ const DetailDialog = ({
                   <Box sx={{ display: "grid", gap: 0.75, mt: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, minmax(0, 1fr))" } }}>
                     <MiniStat label="วันที่ลูกค้าตอบ" value={a.quotationDecisionAt ? thaiDate(a.quotationDecisionAt) : ""} />
                     {k === "approved" && <MiniStat label="เลขที่ PO ลูกค้า" value={a.quotationPoNo} />}
+                    {k === "approved" && a.quotationApprovedAmount != null && <MiniStat label="ยอดที่อนุมัติ" value={baht(a.quotationApprovedAmount)} />}
                     <MiniStat label="บันทึกโดย" value={a.quotationDecisionBy} />
                   </Box>
+                  {k === "approved" && a.quotationApprovedNos?.length > 0 && (
+                    <Typography sx={{ fontSize: "0.84rem", color: "#b45309", fontWeight: 700, mt: 1 }}>
+                      ได้งานบางใบ: {a.quotationApprovedNos.join(", ")}{quoteListOf(a).length ? ` (จาก ${quoteListOf(a).length} ใบ)` : ""}
+                    </Typography>
+                  )}
                   {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{k === "rejected" ? "เหตุผล: " : "หมายเหตุ: "}{a.quotationDecisionNote}</Typography>}
                   {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงนี้ยังดูรกๆ") เอกสารผลลัพธ์เป็นแถวเดียว: ชิปไฟล์ (กดดู) + ปุ่มแนบ · แก้รายละเอียดอยู่มุมขวาบน */}
                   <ResultDocs a={a} k={k} onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                     uploading={upload.busy && upload.eventId === a._id && upload.type === "quotationResult"} progress={upload.progress} />
-                  <ResultDetails a={a} k={k} onSave={(body) => onQuotation(job, body)} open={editResult} onClose={() => setEditResult(false)} />
+                  <ResultDetails a={a} k={k} isFinance={isFinance} onSave={(body) => onQuotation(job, body)} open={editResult} onClose={() => setEditResult(false)} />
                 </Box>
               </Stack>
             </Box>
@@ -1316,7 +1645,7 @@ const DetailDialog = ({
       </DialogContent>
       <ReviseDialog a={a} open={revising} onClose={() => setRevising(false)} onConfirm={(p) => onRevise(job, p)} />
       <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision}
-        asRequest={!isFinance} req={req}
+        asRequest={!isFinance} req={req} a={a} onPreview={onPreview}
         resetInfo={{ label: m.label, detail: [a.quotationDecisionAt ? `ลูกค้าตอบ ${thaiDate(a.quotationDecisionAt)}` : "", a.quotationPoNo ? `PO ${a.quotationPoNo}` : "", a.quotationDecisionNote ? `เหตุผล: ${a.quotationDecisionNote}` : ""].filter(Boolean).join(" · ") }} />
     </Dialog>
   );
@@ -1440,11 +1769,14 @@ function useQuotationActions(fetchJobs, toast, userData) {
 async function withQuotedNotes(events) {
   try {
     // ⚠️ ต้องขอรวมที่ทำเสร็จแล้วด้วย — ค่าเริ่มต้นตัดบันทึกที่ทำเสร็จ (noteDoneAt) ออก ซึ่งคือตัวที่แนบใบเสนอราคา
-    const dr = await EventService.GetDraftEvents({ includeCancelled: true });
+    // ✅ (10 พ.ย. 2569) + ใบเสนอราคาแยก (quoteOnly) — ขอรวมมาด้วย (ค่าเริ่มต้น server ตัดออก)
+    const dr = await EventService.GetDraftEvents({ includeCancelled: true, quotes: "1" });
     const have = new Set(events.map((e) => String(e._id)));
     const notes = (dr?.drafts || [])
-      .filter((d) => d.intakeNote && !d.cancelledAt && !have.has(String(d._id)) && ((d.quotationFiles || []).length || d.quotationStatus))
-      .map((d) => ({ ...d, start: d.start || d.noteDoneAt || d.intakeAt, end: d.end || d.noteDoneAt || d.intakeAt, title: d.title || "บันทึกงาน", site: d.site || d.description?.slice(0, 60) || "" }));
+      .filter((d) => !d.cancelledAt && !have.has(String(d._id)) && (d.quoteOnly || (d.intakeNote && ((d.quotationFiles || []).length || d.quotationStatus))))
+      .map((d) => (d.quoteOnly
+        ? { ...d, start: d.createdAt || d.start, end: d.createdAt || d.end }
+        : { ...d, start: d.start || d.noteDoneAt || d.intakeAt, end: d.end || d.noteDoneAt || d.intakeAt, title: d.title || "บันทึกงาน", site: d.site || d.description?.slice(0, 60) || "" }));
     return [...events, ...notes];
   } catch {
     return events;
@@ -1524,6 +1856,8 @@ export default function QuotationTracking() {
   const [exporting, setExporting] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailId, setDetailId] = useState("");
+  // ✅ (10 พ.ย. 2569) เพิ่ม/แก้ใบเสนอราคาแยก · ลิงก์ ?newQuote=contract:<id> | event:<id> | 1 (เช่น จากหน้าภาพรวมงาน "เสนอราคาต่อสัญญา")
+  const [quoteDlg, setQuoteDlg] = useState({ open: false, initial: null, edit: null });
   const [preview, setPreview] = useState({ url: null, name: "" });
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
   const topRef = useRef(null);
@@ -1562,6 +1896,21 @@ export default function QuotationTracking() {
       })
       .filter((j) => j.groupKey !== "");
   }, [events]);
+
+  useEffect(() => {
+    const nq = searchParams.get("newQuote");
+    if (!nq || loading) return;
+    const [kind, id] = nq.split(":");
+    setQuoteDlg({ open: true, edit: null, initial: kind === "contract" && id ? { kind: "contract", contractGroupId: id } : kind === "event" && id ? { kind: "event", eventId: id } : null });
+    setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete("newQuote"); return next; }, { replace: true });
+  }, [searchParams, setSearchParams, loading]);
+  const cancelQuote = async (a) => {
+    const r = await Swal.fire({ title: "ยกเลิกใบเสนอราคานี้?", input: "text", inputLabel: "เหตุผล (ถ้ามี)", inputPlaceholder: "เช่น เพิ่มซ้ำ / ลูกค้าไม่ต้องการแล้ว",
+      showCancelButton: true, confirmButtonText: "ยกเลิกใบนี้", cancelButtonText: "ไม่ยกเลิก", confirmButtonColor: "#dc2626", reverseButtons: true });
+    if (!r.isConfirmed) return;
+    try { await EventService.UpdateQuoteRef(a._id, { cancel: true, reason: r.value || "" }); toast("ยกเลิกใบเสนอราคาแล้ว"); setDetailId(""); fetchJobs(true); }
+    catch (err) { toast(err?.response?.data?.message || "ยกเลิกไม่สำเร็จ", "error"); }
+  };
 
   // deep-link ?jobId= (แจ้งเตือน/Dashboard) → เปิดใบนั้นเลย
   useEffect(() => {
@@ -1610,7 +1959,8 @@ export default function QuotationTracking() {
     const decided = approved.length + rejected.length;
     return {
       pendingValue: sum(pending), pendingCount: pending.length,
-      approvedValue: sum(approved), approvedCount: approved.length,
+      // ✅ (10 พ.ย. 2569) ได้งานบางใบ = นับยอดที่อนุมัติจริง ไม่ใช่ยอดเต็มทุกใบ
+      approvedValue: approved.reduce((t, j) => t + wonAmountOf(j.anchor), 0), approvedCount: approved.length,
       winRate: decided ? Math.round((approved.length / decided) * 100) : null, decided,
       urgentValue: sum(base.filter((j) => j.groupKey === "follow_up")),
     };
@@ -1707,18 +2057,31 @@ export default function QuotationTracking() {
   return (
     <Box sx={PAGE_SX}>
       {/* ── หัวเพจ ── */}
-      <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box sx={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#fdecec", color: "#dc2626", "& svg": { fontSize: 22, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
+      {/* 🔁 (10 พ.ย. 2569 ผู้ใช้: "จัดวางหัวหน้ามือถือใหม่ให้กระชับ ดูง่าย สวยงาม") มือถือ: ไม่มีกรอบ · ชื่อหน้าบรรทัดเดียว + จำนวนใบ/เวลาอัปเดตบรรทัดเล็ก · ปุ่ม Excel/ตัวกรองขนาดเท่ากัน */}
+      <Box sx={{ borderRadius: { xs: 0, sm: 3 }, border: { xs: 0, sm: `1px solid ${BORDER}` }, bgcolor: { xs: "transparent", sm: "#fff" }, px: { xs: 0.25, sm: 2 }, py: { xs: 0.5, sm: 1.5 }, mb: { xs: 1, sm: 1.5 } }}>
+        <Stack direction="row" alignItems="center" spacing={{ xs: 1.1, sm: 1.5 }}>
+          <Box sx={{ width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 }, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", "& svg": { fontSize: 22 } }}>
             <RequestQuote />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700, fontSize: { xs: "1.2rem", sm: "1.35rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
-            <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+            <Typography noWrap sx={{ fontWeight: 800, fontSize: { xs: "1.05rem", sm: "1.35rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
+            <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB, display: { xs: "none", sm: "block" } }}>
               แนบใบเสนอราคา → เริ่มนับติดตามอัตโนมัติทันที → ติดตามลูกค้า (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → ได้งาน / ไม่ได้งาน
               {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
             </Typography>
+            <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB, display: { xs: "block", sm: "none" } }}>
+              {visible.length} ใบ{lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
+            </Typography>
           </Box>
+          {/* ✅ (10 พ.ย. 2569) เพิ่มใบเสนอราคาแยก — อิงงาน/สัญญาได้ หรือไม่อิง */}
+          <Button variant="contained" startIcon={<AddRounded sx={{ fontSize: "19px !important" }} />} onClick={() => setQuoteDlg({ open: true, initial: null, edit: null })}
+            sx={{ display: { xs: "none", sm: "inline-flex" }, flexShrink: 0, height: 40, px: 2, borderRadius: 2.5, textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+            เพิ่มใบเสนอราคา
+          </Button>
+          <IconButton aria-label="เพิ่มใบเสนอราคา" onClick={() => setQuoteDlg({ open: true, initial: null, edit: null })}
+            sx={{ display: { xs: "inline-flex", sm: "none" }, width: 40, height: 40, borderRadius: 2.5, bgcolor: "#2563eb", color: "#fff", "&:hover": { bgcolor: "#1d4ed8" } }}>
+            <AddRounded sx={{ fontSize: 22 }} />
+          </IconButton>
           <Tooltip title="รีเฟรช">
             <IconButton onClick={() => fetchJobs()} sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, display: { xs: "none", md: "inline-flex" } }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
           </Tooltip>
@@ -1729,7 +2092,7 @@ export default function QuotationTracking() {
           )}
           {!isDesktop && (
             <IconButton aria-label="ค้นหาและตัวกรอง" onClick={() => setFiltersOpen(true)}
-              sx={{ width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: activeFilters ? "#f1f5f9" : "#fff", color: TEXT_MAIN }}>
+              sx={{ width: 40, height: 40, borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: activeFilters ? "#eff6ff" : "#fff", color: activeFilters ? "#2563eb" : TEXT_MAIN }}>
               <Badge badgeContent={activeFilters} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.62rem", height: 16, minWidth: 16 } }}><Tune sx={{ fontSize: 21 }} /></Badge>
             </IconButton>
           )}
@@ -1745,7 +2108,7 @@ export default function QuotationTracking() {
         <Box sx={{
           display: "grid", gap: 1, mb: 1.5,
           // มือถือ: แถวเดียวเลื่อนแนวนอน (ไม่กินจอครึ่งหน้าก่อนถึงรายการ)
-          gridTemplateColumns: { xs: "none", md: "repeat(5, 1fr)" }, gridAutoFlow: { xs: "column", md: "row" }, gridAutoColumns: { xs: "44%", md: "auto" },
+          gridTemplateColumns: { xs: "none", md: "repeat(5, 1fr)" }, gridAutoFlow: { xs: "column", md: "row" }, gridAutoColumns: { xs: "40%", md: "auto" },
           overflowX: { xs: "auto", md: "visible" }, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" },
         }}>
           <Kpi label="มูลค่ารอลูกค้าตอบ" value={baht(stats.pendingValue)} sub={`${stats.pendingCount} ใบ`} color="#2563eb" onClick={() => setStatus("open")} active={status === "open"} />
@@ -1815,7 +2178,7 @@ export default function QuotationTracking() {
             {pageCount > 1 && (
               <Pagination count={pageCount} page={cur} shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
                 onChange={(_, n) => { setPage(n); topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-                sx={{ "& .Mui-selected": { bgcolor: "#fef2f2 !important", color: "#b91c1c", borderColor: "#fecaca" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             )}
           </Stack>
         </>
@@ -1826,8 +2189,19 @@ export default function QuotationTracking() {
           job={detailJob} currentUser={userData} onClose={() => setDetailId("")}
           onQuotation={onQuotation} onFollowUp={onFollowUp} onComment={onComment}
           onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onRevise={onRevise} onPreview={(url, name) => setPreview({ url, name })} upload={upload}
+          onEditQuote={(a) => setQuoteDlg({ open: true, initial: null, edit: a })} onCancelQuote={cancelQuote}
         />
       )}
+      <QuoteOnlyDialog open={quoteDlg.open} events={events} initial={quoteDlg.initial} edit={quoteDlg.edit}
+        onClose={() => setQuoteDlg({ open: false, initial: null, edit: null })}
+        onUploadFiles={onFileUpload}
+        onSaved={async (id) => {
+          const wasEdit = Boolean(quoteDlg.edit);
+          setQuoteDlg({ open: false, initial: null, edit: null });
+          toast(wasEdit ? "บันทึกการแก้ไขแล้ว" : "เพิ่มใบเสนอราคาแล้ว");
+          await fetchJobs(true);
+          if (id) setDetailId(id);
+        }} />
       <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} onClose={() => setPreview({ url: null, name: "" })} />
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
         <Alert severity={snackbar.severity} variant="filled" sx={{ borderRadius: 2 }}>{snackbar.msg}</Alert>
@@ -1835,3 +2209,6 @@ export default function QuotationTracking() {
     </Box>
   );
 }
+
+// ใช้ในเทสต์ (ได้งานบางใบ · ยอดอนุมัติ · แนบหลักฐาน)
+export { DecisionDialog, quoteListOf, wonAmountOf };

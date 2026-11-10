@@ -104,10 +104,18 @@ import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
 import AttachmentList from "@/shared/ui/AttachmentList";
+import RefQuotesBar, { useRefQuotes, refQuotesOf } from "@/shared/ui/RefQuotesBar";
 import { canEditJobFiles, canDeleteJobFile } from "@/shared/utils/jobDocPermissions";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton, { ExcelIcon } from "@/shared/ui/ExportExcelButton";
 import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
+/** แถว Grid ของใบเสนอราคาแยกที่อิงงานนี้ — ไม่มีใบ = ไม่วาดแถว (ไม่เหลือช่องว่าง) */
+const RefQuotesGrid = ({ event }) => {
+  const list = useRefQuotes();
+  if (!refQuotesOf(list, event).length) return null;
+  return <Grid item xs={12}><RefQuotesBar event={event} /></Grid>;
+};
+
 
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "ปุ่มต่างๆ ที่เป็นของเดิมปรับแก้สีสันให้สอดคล้อง สวยงาม")
 //    ปุ่มหลัก = น้ำเงินทึบ (อนุมัติปิดงาน = เขียวทึบ) · ไม่อนุมัติ = เส้นขอบแดง · ปุ่มรอง = เส้นขอบน้ำเงิน — สูง 36 เท่ากันทั้งหน้า
@@ -1249,6 +1257,8 @@ const EventRowCard = ({
           </Button>
         </Grid>
       )}
+      {/* ✅ (10 พ.ย. 2569) ใบเสนอราคาแยกที่อิงงานนี้ — สถานะ + กดเปิดในหน้าติดตามใบเสนอราคา */}
+      {(!hideDocuments || showDocsOverride) && <RefQuotesGrid event={event} />}
       {(!hideDocuments || showDocsOverride) && (
         <Grid item xs={12}>
         <FileUploadSection

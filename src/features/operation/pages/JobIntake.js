@@ -48,6 +48,7 @@ import { PageHeader, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE, PAGE_SX } fr
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import AttachmentList from "@/shared/ui/AttachmentList";
+import RefQuotesBar from "@/shared/ui/RefQuotesBar";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
@@ -171,6 +172,7 @@ const outcomeOf = (job, st, sessions) => {
     if (fu) facts.push(fu.followUpCount ? `ติดตามแล้ว ${fu.followUpCount} ครั้ง` : "ยังไม่เคยติดตาม");
   }
   if (key === "approved") {
+    if (anchor.quotationApprovedAmount != null) facts.push(`อนุมัติ ${baht(anchor.quotationApprovedAmount)}${(anchor.quotationApprovedNos || []).length ? ` (${anchor.quotationApprovedNos.length} ใบ)` : ""}`); // ✅ (10 พ.ย. 2569) ได้งานบางใบ
     if (anchor.quotationPoNo) facts.push(`PO ${anchor.quotationPoNo}`);
     if (anchor.quotationDecisionAt) facts.push(`ตอบรับ ${formatThai(moment(anchor.quotationDecisionAt), "D MMM YY")}`);
   }
@@ -1273,6 +1275,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           )}
         </Box>
 
+        {/* ✅ (10 พ.ย. 2569) ใบเสนอราคาแยกที่อิงงานนี้ */}
+        <RefQuotesBar event={job} />
         {actions && !hideActions && <Box sx={{ pt: 0.5 }}><SheetActionBar actions={actions} /></Box>}
       </Stack>
     );

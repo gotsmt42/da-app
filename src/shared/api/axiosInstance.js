@@ -1,4 +1,5 @@
 // 📁 shared/api/axiosInstance.js
+import { isSavingRequest, beginSaving, endSaving } from "@/shared/api/savingTracker";
 import axios from "axios";
 import { API_URL } from "./apiUrl";
 import { CLIENT_ID } from "@/shared/realtime/realtimeClient";
@@ -38,6 +39,8 @@ API.interceptors.request.use(
     }
     // ✅ รหัสแท็บ — server แนบกลับมากับสัญญาณเรียลไทม์ ให้รู้ว่าการเปลี่ยนแปลงไหนแท็บนี้เป็นคนกดเอง
     config.headers["X-Client-Id"] = CLIENT_ID;
+    // ✅ (10 พ.ย. 2569) นับคำสั่งบันทึก → ป้าย "กำลังบันทึก…" ทุกหน้า (shared/ui/SavingIndicator)
+    if (isSavingRequest(config)) config.__savingId = beginSaving(config);
     return config;
   },
   (error) => Promise.reject(error)
@@ -45,8 +48,9 @@ API.interceptors.request.use(
 
 // ✅ Interceptor สำหรับจัดการ token หมดอายุหรือไม่ถูกต้อง
 API.interceptors.response.use(
-  (response) => response,
+  (response) => { if (response?.config?.__savingId) endSaving(response.config.__savingId, true); return response; },
   (error) => {
+    if (error?.config?.__savingId) endSaving(error.config.__savingId, false);
     const msg = error.response?.data?.message;
 
     if (msg === "Token expired" || msg === "Invalid token") {

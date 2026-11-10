@@ -134,6 +134,8 @@ const Dashboard = () => {
   // ✅ งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) — เดิมไม่มีทางเห็นได้เลยนอกจากเข้าไปเปิดหน้า "แผนงาน"
   // เอง เอามาย่อโชว์เป็นแถบข้างแทนพื้นที่ว่างที่เหลือ (ดู .dashboard-side)
   const [drafts, setDrafts] = useState([]);
+  // ✅ (10 พ.ย. 2569) ใบเสนอราคาแยก (quoteOnly) — ไม่อยู่ใน event-op · นับรวมในกล่อง "ใบเสนอราคาที่ต้องติดตาม"
+  const [quoteDrafts, setQuoteDrafts] = useState([]);
   // ✅ เก็บว่าช่างคนไหนถูกกดขยายดูรายชื่องานค้างอยู่ในแถบ "งานค้างของช่าง" (กดได้หลายคนพร้อมกัน)
   const [expandedOverdueTechIds, setExpandedOverdueTechIds] = useState(
     () => new Set(),
@@ -163,6 +165,7 @@ const Dashboard = () => {
         setUsers(resUsers?.allUser || []);
         setEvents(resEvents?.userEvents || []);
         setDrafts(resDrafts?.drafts || []);
+        EventService.GetDraftEvents({ quotes: "only" }).then((r) => setQuoteDrafts((r?.drafts || []).filter((d) => !d.cancelledAt))).catch(() => {});
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -352,7 +355,7 @@ const Dashboard = () => {
   const staleQuotations = useMemo(() => {
     if (!isAdminOrManager) return [];
     const bySignature = new Map();
-    events.forEach((e) => {
+    [...events, ...quoteDrafts].forEach((e) => {
       if (e.quotationStatus !== "sent" || !e.quotationSentAt) return;
       const key = getOverdueGroupKey(e);
       if (!bySignature.has(key)) bySignature.set(key, e);
@@ -371,7 +374,7 @@ const Dashboard = () => {
         followUpCount: info.followUpCount,
       }))
       .sort((a, b) => b.days - a.days);
-  }, [isAdminOrManager, events]);
+  }, [isAdminOrManager, events, quoteDrafts]);
 
   // 📌 งานวางแผนล่วงหน้า (เฉพาะแอดมิน/manager) — เรียงตามเดือนที่ตั้งใจใกล้สุดก่อน แบ่งหน้าแทน
   // การโชว์แค่ไม่กี่รายการตายตัว ให้เห็นได้ครบทุกใบจากตรงนี้เลยโดยไม่ต้องออกไปหน้า "แผนงาน"

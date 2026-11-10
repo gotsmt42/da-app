@@ -14,6 +14,7 @@ import PushService from "../shared/services/PushService";
 import "./FullLayout.css";
 import AppRebrandNotice from "@/shared/components/AppRebrandNotice";
 import InAppPushBanner from "@/shared/ui/InAppPushBanner";
+import SavingIndicator from "@/shared/ui/SavingIndicator";
 import AppErrorBoundary from "@/shared/ui/AppErrorBoundary";
 import useNewBuildReload from "@/shared/hooks/useNewBuildReload";
 
@@ -251,6 +252,7 @@ const FullLayout = () => {
     <main>
       {/* ✅ แจ้งเตือนแบบ LINE ตอนแอปเปิดอยู่ — แบนเนอร์บนสุด + เสียง (ตอนแอปปิด service worker แจ้งผ่านระบบมือถือแทน) */}
       <InAppPushBanner />
+      <SavingIndicator />
       {/* ส่งฟังก์ชันเปิดปิดสไลด์บาร์ผ่าน props ชื่อ toggleMobileSidebar */}
       <div className={`header ${headerClass}`}>
         <Header toggleMobileSidebar={toggleSidebar} />
