@@ -12,6 +12,7 @@ import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
+import { WORK_VALUE_CSS, workValueInitial, workValueCardHtml, bindWorkValueCard } from "./workValueCard";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import { createElement, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
@@ -35,6 +36,8 @@ import {
 // ✅ (26 ต.ค. 2569) ดู/ตรวจ/แนบเอกสารในฟอร์มนี้เลย — โหลดเมื่อเปิดงานที่ถึงขั้นเอกสาร (ไม่ถ่วงหน้าปฏิทิน)
 const EditEventDocs = lazy(() => import("./EditEventDocs"));
 let formDraftCtl = null;
+// ✅ (10 พ.ย. 2569) การ์ดมูลค่างานครั้งนี้ (ค่าอัตโนมัติ · ก่อน/รวม VAT · AI อ่านไฟล์) — ดู workValueCard.js
+let wvCtl = null;
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -614,6 +617,7 @@ function injectStyles() {
     .ee-value-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.10); }
     .ee-value-box input:disabled { background: #f8fafc; color: #475569; }
     .ee-value-unit { font-size: 13px; font-weight: 700; color: #64748b; }
+    ${WORK_VALUE_CSS}
     #ee-keyGroup .ee-note-field { margin-top: 10px; }
     #ee-keyGroup .ee-note-field label { font-size: 12.5px; font-weight: 700; color: #475569; }
     .ee-ts-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -989,6 +993,7 @@ function injectStyles() {
     .ee-hm-value small { font-weight: 500; color: #94a3b8; font-size: 11px; }
     .ee-hm-value--empty { color: #94a3b8; font-weight: 600; }
     .ee-hm-value--edit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .ee-hm-lshort { display: none; }
     #ee-respSelect, #ee-teamSelect {
       appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%; flex: 1 1 auto; width: 100%; /* ช่องเลือกกว้างเต็มกล่องเท่ากันทุกงาน */
       height: 30px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;
@@ -1218,8 +1223,13 @@ function injectStyles() {
       .ee-hm-item + .ee-hm-item { border-top: 1px solid #eef2f7; }
       /* ✅ กระชับ (ผู้ใช้: "เล็กและกระชับกว่านี้ ยังกินพื้นที่เยอะ") */
       .ee-hm-item { align-items: center; padding: 5px 10px; min-height: 34px; }
-      .ee-hm-label { flex: 0 0 116px; font-size: 12px; gap: 5px; white-space: normal; line-height: 1.3; }
-      .ee-hm-label .ee-hm-count { white-space: nowrap; }
+      /* 🔁 (10 พ.ย. 2569 ผู้ใช้: "ยังดูเพี้ยน ไม่สวย") ป้ายซ้ายบรรทัดเดียวทุกแถว — ไม่ตัดเป็น 3 บรรทัด
+         แถวผู้ปฏิบัติงาน: "หัวหน้าทีม" + จำนวนทีมเป็นบรรทัดเล็กใต้ */
+      .ee-hm-label { flex: 0 0 104px; font-size: 12px; gap: 6px; white-space: nowrap; line-height: 1.25; }
+      .ee-hm-lfull { display: none; }
+      .ee-hm-lshort { display: inline; }
+      .ee-hm-ltxt { display: inline-flex; flex-direction: column; min-width: 0; }
+      .ee-hm-label .ee-hm-count { margin-left: 0; font-size: 11px; font-weight: 700; line-height: 1.2; }
       .ee-hm-label i { font-size: 13px; width: 16px; }
       .ee-hm-value { font-size: 13px; }
       .swal-edit-event #ee-status-header { row-gap: 8px; }
@@ -1605,7 +1615,8 @@ export const getEditEvent = async ({
   const eventIntervalMonths  = ev.extendedProps?.intervalMonths || "";
   const eventJobValue        = ev.extendedProps?.jobValue ?? "";
   // ✅ (2 พ.ย. 2569) มูลค่างานครั้งนี้ (รายครั้ง — คนละค่ากับ jobValue ระดับสัญญา) · "" = ยังไม่ใส่
-  const eventWorkValue       = ev.extendedProps?.workValue ?? "";
+  // ✅ (10 พ.ย. 2569) ค่าเริ่มต้นของการ์ดมูลค่างาน: ค่าที่บันทึกไว้ หรือค่าอัตโนมัติ (สัญญา ÷ ครั้ง / มูลค่างานรวม / ใบเสนอราคาที่ได้งาน)
+  const wvInit = workValueInitial(ev.extendedProps || {});
   // ✅ บันทึกประวัติ — เดิมมีแค่ในหน้า Operation (ActivityLogMini) หน้า /event เองยังไม่เคยแสดงเลย
   // ทั้งที่ activityLog บันทึกลงงานทุกตัวเหมือนกันอยู่แล้ว ดึงมาแสดงแบบเดียวกัน (ย่อ/กางได้) ที่นี่ด้วย
   const eventActivityLog = ev.extendedProps?.activityLog || [];
@@ -2098,7 +2109,7 @@ export const getEditEvent = async ({
           : "ยังไม่ได้มอบหมาย"}</span>`}
       </div>
       <div class="ee-hm-item">
-        <span class="ee-hm-label"><i aria-hidden="true">👷</i>ผู้ปฏิบัติงาน 1 · หัวหน้าทีม${extraWorkerCount ? ` <b class="ee-hm-count">+${extraWorkerCount} คน</b>` : ""}</span>
+        <span class="ee-hm-label"><i aria-hidden="true">👷</i><span class="ee-hm-ltxt"><span class="ee-hm-lfull">ผู้ปฏิบัติงาน 1 · หัวหน้าทีม</span><span class="ee-hm-lshort">หัวหน้าทีม</span>${extraWorkerCount ? `<b class="ee-hm-count">+${extraWorkerCount} คน</b>` : ""}</span></span>
         ${/* ✅ (9 ต.ค. 2569 ผู้ใช้: "ระบุหัวหน้าทีมที่เข้างานได้เลย เหมือนผู้รับผิดชอบ") — เลือกแล้วบันทึกทันที */""}
         ${canEditTeamAssignment
           ? `<span class="ee-hm-value ee-hm-value--edit"><select id="ee-teamSelect" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)">${headTeamOpts}</select><em id="ee-teamMsg" class="ee-hm-msg" aria-live="polite"></em></span>`
@@ -2290,14 +2301,10 @@ export const getEditEvent = async ({
     <section class="ee-card ee-key-card">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">💰</span>
-        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้</p></div>
+        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้ · เลือกว่าเป็นยอดก่อนหรือรวม VAT</p></div>
       </div>
       <div class="ee-card-body">
-        <div class="ee-value-box">
-          <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
-            value="${eventWorkValue === "" || eventWorkValue === null ? "" : Number(eventWorkValue).toLocaleString("th-TH")}" ${isViewOnly ? "disabled" : ""}>
-          <span class="ee-value-unit">บาท</span>
-        </div>
+        ${workValueCardHtml(wvInit, { disabled: isViewOnly })}
       </div>
     </section>`}
 
@@ -2865,6 +2872,11 @@ export const getEditEvent = async ({
           }
           if (btn && !btn.dataset.busy) btn.textContent = keys.length ? `💾 บันทึก (${keys.length})` : "💾 บันทึก";
         };
+        wvCtl = bindWorkValueCard(popupEl, {
+          init: wvInit, eventId, EventService,
+          // งานสัญญาที่มีมูลค่าสัญญาแล้ว แบ่งตามรอบได้เลย ไม่ต้องใช้ AI
+          allowAi: !(eventContractGroupId && Number(eventJobValue) > 0),
+        });
         const fd = domFormDraft(popupEl, `editEvent:${eventId}`, { bannerHost: "#ee-body", askRestore: true, onDirtyChange: renderDirty });
         formDraftCtl = fd;
         fd.restore();
@@ -3855,15 +3867,8 @@ export const getEditEvent = async ({
           .map((name) => ({ userId: teamToId.get(name) || "", name }));
 
       // ✅ มูลค่างานครั้งนี้ — ส่งเฉพาะตอนค่าเปลี่ยน · ว่าง = ล้าง · ตัวเลขผิด = ไม่ส่ง (ค่าเดิมคงอยู่)
-      const readWorkValue = () => {
-        const el = document.getElementById("editWorkValue");
-        if (!el || el.disabled) return {};
-        const t = el.value.replace(/[,\s฿]/g, "");
-        const n = t === "" ? null : Number(t);
-        if (n !== null && (!Number.isFinite(n) || n < 0)) return {};
-        const before = eventWorkValue === "" || eventWorkValue === null ? null : Number(eventWorkValue);
-        return n === before ? {} : { workValue: n };
-      };
+      //    🔁 (10 พ.ย. 2569) + ก่อน/รวม VAT + ที่มาของค่า — อ่านจากการ์ด (workValueCard.js)
+      const readWorkValue = () => (document.getElementById("editWorkValue") ? wvCtl?.read() || {} : {});
       const buildSharedFields = () => ({
         ...readWorkValue(),
         // ✅ ข้อมูล Job (ด่วน · ครบกำหนด · อุปกรณ์ · รอข้อมูล) — ไม่มีการ์ดนี้ (นัดฝ่ายขาย) = ไม่ส่ง

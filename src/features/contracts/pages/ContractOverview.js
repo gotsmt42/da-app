@@ -133,9 +133,9 @@ const VisitExtra = ({ visit, showValue, size = "0.62rem" }) => {
         </Typography>
       )}
       {hasValue && (
-        <Typography variant="caption" title="มูลค่างานครั้งนี้"
+        <Typography variant="caption" title={`มูลค่างานครั้งนี้ (${visit.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})`}
           sx={{ display: "block", fontSize: size, lineHeight: 1.3, fontWeight: 800, color: "#059669", whiteSpace: "nowrap" }}>
-          ฿{Number(visit.workValue).toLocaleString("th-TH", { maximumFractionDigits: 2 })}
+          ฿{Number(visit.workValue).toLocaleString("th-TH", { maximumFractionDigits: 2 })}{visit.workValueVatIncluded ? " (รวม VAT)" : ""}
         </Typography>
       )}
     </>

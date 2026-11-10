@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { workValueNet, vatLabel } from "@/shared/utils/workValue";
 import { saveAs } from "file-saver";
 // ✅ ของกลางชุดเดียวกับหน้าจอ — ยอดในไฟล์ต้องตรงกับที่เห็นบนจอเสมอ
 import { contractBillingSummary, roundBillingStatus, baht as bahtText } from "@/shared/utils/billing";
@@ -120,7 +121,7 @@ export async function exportContractsToExcel({
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
     { key: "jobValue", header: "มูลค่างานรวม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     // ✅ (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์") ผลรวม "มูลค่างานครั้งนี้" ที่ใส่ไว้ (นับครั้งละ 1 ค่า)
-    { key: "workValueSum", header: "มูลค่างานที่ใส่รายครั้ง (฿)", width: 17, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    { key: "workValueSum", header: "มูลค่างานที่ใส่รายครั้ง ก่อน VAT (฿)", width: 17, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     // ✅ ค่าคอมที่จ่ายให้ฝั่งลูกค้า + สัดส่วนเทียบมูลค่างาน — ใส่ % เป็นคอลัมน์แยกให้เรียง/กรองได้
     // (บนจอโชว์เป็นบรรทัดเล็กใต้ตัวเลข ซึ่งดีเวลาไล่ดูทีละแถว แต่ในไฟล์ต้องเป็นคอลัมน์ถึงจะใช้งานต่อได้)
     { key: "commission", header: "ค่าคอม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
@@ -335,7 +336,7 @@ export async function exportContractsToExcel({
         (c.visits || []).forEach((v) => {
           if (v.workValue === null || v.workValue === undefined || v.workValue === "") return;
           const k = String(v.jobGroupId || `t${Number(v.time) || 1}`);
-          if (!byRound.has(k)) byRound.set(k, Number(v.workValue) || 0);
+          if (!byRound.has(k)) byRound.set(k, workValueNet(v) || 0);
         });
         return byRound.size ? [...byRound.values()].reduce((a, b) => a + b, 0) : "";
       })(),
@@ -367,7 +368,7 @@ export async function exportContractsToExcel({
           formatEventDateRange(v),
           v.team ? `👷 ${v.team} (หัวหน้าทีม)` : "",
           members.length > 0 ? `👥 ${members.join(", ")}` : "",
-          v.workValue !== null && v.workValue !== undefined && v.workValue !== "" ? `฿ ${Number(v.workValue).toLocaleString("th-TH")}` : "",
+          v.workValue !== null && v.workValue !== undefined && v.workValue !== "" ? `฿ ${Number(v.workValue).toLocaleString("th-TH")} (${vatLabel(v.workValueVatIncluded)})` : "",
         ].filter(Boolean).join("\n");
       });
 

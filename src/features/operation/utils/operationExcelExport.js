@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { workValueNet } from "@/shared/utils/workValue";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -69,8 +70,9 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   const workersOf = (a) => [...new Set([a.team, ...((a.teamMembers || []).map((m) => m?.name))].filter(Boolean))];
   // มูลค่างานครั้งนี้ของงาน — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่
   const workValueOf = (sessions) => {
+    // 🔁 (10 พ.ย. 2569) ยอดก่อน VAT เสมอ (ใส่แบบรวม VAT ไว้ = ถอด VAT ออก) — รวมยอดได้ถูกต้อง
     const hit = sessions.find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "");
-    return hit ? Number(hit.workValue) : null;
+    return hit ? workValueNet(hit) : null;
   };
   const workerSlots = Math.max(4, ...jobs.map((job) => workersOf(job.sessions[0] || {}).length));
   const workerCols = Array.from({ length: workerSlots }, (_, i) => (
@@ -103,7 +105,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     { key: "checkOut", header: "เวลาเสร็จงานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "workNote", header: "รายละเอียดงานที่ทำ", width: 36, group: "การปฏิบัติงาน", wrap: true },
     { key: "closeState", header: "สถานะการปิดงาน", width: 18, group: "การปฏิบัติงาน", align: "center" },
-    ...(showValue ? [{ key: "workValue", header: "มูลค่างานครั้งนี้ (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
+    ...(showValue ? [{ key: "workValue", header: "มูลค่างานครั้งนี้ ก่อน VAT (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
     { key: "docReport", header: "Service Report", width: 14, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docQuotation", header: "ใบเสนอราคา", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docInvoice", header: "เอกสารการเงิน (ไฟล์)", width: 16, group: "เอกสารแนบ (ไฟล์)", align: "center" },

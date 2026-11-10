@@ -100,6 +100,7 @@ import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import WorkValueField from "@/shared/ui/WorkValueField";
+import { workValueNet, vatLabel } from "@/shared/utils/workValue";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
@@ -1546,9 +1547,9 @@ const EventRowCard = ({
                       แอดมิน/manager แก้ได้แม้งานปิดแล้ว (เติมงานเก่าย้อนหลัง) · ช่างแก้ได้จนกว่างานปิด */}
                   {event.department !== "sales" && (
                     <InfoLine label="มูลค่างาน" center>
-                      <WorkValueField compact value={event.workValue}
+                      <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
                         disabled={!onStatusUpdate || (!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น")}
-                        onSave={(v) => onStatusUpdate?.(event._id, { workValue: v })} />
+                        onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
                     </InfoLine>
                   )}
                   {canAssignTeam && (
@@ -1817,6 +1818,7 @@ const EventRowCard = ({
                   <Box sx={{ textAlign: "right", flexShrink: 0 }}>
                     <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#0e7490" }}>มูลค่างานครั้งนี้</Typography>
                     <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#155e75", lineHeight: 1.2 }}>{baht(event.workValue)}</Typography>
+                    <Typography sx={{ fontSize: "0.66rem", color: "#64748b" }}>{vatLabel(event.workValueVatIncluded)}</Typography>
                   </Box>
                 )}
               </Stack>
@@ -2071,11 +2073,10 @@ const StatusStrip = ({ items, value, onChange }) => (
   </Box>
 );
 
-/** มูลค่างานครั้งนี้ของงาน (ทุกวันในกลุ่มเก็บค่าเดียวกัน — ใช้ค่าแรกที่มี) · null = ช่างยังไม่ใส่ */
-const workValueOf = (sessions) => {
-  const hit = (sessions || []).find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "");
-  return hit ? Number(hit.workValue) : null;
-};
+/** วันแรกของงานที่ใส่มูลค่าไว้ (ทุกวันในกลุ่มเก็บค่าเดียวกัน) */
+const workValueHit = (sessions) => (sessions || []).find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "") || null;
+/** 🔁 (10 พ.ย. 2569) มูลค่างานครั้งนี้ "ก่อน VAT" (ใช้รวมยอด — ไม่บวกยอดรวม VAT ปนกับยอด Net) · null = ยังไม่ใส่ */
+const workValueOf = (sessions) => workValueNet(workValueHit(sessions));
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 
 /** กรองผู้เข้างาน: "all" | "noteam" (ยังไม่มีทีม) | ชื่อคน (หัวหน้าทีมหรือลูกทีม) */
@@ -2400,11 +2401,12 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
               {/* เอกสารที่แนบ — ตรรกะเดียวกับการ์ดงาน (x/4 · ครบ/ต้องมี/ไม่มี) · ใบเสนอราคากดติดตามได้ทันที */}
               <TableCell sx={{ minWidth: 200 }}><JobDocsCell event={a} /></TableCell>
               {showValue && (() => {
-                const wv = workValueOf(job.sessions);
+                const hit = workValueHit(job.sessions);
                 return (
                   // ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้แก้ไข และใส่มูลค่างานในนี้ได้ด้วย") กดดินสอ → พิมพ์ → บันทึก (ทุกวันของงานนี้)
                   <TableCell align="right" sx={{ minWidth: 120, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
-                    <WorkValueField compact value={wv} disabled={!onSaveValue} onSave={(v) => onSaveValue?.(job, v)} />
+                    <WorkValueField compact value={hit ? hit.workValue : null} vatIncluded={hit?.workValueVatIncluded} event={job.sessions[0]}
+                      disabled={!onSaveValue} onSave={(v, meta) => onSaveValue?.(job, v, meta)} />
                   </TableCell>
                 );
               })()}
@@ -3913,7 +3915,7 @@ const Operation = () => {
             <Box sx={{ mb: 1.5, px: { xs: 1.75, sm: 2 }, py: { xs: 1.1, sm: 1.25 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: { xs: "nowrap", sm: "wrap" } }}>
               <Box sx={{ minWidth: 0, flex: { xs: 1, sm: "0 1 auto" } }}>
                 <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>
-                  มูลค่างานรวม{filterMember !== "all" && filterMember !== "noteam" ? ` · ${filterMember}` : ""}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
+                  มูลค่างานรวม (ก่อน VAT){filterMember !== "all" && filterMember !== "noteam" ? ` · ${filterMember}` : ""}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
                 </Typography>
                 <Typography noWrap sx={{ fontSize: { xs: "1.25rem", sm: "1.35rem" }, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{baht(valueSummary.total)}</Typography>
               </Box>
@@ -3941,8 +3943,8 @@ const Operation = () => {
             <>
             <OperationTable
               showValue={isAdminOrManager}
-              onSaveValue={async (job, v) => {
-                if (!(await handleStatusUpdate(job.sessions[0]._id, { workValue: v }))) return;
+              onSaveValue={async (job, v, meta = {}) => {
+                if (!(await handleStatusUpdate(job.sessions[0]._id, { workValue: v, ...meta }))) return;
                 setSnackbar({ open: true, msg: v === null ? "ล้างมูลค่างานแล้ว" : `บันทึกมูลค่างาน ${baht(v)} แล้ว`, severity: "success" });
               }}
               employee={employee}

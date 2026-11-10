@@ -294,6 +294,12 @@ const EventService = {
     return res.data?.summaries || [];
   },
 
+  /** ✅ (10 พ.ย. 2569) ให้ AI อ่าน "มูลค่างานครั้งนี้" จากไฟล์ของทั้งงาน — คืนยอดก่อน VAT/รวม VAT ให้เลือก ไม่ได้บันทึก */
+  async ScanWorkValue(id) {
+    const res = await API.post(`/events/${id}/work-value/scan`, {}, { timeout: 180000 });
+    return res.data?.result || null;
+  },
+
   async BillingScanAvailability() {
     const res = await API.get("/events/billing/scan-availability");
     return res.data;

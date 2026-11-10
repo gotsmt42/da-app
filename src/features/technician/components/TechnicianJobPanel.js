@@ -481,9 +481,9 @@ const TechnicianJobCard = ({
   };
 
   // ── Save Work Value (ทั้งกลุ่มวันของงานเดียวกัน) ─────────────────────
-  const handleSaveWorkValue = async (v) => {
-    await (onStatusUpdate || onInputUpdate)(event._id, { workValue: v });
-    await pushLog("value_saved", v === null ? "ล้างมูลค่างาน" : `มูลค่างานครั้งนี้ ${Number(v).toLocaleString("th-TH")} บาท`);
+  const handleSaveWorkValue = async (v, meta = {}) => {
+    await (onStatusUpdate || onInputUpdate)(event._id, { workValue: v, ...meta });
+    await pushLog("value_saved", v === null ? "ล้างมูลค่างาน" : `มูลค่างานครั้งนี้ ${Number(v).toLocaleString("th-TH")} บาท (${meta.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})`);
   };
 
   // ── Save Work Note ───────────────────────────────────────────────
@@ -521,7 +521,7 @@ const TechnicianJobCard = ({
   const expandedContent = (
     <Stack spacing={2}>
       {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ ไม่บังคับ */}
-      <WorkValueField value={event.workValue} disabled={isLocked} onSave={handleSaveWorkValue} />
+      <WorkValueField value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} disabled={isLocked} onSave={handleSaveWorkValue} />
 
       {/* สรุปงาน */}
       <Box>

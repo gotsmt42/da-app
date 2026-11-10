@@ -1,4 +1,5 @@
 import moment from "moment";
+import { workValueNet } from "@/shared/utils/workValue";
 import { getOverdueGroupKey, isFlaggedDays, isSevereDays } from "@/shared/utils/overdueJobs";
 
 /**
@@ -39,7 +40,7 @@ const dayEnd = (e) => {
 
 const valueOf = (rows) => {
   const hit = rows.find((r) => r.workValue !== null && r.workValue !== undefined && r.workValue !== "");
-  return hit ? Number(hit.workValue) : null;
+  return hit ? workValueNet(hit) : null; // 🔁 (10 พ.ย. 2569) ก่อน VAT เสมอ
 };
 const workersOf = (rows) => [...new Set(rows.flatMap((r) => [r.team, ...((r.teamMembers || []).map((m) => m?.name))]).filter(Boolean))];
 
