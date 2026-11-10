@@ -12,6 +12,7 @@ import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import { createElement, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import SitePhotos from "@/shared/ui/SitePhotos";
@@ -1033,7 +1034,8 @@ function injectStyles() {
     .ee-av { flex-shrink: 0; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; line-height: 1; box-sizing: border-box; }
     .ee-av--empty { background: #fff; color: #94a3b8; border: 1.5px dashed #cbd5e1; }
     .ee-av-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
-    .ee-av-wrap .ee-av--img { position: absolute; inset: 0; background: #fff; }
+    .ee-av-wrap .ee-av--img { position: absolute; inset: 0; background: #fff; object-fit: cover; opacity: 0; transition: opacity .2s ease; }
+    .ee-av-wrap .ee-av--img.is-ready { opacity: 1; }
     .ee-pick-layer { position: absolute; inset: 0; z-index: 60; }
     .ee-pick-backdrop { position: absolute; inset: 0; }
     .ee-pick-menu {
@@ -1051,7 +1053,7 @@ function injectStyles() {
       font: inherit; font-size: 14px; background: #fff;
     }
     .ee-pick-search input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
-    .ee-pick-list { overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .ee-pick-list { position: relative; overscroll-behavior: contain; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
     .ee-pick-item {
       display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
       padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #0f172a;
@@ -1071,12 +1073,16 @@ function injectStyles() {
     .ee-pick-menu .ee-pick-item .ee-pick-ico { width: 30px; height: 30px; }
     /* มือถือ: แผ่นเลื่อนจากล่าง */
     .ee-pick-layer--sheet { position: fixed; z-index: 100001; }
-    .ee-pick-layer--sheet .ee-pick-backdrop { background: rgba(15,23,42,.35); }
+    .ee-pick-layer--sheet .ee-pick-backdrop { background: rgba(15,23,42,.35); animation: ee-pick-fade .2s ease-out; }
+    @keyframes ee-pick-fade { from { opacity: 0; } to { opacity: 1; } }
+    .ee-pick-layer--sheet.is-closing .ee-pick-backdrop { opacity: 0; transition: opacity .16s ease-in; }
+    .ee-pick-layer--sheet.is-closing .ee-pick-menu { transform: translateY(100%); transition: transform .18s ease-in; }
     .ee-pick-layer--sheet .ee-pick-menu {
       left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 75dvh; border-radius: 18px 18px 0 0;
-      padding-bottom: env(safe-area-inset-bottom); animation: ee-pick-up .18s ease-out;
+      padding-bottom: env(safe-area-inset-bottom); animation: ee-pick-up .24s cubic-bezier(.2,.8,.2,1);
+      will-change: transform; contain: layout paint;
     }
-    @keyframes ee-pick-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+    @keyframes ee-pick-up { from { transform: translateY(100%); } to { transform: none; } }
     .ee-pick-layer--sheet .ee-pick-head { padding: 14px 14px 6px 18px; }
     .ee-pick-layer--sheet .ee-pick-head b { font-size: 15px; color: #0f172a; }
     .ee-pick-layer--sheet .ee-pick-list { padding: 6px 10px 10px; }
@@ -1351,7 +1357,24 @@ function enhanceSelect(sel, { host, title, renderItem, btnClass = "", search = f
   sel.addEventListener("change", paint);
 
   let layer = null;
-  const close = () => { layer?.remove(); layer = null; btn.setAttribute("aria-expanded", "false"); };
+  // มือถือ: เลื่อนลงแล้วค่อยถอด (ไม่หายวับ) · จอคอม: ถอดทันที
+  const close = () => {
+    const l = layer;
+    layer = null;
+    btn.setAttribute("aria-expanded", "false");
+    if (!l) return;
+    if (l.classList.contains("ee-pick-layer--sheet") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      l.classList.add("is-closing");
+      setTimeout(() => l.remove(), 190);
+    } else l.remove();
+  };
+  // โหลดรูปย่อของรายชื่อไว้ก่อน — เปิดรายชื่อแล้วรูปขึ้นทันที ไม่กระพริบ
+  {
+    const urls = [];
+    const probe = document.createElement("div");
+    options().forEach((o) => { probe.innerHTML = renderItem(o); probe.querySelectorAll("img").forEach((im) => urls.push(im.getAttribute("src"))); });
+    preloadAvatarSrc(urls);
+  }
   const pick = (value) => {
     close();
     if (value !== sel.value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
@@ -1404,7 +1427,12 @@ function enhanceSelect(sel, { host, title, renderItem, btnClass = "", search = f
       layer.querySelector(".ee-pick-none").hidden = shown > 0;
     });
     if (q && !mobile) q.focus();
-    layer.querySelector(".ee-pick-item.is-on")?.scrollIntoView({ block: "nearest" });
+    // ⚠️ ไม่ใช้ scrollIntoView — มันเลื่อน "ทุกชั้น" (ฟอร์ม/หน้าด้านหลัง) ด้วย หน้าจอจึงเด้ง · เลื่อนเฉพาะรายการในแผ่นนี้
+    {
+      const list = layer.querySelector(".ee-pick-list");
+      const on = layer.querySelector(".ee-pick-item.is-on");
+      if (list && on) list.scrollTop = Math.max(0, on.offsetTop - list.clientHeight / 2 + on.offsetHeight / 2);
+    }
   };
   btn.addEventListener("click", () => (layer ? close() : open()));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && layer) { e.stopPropagation(); close(); } }, true);
@@ -1412,14 +1440,31 @@ function enhanceSelect(sel, { host, title, renderItem, btnClass = "", search = f
 }
 
 /** รูปพนักงาน — แบบเดียวกับ PersonChip ในหน้าอื่น (รูปจริงก่อน ไม่มีค่อยใช้ตัวอักษรย่อบนสีประจำตัว) */
+// 🐛 (10 พ.ย. 2569 ผู้ใช้: "เวลากดเลือก หน้าจอเด้งๆ กระพริบ น่าจะโหลดรูป") — เดิมโหลดรูปเต็มขนาด (หลาย MB) ทุกครั้งที่เปิดรายชื่อ
+//    ✅ ใช้รูปย่อ ~10 KB จาก Cloudinary · โหลด/ถอดรหัสล่วงหน้าครั้งเดียว (preloadAvatarSrc) · รูปที่พร้อมแล้วแสดงทันที ไม่มีจังหวะสลับตัวอักษร→รูป
+const avatarSrc = (url) => (url ? thumbUrl(url, 96) || url : "");
+const readyAvatars = new Set();
+/** โหลด/ถอดรหัสรูปไว้ก่อน — src = ลิงก์ที่ใช้แสดงจริง (รูปย่อแล้ว) */
+const preloadAvatarSrc = (srcs) => {
+  srcs.filter(Boolean).forEach((src) => {
+    if (readyAvatars.has(src)) return;
+    const im = new Image();
+    im.decoding = "async";
+    im.src = src;
+    (im.decode ? im.decode() : Promise.resolve()).then(() => readyAvatars.add(src)).catch(() => {});
+  });
+};
 const personAvatarHtml = (name, imageUrl, size = 26) => {
   const box = `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px`;
   if (!name) return `<span class="ee-av ee-av--empty" style="${box}">?</span>`;
   const letter = `<span class="ee-av" style="${box};background:${personColor(name)}">${escapeHtml(personInitial(name))}</span>`;
+  if (!imageUrl) return letter;
+  const src = avatarSrc(imageUrl);
+  // รูปพร้อมแล้ว = แสดงรูปเลย (ไม่มีตัวอักษรรองข้างใต้ให้กระพริบ) · ยังไม่พร้อม = ตัวอักษรก่อน แล้วรูปจางเข้า
   // ⚠️ รูปโหลดไม่ได้ (ลิงก์เสีย) → ซ่อนรูป ให้ตัวอักษรย่อที่วางซ้อนอยู่ด้านหลังโผล่ขึ้นมาแทน
-  return imageUrl
-    ? `<span class="ee-av-wrap" style="${box}">${letter}<img class="ee-av ee-av--img" src="${escapeHtml(imageUrl)}" alt="" style="${box}" onerror="this.remove()"></span>`
-    : letter;
+  return readyAvatars.has(src)
+    ? `<span class="ee-av-wrap" style="${box}"><img class="ee-av ee-av--img is-ready" src="${escapeHtml(src)}" alt="" style="${box}" decoding="async" onerror="this.remove()"></span>`
+    : `<span class="ee-av-wrap" style="${box}">${letter}<img class="ee-av ee-av--img" src="${escapeHtml(src)}" alt="" style="${box}" decoding="async" onload="this.classList.add('is-ready')" onerror="this.remove()"></span>`;
 };
 
 const STATUS_CONFIG = {

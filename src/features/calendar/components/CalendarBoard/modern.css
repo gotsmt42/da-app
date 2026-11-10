@@ -367,5 +367,6 @@
   0%, 40% { box-shadow: inset 0 0 0 3px #2563eb; }
   100% { box-shadow: inset 0 0 0 3px transparent; }
 }
-/* ✅ (10 พ.ย. 2569) มือถือ: ช่องเลือกช่างเข้างานอยู่นอกแผงตัวกรอง */
-.ec-modern .ec-person-row { min-width: 0; }
+/* ✅ (10 พ.ย. 2569) มือถือ: ช่องเลือกช่างอยู่ในแถวเครื่องมือ ระหว่างปุ่มกาง/ย่อ กับปุ่มตัวกรอง — กินที่ว่างที่เหลือ */
+.event-toolbar-row > .tb-person { flex: 1 1 110px; min-width: 0; display: flex; }
+.event-toolbar-row > .tb-person > .MuiButtonBase-root { flex: 1; min-width: 0; }

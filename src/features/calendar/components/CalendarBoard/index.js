@@ -2694,6 +2694,17 @@ function EventCalendar() {
         </button>
         )}
 
+        {/* ✅ (10 พ.ย. 2569 ผู้ใช้: "เอาตัวเลือกช่างเข้างานมาไว้ด้านนอก" · "ให้มาแทรกระหว่างปุ่มกาง/ย่อ กับปุ่มตัวกรอง ไม่รก")
+            มือถือ: ช่องเลือกช่าง/เซลอยู่ในแถวเครื่องมือเดียวกัน กินที่ว่างที่เหลือ (ไม่เพิ่มแถวใหม่) */}
+        {!isWideToolbar && (!isSalesView || viewingSalesCalendar) && (
+          <div className="tb-person">
+            <PersonSelectField label="" title={isSalesView ? "เลือกพนักงานฝ่ายขาย" : "เลือกช่างที่เข้างาน"} value={selectedTechnician || "all"}
+              onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
+              allLabel={isSalesView ? "ทุกคน" : "ช่างทุกคน"} allCount={events.length} unit={isSalesView ? "นัด" : "งาน"}
+              options={personOptionsFor(isSalesView ? salespersonOptions : technicianOptions)} sx={{ width: "100%", px: 1, gap: 0.75 }} />
+          </div>
+        )}
+
         {!isWideToolbar && (
         <button
           className={`filter-toggle-btn ${showFilterPanel ? "filter-toggle-btn--open" : ""} ${activeFilterCount > 0 ? "filter-toggle-btn--active" : ""}`}
@@ -2732,16 +2743,6 @@ function EventCalendar() {
         {/* ตารางเซลบนมือถือไม่โชว์ปุ่ม Excel (ใช้บนคอมเป็นหลัก) — ลดปุ่มในแถวให้เหลือเท่าที่จำเป็น */}
         {/* ✅ (8 ต.ค. 2569) ปุ่ม Excel ย้ายไปอยู่ข้างปุ่ม "เพิ่ม..." บนหัวหน้า (ดู SalesTopBar/TechTopBar) */}
       </div>
-
-      {/* ✅ (10 พ.ย. 2569 ผู้ใช้: "เอาตัวเลือกช่างเข้างานมาไว้ด้านนอกให้ดูง่าย") มือถือ: เลือกช่าง/เซลอยู่นอกแผงตัวกรอง เห็นตลอด */}
-      {!isWideToolbar && (!isSalesView || viewingSalesCalendar) && (
-        <div className="ec-person-row mb-2">
-          <PersonSelectField label="" title={isSalesView ? "เลือกพนักงานฝ่ายขาย" : "เลือกช่างที่เข้างาน"} value={selectedTechnician || "all"}
-            onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
-            allLabel={isSalesView ? "ฝ่ายขายทุกคน" : "ช่างทุกคน"} allCount={events.length} unit={isSalesView ? "นัด" : "งาน"}
-            options={personOptionsFor(isSalesView ? salespersonOptions : technicianOptions)} sx={{ width: "100%" }} />
-        </div>
-      )}
 
       {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด
           ยกเลิกเอง หรือคัดลอกทับ เพื่อวางซ้ำได้หลายวันโดยไม่ต้องคัดลอกใหม่ทุกครั้ง) กดวันที่บนปฏิทิน
