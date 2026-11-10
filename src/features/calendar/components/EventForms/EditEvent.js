@@ -1130,6 +1130,12 @@ function injectStyles() {
     /* 🔁 (24 ต.ค. 2569 ผู้ใช้: "แก้ไข UX/UI การกดแก้ไขสถานะ ให้สวยงาม ดูง่าย สื่อความหมาย") ปุ่มเส้นขอบ + หน้าต่างเลือกสถานะในกล่อง */
     .swal-edit-event .ee-status-unlock { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border: 1px solid #e6e9ef; border-radius: 9px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #334155; cursor: pointer; }
     .swal-edit-event .ee-status-unlock:hover { border-color: #2563eb; color: #2563eb; }
+    /* 🔁 (10 พ.ย. 2569 ผู้ใช้: "กดแก้อะไร ต้องให้กดบันทึกด้านล่างก่อนค่าถึงเปลี่ยน") แถบ "ยังไม่บันทึก" + ช่องที่แก้มีขอบส้ม */
+    #ee-dirty-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 14px; background: #fffbeb; border-top: 1px solid #fde68a; color: #92400e; font-size: 12.5px; font-weight: 700; text-align: left; }
+    #ee-dirty-bar.show { display: flex; }
+    #ee-dirty-bar .ee-dirty-txt { flex: 1; min-width: 150px; }
+    #ee-dirty-bar button { border: 1px solid #fcd34d; background: #fff; color: #92400e; font: inherit; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
+    .ee-dirty-mark { box-shadow: 0 0 0 2px #fbbf24 !important; border-radius: 10px; }
     .ee-st-overlay { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15,23,42,.45); animation: eeStFade .15s ease; }
     @keyframes eeStFade { from { opacity: 0 } to { opacity: 1 } }
     .ee-st-card { width: 100%; max-width: 420px; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px -12px rgba(15,23,42,.45); overflow: hidden; text-align: left; }
@@ -2539,6 +2545,7 @@ export const getEditEvent = async ({
 
   </div>
 
+  <div id="ee-dirty-bar" role="status" aria-live="polite"><span class="ee-dirty-txt"></span><button type="button" id="ee-dirty-revert">ยกเลิกการแก้ไข</button></div>
   <!-- ── Action bar (แยก 3 กลุ่มชัดเจน) ── -->
   <div id="ee-action-bar">
 
@@ -2762,10 +2769,46 @@ export const getEditEvent = async ({
     didOpen: () => {
       // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
       {
-        const fd = domFormDraft(Swal.getPopup(), `editEvent:${eventId}`, { bannerHost: "#ee-body" });
+        // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ทุกการดำเนินการ กดแก้อะไร ต้องให้กดบันทึกด้านล่างก่อนค่าถึงเปลี่ยน ตอนนี้แค่เลือกก็เปลี่ยนแล้ว")
+        //    • เปิดฟอร์มต้องเห็นค่าที่บันทึกจริงเสมอ — การแก้ที่ค้าง (ไม่ได้กดบันทึก) ไม่เติมให้เอง แต่ถาม "กู้คืน / ทิ้ง"
+        //    • แก้ช่องไหน = ขอบส้ม + แถบ "แก้ไขแล้ว N รายการ ยังไม่บันทึก" + ปุ่มบันทึกบอกจำนวน · ยกเลิกการแก้ไขได้
+        //    • กดปิดทั้งที่ยังไม่บันทึก = ถามก่อน (ทิ้งการแก้ไข / กลับไปแก้ต่อ / บันทึก)
+        const popupEl = Swal.getPopup();
+        const labelOf = (el) => (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
+        const renderDirty = (keys) => {
+          popupEl.querySelectorAll(".ee-dirty-mark").forEach((n) => n.classList.remove("ee-dirty-mark"));
+          const names = [];
+          keys.forEach((k) => {
+            const el = k.startsWith("radio:") ? popupEl.querySelector(`input[type="radio"][name="${CSS.escape(k.slice(6))}"]`) : popupEl.querySelector(`#${CSS.escape(k)}`);
+            if (!el) return;
+            const target = el.tomselect?.wrapper || el.closest(".ee-hm-value")?.querySelector(".ee-pick-btn") || el.closest(".ee-field") || el;
+            target.classList.add("ee-dirty-mark");
+            const n = labelOf(el);
+            if (n && !names.includes(n)) names.push(n);
+          });
+          const bar = document.getElementById("ee-dirty-bar");
+          const btn = document.getElementById("btnConfirm");
+          if (bar) {
+            bar.classList.toggle("show", keys.length > 0);
+            const t = bar.querySelector(".ee-dirty-txt");
+            if (t) t.textContent = keys.length ? `แก้ไขแล้ว ${keys.length} รายการ${names.length ? ` (${names.slice(0, 3).join(" · ")}${names.length > 3 ? " …" : ""})` : ""} — ยังไม่บันทึก กด “บันทึก” เพื่อยืนยัน` : "";
+          }
+          if (btn && !btn.dataset.busy) btn.textContent = keys.length ? `💾 บันทึก (${keys.length})` : "💾 บันทึก";
+        };
+        const fd = domFormDraft(popupEl, `editEvent:${eventId}`, { bannerHost: "#ee-body", askRestore: true, onDirtyChange: renderDirty });
         formDraftCtl = fd;
         fd.restore();
         setTimeout(() => fd.start(), 300);
+        document.getElementById("ee-dirty-revert")?.addEventListener("click", () => {
+          // สถานะเปลี่ยนผ่านหน้าต่างแก้สถานะ (ช่องถูกล็อก) — คืนค่าเองก่อน แล้วคืนช่องอื่นทั้งหมด
+          const st = document.getElementById("editStatus");
+          if (st && st.dataset.initial && st.value !== st.dataset.initial) {
+            st.disabled = false; st.value = st.dataset.initial; st.dispatchEvent(new Event("change", { bubbles: true })); st.disabled = true;
+            document.getElementById("ee-status-changed")?.remove();
+          }
+          fd.revert();
+          ["ee-respMsg", "ee-teamMsg"].forEach((id) => { const m = document.getElementById(id); if (m) { m.textContent = ""; m.classList.remove("pending"); } });
+        });
       }
       // ✅ รูปและไฟล์หน้างาน (React) — ช่างที่อยู่ในงาน/แอดมินเพิ่ม/ลบได้ · งานปิดแล้ว/รออนุมัติ ดูอย่างเดียว
       {
@@ -3011,6 +3054,7 @@ export const getEditEvent = async ({
 
       /* status header reactive */
       const statusSel = document.getElementById("editStatus");
+      if (statusSel) statusSel.dataset.initial = statusSel.value;
       const headerEl = document.getElementById("ee-status-header");
       const iconEl = document.getElementById("ee-status-icon");
       statusSel?.addEventListener("change", (e) => {
@@ -4258,12 +4302,36 @@ export const getEditEvent = async ({
         }));
 
       /* Cancel / custom close */
-      document
-        .getElementById("btnCancel")
-        ?.addEventListener("click", () => Swal.close());
-      document
-        .getElementById("ee-close-btn")
-        ?.addEventListener("click", () => Swal.close());
+      // 🔁 (10 พ.ย. 2569) ปิดทั้งที่ยังไม่บันทึก = ถามก่อน ไม่ปิดทิ้งเงียบๆ (และไม่เก็บค่าค้างไปโผล่ตอนเปิดใหม่ถ้าเลือกทิ้ง)
+      const guardedClose = () => {
+        const keys = formDraftCtl?.dirtyKeys?.() || [];
+        const popup = Swal.getPopup();
+        if (!keys.length || !popup) { Swal.close(); return; }
+        if (popup.querySelector(".ee-st-overlay")) return;
+        const ov = document.createElement("div");
+        ov.className = "ee-st-overlay";
+        ov.innerHTML = `
+          <div class="ee-st-card" role="dialog" aria-label="ยังไม่บันทึกการแก้ไข">
+            <div class="ee-st-head">
+              <div class="ee-st-title">ยังไม่ได้บันทึกการแก้ไข</div>
+              <div class="ee-st-sub">แก้ไขไว้ ${keys.length} รายการ — ถ้าปิดตอนนี้ ค่าที่แก้จะไม่ถูกบันทึก</div>
+            </div>
+            <div class="ee-st-list">
+              <button type="button" class="ee-st-opt" data-a="save" style="--c:#2563eb;--soft:#eff6ff"><span class="ee-st-txt"><b>บันทึกการแก้ไข</b><small>บันทึกแล้วค่อยปิด</small></span></button>
+              <button type="button" class="ee-st-opt" data-a="drop" style="--c:#dc2626;--soft:#fef2f2"><span class="ee-st-txt"><b>ทิ้งการแก้ไข แล้วปิด</b><small>ค่าที่บันทึกไว้เดิมไม่เปลี่ยน</small></span></button>
+            </div>
+            <div class="ee-st-foot"><span class="ee-st-note"></span><button type="button" class="ee-st-cancel">กลับไปแก้ต่อ</button></div>
+          </div>`;
+        const close = () => ov.remove();
+        ov.addEventListener("click", (ev) => { if (ev.target === ov) close(); });
+        ov.querySelector(".ee-st-cancel").addEventListener("click", close);
+        ov.querySelector('[data-a="save"]').addEventListener("click", () => { close(); document.getElementById("btnConfirm")?.click(); });
+        ov.querySelector('[data-a="drop"]').addEventListener("click", () => { formDraftCtl?.discard?.(); close(); Swal.close(); });
+        popup.style.position = popup.style.position || "relative";
+        popup.appendChild(ov);
+      };
+      document.getElementById("btnCancel")?.addEventListener("click", guardedClose);
+      document.getElementById("ee-close-btn")?.addEventListener("click", guardedClose);
 
       /* ✅ ออกใบส่งมอบงาน — ปิดหน้าแก้ไขก่อนแล้วค่อยเปิดกล่องออกเอกสาร (React Dialog) ไม่ซ้อนกัน
          2 ชั้น ซึ่งบนมือถือจะกลายเป็นกล่องซ้อนกล่องจนกดปิดไม่ถูกว่าปิดอันไหนอยู่

@@ -140,7 +140,12 @@ const diffKeys = (a = {}, b = {}) => [...new Set([...Object.keys(a), ...Object.k
   .filter((k) => JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? ""));
 const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, obj[k]]));
 
-export function domFormDraft(root, key, { bannerHost } = {}) {
+/**
+ * @param opts.askRestore  ✅ (10 พ.ย. 2569 ผู้ใช้: "หน้า editEvent กดแก้อะไรต้องกดบันทึกก่อนค่าถึงเปลี่ยน ตอนนี้แค่เลือกก็เปลี่ยนแล้ว")
+ *        true = ไม่เติมค่าค้างให้เอง (ฟอร์มแก้ไขข้อมูลที่บันทึกแล้ว — เปิดมาต้องเห็นค่าจริง) แต่ถามด้วยแถบ "กู้คืน / ทิ้ง"
+ * @param opts.onDirtyChange (keys: string[]) => void — ช่องที่แก้แล้วยังไม่บันทึก (ใช้แสดงแถบ "ยังไม่บันทึก" / ไฮไลต์ช่อง)
+ */
+export function domFormDraft(root, key, { bannerHost, askRestore = false, onDirtyChange } = {}) {
   let pending = null;   // ร่างที่จะกู้คืน: { at, data: เฉพาะช่องที่ต่าง, base }
   let baseline = null;  // ค่าตั้งต้นของฟอร์ม (หลังเตรียมตัวเสร็จ / base ของร่างที่กู้คืน)
   let timer = null;
@@ -148,6 +153,12 @@ export function domFormDraft(root, key, { bannerHost } = {}) {
   let started = false;
   let startedAt = 0;
 
+  let dirtyTimer = null;
+  const notifyDirty = () => {
+    if (!onDirtyChange) return;
+    clearTimeout(dirtyTimer);
+    dirtyTimer = setTimeout(() => { if (active && baseline && root.isConnected) onDirtyChange(diffKeys(collect(root), baseline)); }, 120);
+  };
   const persist = () => {
     if (!active || !started || !root.isConnected || !baseline) return;
     const now = collect(root);
@@ -160,12 +171,14 @@ export function domFormDraft(root, key, { bannerHost } = {}) {
     // โค้ดเปลี่ยนค่าเอง (ไม่มีการกด/พิมพ์จริงไม่นาน) → ถือเป็นค่าตั้งต้นใหม่ ไม่ใช่สิ่งที่ผู้ใช้กรอก
     if (!e.isTrusted && !userActedWithin(1500, startedAt)) {
       const now = collect(root);
-      const changedByUser = pending ? Object.keys(pending.data) : [];
+      const changedByUser = pending && !askRestore ? Object.keys(pending.data) : [];
       baseline = { ...now, ...pick(baseline, changedByUser) };
+      notifyDirty();
       return;
     }
     clearTimeout(timer);
     timer = setTimeout(persist, 400);
+    notifyDirty();
   };
 
   return {
@@ -175,12 +188,42 @@ export function domFormDraft(root, key, { bannerHost } = {}) {
       const v2 = d?.data?.v === 2 ? d.data : null;
       if (!v2 || !Object.keys(v2.data || {}).length) { if (d) clearDraft(key); return false; }
       pending = { at: d.at, data: v2.data, base: v2.base };
+      if (askRestore) return false; // ถามก่อนด้วยแถบใน start()
       apply(root, pending.data);
       return true;
     },
     /** เริ่มติดตามการแก้ + แสดงแถบกู้คืน (เรียกหลังฟอร์มเตรียมตัวเสร็จ) */
     start() {
       let now = collect(root);
+      if (pending && askRestore) {
+        // ค่าจริงของงาน = ค่าตั้งต้น · แก้ค้างไว้ = เสนอให้กู้คืนเอง (ไม่เติมให้เอง)
+        baseline = now;
+        pending.data = pick(pending.data, Object.keys(pending.data).filter((k) => k in now && JSON.stringify(now[k] ?? "") !== JSON.stringify(pending.data[k] ?? "")));
+        const n = Object.keys(pending.data).length;
+        if (!n) { clearDraft(key); pending = null; }
+        else {
+          const host = (bannerHost && root.querySelector(bannerHost)) || root;
+          const bar = document.createElement("div");
+          bar.setAttribute("data-no-draft", "");
+          bar.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;font-weight:600;text-align:left;";
+          const btn = "border:1px solid #fcd34d;background:#fff;color:#92400e;font-weight:800;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit";
+          bar.innerHTML = `<span style="flex:1;min-width:160px">มีการแก้ไขที่ยังไม่ได้บันทึก ${n} ช่อง (${draftAgoText(pending.at)}) — ค่าที่เห็นตอนนี้คือค่าที่บันทึกจริง</span><button type="button" data-a="restore" style="${btn}">กู้คืนการแก้ไข</button><button type="button" data-a="drop" style="${btn};color:#64748b;border-color:#e2e8f0">ทิ้ง</button>`;
+          bar.querySelector('[data-a="restore"]').addEventListener("click", () => {
+            apply(root, pending.data, { fire: true });
+            pending = null;
+            bar.remove();
+            persist();
+            notifyDirty();
+          });
+          bar.querySelector('[data-a="drop"]').addEventListener("click", () => { clearDraft(key); pending = null; bar.remove(); });
+          host.prepend(bar);
+        }
+        started = true;
+        startedAt = Date.now();
+        root.addEventListener("input", onEdit, true);
+        root.addEventListener("change", onEdit, true);
+        return;
+      }
       if (pending) {
         // ช่องที่ไม่มีอยู่ในฟอร์มแล้ว (เปลี่ยนรุ่นฟอร์ม/ช่องอัตโนมัติ) ไม่นับ
         pending.data = pick(pending.data, Object.keys(pending.data).filter((k) => k in now));
@@ -221,7 +264,19 @@ export function domFormDraft(root, key, { bannerHost } = {}) {
       root.addEventListener("input", onEdit, true);
       root.addEventListener("change", onEdit, true);
     },
-    clear() { active = false; clearTimeout(timer); clearDraft(key); },
+    clear() { active = false; clearTimeout(timer); clearTimeout(dirtyTimer); clearDraft(key); },
+    /** ช่องที่แก้แล้วยังไม่บันทึก (เทียบค่าตั้งต้น) */
+    dirtyKeys() { return baseline && root.isConnected ? diffKeys(collect(root), baseline) : []; },
+    /** ยกเลิกการแก้ไขทั้งหมด — คืนค่าตั้งต้นให้ทุกช่องที่แก้ + ล้างร่าง */
+    revert() {
+      if (!baseline) return;
+      const keys = diffKeys(collect(root), baseline);
+      apply(root, pick(baseline, keys), { fire: true });
+      clearDraft(key);
+      notifyDirty();
+    },
+    /** ปิดโดยทิ้งการแก้ไข (ไม่เก็บร่าง) */
+    discard() { active = false; clearTimeout(timer); clearTimeout(dirtyTimer); clearDraft(key); },
     /** ฟอร์มกำลังปิด (ไม่ได้บันทึก) — เก็บค่าล่าสุดทันที (ถ้ามีช่องที่แก้จริง) */
     stop() {
       if (!active) return;

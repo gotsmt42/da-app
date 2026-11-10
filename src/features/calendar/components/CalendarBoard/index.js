@@ -2530,7 +2530,7 @@ function EventCalendar() {
             <>
               {/* คนเดียวเห็นนัดตัวเองอยู่แล้วจากขอบเขตฝั่ง server — ตัวกรองนี้มีความหมายเฉพาะตอน
                   แอดมิน/ผู้จัดการเปิดดูรวมของทุกเซล */}
-              {viewingSalesCalendar && (
+              {viewingSalesCalendar && isWideToolbar && (
                 <div className="event-filter-msel" style={{ minWidth: 0, flex: "1 1 190px" }}>
                   <PersonSelectField label="" title="เลือกพนักงานฝ่ายขาย" value={selectedTechnician || "all"}
                     onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
@@ -2562,11 +2562,13 @@ function EventCalendar() {
             </>
           ) : (
             <>
+              {isWideToolbar && (
               <div className="event-filter-msel" style={{ minWidth: 0, flex: "1 1 190px" }}>
                 <PersonSelectField label="" title="เลือกช่างที่เข้างาน" value={selectedTechnician || "all"}
                   onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
                   allLabel="ช่างทุกคน" allCount={events.length} unit="งาน" options={personOptionsFor(technicianOptions)} sx={{ width: "100%" }} />
               </div>
+              )}
 
               {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
                   2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
@@ -2700,7 +2702,7 @@ function EventCalendar() {
           aria-label="ตัวกรอง"
         >
           <FontAwesomeIcon icon={faSliders} />
-          {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+          {activeFilterCount - (selectedTechnician ? 1 : 0) > 0 && <span className="filter-badge">{activeFilterCount - (selectedTechnician ? 1 : 0)}</span>}
         </button>
         )}
 
@@ -2730,6 +2732,16 @@ function EventCalendar() {
         {/* ตารางเซลบนมือถือไม่โชว์ปุ่ม Excel (ใช้บนคอมเป็นหลัก) — ลดปุ่มในแถวให้เหลือเท่าที่จำเป็น */}
         {/* ✅ (8 ต.ค. 2569) ปุ่ม Excel ย้ายไปอยู่ข้างปุ่ม "เพิ่ม..." บนหัวหน้า (ดู SalesTopBar/TechTopBar) */}
       </div>
+
+      {/* ✅ (10 พ.ย. 2569 ผู้ใช้: "เอาตัวเลือกช่างเข้างานมาไว้ด้านนอกให้ดูง่าย") มือถือ: เลือกช่าง/เซลอยู่นอกแผงตัวกรอง เห็นตลอด */}
+      {!isWideToolbar && (!isSalesView || viewingSalesCalendar) && (
+        <div className="ec-person-row mb-2">
+          <PersonSelectField label="" title={isSalesView ? "เลือกพนักงานฝ่ายขาย" : "เลือกช่างที่เข้างาน"} value={selectedTechnician || "all"}
+            onChange={(v) => setSelectedTechnician(v === "all" ? "" : v)}
+            allLabel={isSalesView ? "ฝ่ายขายทุกคน" : "ช่างทุกคน"} allCount={events.length} unit={isSalesView ? "นัด" : "งาน"}
+            options={personOptionsFor(isSalesView ? salespersonOptions : technicianOptions)} sx={{ width: "100%" }} />
+        </div>
+      )}
 
       {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด
           ยกเลิกเอง หรือคัดลอกทับ เพื่อวางซ้ำได้หลายวันโดยไม่ต้องคัดลอกใหม่ทุกครั้ง) กดวันที่บนปฏิทิน
@@ -3250,9 +3262,23 @@ function EventCalendar() {
               text: "ถัดไป",
               click: () => calendarRef.current.getApi().next(),
             },
+            // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ปุ่มวันนี้เวลากดให้เลื่อนไปวันนี้เลย") ไปเดือน/สัปดาห์ปัจจุบัน แล้วเลื่อนจอไปที่ช่องวันนี้
+            //    (ทั้งแนวตั้ง และแนวนอนตอนขยายคอลัมน์บนมือถือ) · ช่องวันนี้กระพริบให้เห็นตำแหน่ง
             today: {
               text: "วันนี้",
-              click: () => calendarRef.current.getApi().today(),
+              click: () => {
+                calendarRef.current.getApi().today();
+                setTimeout(() => {
+                  const root = document.getElementById("content-id") || document;
+                  const el = root.querySelector(".fc-daygrid-day.fc-day-today, .fc-list-day.fc-day-today, .fc-timegrid-col.fc-day-today, .fc-col-header-cell.fc-day-today");
+                  if (!el) return;
+                  el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+                  el.classList.remove("ec-today-flash");
+                  void el.offsetWidth; // เริ่มแอนิเมชันใหม่ทุกครั้งที่กด
+                  el.classList.add("ec-today-flash");
+                  setTimeout(() => el.classList.remove("ec-today-flash"), 1600);
+                }, 80);
+              },
             },
             // ✅ ปุ่มย่อ/ขยายความกว้างคอลัมน์ — วางไว้แถวเดียวกับ "วันนี้" ตรงกลางจอ กดง่ายด้วยนิ้วโป้ง
             // (เดิมอยู่บนสุดปนกับปุ่มค้นหา/ตัวกรอง/ส่งออก ซึ่งเป็นกลุ่มเครื่องมือคนละเรื่องกันและอยู่ไกล)

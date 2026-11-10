@@ -360,3 +360,12 @@
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-site,
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-row,
 .modern-calendar-container.ec-modern .fc-daygrid .ec-card-team { overflow-wrap: anywhere; }
+
+/* ✅ (10 พ.ย. 2569) ปุ่ม "วันนี้" — เลื่อนไปที่ช่องวันนี้แล้วกระพริบให้เห็นตำแหน่ง */
+.ec-modern .fc .ec-today-flash { animation: ec-today-flash 1.5s ease-out; }
+@keyframes ec-today-flash {
+  0%, 40% { box-shadow: inset 0 0 0 3px #2563eb; }
+  100% { box-shadow: inset 0 0 0 3px transparent; }
+}
+/* ✅ (10 พ.ย. 2569) มือถือ: ช่องเลือกช่างเข้างานอยู่นอกแผงตัวกรอง */
+.ec-modern .ec-person-row { min-width: 0; }
