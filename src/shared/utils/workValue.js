@@ -28,6 +28,27 @@ export const workValueNet = (ev) => (hasWorkValue(ev?.workValue) ? vatParts(ev.w
 
 export const vatLabel = (vatIncluded) => (vatIncluded ? "รวม VAT" : "ก่อน VAT");
 
+/**
+ * ✅ (10 พ.ย. 2569 ผู้ใช้: "งานสัญญาไม่ให้มีระบุก่อน VAT/รวม VAT … ให้ไประบุที่หน้าภาพรวมงาน")
+ *    งานสัญญา = VAT ตามมูลค่าสัญญาเสมอ · คืน null ถ้าไม่ใช่งานสัญญา (เลือก VAT เองได้)
+ */
+export function contractVatInfo(ev) {
+  if (!ev?.contractGroupId) return null;
+  const flag = ev.jobValueVatIncluded;
+  const set = flag === true || flag === false;
+  const hasValue = Number(ev.jobValue) > 0;
+  return {
+    vatIncluded: flag === true,
+    set,
+    hasValue,
+    text: !hasValue
+      ? "งานสัญญา — ยังไม่ได้ใส่มูลค่าสัญญา · ใส่มูลค่า ระบุ VAT และแนบใบเสนอราคาได้ที่หน้า “ภาพรวมงาน”"
+      : set
+        ? `ตามมูลค่าสัญญา: ${flag ? "รวม VAT 7%" : "ก่อน VAT (Net)"} — เปลี่ยนได้ที่หน้า “ภาพรวมงาน”`
+        : "ตามมูลค่าสัญญา (ยังไม่ระบุ VAT — คิดเป็นก่อน VAT) — ระบุได้ที่หน้า “ภาพรวมงาน”",
+  };
+}
+
 /** ข้อความสั้นใต้ยอด เช่น "ก่อน VAT · รวม VAT ฿11,128.00" */
 export function vatNote(amount, vatIncluded) {
   const p = vatParts(amount, vatIncluded);
@@ -58,7 +79,8 @@ export function suggestWorkValue(ev) {
     if (amount === null) return null;
     const isLast = rounds > 1 && roundNo !== null && roundNo >= rounds;
     return {
-      amount, vatIncluded: null, source: "contract",
+      // 🔁 (10 พ.ย. 2569) ใช้การระบุ VAT ของมูลค่าสัญญา (หน้าภาพรวมงาน) — ไม่ให้เลือกเองรายครั้ง
+      amount, vatIncluded: ev.jobValueVatIncluded === true, source: "contract",
       hint: rounds > 1 ? `มูลค่าสัญญา ${baht(jobValue)} ÷ ${rounds} ครั้ง${isLast ? " (ครั้งสุดท้ายรับเศษ)" : ""}` : `มูลค่าสัญญา ${baht(jobValue)}`,
     };
   }

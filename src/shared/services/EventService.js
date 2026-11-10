@@ -466,6 +466,27 @@ const EventService = {
     }
   },
 
+  // ✅ (10 พ.ย. 2569) ใบเสนอราคาของทั้งสัญญา (หน้าภาพรวมงาน) — แนบ/ลบ · ให้ AI อ่านมูลค่าสัญญา (ไม่บันทึกเอง)
+  async UploadContractQuotationFile(contractGroupId, file) {
+    const prepared = await prepareUploadFile(file);
+    if (!prepared.ok) throw new Error(prepared.message);
+    const formData = new FormData();
+    formData.append("file", prepared.file);
+    const res = await API.post(`/events/contract/${contractGroupId}/quotation-file`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+    });
+    return res.data?.file || null;
+  },
+  async DeleteContractQuotationFile(contractGroupId, fileId) {
+    const res = await API.delete(`/events/contract/${contractGroupId}/quotation-file/${fileId}`);
+    return res.data;
+  },
+  async ScanContractValue(contractGroupId) {
+    const res = await API.post(`/events/contract/${contractGroupId}/value/scan`, {}, { timeout: 180000 });
+    return res.data?.result || null;
+  },
+
   // ✅ รวมงานเก่า (ที่ยังไม่มี contractGroupId) ที่เลือกไว้ให้กลายเป็นสัญญาเดียวกัน — ดูรายละเอียด
   // การจัดเรียง "ครั้งที่" อัตโนมัติที่ PUT /events/contract/merge
   async MergeIntoContract(payload) {

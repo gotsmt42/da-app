@@ -2301,7 +2301,7 @@ export const getEditEvent = async ({
     <section class="ee-card ee-key-card">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">💰</span>
-        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้ · เลือกว่าเป็นยอดก่อนหรือรวม VAT</p></div>
+        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>${eventContractGroupId ? "งานสัญญา — แบ่งจากมูลค่าสัญญาให้อัตโนมัติ · VAT ตามที่ระบุไว้ที่หน้าภาพรวมงาน" : "ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้ · เลือกว่าเป็นยอดก่อนหรือรวม VAT"}</p></div>
       </div>
       <div class="ee-card-body">
         ${workValueCardHtml(wvInit, { disabled: isViewOnly })}
@@ -2875,7 +2875,7 @@ export const getEditEvent = async ({
         wvCtl = bindWorkValueCard(popupEl, {
           init: wvInit, eventId, EventService,
           // งานสัญญาที่มีมูลค่าสัญญาแล้ว แบ่งตามรอบได้เลย ไม่ต้องใช้ AI
-          allowAi: !(eventContractGroupId && Number(eventJobValue) > 0),
+          allowAi: !eventContractGroupId,
         });
         const fd = domFormDraft(popupEl, `editEvent:${eventId}`, { bannerHost: "#ee-body", askRestore: true, onDirtyChange: renderDirty });
         formDraftCtl = fd;

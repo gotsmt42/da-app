@@ -7,9 +7,10 @@
  *      (บันทึกพร้อมการกด "บันทึก" ของฟอร์ม — ไม่ได้บันทึกเองเงียบๆ)
  *    • เลือก "ก่อน VAT (Net)" / "รวม VAT 7%" · ใต้ช่องแสดงอีกฝั่งของยอดให้ทันที
  *    • ปุ่ม AI อ่านไฟล์ของงาน → เลือกใช้ยอด Net หรือยอดรวม VAT ได้ในคลิกเดียว
+ *    🔁 (10 พ.ย. 2569) งานสัญญา: ไม่มีตัวเลือก VAT · ไม่มีปุ่ม AI — ใช้การระบุ VAT ของมูลค่าสัญญา (หน้าภาพรวมงาน)
  *    สูตร/ค่าแนะนำอยู่ที่ shared/utils/workValue.js ที่เดียว (ใช้ร่วมกับหน้างานช่าง · หน้าการดำเนินงาน · วางบิล)
  */
-import { suggestWorkValue, vatParts, hasWorkValue } from "@/shared/utils/workValue";
+import { suggestWorkValue, vatParts, hasWorkValue, contractVatInfo } from "@/shared/utils/workValue";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n).toLocaleString("th-TH", { maximumFractionDigits: 2 });
@@ -43,6 +44,9 @@ export const WORK_VALUE_CSS = `
   .ee-wv-ai-use button { flex: 1 1 140px; min-height: 34px; padding: 4px 10px; border-radius: 9px; border: 1px solid #bfdbfe; background: #fff; color: #1d4ed8; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; line-height: 1.25; }
   .ee-wv-ai-use button:hover { background: #eff6ff; }
   .ee-wv-ai-use button small { display: block; font-weight: 500; color: #64748b; font-size: 11px; }
+  .ee-wv-contract { margin-top: 10px; display: flex; gap: 6px; align-items: flex-start; padding: 8px 10px; border-radius: 9px; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; font-size: 12px; line-height: 1.45; }
+  .ee-wv-contract b { color: #1e293b; font-weight: 600; }
+  .ee-wv-contract.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
   .ee-wv-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid #c7d2fe; border-top-color: #4338ca; animation: ee-boot-spin .8s linear infinite; }
 `;
 
@@ -54,12 +58,14 @@ export function workValueInitial(p = {}) {
   const saved = hasWorkValue(p.workValue);
   const savedVat = Boolean(p.workValueVatIncluded);
   const suggest = saved ? null : suggestWorkValue(p);
+  const contract = contractVatInfo(p);
   return {
-    saved, savedVat,
+    saved, savedVat, contract,
     savedValue: saved ? Number(p.workValue) : null,
     suggest,
     amount: saved ? Number(p.workValue) : suggest ? suggest.amount : null,
-    vat: saved ? savedVat : suggest && suggest.vatIncluded !== null ? suggest.vatIncluded : savedVat,
+    // งานสัญญา = VAT ตามมูลค่าสัญญาเสมอ (ทั้งค่าที่บันทึกแล้วและค่าใหม่)
+    vat: contract ? contract.vatIncluded : saved ? savedVat : suggest && suggest.vatIncluded !== null ? suggest.vatIncluded : savedVat,
     source: saved ? (p.workValueSource || "") : suggest ? suggest.source : "",
   };
 }
@@ -68,19 +74,23 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
   const dis = disabled ? "disabled" : "";
   // ดูอย่างเดียว = แสดงเฉพาะค่าที่บันทึกจริง (ค่าอัตโนมัติยังไม่ถูกบันทึก ห้ามดูเหมือนเป็นค่าจริง)
   const amount = disabled ? init.savedValue : init.amount;
-  const vat = disabled ? init.savedVat : init.vat;
+  const vat = disabled && !init.contract ? init.savedVat : init.vat;
+  const ct = init.contract;
+  const vatHtml = ct
+    ? `<div id="ee-wv-contract" class="ee-wv-contract${ct.set && ct.hasValue ? "" : " warn"}" data-no-draft><span aria-hidden="true">ⓘ</span><span>${esc(ct.text)}</span></div>`
+    : `<div class="ee-vat-seg" role="radiogroup" aria-label="ยอดนี้คือ">
+      <label><input type="radio" name="editWorkValueVat" value="0" ${vat ? "" : "checked"} ${dis}><span>ก่อน VAT (Net)</span></label>
+      <label><input type="radio" name="editWorkValueVat" value="1" ${vat ? "checked" : ""} ${dis}><span>รวม VAT 7%</span></label>
+    </div>`;
   return `
     <div class="ee-value-box">
       <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
         value="${amount === null ? "" : fmt(amount)}" ${dis}>
       <span class="ee-value-unit">บาท</span>
     </div>
-    <div class="ee-vat-seg" role="radiogroup" aria-label="ยอดนี้คือ">
-      <label><input type="radio" name="editWorkValueVat" value="0" ${vat ? "" : "checked"} ${dis}><span>ก่อน VAT (Net)</span></label>
-      <label><input type="radio" name="editWorkValueVat" value="1" ${vat ? "checked" : ""} ${dis}><span>รวม VAT 7%</span></label>
-    </div>
+    ${vatHtml}
     <div id="ee-wv-break" class="ee-wv-break" aria-live="polite"></div>
-    ${init.suggest && !disabled ? `<div id="ee-wv-auto" class="ee-wv-auto" data-no-draft><span aria-hidden="true">✦</span><span>ใส่ให้อัตโนมัติจาก${esc(init.suggest.hint)} — ตรวจแล้วกด “บันทึก” ด้านล่าง${init.suggest.vatIncluded === null ? " · เลือกให้ตรงว่าเป็นยอดก่อนหรือรวม VAT" : ""}</span></div>` : ""}
+    ${init.suggest && !disabled ? `<div id="ee-wv-auto" class="ee-wv-auto" data-no-draft><span aria-hidden="true">✦</span><span>ใส่ให้อัตโนมัติจาก${esc(init.suggest.hint)} — ตรวจแล้วกด “บันทึก” ด้านล่าง${init.suggest.vatIncluded === null && !ct ? " · เลือกให้ตรงว่าเป็นยอดก่อนหรือรวม VAT" : ""}</span></div>` : ""}
     <div id="ee-wv-ai" class="ee-wv-ai" data-no-draft></div>`;
 }
 
@@ -93,7 +103,9 @@ export function bindWorkValueCard(root, { init, eventId, EventService, allowAi =
   if (!inp) return { read: () => ({}) };
   let source = init.source || "";
   const radios = [...root.querySelectorAll('input[name="editWorkValueVat"]')];
-  const vatOn = () => root.querySelector('input[name="editWorkValueVat"]:checked')?.value === "1";
+  const vatOn = init.contract
+    ? () => init.contract.vatIncluded
+    : () => root.querySelector('input[name="editWorkValueVat"]:checked')?.value === "1";
   const breakEl = root.querySelector("#ee-wv-break");
 
   const render = () => {
@@ -128,7 +140,7 @@ export function bindWorkValueCard(root, { init, eventId, EventService, allowAi =
 
   // ── AI อ่านยอดจากไฟล์ (เปิดใช้เฉพาะเมื่อเซิร์ฟเวอร์มีคีย์) ──
   const host = root.querySelector("#ee-wv-ai");
-  if (host && allowAi && !inp.disabled && EventService?.ScanWorkValue) {
+  if (host && allowAi && !init.contract && !inp.disabled && EventService?.ScanWorkValue) {
     const KIND = { po: "PO", quotation: "ใบเสนอราคา", invoice: "ใบวางบิล", contract: "สัญญา", other: "เอกสาร" };
     const idle = (label = "✦ ให้ AI อ่านยอดจากไฟล์ของงาน") => {
       host.innerHTML = `<button type="button" class="ee-wv-ai-btn">${label}</button>`;

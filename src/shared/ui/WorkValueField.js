@@ -5,12 +5,13 @@
  *
  * 🔁 (10 พ.ย. 2569 ผู้ใช้: "ให้ใส่อัตโนมัติ · เลือกได้ว่ายอดบวก VAT หรือยอด Net · ทำให้สอดคล้องกันทั้งหมด")
  *    • เลือก "ก่อน VAT" / "รวม VAT 7%" · แสดงอีกฝั่งของยอดทันที (สูตรเดียวกับฟอร์มแก้ไขงาน — shared/utils/workValue.js)
+ *    🔁 (10 พ.ย. 2569) งานสัญญา = ไม่มีตัวเลือก VAT · ใช้การระบุ VAT ของมูลค่าสัญญาที่หน้าภาพรวมงาน
  *    • ยังไม่เคยใส่ + มีข้อมูลพอ (สัญญา ÷ ครั้ง / มูลค่างานรวม / ใบเสนอราคาที่ได้งาน) → เปิดช่องมาพร้อมค่าแนะนำ บอกที่มา
  */
 import React, { useState } from "react";
 import { Box, Button, IconButton, Stack, TextField, Typography, InputAdornment, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { EditRounded as Edit, PaymentsRounded as Payments, AutoAwesomeRounded as AutoAwesome } from "@mui/icons-material";
-import { suggestWorkValue, vatParts, vatLabel, hasWorkValue } from "@/shared/utils/workValue";
+import { suggestWorkValue, vatParts, vatLabel, hasWorkValue, contractVatInfo } from "@/shared/utils/workValue";
 
 const parseBaht = (v) => {
   const t = String(v ?? "").replace(/[,\s฿]/g, "");
@@ -28,6 +29,7 @@ const fmt2 = (n) => Number(n).toLocaleString("th-TH", { minimumFractionDigits: 2
  */
 export default function WorkValueField({ value, vatIncluded = false, event, onSave, disabled = false, compact = false }) {
   const has = hasWorkValue(value);
+  const ct = contractVatInfo(event);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [vat, setVat] = useState(Boolean(vatIncluded));
@@ -41,7 +43,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
   const start = () => {
     const sg = has ? null : suggestWorkValue(event);
     setText(has ? fmt(value) : sg ? fmt(sg.amount) : "");
-    setVat(has ? Boolean(vatIncluded) : sg && sg.vatIncluded !== null ? sg.vatIncluded : Boolean(vatIncluded));
+    setVat(ct ? ct.vatIncluded : has ? Boolean(vatIncluded) : sg && sg.vatIncluded !== null ? sg.vatIncluded : Boolean(vatIncluded));
     setSource(has ? "" : sg ? sg.source : "manual");
     setHint(sg ? sg.hint : "");
     setEditing(true);
@@ -50,7 +52,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
     if (invalid) return;
     setSaving(true);
     try {
-      await onSave?.(parsed, { workValueVatIncluded: vat, workValueSource: parsed === null ? "" : (source || "manual") });
+      await onSave?.(parsed, { workValueVatIncluded: ct ? ct.vatIncluded : vat, workValueSource: parsed === null ? "" : (source || "manual") });
       setEditing(false);
     } finally { setSaving(false); }
   };
@@ -75,12 +77,16 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
           <Button size="small" onClick={() => setEditing(false)} sx={{ height: 40, textTransform: "none", minWidth: 0, color: "#64748b" }}>ยกเลิก</Button>
         </Stack>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
+          {ct ? (
+            <Typography sx={{ fontSize: "0.74rem", lineHeight: 1.45, color: ct.set && ct.hasValue ? "#475569" : "#92400e", flex: "1 1 100%" }}>{ct.text}</Typography>
+          ) : (
           <ToggleButtonGroup size="small" exclusive value={vat ? "1" : "0"} onChange={(_, v) => v !== null && setVat(v === "1")}
             sx={{ bgcolor: "#f1f5f9", p: 0.25, borderRadius: 2, "& .MuiToggleButton-root": { border: 0, borderRadius: "7px !important", px: 1.25, py: 0.25, textTransform: "none", fontSize: "0.76rem", fontWeight: 600, color: "#64748b" },
               "& .Mui-selected": { bgcolor: "#fff !important", color: "#1d4ed8 !important", boxShadow: "0 1px 2px rgba(15,23,42,.12)" } }}>
             <ToggleButton value="0">ก่อน VAT (Net)</ToggleButton>
             <ToggleButton value="1">รวม VAT 7%</ToggleButton>
           </ToggleButtonGroup>
+          )}
           {parts && (
             <Typography sx={{ fontSize: "0.74rem", color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
               {vat ? `ก่อน VAT ฿${fmt2(parts.net)}` : `รวม VAT ฿${fmt2(parts.gross)}`}

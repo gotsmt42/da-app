@@ -1,6 +1,6 @@
 {
   "name": "da-app",
-  "version": "2.60.0-beta",
+  "version": "2.61.0-beta",
   "private": true,
   "dependencies": {
     "@capacitor-firebase/messaging": "^7.5.0",

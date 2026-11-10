@@ -19,6 +19,25 @@ describe("การ์ดมูลค่างานครั้งนี้", (
     expect(ctl.read()).toEqual({ workValue: 10400, workValueVatIncluded: false, workValueSource: "contract" });
   });
 
+  it("งานสัญญา: ไม่มีตัวเลือก VAT — ใช้ VAT ของมูลค่าสัญญา (รวม VAT)", () => {
+    const { root, ctl } = mount({ contractGroupId: "C1", jobValue: 42800, jobValueVatIncluded: true, visitCount: 4, time: "1" });
+    expect(root.querySelector('input[name="editWorkValueVat"]')).toBeNull();
+    expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/รวม VAT 7%/);
+    expect(root.querySelector("#ee-wv-break").textContent).toMatch(/ก่อน VAT/);
+    expect(ctl.read()).toEqual({ workValue: 10700, workValueVatIncluded: true, workValueSource: "contract" });
+  });
+
+  it("งานสัญญาที่บันทึกค่าไว้แล้ว แต่ธง VAT ไม่ตรงกับสัญญา → ส่งธงของสัญญาไปซิงก์", () => {
+    const { ctl } = mount({ contractGroupId: "C1", jobValue: 40000, jobValueVatIncluded: true, workValue: 10000, workValueVatIncluded: false });
+    expect(ctl.read()).toEqual({ workValueVatIncluded: true });
+  });
+
+  it("งานสัญญาที่ยังไม่มีมูลค่าสัญญา → บอกให้ไปใส่ที่หน้าภาพรวมงาน", () => {
+    const { root, inp } = mount({ contractGroupId: "C1", visitCount: 4, time: "1" });
+    expect(inp.value).toBe("");
+    expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/ภาพรวมงาน/);
+  });
+
   it("ค่าที่บันทึกแล้วไม่เปลี่ยน = ไม่ส่งอะไร · สลับเป็นรวม VAT = ส่งเฉพาะธง VAT", () => {
     const { root, ctl } = mount({ workValue: 10700, workValueVatIncluded: false });
     expect(ctl.read()).toEqual({});

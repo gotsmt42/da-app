@@ -57,6 +57,8 @@ import BillingDialog from "@/features/finance/components/BillingDialog";
 import BillingChip from "@/features/finance/components/BillingChip";
 import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
+import ContractValuePanel from "@/features/contracts/components/ContractValuePanel";
+import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote } from "@mui/icons-material";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
 import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
 import ColumnSettings from "@/features/contracts/components/ColumnSettings";
@@ -500,6 +502,29 @@ const ModernDialogTitle = ({ icon, color = "#2563eb", title, sub, onClose }) => 
   </DialogTitle>
 );
 /** การ์ดสรุปงาน/สัญญา — โครงการตัวหนา · บริษัท/ประเภท/ระบบ · ป้ายเลขที่สัญญา · ชิปข้อมูลเสริม */
+/**
+ * ✅ (10 พ.ย. 2569) ป้ายใต้มูลค่าสัญญา: ก่อน VAT / รวม VAT / "ระบุ VAT" (ยังไม่ระบุ) + จำนวนใบเสนอราคาที่แนบ
+ *    กดแล้วเปิดกล่อง "มูลค่าสัญญา · ใบเสนอราคา" (ระบุ VAT · แนบไฟล์ · ให้ AI อ่านยอด)
+ */
+const ContractVatTag = ({ c, onOpen, align = "center" }) => {
+  const vat = c.jobValueVatIncluded;
+  const n = (c.contractQuotationFiles || []).length;
+  const unset = vat !== true && vat !== false;
+  return (
+    <Box component="button" type="button" title="ระบุ VAT · แนบใบเสนอราคาของสัญญา"
+      onClick={(e) => { e.stopPropagation(); onOpen?.(); }}
+      sx={{ border: 0, bgcolor: "transparent", p: 0, m: 0, cursor: "pointer", font: "inherit", display: "inline-flex", alignItems: "center", justifyContent: align, gap: 0.4,
+        fontSize: "0.66rem", lineHeight: 1.35, fontWeight: 600, color: unset ? "#b45309" : "#64748b", whiteSpace: "nowrap", "&:hover": { color: "#2563eb", textDecoration: "underline" } }}>
+      {unset ? "ระบุ VAT" : vat ? "รวม VAT" : "ก่อน VAT"}
+      {n > 0 && (
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", color: "#64748b" }}>
+          · <AttachFileIcon sx={{ fontSize: 11, transform: "rotate(45deg)" }} />{n}
+        </Box>
+      )}
+    </Box>
+  );
+};
+
 const ContractSummaryCard = ({ ct, chips = [] }) => (
   <Box sx={{ p: 1.75, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
     <Stack direction="row" alignItems="flex-start" spacing={1.25}>
@@ -1661,6 +1686,10 @@ export default function ContractOverview() {
   const handleCloseBilling = useCallback(() => setBillingTargetId(null), []);
   const handleBillingSaved = useCallback((updated) => {
     setEvents((prev) => prev.map((e) => (String(e._id) === String(updated._id) ? { ...e, ...updated } : e)));
+  }, []);
+  // ✅ (10 พ.ย. 2569) มูลค่าสัญญา/VAT/ใบเสนอราคาของสัญญา บันทึกแล้ว → อัปเดตทุกครั้งของสัญญาในหน้าทันที
+  const patchContractRows = useCallback((gid, fields) => {
+    setEvents((prev) => prev.map((e) => (e.contractGroupId && String(e.contractGroupId) === String(gid) ? { ...e, ...fields } : e)));
   }, []);
 
 
@@ -4048,6 +4077,7 @@ export default function ContractOverview() {
   //    จะแย่งโฟกัส ทำให้ช่องในกล่องเสียโฟกัสแล้วบันทึก/ออกจากโหมดแก้ไขทันที (ผู้ใช้เจอ "แก้ไขไม่ได้ UI ทับ")
   //    ✅ ระหว่างเปิดกล่อง ตารางไม่เข้าโหมดแก้ไขเลย — แก้ได้ที่กล่องที่เดียว
   const [rowEditorKey, setRowEditorKey] = useState(null);
+  const [valueDialogKey, setValueDialogKey] = useState(null); // กล่อง "มูลค่าสัญญา · ใบเสนอราคา"
   const tableEditingCell = rowEditorKey ? null : editingCell;
 
   // ✅ (26 ต.ค. 2569 "select ดูข้อมูลหน่วง") วาดแถวในคอมโพเนนต์ย่อยของแต่ละแถว (TableRowShell) แทนการสร้าง JSX
@@ -4467,7 +4497,12 @@ export default function ContractOverview() {
                           editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "jobValue"}
                           value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
                           width={colVar("jobValue")} align="center"
-                          formatDisplay={(v) => (hasMoney(v) ? formatBaht(v) : <Dash />)}
+                          formatDisplay={(v) => (c.isRealContract ? (
+                            <Stack spacing={0} alignItems="center">
+                              <Box component="span">{hasMoney(v) ? formatBaht(v) : <Dash />}</Box>
+                              <ContractVatTag c={c} onOpen={() => setValueDialogKey(c.key)} />
+                            </Stack>
+                          ) : (hasMoney(v) ? formatBaht(v) : <Dash />))}
                           onStartEdit={() => beginEdit(c, "jobValue")}
                           onCommit={(v) => commitEdit(c, v)}
                           onCancel={cancelEdit}
@@ -5012,6 +5047,7 @@ export default function ContractOverview() {
   const [rowMenu, setRowMenu] = useState(null); // { anchor, row } | null
   // ⚠️ เก็บแค่ key — อ่านแถวสดจาก contracts ทุกครั้ง ค่าที่เพิ่งแก้ในกล่องจะเห็นทันที ไม่ค้างค่าเก่า
   const rowEditorRow = rowEditorKey ? contracts.find((x) => x.key === rowEditorKey) || null : null;
+  const valueDialogRow = valueDialogKey ? contracts.find((x) => x.key === valueDialogKey) || null : null;
   const openRowEditor = (c) => {
     // กล่องแก้ไขใช้การ์ดรายละเอียดตัวเดียวกับจอมือถือ (ทุกช่องแก้ได้ในที่เดียว) — กางรายละเอียดไว้ให้เลย
     setExpandedCards((prev) => new Set(prev).add(c.key));
@@ -5239,6 +5275,7 @@ export default function ContractOverview() {
                   : <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ระบุมูลค่า</Typography>)}
                 {...fp("jobValue")}
               />
+              {c.isRealContract && <ContractVatTag c={c} align="flex-end" onOpen={() => setValueDialogKey(c.key)} />}
             </Box>
           </Stack>
 
@@ -5382,6 +5419,15 @@ export default function ContractOverview() {
         })()}
 
         </DetailSection>
+
+        {/* ✅ (10 พ.ย. 2569) มูลค่าสัญญา · รวม VAT หรือไม่ · ใบเสนอราคาของสัญญา (งานรายครั้งใช้ค่านี้) */}
+        {c.isRealContract && (
+          <DetailSection title="มูลค่าสัญญา · ใบเสนอราคา">
+            <Box sx={{ py: 1.25 }}>
+              <ContractValuePanel contract={c} canEdit={isAdminOrManager} onPatch={(f) => patchContractRows(c.key, f)} />
+            </Box>
+          </DetailSection>
+        )}
 
         {/* ระยะเวลา/จำนวนครั้ง/ค่าคอม — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้)
             วาง 2 คอลัมน์ ป้ายบน-ค่าล่าง อ่านทีเดียวเห็นครบทั้งช่วงสัญญา */}
@@ -7832,6 +7878,26 @@ export default function ContractOverview() {
           <Button onClick={() => setHistoryContract(null)} sx={{ textTransform: "none" }}>ปิด</Button>
         </DialogActions>
       </Dialog>
+      )}
+
+      {/* ✅ (10 พ.ย. 2569) กล่อง "มูลค่าสัญญา · ใบเสนอราคา" — เปิดจากป้าย VAT ใต้มูลค่าในตาราง/การ์ด */}
+      {valueDialogRow && (
+        <Dialog open onClose={() => setValueDialogKey(null)} fullWidth maxWidth="xs" fullScreen={isMobile} slotProps={{ paper: MODERN_PAPER(isMobile) }}>
+          <ModernDialogTitle icon={<RequestQuote />} title="มูลค่าสัญญา · ใบเสนอราคา"
+            sub={[valueDialogRow.site || valueDialogRow.company, valueDialogRow.contractNo].filter(Boolean).join(" · ")}
+            onClose={() => setValueDialogKey(null)} />
+          <DialogContent sx={{ p: 2 }}>
+            <Box sx={{ pt: 2, px: 0.25 }}>
+              <ContractValuePanel contract={valueDialogRow} canEdit={isAdminOrManager} onPatch={(f) => patchContractRows(valueDialogRow.key, f)} />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}` }}>
+            <Button onClick={() => setValueDialogKey(null)} variant="contained" disableElevation
+              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, "&:hover": { bgcolor: "#1d4ed8" } }}>
+              เสร็จสิ้น
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {/* ✅ กล่อง "วางบิล / รับเงิน" ของงานรายครั้ง — ตัวเดียวกับที่หน้า /billing ใช้ (ของกลาง)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vatParts, workValueNet, suggestWorkValue, vatNote } from "./workValue";
+import { vatParts, workValueNet, suggestWorkValue, vatNote, contractVatInfo } from "./workValue";
 
 describe("vatParts", () => {
   it("ยอดก่อน VAT → บวก 7%", () => {
@@ -33,8 +33,9 @@ describe("suggestWorkValue", () => {
     const last = suggestWorkValue({ ...base, time: "3" });
     expect(last.amount).toBe(33333.34);
     expect(last.source).toBe("contract");
-    expect(last.vatIncluded).toBeNull();
+    expect(last.vatIncluded).toBe(false); // ยังไม่ระบุ VAT ของสัญญา = ก่อน VAT
     expect(last.hint).toMatch(/÷ 3 ครั้ง/);
+    expect(suggestWorkValue({ ...base, time: "1", jobValueVatIncluded: true }).vatIncluded).toBe(true);
   });
   it("งานสัญญาไม่มีมูลค่า = ไม่แนะนำ", () => {
     expect(suggestWorkValue({ contractGroupId: "C1", visitCount: 4 })).toBeNull();
@@ -56,5 +57,18 @@ describe("vatNote", () => {
   it("บอกอีกฝั่งของยอด", () => {
     expect(vatNote(10000, false)).toMatch(/^ก่อน VAT · รวม VAT ฿10,700/);
     expect(vatNote(10700, true)).toMatch(/^รวม VAT · ก่อน VAT ฿10,000/);
+  });
+});
+
+describe("contractVatInfo (งานสัญญา = VAT ตามมูลค่าสัญญา)", () => {
+  it("ไม่ใช่งานสัญญา = null", () => {
+    expect(contractVatInfo({ jobValue: 5000 })).toBeNull();
+  });
+  it("ระบุแล้ว / ยังไม่ระบุ / ยังไม่มีมูลค่าสัญญา", () => {
+    expect(contractVatInfo({ contractGroupId: "C", jobValue: 1000, jobValueVatIncluded: true })).toMatchObject({ vatIncluded: true, set: true, hasValue: true });
+    const unset = contractVatInfo({ contractGroupId: "C", jobValue: 1000, jobValueVatIncluded: null });
+    expect(unset).toMatchObject({ vatIncluded: false, set: false });
+    expect(unset.text).toMatch(/ยังไม่ระบุ VAT/);
+    expect(contractVatInfo({ contractGroupId: "C" }).text).toMatch(/ยังไม่ได้ใส่มูลค่าสัญญา/);
   });
 });

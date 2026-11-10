@@ -133,6 +133,9 @@ export const groupEventsByContract = (events) => {
       contractYears: head.contractGroupId ? head.contractYears : undefined,
       estimatedDaysPerVisit: head.contractGroupId ? head.estimatedDaysPerVisit : undefined,
       jobValue: head.jobValue,
+      // ✅ (10 พ.ย. 2569) มูลค่าสัญญารวม VAT หรือไม่ (null = ยังไม่ระบุ) + ใบเสนอราคาของทั้งสัญญา — ระบุ/แนบที่หน้าภาพรวมงาน
+      jobValueVatIncluded: head.contractGroupId ? (head.jobValueVatIncluded ?? null) : undefined,
+      contractQuotationFiles: head.contractGroupId ? (head.contractQuotationFiles || []) : undefined,
       commission: head.commission,   // ค่าคอมให้ลูกค้า — ระดับสัญญาเหมือน jobValue
       team: teamNames.join(", ") || "-",
       teamLeaderName,
