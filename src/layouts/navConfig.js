@@ -71,8 +71,8 @@ export const DEST = {
   ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "บันทึกชั่วโมง OT · อิงงาน · ขออนุมัติ", href: "/ot", icon: AppIcon.Ot, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: AppIcon.Contractor, badgeKey: "contractorPay" },
   // ✅ (11 ต.ค. 2569) คิวอนุมัติใบเบิก — คลิปบอร์ดติ๊กถูก (ไม่ใช้ถาดรับเข้าซ้ำกับคำขอลงงาน) · ชื่อบอกตรงๆ ว่าต้องอนุมัติ
-  expenseInbox: { title: "รออนุมัติเบิก", short: "รออนุมัติ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: AppIcon.Approve, badgeKey: "expenseInbox" },
-  expenseReport: { title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: AppIcon.Report },
+  expenseInbox: { title: "รออนุมัติเบิก-เคลม", short: "รออนุมัติ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: AppIcon.Approve, badgeKey: "expenseInbox" },
+  expenseReport: { title: "รายงานเบิก-เคลม", short: "รายงาน", sub: "ค่าใช้จ่ายจริง · ค้างเคลม · สำรองจ่าย", href: "/expenses/report", icon: AppIcon.Report },
 
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ชื่อเมนูให้สื่อความหมาย สอดคล้อง · เอกสารไม่ควรรวมกับใบเสนอราคา · ใบเสนอราคาแก้เป็นติดตามใบเสนอราคา")
   documents: { title: "เอกสาร", sub: "เอกสารประจำงาน · เอกสารที่ออก · คลังไฟล์", href: "/documents", icon: AppIcon.Documents },

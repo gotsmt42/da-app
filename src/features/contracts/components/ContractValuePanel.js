@@ -8,15 +8,16 @@
  *    onPatch(fields) = อัปเดตแถวในหน้าทันที (ทุกครั้งของสัญญา) หลังเซิร์ฟเวอร์บันทึกสำเร็จ
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Button, CircularProgress, IconButton, InputAdornment, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import {
-  AddRounded as Add, UploadFileRounded as UploadFile, PictureAsPdfRounded as Pdf, ImageRounded as ImageIcon, InsertDriveFileRounded as FileIcon,
-  DeleteOutlineRounded as DeleteOutline, AutoAwesomeRounded as AutoAwesome,
+  AddRounded as Add, UploadFileRounded as UploadFile,
+  AutoAwesomeRounded as AutoAwesome,
   EditRounded as Edit, RadioButtonCheckedRounded as RadioOn, RadioButtonUncheckedRounded as RadioOff,
 } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import { ACCEPT_ALL } from "@/shared/utils/fileUpload";
+import AttachmentList from "@/shared/ui/AttachmentList";
 import { perRoundAmount } from "@/shared/utils/billing";
 import { vatParts } from "@/shared/utils/workValue";
 
@@ -101,12 +102,8 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
     }
   };
 
-  const onDelete = async (f) => {
-    const r = await Swal.fire({
-      icon: "warning", title: "ลบไฟล์นี้?", text: f.fileName || "", showCancelButton: true,
-      confirmButtonText: "ลบไฟล์", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626",
-    });
-    if (!r.isConfirmed) return;
+  // โมดูลไฟล์กลางถามยืนยันก่อนลบให้แล้ว
+  const removeFile = async (f) => {
     setBusy(`del:${f._id}`);
     try {
       await EventService.DeleteContractQuotationFile(gid, f._id);
@@ -134,7 +131,6 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
     if (await save({ jobValue: amount, jobValueVatIncluded: useGross }, "apply")) setAi((s) => ({ ...s, result: null }));
   };
 
-  const fileIcon = (f) => (isPdf(f) ? <Pdf sx={{ fontSize: 20, color: "#dc2626" }} /> : isImg(f) ? <ImageIcon sx={{ fontSize: 20, color: "#2563eb" }} /> : <FileIcon sx={{ fontSize: 20, color: "#64748b" }} />);
   const canScan = canEdit && ai.enabled && files.some((f) => isPdf(f) || isImg(f));
   const aiSrc = ai.result?.found ? [KIND[ai.result.docType] || "เอกสาร", ai.result.docNo].filter(Boolean).join(" ") : "";
   const vatSet = vat === true || vat === false;
@@ -236,49 +232,27 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
           )}
         </Stack>
 
-        {files.length === 0 ? (
-          canEdit ? (
-            <Box component="button" type="button" onClick={pickFile} disabled={Boolean(busy)}
-              sx={{ mt: 1, width: "100%", display: "flex", alignItems: "center", gap: 1.25, p: 1.25, borderRadius: 2.5, cursor: "pointer", font: "inherit", textAlign: "left",
-                border: "1.5px dashed #cbd5e1", bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: "#f8fbff" }, "&:disabled": { opacity: 0.7, cursor: "default" } }}>
-              <Box sx={{ width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0 }}>
-                {busy === "upload" ? <CircularProgress size={16} /> : <UploadFile sx={{ fontSize: 20 }} />}
-              </Box>
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#0f172a" }}>{busy === "upload" ? "กำลังแนบ…" : "แนบใบเสนอราคา"}</Typography>
-                <Typography sx={{ fontSize: "0.7rem", color: "#64748b" }}>PDF หรือรูปภาพ · แนบแล้วให้ AI อ่านยอดได้</Typography>
-              </Box>
+        {/* 🔁 (11 พ.ย. 2569 ผู้ใช้: "รูปแบบการแสดงรูปภาพ ไฟล์ ให้ตรงกับที่ใช้ในระบบ") — โมดูลไฟล์กลาง (แถวไฟล์ · กล่องดูไฟล์ · ลบ) */}
+        {files.length === 0 && canEdit ? (
+          <Box component="button" type="button" onClick={pickFile} disabled={Boolean(busy)}
+            sx={{ mt: 1, width: "100%", display: "flex", alignItems: "center", gap: 1.25, p: 1.25, borderRadius: 2.5, cursor: "pointer", font: "inherit", textAlign: "left",
+              border: "1.5px dashed #cbd5e1", bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: "#f8fbff" }, "&:disabled": { opacity: 0.7, cursor: "default" } }}>
+            <Box sx={{ width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0 }}>
+              {busy === "upload" ? <CircularProgress size={16} /> : <UploadFile sx={{ fontSize: 20 }} />}
             </Box>
-          ) : (
-            <Typography sx={{ mt: 0.5, fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีไฟล์</Typography>
-          )
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#0f172a" }}>{busy === "upload" ? "กำลังแนบ…" : "แนบใบเสนอราคา"}</Typography>
+              <Typography sx={{ fontSize: "0.7rem", color: "#64748b" }}>PDF หรือรูปภาพ · แนบแล้วให้ AI อ่านยอดได้</Typography>
+            </Box>
+          </Box>
         ) : (
-          <Stack sx={{ mt: 1 }} gap={0.75}>
-            {files.map((f) => (
-              <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={1}
-                sx={{ pl: 1.1, pr: 0.5, py: 0.75, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #eef2f7" }}>
-                {fileIcon(f)}
-                <Box component="a" href={f.fileUrl} target="_blank" rel="noopener noreferrer"
-                  sx={{ flex: 1, minWidth: 0, color: "#1e293b", textDecoration: "none", "&:hover .cv-name": { color: "#2563eb" } }}>
-                  <Typography noWrap className="cv-name" sx={{ fontSize: "0.82rem", fontWeight: 600 }}>{f.fileName || "ไฟล์"}</Typography>
-                  {(f.uploadedBy || f.uploadedAt) && (
-                    <Typography noWrap sx={{ fontSize: "0.68rem", color: "#94a3b8" }}>
-                      {[f.uploadedBy, f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : ""].filter(Boolean).join(" · ")}
-                    </Typography>
-                  )}
-                </Box>
-                {canEdit && (
-                  <Tooltip title="ลบไฟล์">
-                    <span>
-                      <IconButton size="small" onClick={() => onDelete(f)} disabled={Boolean(busy)} sx={{ color: "#94a3b8", "&:hover": { color: "#dc2626" } }}>
-                        {busy === `del:${f._id}` ? <CircularProgress size={14} /> : <DeleteOutline sx={{ fontSize: 18 }} />}
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                )}
-              </Stack>
-            ))}
-          </Stack>
+          <Box sx={{ mt: 1 }}>
+            <AttachmentList
+              files={files.map((f) => ({ ...f, tag: "ใบเสนอราคาสัญญา" }))}
+              readOnly emptyText="ยังไม่มีไฟล์"
+              onDelete={canEdit && !busy ? (f) => removeFile(f) : undefined}
+            />
+          </Box>
         )}
 
         {canScan && !ai.result?.found && (

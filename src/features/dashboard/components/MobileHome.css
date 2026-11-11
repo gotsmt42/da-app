@@ -403,3 +403,6 @@
   font-size: 0.82rem; font-weight: 800;
 }
 .mh .mh-myjobs-cta .mh-myjobs-go { margin-left: 0; font-size: 19px; color: #fff; }
+
+/* ✅ (11 พ.ย. 2569) การ์ดบันทึกเข้างานวันนี้ — ใต้การ์ดงานของฉัน ระยะขอบเดียวกัน */
+.mh-today { margin: 12px 16px 0; }

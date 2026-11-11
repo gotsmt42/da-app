@@ -30,24 +30,38 @@ const CLAIM_DONE = ["approved", "settled"];
 const emptyTotals = () => ({
   count: 0, requested: 0, pending: 0, reviewing: 0, toPay: 0, advanced: 0, actual: 0,
   outstanding: 0, refundDue: 0, extraDue: 0, refunded: 0, extraPaid: 0, overdue: 0,
+  // ✅ (11 พ.ย. 2569) ใบข้ามเดือน — โหมด "นับตามวันที่ใบเคลม" (ดู applyBasis)
+  //   carriedIn  = ยอดใช้จริงของใบเคลมในช่วงนี้ ที่ใบ Advance อยู่ก่อนช่วง (รวมอยู่ใน actual แล้ว)
+  //   claimedLater = ยอด Advance ในช่วงนี้ ที่ใบเคลมอนุมัติลงวันที่หลังช่วง (ไม่ใช่ "ค้างเคลม" · ใช้จริงไปนับในช่วงของใบเคลม)
+  carriedIn: 0, carriedInCount: 0, claimedLater: 0, claimedLaterCount: 0,
   reimburseCount: 0, reimbursePending: 0, reimburseReviewing: 0, reimburse: 0, reimburseDue: 0, reimbursePaid: 0,
 });
 
-const addRow = (t, a, now) => {
+/**
+ * ใบ Advance หนึ่งใบ (+ ใบเคลมของมัน)
+ * @param part "both" | "adv" | "claim" — นับเฉพาะส่วนไหน (โหมดนับตามวันที่ใบเคลม: ส่วน Advance กับส่วนใบเคลมอาจอยู่คนละเดือน)
+ *   ธงจาก applyBasis: a._adv === false = ไม่นับส่วน Advance (ใบ Advance อยู่ก่อนช่วง) · a._clm === false = ไม่นับส่วนใบเคลม (เคลมหลังช่วง)
+ */
+const addRow = (t, a, now, part = "both") => {
+  const advOn = a._adv !== false && part !== "claim";
+  const clmOn = a._clm !== false && part !== "adv";
   const claim = a.claim && a.claim.status !== "cancelled" ? a.claim : null;
   const total = Number(a.total) || 0;
-  t.count += 1;
-  t.requested += total;
-  // ⚠️ "reviewed" = ตรวจสอบแล้วแต่ยังไม่อนุมัติ → ยังเป็นเงินที่ยังไม่ผ่านอนุมัติ ต้องนับรวมใน pending
-  // ไม่งั้นใบที่ค้างอยู่ขั้นที่ 2 จะหายไปจากรายงานทั้งที่ยังไม่จบ
-  if (["pending", "reviewed", "rejected"].includes(a.status)) t.pending += total;
-  if (a.status === "reviewed") t.reviewing += total;
-  if (a.status === "approved") t.toPay += total;
+  if (advOn) {
+    t.count += 1;
+    t.requested += total;
+    // ⚠️ "reviewed" = ตรวจสอบแล้วแต่ยังไม่อนุมัติ → ยังเป็นเงินที่ยังไม่ผ่านอนุมัติ ต้องนับรวมใน pending
+    // ไม่งั้นใบที่ค้างอยู่ขั้นที่ 2 จะหายไปจากรายงานทั้งที่ยังไม่จบ
+    if (["pending", "reviewed", "rejected"].includes(a.status)) t.pending += total;
+    if (a.status === "reviewed") t.reviewing += total;
+    if (a.status === "approved") t.toPay += total;
+  }
   if (PAID.includes(a.status)) {
-    t.advanced += total;
+    if (advOn) t.advanced += total;
     const claimApproved = claim && CLAIM_DONE.includes(claim.status);
-    if (claimApproved) {
+    if (claimApproved && clmOn) {
       t.actual += Number(claim.total) || 0;
+      if (a._adv === false) { t.carriedIn += Number(claim.total) || 0; t.carriedInCount += 1; }
       const diff = Number(claim.difference) || 0;
       if (claim.status === "approved") {
         if (diff < 0) t.refundDue += -diff;
@@ -56,7 +70,10 @@ const addRow = (t, a, now) => {
         if (diff < 0) t.refunded += -diff;
         if (diff > 0) t.extraPaid += diff;
       }
-    } else {
+    } else if (claimApproved && advOn && a._clm === false) {
+      // เคลียร์แล้วด้วยใบเคลมที่ลงวันที่หลังช่วงนี้ — ไม่ใช่เงินค้าง
+      t.claimedLater += total; t.claimedLaterCount += 1;
+    } else if (!claimApproved && advOn) {
       t.outstanding += total;
       if (a.status === "paid" && a.dueClearAt && new Date(a.dueClearAt) < now) t.overdue += 1;
     }
@@ -78,7 +95,7 @@ const addReimburse = (t, r) => {
 };
 
 /** ⚠️ ปัดเฉพาะยอดเงิน — key/label ของกลุ่มเป็นสตริง ส่วน count/overdue/*Count เป็นจำนวนใบ */
-const NON_MONEY = ["count", "overdue", "reimburseCount"];
+const NON_MONEY = ["count", "overdue", "reimburseCount", "carriedInCount", "claimedLaterCount"];
 const MONEY_FIELDS = Object.keys(emptyTotals()).filter((k) => !NON_MONEY.includes(k));
 const round = (t) => {
   const out = { ...t };
@@ -146,6 +163,30 @@ export const buildPipeline = (rows = [], reimburseRows = []) => {
 
 /** เดือนตามเวลาไทย "2026-09" (docDate เก็บเที่ยงวัน UTC จึงตัดสตริงได้ตรงๆ ไม่คลาดวัน) */
 export const monthKey = (d) => String(d || "").slice(0, 7);
+const dayOf = (d) => String(d || "").slice(0, 10);
+
+/**
+ * ✅ (11 พ.ย. 2569 ผู้ใช้: "ยอดเคลม/สำรองจ่ายอิงยอด Advance ไหม ใบข้ามเดือน จะเช็คยอดเดือนให้ถูกต้อง" → เลือก "มีปุ่มสลับได้ทั้ง 2 แบบ")
+ * เลือกว่า "ยอดใช้จริง (ใบเคลม)" นับเข้าช่วงเวลาตามวันที่ของอะไร
+ *   basis "claim"   (ค่าเริ่มต้น) ตามวันที่ใบเคลม = ค่าใช้จ่ายจริงของเดือน
+ *       • ใบ Advance ในช่วง ที่ใบเคลมลงวันที่หลังช่วง → นับส่วน Advance · ส่วนใบเคลมไปนับในช่วงของใบเคลม (_clm = false · ไม่นับเป็นค้างเคลม)
+ *       • ใบเคลมในช่วง ที่ใบ Advance อยู่ก่อนช่วง (carryIn จาก server) → นับเฉพาะส่วนใบเคลม (_adv = false)
+ *   basis "advance" ตามวันที่ใบ Advance = ใบ Advance กับใบเคลมของมันอยู่ช่วงเดียวกันเสมอ (เทียบเบิก↔ใช้จริงทีละใบ)
+ * ใบสำรองจ่าย/ค่าจ้างผู้รับเหมา นับตามวันที่ของใบตัวเองเสมอ (ไม่มี Advance)
+ */
+export function applyBasis(advances = [], carryIn = [], basis = "claim", from = "", to = "") {
+  if (basis !== "claim") return (advances || []).map((a) => ({ ...a, _adv: true, _clm: true }));
+  const inRange = (d) => { const k = dayOf(d); return (!from || k >= from) && (!to || k <= to); };
+  const seen = new Set((advances || []).map((a) => String(a._id)));
+  return [
+    ...(advances || []).map((a) => {
+      const claim = a.claim && a.claim.status !== "cancelled" ? a.claim : null;
+      const clmIn = !claim || inRange(claim.docDate);
+      return { ...a, _adv: true, _clm: clmIn, _claimLater: Boolean(claim) && !clmIn };
+    }),
+    ...(carryIn || []).filter((a) => a?.claim && !seen.has(String(a._id))).map((a) => ({ ...a, _adv: false, _clm: true, _advEarlier: true })),
+  ];
+}
 
 /**
  * @param {Array} advances  แถวจาก /report (ใบ Advance + claim ที่ผูกอยู่)
@@ -153,7 +194,7 @@ export const monthKey = (d) => String(d || "").slice(0, 7);
  * @param {Array}  [opts.reimbursements] ใบสำรองจ่ายในช่วงเวลาเดียวกัน (ไม่มี Advance ให้เทียบ)
  * @param {Date}   [opts.now]
  */
-export function buildExpenseReport(advances, { reimbursements = [], now = new Date() } = {}) {
+export function buildExpenseReport(advances, { reimbursements = [], now = new Date(), basis = "advance" } = {}) {
   const rows = (advances || []).filter((a) => a && a.status !== "cancelled");
   const reimburseRows = (reimbursements || []).filter((r) => r && r.status !== "cancelled");
   const totals = emptyTotals();
@@ -173,8 +214,23 @@ export function buildExpenseReport(advances, { reimbursements = [], now = new Da
     now
   ).sort((x, y) => (x.key === "__none__") - (y.key === "__none__") || y.advanced - x.advanced || y.reimburse - x.reimburse);
 
-  const byMonth = groupBy(rows, reimburseRows, (a) => monthKey(a.docDate), (a) => monthKey(a.docDate), now)
-    .sort((x, y) => (x.key < y.key ? -1 : 1));
+  // ✅ โหมดนับตามวันที่ใบเคลม: ส่วน Advance ลงเดือนของใบ Advance · ส่วนใบเคลมลงเดือนของใบเคลม (อาจคนละเดือน)
+  const byMonth = (() => {
+    if (basis !== "claim") {
+      return groupBy(rows, reimburseRows, (a) => monthKey(a.docDate), (a) => monthKey(a.docDate), now);
+    }
+    const map = new Map();
+    const mb = (k) => { if (!map.has(k)) map.set(k, { key: k, label: k, jobStart: "", ...emptyTotals() }); return map.get(k); };
+    rows.forEach((a) => {
+      const advKey = monthKey(a.docDate);
+      const claim = a.claim && a.claim.status !== "cancelled" ? a.claim : null;
+      const clmKey = claim ? monthKey(claim.docDate) : advKey;
+      if (a._adv !== false) addRow(mb(advKey), a, now, clmKey === advKey ? "both" : "adv");
+      if (a._clm !== false && claim && (clmKey !== advKey || a._adv === false)) addRow(mb(clmKey), a, now, "claim");
+    });
+    reimburseRows.forEach((r) => addReimburse(mb(monthKey(r.docDate)), r));
+    return [...map.values()].map(round);
+  })().sort((x, y) => (x.key < y.key ? -1 : 1));
 
   // ── หมวดค่าใช้จ่าย: ตั้งเบิก (รายการใน Advance ที่จ่ายแล้ว) เทียบ ใช้จริง (รายการในใบเคลมที่อนุมัติ) ──
   const catMap = new Map();
@@ -185,9 +241,9 @@ export function buildExpenseReport(advances, { reimbursements = [], now = new Da
   };
   rows.forEach((a) => {
     if (!PAID.includes(a.status)) return;
-    (a.items || []).forEach((it) => { cat(it.category).planned += Number(it.amount) || 0; });
+    if (a._adv !== false) (a.items || []).forEach((it) => { cat(it.category).planned += Number(it.amount) || 0; });
     const claim = a.claim;
-    if (claim && CLAIM_DONE.includes(claim.status)) {
+    if (claim && CLAIM_DONE.includes(claim.status) && a._clm !== false) {
       (claim.items || []).forEach((it) => { cat(it.category).actual += Number(it.amount) || 0; });
     }
   });
@@ -226,7 +282,7 @@ export function buildExpenseReport(advances, { reimbursements = [], now = new Da
 const personKey = (p) => (p?.userId ? `u:${p.userId}` : `n:${String(p?.name || "").trim() || "-"}`);
 const personLabel = (p) => String(p?.fullName || p?.name || "").trim() || "-";
 
-export function buildPersonLedger(advances = [], reimbursements = []) {
+export function buildPersonLedger(advances = [], reimbursements = [], { basis = "advance" } = {}) {
   const rows = (advances || []).filter((a) => a && a.status !== "cancelled");
   const reimburseRows = (reimbursements || []).filter((r) => r && r.status !== "cancelled");
   const map = new Map();
@@ -290,14 +346,18 @@ export function buildPersonLedger(advances = [], reimbursements = []) {
 
   rows.forEach((a) => {
     const pair = [];
-    (a.items || []).forEach((it) => {
-      pair.push(addLine(a, it, "advance", "requested"));
-      if (PAID.includes(a.status)) bucket(ownerOf(it, a)).advanced += Number(it.amount) || 0;
-    });
+    if (a._adv !== false) {
+      (a.items || []).forEach((it) => {
+        pair.push(addLine(a, it, "advance", "requested"));
+        if (PAID.includes(a.status)) bucket(ownerOf(it, a)).advanced += Number(it.amount) || 0;
+      });
+    }
     const claim = a.claim && a.claim.status !== "cancelled" ? a.claim : null;
-    if (claim && CLAIM_DONE.includes(claim.status)) {
+    if (claim && CLAIM_DONE.includes(claim.status) && a._clm !== false) {
       // ⚠️ ผู้เบิกของใบเคลม = ผู้เบิกของใบ Advance เสมอ — ใช้ของ Advance เผื่อแถวใบเคลมไม่ได้แนบ requester มา
-      (claim.items || []).forEach((it) => pair.push(addLine({ ...claim, requester: claim.requester || a.requester }, it, "claim", "actual", a.docDate, a)));
+      // โหมดนับตามวันที่ใบเคลม: บรรทัดใบเคลมลงเดือนของใบเคลมเอง
+      const anchor = basis === "claim" ? claim.docDate : a.docDate;
+      (claim.items || []).forEach((it) => pair.push(addLine({ ...claim, requester: claim.requester || a.requester }, it, "claim", "actual", anchor, a)));
     }
     markShared(pair);
   });

@@ -26,7 +26,8 @@ import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { formatThai } from "@/shared/utils/thaiDate";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import { PageHeader, EmptyState, INK, INK_2, MUTED, PAGE_SX, ICON_BTN_SX } from "@/shared/ui/PageKit";
-import AttendanceList, { AttendanceTable } from "../components/AttendanceList";
+import AttendanceList, { AttendanceTable, AttendanceDetailDialog, AttendanceAvatarContext } from "../components/AttendanceList";
+import { hasValidAvatar } from "@/shared/utils/user";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { ON_SITE_M } from "../attendanceMeta";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
@@ -65,10 +66,14 @@ export default function AttendancePage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "pending" && isApprover ? "pending" : "list";
   // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ประวัติเข้างานด้วยทำให้ละเอียดและชัดเจนสมบูรณ์") ช่วงเวลาชุดเดียวกับหน้ารายงาน (ภาษาไทย)
-  const [period, setPeriod] = useState({
-    preset: "7d", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
-    from: fmt(moment().subtract(6, "days")), to: fmt(moment()),
-  });
+  // 🔁 (11 พ.ย. 2569 ผู้ใช้: "ให้แสดงเป็นของวันนี้ค่าตั้งต้น") · ลิงก์จากแจ้งเตือน ?date=YYYY-MM-DD = เปิดวันนั้น
+  const linkDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? params.get("date") : "";
+  const [period, setPeriod] = useState(() => ({
+    preset: linkDate && linkDate !== fmt(moment()) ? "custom" : "today", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
+    from: linkDate || fmt(moment()), to: linkDate || fmt(moment()),
+  }));
+  // ✅ (11 พ.ย. 2569 ผู้ใช้: "การแจ้งเตือนให้ลิงก์ให้ตรง เวลามีการบันทึกเข้างาน") ?open=<attendanceId> = เปิดรายละเอียดบันทึกนั้นทันที
+  const openParam = params.get("open") || "";
   const [from, to] = periodRange(period.preset, period);
   const [person, setPerson] = useState("all");
   const [q, setQ] = useState("");
@@ -167,6 +172,12 @@ export default function AttendancePage() {
     return [...m.entries()];
   }, [pg.rows]);
 
+  // รูปโปรไฟล์จริงของแต่ละคน — ใช้ในรายการ/ตาราง/รายละเอียด (รวมรูปตัวเองเมื่อดูได้แค่ของตัวเอง)
+  const avatarMap = useMemo(() => {
+    const m = new Map(employees.filter((u) => hasValidAvatar(u.imageUrl)).map((u) => [String(u._id), u.imageUrl]));
+    if (me && hasValidAvatar(userData?.imageUrl) && !m.has(me)) m.set(me, userData.imageUrl);
+    return m;
+  }, [employees, me, userData?.imageUrl]);
   const people = useMemo(() => employees.filter((u) => u.fname).map((u) => ({
     id: String(u._id), name: [u.fname, u.lname].filter(Boolean).join(" "), avatar: u.imageUrl, note: u.jobTitle || undefined,
   })), [employees]);
@@ -195,7 +206,8 @@ export default function AttendancePage() {
   const setTab = (t) => setParams((p) => { const n = new URLSearchParams(p); if (t === "list") n.delete("tab"); else n.set("tab", t); return n; }, { replace: true });
 
   return (
-    // 🔁 (26 ต.ค. 2569) กว้างเท่าหน้าการดำเนินงาน/งานใหม่ — สลับแท็บแล้วขอบไม่กระโดด
+    <AttendanceAvatarContext.Provider value={avatarMap}>
+    {/* 🔁 (26 ต.ค. 2569) กว้างเท่าหน้าการดำเนินงาน/งานใหม่ — สลับแท็บแล้วขอบไม่กระโดด */}
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader
@@ -281,25 +293,7 @@ export default function AttendancePage() {
             />
           )}
 
-          {/* ── สรุปรายคน ── */}
-          {seeAll && person === "all" && byPerson.length > 1 && (
-            <ReportSection title="สรุปรายคน" hint="เรียงตามจำนวนครั้งที่เข้างาน · กดชื่อเพื่อดูเฉพาะคนนั้น">
-              <Box sx={R_CARD}>
-                {personPg.rows.map((p, i) => (
-                  <RankRow key={p.id} rank={(personPg.page - 1) * personPg.size + i + 1}
-                    leading={<PersonAvatar name={p.name} avatar={people.find((x) => x.id === p.id)?.avatar} />}
-                    title={p.name}
-                    sub={`${p.jobs} งาน · ${p.days} วัน · ล่าสุด ${p.last ? formatThai(moment(p.last), "D MMM YY HH:mm") : "-"}`}
-                    value={`${p.visits} ครั้ง`}
-                    valueSub={p.far ? <span style={{ color: "#b45309", fontWeight: 700 }}>ตำแหน่งไม่ตรง {p.far}</span> : "ตรงหน้างานทุกครั้ง"}
-                    onClick={() => setPerson(p.id)} />
-                ))}
-                <TotalRow label={`รวม ${byPerson.length} คน`} value={`${stats.visits} ครั้ง`} valueSub={`${stats.jobs} งาน`} />
-              </Box>
-              <PageBar {...personPg} unit="คน" />
-            </ReportSection>
-          )}
-
+          {/* 🔁 (11 พ.ย. 2569 ผู้ใช้: "เอารายการเข้างานมาแสดงให้ชัดเจน สลับตำแหน่งกับสรุปรายคน") */}
           <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.18rem", sm: "1.3rem" }, color: INK, mb: 1.25, px: { xs: 0.5, sm: 0 } }}>
             รายการเข้างาน <Box component="span" sx={{ fontSize: "0.86rem", fontWeight: 600, color: MUTED }}>{view$.length} ครั้ง</Box>
           </Typography>
@@ -307,7 +301,7 @@ export default function AttendancePage() {
           {rows === null ? (
             <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={84} />)}</Stack>
           ) : !view$.length ? (
-            <EmptyState icon={<PlaceRounded />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="หัวหน้าทีมกดเข้างานได้จากการ์ดงานในหน้า “งานของฉัน”" />
+            <EmptyState icon={<PlaceRounded />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="ทุกคนในทีม (หัวหน้าทีม + ลูกทีม) กดบันทึกเข้างานของตัวเองจากการ์ดงานในหน้า “งานของฉัน”" />
           ) : isTable ? (
             <>
               <AttendanceTable rows={pg.rows} me={me} isApprover={isApprover} onChanged={onChanged} />
@@ -331,6 +325,31 @@ export default function AttendancePage() {
             <PageBar {...pg} setPage={goPage} unit="ครั้ง" />
             </>
           )}
+
+          {/* ── สรุปรายคน ── */}
+          <Box sx={{ mt: 2.5 }} />
+          {seeAll && person === "all" && byPerson.length > 1 && (
+            <ReportSection title="สรุปรายคน" hint="เรียงตามจำนวนครั้งที่เข้างาน · กดชื่อเพื่อดูเฉพาะคนนั้น">
+              <Box sx={R_CARD}>
+                {personPg.rows.map((p, i) => (
+                  <RankRow key={p.id} rank={(personPg.page - 1) * personPg.size + i + 1}
+                    leading={<PersonAvatar name={p.name} avatar={people.find((x) => x.id === p.id)?.avatar} />}
+                    title={p.name}
+                    sub={`${p.jobs} งาน · ${p.days} วัน · ล่าสุด ${p.last ? formatThai(moment(p.last), "D MMM YY HH:mm") : "-"}`}
+                    value={`${p.visits} ครั้ง`}
+                    valueSub={p.far ? <span style={{ color: "#b45309", fontWeight: 700 }}>ตำแหน่งไม่ตรง {p.far}</span> : "ตรงหน้างานทุกครั้ง"}
+                    onClick={() => setPerson(p.id)} />
+                ))}
+                <TotalRow label={`รวม ${byPerson.length} คน`} value={`${stats.visits} ครั้ง`} valueSub={`${stats.jobs} งาน`} />
+              </Box>
+              <PageBar {...personPg} unit="คน" />
+            </ReportSection>
+          )}
+
+          <AttendanceDetailDialog
+            row={openParam ? (rows || []).find((r) => String(r._id) === openParam) || null : null}
+            onClose={() => { const p = new URLSearchParams(params); p.delete("open"); setParams(p, { replace: true }); }}
+            me={me} isApprover={isApprover} onChanged={onChanged} />
           <Typography sx={{ mt: 2, fontSize: "0.72rem", color: MUTED, textAlign: "center" }}>
             🔒 เวลาทั้งหมดบันทึกจากเซิร์ฟเวอร์ แก้จากเครื่องไม่ได้ — การแก้เวลาต้องผ่านการอนุมัติ และเก็บประวัติไว้ทุกครั้ง
             {!seeAll && <><br />อยากแก้เวลา? กดที่รายการแล้วเลือก “ขอแก้เวลา”</>}
@@ -338,5 +357,6 @@ export default function AttendancePage() {
         </>
       )}
     </Box>
+    </AttendanceAvatarContext.Provider>
   );
 }

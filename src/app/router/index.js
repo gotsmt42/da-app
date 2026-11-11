@@ -539,8 +539,8 @@ const ThemeRoutes = [
         ["expenses/advances", "advance", "ใบเบิก Advance"],
         ["expenses/claims", "claim", "ใบเคลม"],
         ["expenses/contractors", "contractor", "ใบเบิกค่าจ้างผู้รับเหมา"],
-        ["expenses/approvals", "inbox", "รอดำเนินการ"],
-        ["expenses/report", "report", "รายงานการเบิก"],
+        ["expenses/approvals", "inbox", "รออนุมัติเบิก-เคลม"],
+        ["expenses/report", "report", "รายงานเบิก-เคลม"],
       ].map(([path, view, title]) => ({
         path,
         element: (

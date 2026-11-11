@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExpenseReport, buildPersonLedger, personBreakdown, filterByCategory } from "./expenseReport";
+import { buildExpenseReport, buildPersonLedger, personBreakdown, filterByCategory, applyBasis } from "./expenseReport";
 import { bahtText, qtyText, differenceMeta } from "../expenseMeta";
 
 const adv = (over = {}) => ({
@@ -274,5 +274,55 @@ describe("filterByCategory — ดูทีละหมวด", () => {
     const out = filterByCategory([adv], [rmb], "all");
     expect(out.advances[0]).toBe(adv);
     expect(out.reimbursements[0]).toBe(rmb);
+  });
+});
+
+describe("ใบข้ามเดือน — นับยอดใช้จริงตามวันที่ใบเคลม / ตามวันที่ใบ Advance (applyBasis)", () => {
+  // เบิก Advance 30 ต.ค. 1,000 → เคลม 3 พ.ย. ใช้จริง 800 (คืน 200)
+  const claim = { _id: "c1", kind: "claim", status: "settled", total: 800, difference: -200, docDate: "2026-11-03T12:00:00.000Z", items: [{ category: "allowance", amount: 800 }] };
+  const octAdv = adv({ _id: "a1", docDate: "2026-10-30T12:00:00.000Z", claim });
+  const OCT = ["2026-10-01", "2026-10-31"];
+  const NOV = ["2026-11-01", "2026-11-30"];
+
+  it("ตามวันที่ใบ Advance: เดือน ต.ค. ได้ทั้งเบิกและใช้จริง", () => {
+    const t = buildExpenseReport(applyBasis([octAdv], [], "advance", ...OCT), { basis: "advance" }).totals;
+    expect(t.advanced).toBe(1000);
+    expect(t.actual).toBe(800);
+  });
+
+  it("ตามวันที่ใบเคลม: ต.ค. = เบิก 1,000 · ใช้จริง 0 · ไม่นับเป็นค้างเคลม (เคลมหลังช่วง)", () => {
+    const t = buildExpenseReport(applyBasis([octAdv], [], "claim", ...OCT), { basis: "claim" }).totals;
+    expect(t.advanced).toBe(1000);
+    expect(t.actual).toBe(0);
+    expect(t.outstanding).toBe(0);
+    expect(t.claimedLater).toBe(1000);
+  });
+
+  it("ตามวันที่ใบเคลม: พ.ย. = ใช้จริง 800 จากใบ Advance เดือนก่อน (carryIn) · ไม่นับยอดเบิกซ้ำ", () => {
+    const t = buildExpenseReport(applyBasis([], [octAdv], "claim", ...NOV), { basis: "claim" }).totals;
+    expect(t.advanced).toBe(0);
+    expect(t.count).toBe(0);
+    expect(t.actual).toBe(800);
+    expect(t.carriedIn).toBe(800);
+    expect(t.refunded).toBe(200);
+  });
+
+  it("ตามวันที่ใบเคลม: ช่วงหลายเดือน แยกเบิกไป ต.ค. · ใช้จริงไป พ.ย. ในกราฟรายเดือน + รายบุคคลตรงกัน", () => {
+    const r = buildExpenseReport(applyBasis([octAdv], [], "claim", "2026-10-01", "2026-11-30"), { basis: "claim" });
+    const oct = r.byMonth.find((m) => m.key === "2026-10");
+    const nov = r.byMonth.find((m) => m.key === "2026-11");
+    expect(oct.advanced).toBe(1000);
+    expect(oct.actual).toBe(0);
+    expect(nov.actual).toBe(800);
+    expect(r.totals.actual).toBe(800);
+    const led = buildPersonLedger(applyBasis([octAdv], [], "claim", "2026-10-01", "2026-11-30"), [], { basis: "claim" })[0];
+    expect(led.advanced).toBe(1000);
+    expect(led.actual).toBe(800);
+    expect(led.lines.find((l) => l.source === "claim").month).toBe("2026-11");
+  });
+
+  it("ใบ Advance ที่อยู่ในรายการช่วงนี้แล้ว ไม่ถูกนับซ้ำจาก carryIn", () => {
+    const rows = applyBasis([octAdv], [octAdv], "claim", "2026-10-01", "2026-11-30");
+    expect(rows.length).toBe(1);
   });
 });

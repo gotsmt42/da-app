@@ -762,31 +762,27 @@ const renderCancelledMark = (doc, hasBold) => {
   } catch { /* เบราว์เซอร์/เวอร์ชันที่ไม่รองรับความโปร่งใส — สถานะยังอยู่ท้ายกระดาษ */ }
 };
 
-/**
- * @param {object} opts.expense  ใบจาก API (รูปแบบเดียวกับ GET /api/expenses/:id)
- * @param {"blob"|"open"|"download"} [opts.mode]
- * @returns {Promise<{blob: Blob, url: string, fileName: string}>}
- */
-/**
- * @param {object} opts.signatures  ลายเซ็นที่ผนึกไว้ในใบ { requester, reviewer, approver, disburser } จาก
- *   GET /api/expenses/:id/signatures — ไม่ส่งมาก็ออกใบได้ (เว้นช่องให้เซ็นมือ)
- */
-export async function generateExpensePdf({ expense, signatures = null, mode = "blob" }) {
+/** โหลด jsPDF + ฟอนต์ไทย + โลโก้หัวกระดาษ (ครั้งเดียวต่อไฟล์) */
+const loadKit = async () => {
   const [{ jsPDF }, fontModule, bold] = await Promise.all([
     import("jspdf"),
     import("@/assets/fonts/THSarabunNew_base64"),
     loadBoldFont(),
   ]);
-  const font = fontModule.default;
-  const hasBold = Boolean(bold);
-
   // ✅ ย่อโลโก้หัวกระดาษก่อนฝังลงไฟล์ — ดูหัวข้อ "ขนาดไฟล์ PDF" ใน deliveryNotePdf.js
   await preparePrintAssets();
-  // โลโก้ธนาคารของใบนี้ (+ ใบ Advance ที่แนบมา) — โหลดก่อนวาด
-  await Promise.all([expense?.payTo?.bankCode, expense?.advanceDoc?.payTo?.bankCode].filter(Boolean).map(loadBankLogo));
+  return { jsPDF, font: fontModule.default, bold };
+};
 
-  /** เลือกขั้นย่อที่ทำให้ใบนี้จบพอดีหนึ่งแผ่น (วัดบนกระดาษทดก่อน) แล้ววาดลงแผ่นปัจจุบัน */
-  const renderSheet = (doc, sheet, sheetSignatures, { attachNote = "", page = 1, pages = 1 } = {}) => {
+/** โลโก้ธนาคารของใบ (+ ใบ Advance ที่แนบมา) — โหลดก่อนวาด (jsPDF วาดรูปแบบ sync) */
+const loadBankLogosOf = (expenses) => Promise.all(
+  [...new Set(expenses.flatMap((e) => [e?.payTo?.bankCode, e?.advanceDoc?.payTo?.bankCode]).filter(Boolean))].map(loadBankLogo)
+);
+
+/** ตัววาด "หนึ่งแผ่น" — เลือกขั้นย่อที่ทำให้ใบนี้จบพอดีหนึ่งแผ่น (วัดบนกระดาษทดก่อน) แล้ววาดลงแผ่นปัจจุบัน */
+const sheetRenderer = ({ jsPDF, font, bold }) => {
+  const hasBold = Boolean(bold);
+  return (doc, sheet, sheetSignatures, { attachNote = "", page = 1, pages = 1 } = {}) => {
     let step = FIT_STEPS[FIT_STEPS.length - 1];
     for (const candidate of FIT_STEPS) {
       const scratch = newDoc(jsPDF, font, bold);
@@ -801,16 +797,18 @@ export async function generateExpensePdf({ expense, signatures = null, mode = "b
     renderFooter(doc, sheet, { page, pages });
     if (sheet.status === "cancelled") renderCancelledMark(doc, hasBold);
   };
+};
 
-  /**
-   * ✅ ผู้ใช้สั่ง: ใบเคลมให้แนบใบ Advance ที่อ้างถึงเป็นหน้าที่ 2 เพื่อปริ้นคู่กัน
-   * ⚠️ หน้าแรกยังเหมือนเดิมทุกอย่าง (รวมตารางเทียบตั้งเบิก↔ใช้จริงในใบเคลม) — แค่เพิ่มแผ่นที่สองต่อท้าย
-   * ⚠️ ใบสำรองจ่ายไม่มี Advance ให้แนบ และใบ Advance ที่พิมพ์เดี่ยวๆ ก็ยังหน้าเดียวเหมือนเดิม
-   */
+/**
+ * วาดใบหนึ่งใบ (1–2 แผ่น) ต่อท้ายเอกสาร
+ * ✅ ผู้ใช้สั่ง: ใบเคลมให้แนบใบ Advance ที่อ้างถึงเป็นหน้าที่ 2 เพื่อปริ้นคู่กัน
+ * ⚠️ ใบสำรองจ่ายไม่มี Advance ให้แนบ และใบ Advance ที่พิมพ์เดี่ยวๆ ก็ยังหน้าเดียวเหมือนเดิม
+ * @param {boolean} first ใบแรกของไฟล์ = วาดลงแผ่นที่มีอยู่แล้ว · ใบถัดไป = ขึ้นแผ่นใหม่
+ */
+const drawExpense = (doc, renderSheet, expense, signatures, first) => {
   const attached = expense.kind === "claim" && slipKind(expense) === "claim" ? expense.advanceDoc : null;
   const pages = attached ? 2 : 1;
-
-  const doc = newDoc(jsPDF, font, bold);
+  if (!first) doc.addPage();
   renderSheet(doc, expense, signatures, { page: 1, pages });
   if (attached) {
     doc.addPage();
@@ -820,13 +818,47 @@ export async function generateExpensePdf({ expense, signatures = null, mode = "b
       pages,
     });
   }
+  return pages;
+};
 
+/**
+ * @param {object} opts.expense  ใบจาก API (รูปแบบเดียวกับ GET /api/expenses/:id)
+ * @param {object} opts.signatures  ลายเซ็นที่ผนึกไว้ในใบ { requester, reviewer, approver, disburser, advance? } จาก
+ *   GET /api/expenses/:id/signatures — ไม่ส่งมาก็ออกใบได้ (เว้นช่องให้เซ็นมือ)
+ * @param {"blob"|"open"|"download"} [opts.mode]
+ * @returns {Promise<{blob: Blob, url: string, fileName: string}>}
+ */
+export async function generateExpensePdf({ expense, signatures = null, mode = "blob" }) {
+  const kit = await loadKit();
+  await loadBankLogosOf([expense]);
+  const doc = newDoc(kit.jsPDF, kit.font, kit.bold);
+  drawExpense(doc, sheetRenderer(kit), expense, signatures, true);
   doc.setProperties({
     title: `${KIND_META[slipKind(expense)]?.docTitle || "ใบเบิก"} ${expense.docNo || ""}`,
     subject: expense.subject || "",
     creator: ISSUER.nameEn,
   });
   return outputDocument(doc, expense.docNo || "ใบเบิก", mode);
+}
+
+/**
+ * ✅ (11 พ.ย. 2569 ผู้ใช้: "ขอให้ระบบ print ใบ Advance / เคลมของทุกคนพร้อมกันได้ ตอนนี้ยัง print แยกทีละใบ")
+ *    หลายใบในไฟล์เดียว — แต่ละใบวาดด้วยตัววาดเดียวกับการพิมพ์ทีละใบทุกประการ (หน้าตา/ลายเซ็น/ใบ Advance แนบเหมือนเดิม)
+ *    ทุกใบขึ้นแผ่นใหม่เสมอ (ตัดกระดาษแยกใบได้) · เรียงตามลำดับที่ส่งมา
+ * @param {Array<{expense: object, signatures?: object}>} opts.items
+ * @returns {Promise<{blob, url, fileName, safeName, sheets: number}>}
+ */
+export async function generateExpensesPdf({ items, fileName = "ใบเบิกหลายใบ", title = "", mode = "blob" }) {
+  const list = (items || []).filter((x) => x?.expense);
+  if (!list.length) throw new Error("ไม่มีใบให้พิมพ์");
+  const kit = await loadKit();
+  await loadBankLogosOf(list.map((x) => x.expense));
+  const doc = newDoc(kit.jsPDF, kit.font, kit.bold);
+  const renderSheet = sheetRenderer(kit);
+  let sheets = 0;
+  list.forEach((x, i) => { sheets += drawExpense(doc, renderSheet, x.expense, x.signatures || null, i === 0); });
+  doc.setProperties({ title: title || fileName, creator: ISSUER.nameEn });
+  return { ...outputDocument(doc, fileName, mode), sheets };
 }
 
 export const __test = { wrapText, FIT_STEPS, SIG_TOP };

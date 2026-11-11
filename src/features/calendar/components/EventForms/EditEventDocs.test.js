@@ -23,7 +23,7 @@ describe("EditEventDocs (Event page)", () => {
     open();
     expect(await screen.findByText("0/4 รายการ")).toBeTruthy();
     expect(screen.getByText("งานนี้ต้องวางบิลลูกค้าไหม?")).toBeTruthy();
-    expect(screen.getAllByText("แนบไฟล์").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /^แนบ$/ }).length).toBeGreaterThan(0); // ปุ่ม "+ แนบ" หัวการ์ด (11 พ.ย. 2569)
   });
 
   it("technician not on the job: view-only + says why", async () => {

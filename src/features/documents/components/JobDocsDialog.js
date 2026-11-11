@@ -8,20 +8,17 @@
  * ดูแลพร้อมกันโดยไม่ได้ประโยชน์เพิ่ม
  */
 import { useRef, useState } from "react";
-import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, Chip, useMediaQuery, TextField, MenuItem, LinearProgress, Alert,
+  Button, useMediaQuery, LinearProgress, Alert,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { InsertDriveFileRounded as InsertDriveFile, FolderOpenRounded as FolderOpen, AttachFileRounded as AttachFile } from "@mui/icons-material";
-import { roundDocs, isImageFile, JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
+import { FolderOpenRounded as FolderOpen, AttachFileRounded as AttachFile } from "@mui/icons-material";
+import { roundDocs, isDocRequired, JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
+import AttachmentList from "@/shared/ui/AttachmentList";
 import EventService from "@/shared/services/EventService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
-import FilePreviewDialog from "./FilePreviewDialog";
-import { formatThai } from "@/shared/utils/thaiDate";
-import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const TEXT_SUB = "#64748b";
 
@@ -31,7 +28,6 @@ const TEXT_SUB = "#64748b";
  */
 export default function JobDocsDialog({ roundVisits, title, onClose, canUpload = false, onUploaded }) {
   const isMobile = useMediaQuery("(max-width:900px)");
-  const [preview, setPreview] = useState(null);
   const [uploadType, setUploadType] = useState(JOB_DOC_TYPES[0].key);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -77,139 +73,101 @@ export default function JobDocsDialog({ roundVisits, title, onClose, canUpload =
 
   if (visits.length === 0) return null;
   const groups = roundDocs(roundVisits);
+  const byKey = new Map(groups.map((g) => [g.key, g.files]));
   // ⚠️ ครั้งที่มีหลายวัน ต้องบอกได้ว่าไฟล์มาจากการเข้างานวันไหน — ครั้งที่มีวันเดียวไม่ต้องบอก
-  // (ข้อความซ้ำใต้ทุกไฟล์โดยไม่ให้ข้อมูลอะไรเพิ่ม = เสียงรบกวน)
   const multiVisit = roundVisits.length > 1;
+  const head = visits[0];
+  const filled = JOB_DOC_TYPES.filter((t) => (byKey.get(t.key) || []).length > 0).length;
+  const pickType = (key) => { setUploadType(key); setTimeout(() => fileInputRef.current?.click(), 0); };
 
+  /**
+   * 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงาน แก้รูปแบบการแสดงเอกสารให้สวยงาม เข้าธีมแอพ ดูง่าย ตอนนี้เหมือนวางโล่งๆ")
+   *    การ์ดเอกสาร 4 ชนิดแบบเดียวกับหน้าการดำเนินงาน/งานของฉัน: กรอบไอคอนสี · ชื่อ · สถานะ (แนบแล้ว x ไฟล์ / ยังไม่แนบ · บังคับ/ถ้ามี)
+   *    · ปุ่ม "+ แนบ" ของชนิดนั้นมุมขวา (ไม่ต้องเลือกชนิดจากช่องก่อน) · แถวไฟล์ภาพย่อ (โมดูลไฟล์กลาง เลื่อนดูไฟล์อื่นได้)
+   */
   return (
-    <>
-      <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={isMobile}>
-        <DialogTitle sx={{ pb: 1 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: "1rem" }} noWrap>เอกสารของงาน</Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>{title}</Typography>
-        </DialogTitle>
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={isMobile}
+      PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: "#f8fafc" } }}>
+      <DialogTitle sx={{ p: 0, bgcolor: "#fff", borderBottom: "1px solid #e6e9ef" }}>
+        <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, py: 1.5 }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: "11px", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0 }}>
+            <FolderOpen sx={{ fontSize: 21 }} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", color: "#0f172a", lineHeight: 1.3 }} noWrap>เอกสารประจำงาน</Typography>
+            <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }} noWrap>{title}</Typography>
+          </Box>
+          <Typography sx={{ flexShrink: 0, fontSize: "1.2rem", fontWeight: 900, color: filled === JOB_DOC_TYPES.length ? "#16a34a" : "#2563eb", fontVariantNumeric: "tabular-nums" }}>
+            {filled}/{JOB_DOC_TYPES.length}
+          </Typography>
+        </Stack>
+        <LinearProgress variant="determinate" value={(filled / JOB_DOC_TYPES.length) * 100}
+          sx={{ height: 4, bgcolor: "#eef2f7", "& .MuiLinearProgress-bar": { bgcolor: filled === JOB_DOC_TYPES.length ? "#16a34a" : "#2563eb" } }} />
+      </DialogTitle>
 
-        <DialogContent dividers>
-          {/* ── แนบไฟล์ (แอดมิน/manager) ────────────────────────────────────────
-              ✅ อยู่บนสุดของกล่อง ไม่ใช่ล่างสุด — คนที่เปิดกล่องนี้เพื่อ "แนบ" จะเจอทันทีโดยไม่ต้อง
-              เลื่อนผ่านไฟล์ที่มีอยู่ทั้งหมดก่อน (งานที่มีเอกสาร 9 ไฟล์เกิดขึ้นจริง) */}
-          {canUpload && (
-            <Box sx={{ mb: groups.length > 0 ? 2.5 : 0, p: 1.5, borderRadius: 2, bgcolor: alpha("#0f172a", 0.03), border: "1px dashed", borderColor: "divider" }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} alignItems={{ sm: "center" }}>
-                <TextField
-                  select size="small" label="ชนิดเอกสาร" value={uploadType}
-                  onChange={(e) => setUploadType(e.target.value)}
-                  disabled={uploading}
-                  sx={{ minWidth: 190 }}
-                >
-                  {JOB_DOC_TYPES.map((t) => (
-                    <MenuItem key={t.key} value={t.key}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <t.Icon sx={{ fontSize: 17, color: t.color }} />
-                        <span>{t.label}</span>
-                      </Stack>
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <Button
-                  variant="outlined" size="small" startIcon={<AttachFile sx={{ fontSize: 17 }} />}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
-                >
-                  {uploading ? `กำลังอัปโหลด ${progress}%` : "เลือกไฟล์แนบ"}
-                </Button>
-                {/* ⚠️ จำกัดชนิดไฟล์ให้ตรงกับที่ server รับจริง (ดู allowedTypes ใน PUT /events/upload/:id)
-                    ไม่งั้นผู้ใช้เลือกไฟล์ได้แล้วเพิ่งมารู้ตอนอัปโหลดเสร็จว่าไม่รองรับ */}
-                <input
-                  ref={fileInputRef} type="file" hidden onChange={handlePick}
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
-                />
-              </Stack>
-              {uploading && <LinearProgress variant="determinate" value={progress} sx={{ mt: 1.25, borderRadius: 1 }} />}
-              {uploadError && <Alert severity="error" sx={{ mt: 1.25, py: 0 }}>{String(uploadError)}</Alert>}
-              {multiVisit && !uploading && (
-                <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.disabled" }}>
-                  ครั้งนี้เข้างาน {visits.length} ช่วง — ไฟล์จะถูกแนบไว้ที่ช่วงแรก ({formatEventDateRange(visits[0])}) และแสดงรวมเป็นเอกสารของครั้งนี้
-                </Typography>
-              )}
-            </Box>
-          )}
-
-          {groups.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: canUpload ? 3 : 5 }}>
-              <FolderOpen sx={{ fontSize: 36, color: "text.disabled", mb: 1 }} />
-              <Typography variant="body2" sx={{ color: TEXT_SUB }}>
-                {canUpload
-                  ? "ครั้งนี้ยังไม่มีเอกสารแนบ — เลือกชนิดเอกสารแล้วกด \"เลือกไฟล์แนบ\" ด้านบนได้เลย"
-                  : 'ครั้งนี้ยังไม่มีเอกสารแนบ — แนบได้ที่หน้า "การดำเนินงาน"'}
-              </Typography>
-            </Box>
-          ) : (
-            <Stack spacing={2.5}>
-              {groups.map(({ key, label, color, Icon, files }) => (
-                <Box key={key}>
-                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1 }}>
-                    <Icon sx={{ fontSize: 17, color }} />
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.85rem" }}>{label}</Typography>
-                    <Chip
-                      size="small" label={`${files.length} ไฟล์`}
-                      sx={{ height: 18, fontSize: "0.63rem", fontWeight: 700, bgcolor: alpha(color, 0.12), color }}
-                    />
-                  </Stack>
-
-                  {/* ✅ เรียงเป็นตาราง ไม่ใช่แถวเลื่อนแนวนอน — งานที่มีเอกสาร 9 ไฟล์ (เกิดขึ้นจริง)
-                      ถ้าเลื่อนแนวนอนจะเห็นทีละ 3 ไฟล์และไม่รู้ว่ามีอีกกี่ไฟล์ ต้องลากไปเรื่อยๆ */}
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: "repeat(4, 1fr)" }, gap: 1 }}>
-                    {files.map((f) => (
-                      <Box key={f._id || f.fileUrl}>
-                        <Box
-                          onClick={() => setPreview({ file: f, label, files })}
-                          sx={{
-                            width: "100%", aspectRatio: "1", borderRadius: 2, overflow: "hidden", cursor: "pointer",
-                            border: "1px solid", borderColor: "divider", bgcolor: alpha("#0f172a", 0.03),
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            transition: "border-color .15s",
-                            "&:hover": { borderColor: color },
-                          }}
-                        >
-                          {isImageFile(f)
-                            ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy"
-                                sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : <InsertDriveFile sx={{ fontSize: 30, color: TEXT_SUB }} />}
-                        </Box>
-                        <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mt: 0.25, fontSize: "0.62rem" }} noWrap>
-                          {f.fileName || "ไฟล์แนบ"}
-                        </Typography>
-                        {multiVisit && f._visit && (
-                          <Typography variant="caption" sx={{ display: "block", color: "text.disabled", fontSize: "0.6rem" }} noWrap>
-                            {formatEventDateRange(f._visit)}
-                          </Typography>
-                        )}
-                      </Box>
-                    ))}
+      <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+        {uploadError && <Alert severity="error" sx={{ mb: 1.25, py: 0 }}>{String(uploadError)}</Alert>}
+        <Stack spacing={1.1} sx={{ pt: 1.5 }}>
+          {JOB_DOC_TYPES.map((t) => {
+            const files = byKey.get(t.key) || [];
+            const busy = uploading && uploadType === t.key;
+            const required = isDocRequired(head, t.key);
+            const has = files.length > 0;
+            return (
+              <Box key={t.key} sx={{ bgcolor: "#fff", borderRadius: "14px", border: "1px solid", borderColor: has ? "#bbf7d0" : "#e6e9ef", px: 1.5, py: 1.25 }}>
+                <Stack direction="row" alignItems="center" gap={1.25}>
+                  <Box sx={{ width: 38, height: 38, borderRadius: "11px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(t.color, 0.1), color: t.color }}>
+                    <t.Icon sx={{ fontSize: 20 }} />
                   </Box>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </DialogContent>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", lineHeight: 1.3 }}>
+                      {t.label}{required && <Box component="span" sx={{ color: "#dc2626", ml: 0.25 }}>*</Box>}
+                    </Typography>
+                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 0.2 }}>
+                      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: has ? "#16a34a" : required ? "#d97706" : "#cbd5e1" }} />
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: has ? "#15803d" : required ? "#b45309" : TEXT_SUB }}>
+                        {has ? `แนบแล้ว ${files.length} ไฟล์` : "ยังไม่แนบ"}
+                      </Typography>
+                      <Typography sx={{ fontSize: "0.74rem", color: "#94a3b8" }}>· {required ? "บังคับ" : "ถ้ามี"}</Typography>
+                    </Stack>
+                  </Box>
+                  {canUpload && (
+                    <Button size="small" onClick={() => pickType(t.key)} disabled={uploading} startIcon={<AttachFile sx={{ fontSize: "17px !important" }} />}
+                      sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, fontSize: "0.8rem", borderRadius: "10px", px: 1.5, minHeight: 34, bgcolor: "#eff6ff", color: "#2563eb", "&:hover": { bgcolor: "#dbeafe" } }}>
+                      {has ? "เพิ่ม" : "แนบ"}
+                    </Button>
+                  )}
+                </Stack>
+                {(has || busy) && (
+                  <Box sx={{ mt: 1 }}>
+                    <AttachmentList readOnly emptyText={null}
+                      files={files.map((f) => ({ ...f, tag: multiVisit && f._visit ? formatEventDateRange(f._visit) : null }))}
+                      uploading={busy ? { progress } : null}
+                      sx={{ maxHeight: 280, overflowY: "auto" }} />
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+        </Stack>
+        {multiVisit && canUpload && (
+          <Typography sx={{ display: "block", mt: 1.25, fontSize: "0.72rem", color: "#94a3b8" }}>
+            ครั้งนี้เข้างาน {visits.length} ช่วง — ไฟล์ใหม่แนบไว้ที่ช่วงแรก ({formatEventDateRange(visits[0])}) และแสดงรวมเป็นเอกสารของครั้งนี้
+          </Typography>
+        )}
+        {!canUpload && filled === 0 && (
+          <Typography sx={{ mt: 1.25, fontSize: "0.78rem", color: TEXT_SUB, textAlign: "center" }}>ยังไม่มีเอกสารแนบ — แนบได้ที่หน้า “การดำเนินงาน” หรือ “งานของฉัน”</Typography>
+        )}
+        {/* ⚠️ จำกัดชนิดไฟล์ให้ตรงกับที่ server รับจริง — ไม่งั้นเลือกได้แล้วเพิ่งมารู้ตอนอัปโหลดเสร็จ */}
+        <input ref={fileInputRef} type="file" hidden onChange={handlePick} accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx" />
+      </DialogContent>
 
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={onClose} sx={{ textTransform: "none" }}>ปิด</Button>
-        </DialogActions>
-      </Dialog>
-
-      <FilePreviewDialog
-        file={preview?.file}
-        files={preview?.files}
-        caption={[
-          preview?.label,
-          preview?.file?._visit && multiVisit ? formatEventDateRange(preview.file._visit) : null,
-          preview?.file?.uploadedAt ? `อัปโหลด ${formatThai(moment(preview.file.uploadedAt), "DD/MM/YYYY")}` : null,
-        ].filter(Boolean).join(" · ")}
-        onClose={() => setPreview(null)}
-      />
-    </>
+      <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "#fff", borderTop: "1px solid #e6e9ef" }}>
+        <Button onClick={onClose} variant="contained" disableElevation
+          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
+          เสร็จสิ้น
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

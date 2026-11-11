@@ -30,7 +30,7 @@ import {
   renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser,
 } from "@/shared/utils/pdfRaster";
 import PdfPagesView from "@/shared/components/PdfPagesView";
-import { generateExpensePdf } from "../utils/expensePdf";
+import { generateExpensePdf, generateExpensesPdf } from "../utils/expensePdf";
 import { generateBlankClaimPdf, localFormCode } from "../utils/expenseBlankPdf";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
@@ -42,8 +42,22 @@ const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช�
 /**
  * @param {object}  [expense]  ใบจาก API — โหมดพิมพ์เอกสารจริง
  * @param {object}  [blank]    { variant: "empty"|"advance"|"reimburse", advance?, printedBy } — โหมดฟอร์มเปล่า
+ * @param {object}  [bulk]     { docs: [{_id, docNo}], kind, title, orderLabel } — ✅ (11 พ.ย. 2569) พิมพ์หลายใบในไฟล์เดียว
+ *   โหลดใบเต็ม + ลายเซ็นทีละใบ (พร้อมกันครั้งละ 3) · โหลดใบไหนไม่ได้ (ลองซ้ำแล้ว) = ไม่สร้างไฟล์ บอกเลขที่ใบ — กันพิมพ์ไม่ครบโดยไม่รู้ตัว
  */
-export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
+const BULK_CONCURRENCY = 3;
+/** ใบเต็ม + ลายเซ็น (ใบเคลม = ลายเซ็นของใบ Advance ที่แนบด้วย) — แบบเดียวกับการพิมพ์ทีละใบ */
+const loadPrintable = async (id) => {
+  const full = await ExpenseService.get(id);
+  const advanceId = full?.kind === "claim" ? full?.advanceDoc?._id : null;
+  const [signatures, advanceSignatures] = await Promise.all([
+    ExpenseService.signatures(id),
+    advanceId ? ExpenseService.signatures(advanceId) : null,
+  ]);
+  return { expense: full, signatures: { ...(signatures || {}), advance: advanceSignatures || {} } };
+};
+
+export default function ExpensePrintDialog({ open, expense, blank, bulk, onClose }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   // ตัดสินครั้งเดียวต่อการเปิดหน้า — ชนิดเครื่องไม่เปลี่ยนระหว่างใช้งาน
   const imageMode = useMemo(() => prefersImagePrint(), []);
@@ -54,12 +68,15 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   const [rasterFailed, setRasterFailed] = useState(false);
   const [formInfo, setFormInfo] = useState(null);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState(null); // หลายใบ: { done, total }
+  const [sheetCount, setSheetCount] = useState(0);
+  const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState("");
   const printFrameRef = useRef(null);
   const printerRef = useRef(null);
 
   // ⚠️ slipKind ไม่ใช่ expense.kind — ใบสำรองจ่ายต้องได้สี/ป้ายของตัวเอง ไม่ใช่ป้าย CLAIM สีม่วง
-  const kind = blank ? (blank.variant === "reimburse" ? "reimburse" : "claim") : slipKind(expense);
+  const kind = bulk ? (bulk.kind || "advance") : blank ? (blank.variant === "reimburse" ? "reimburse" : "claim") : slipKind(expense);
   /** ชื่อเรียกฟอร์มเปล่าตามชนิดเอกสาร — ใช้ทั้งหัวกล่อง ชื่อไฟล์ และหัวข้อตอนสั่งพิมพ์ */
   const blankName = blank?.variant === "reimburse" ? "ฟอร์มใบเบิกค่าใช้จ่าย (สำรองจ่าย)" : "ฟอร์มใบเคลม";
   const meta = KIND_META[kind] || KIND_META.advance;
@@ -74,20 +91,53 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   } : null;
   // ⚠️ ใช้คีย์ข้อความแทน object — ฟอร์มแม่ re-render ทุกครั้งที่พิมพ์ ถ้าผูกกับ object ตรงๆ จะสร้าง PDF
   // (และขอรหัสฟอร์มใหม่จาก server) ซ้ำทุกตัวอักษรที่พิมพ์
-  const jobKey = blank
+  const jobKey = bulk
+    ? `bulk:${(bulk.docs || []).map((d) => d._id).join(",")}:${attempt}`
+    : blank
     ? `blank:${blank.variant}:${blank.advance?._id || ""}`
     : `doc:${expense?._id}:${expense?.status}:${expense?.updatedAt}`;
 
   useEffect(() => {
-    if (!open || (!expense && !blank)) return undefined;
+    if (!open || (!expense && !blank && !bulk)) return undefined;
     let alive = true;
     const owned = { url: "", pages: null, printer: null };
-    setPdf(null); setPages(null); setShown(null); setRasterFailed(false); setFormInfo(null); setError(""); setNotice("");
+    setPdf(null); setPages(null); setShown(null); setRasterFailed(false); setFormInfo(null); setError(""); setNotice(""); setProgress(null); setSheetCount(0);
 
     (async () => {
       let out;
       try {
-        if (blank) {
+        if (bulk) {
+          const docs = bulk.docs || [];
+          const results = new Array(docs.length);
+          const failed = [];
+          let next = 0;
+          let done = 0;
+          setProgress({ done: 0, total: docs.length });
+          await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, docs.length) }, async () => {
+            while (alive && next < docs.length) {
+              const i = next;
+              next += 1;
+              try {
+                let r;
+                try { r = await loadPrintable(docs[i]._id); } catch { r = await loadPrintable(docs[i]._id); } // ลองซ้ำ 1 ครั้ง (เน็ตสะดุด)
+                // ⚠️ ตรวจว่าได้ใบที่ขอจริง — ห้ามพิมพ์ผิดใบ
+                if (!r?.expense || String(r.expense._id) !== String(docs[i]._id)) throw new Error("mismatch");
+                results[i] = r;
+              } catch {
+                failed.push(docs[i].docNo || docs[i]._id);
+              }
+              done += 1;
+              if (alive) setProgress({ done, total: docs.length });
+            }
+          }));
+          if (!alive) return;
+          if (failed.length) {
+            setError(`โหลดใบไม่สำเร็จ ${failed.length} ใบ (${failed.join(", ")}) — ยังไม่ได้สร้างไฟล์ เพื่อไม่ให้พิมพ์ไม่ครบ · กด "ลองใหม่"`);
+            return;
+          }
+          out = await generateExpensesPdf({ items: results, fileName: bulk.title || "ใบเบิกหลายใบ", title: bulk.title });
+          if (alive) setSheetCount(out.sheets || 0);
+        } else if (blank) {
           const form = blank.variant === "advance"
             ? await ExpenseService.issueBlankClaimForm(blank.advance._id)
             : { code: localFormCode(), issuedAt: new Date().toISOString(), issuedBy: blank.printedBy || "" };
@@ -192,16 +242,18 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   // 🔁 (4 พ.ย. 2569 ผู้ใช้: "หน้าใบเบิก เคลม ... กดแชร์ไม่ได้บางกรณี ขึ้นแจ้งเตือนเรื่องพิมพ์") ตัวกลาง shared/utils/pdfShare
   const handleShare = () => {
     if (!pdf?.blob) return;
-    const text = blank ? `${blankName} ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
+    const text = bulk ? (bulk.title || "ใบเบิกหลายใบ") : blank ? `${blankName} ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
     sharePdf({ blob: pdf.blob, fileName: pdf.fileName, pages, text, download: handleDownload, notify: setNotice });
   };
 
-  if (!expense && !blank) return null;
+  if (!expense && !blank && !bulk) return null;
   const printReady = imageMode ? Boolean(pages) || rasterFailed : Boolean(pdf);
   const preparing = Boolean(pdf) && imageMode && !pages && !rasterFailed;
 
-  const headTitle = blank ? `${blankName}เปล่า · กรอกด้วยลายมือ` : expense.docNo;
-  const headSub = blank
+  const headTitle = bulk ? `พิมพ์หลายใบ · ${(bulk.docs || []).length} ใบ` : blank ? `${blankName}เปล่า · กรอกด้วยลายมือ` : expense.docNo;
+  const headSub = bulk
+    ? (sheetCount ? `ไฟล์เดียว ${sheetCount} แผ่น A4 · ขึ้นแผ่นใหม่ทุกใบ${bulk.orderLabel ? ` · ${bulk.orderLabel}` : ""}` : progress ? `กำลังโหลดใบ ${progress.done}/${progress.total}…` : "กำลังเตรียม…")
+    : blank
     ? (formInfo
       ? `รหัสฟอร์ม ${formInfo.code}${blank.variant === "advance" ? ` · บันทึกในประวัติใบ ${blank.advance.docNo} แล้ว` : blank.variant === "reimburse" ? " · ใบสำรองจ่ายไม่มี Advance" : " · ไม่ผูกใบ Advance"}`
       : blank.variant === "advance" ? "กำลังออกรหัสฟอร์ม..." : "A4")
@@ -235,7 +287,12 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
       </DialogTitle>
 
       <DialogContent sx={{ p: 0, bgcolor: "#525659", display: "flex", flexDirection: "column" }}>
-        {error && <Alert severity="error" sx={{ borderRadius: 0 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ borderRadius: 0 }}
+            action={bulk ? <Button color="inherit" size="small" onClick={() => setAttempt((n) => n + 1)} sx={{ fontWeight: 700 }}>ลองใหม่</Button> : undefined}>
+            {error}
+          </Alert>
+        )}
         {notice && <Alert severity="info" onClose={() => setNotice("")} sx={{ borderRadius: 0, "& .MuiAlert-message": { fontSize: "0.8rem" } }}>{notice}</Alert>}
         {rasterFailed && !notice && (
           <Alert severity="warning" sx={{ borderRadius: 0, "& .MuiAlert-message": { fontSize: "0.8rem" } }}>
@@ -253,7 +310,9 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
             <Stack alignItems="center" justifyContent="center" sx={{ height: "100%", color: "#fff" }} spacing={1.5}>
               <CircularProgress size={28} sx={{ color: "#fff" }} />
               <Typography variant="caption">
-                {blank?.variant === "advance" && !formInfo ? "กำลังออกรหัสฟอร์ม..." : preparing ? "กำลังเตรียมหน้าพิมพ์..." : "กำลังจัดหน้าเอกสาร..."}
+                {bulk && progress && progress.done < progress.total
+                  ? `กำลังโหลดใบ ${progress.done}/${progress.total}...`
+                  : blank?.variant === "advance" && !formInfo ? "กำลังออกรหัสฟอร์ม..." : preparing ? "กำลังเตรียมหน้าพิมพ์..." : "กำลังจัดหน้าเอกสาร..."}
               </Typography>
             </Stack>
           )}

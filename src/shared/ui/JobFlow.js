@@ -185,11 +185,11 @@ export function nextStepOf(ev, mode, { mine, ackedByMe } = {}) {
     if (ev.checkedInAt) {
       return { tone: ACCENT_TONE, title: `เข้างานแล้ว ${moment(ev.checkedInAt).format("HH:mm")} · รอเอกสาร`, desc: "รอช่างแนบเอกสารประจำงาน แล้วกดขอปิดงาน" };
     }
-    if (!ev.team && !ev.resPerson) return { tone: AMBER, title: "ยังไม่มีหัวหน้าทีมเข้างาน", desc: "มอบหมายหัวหน้าทีมในการ์ดนี้ ทีมจึงกดเข้างานได้" };
+    if (!ev.team && !ev.resPerson) return { tone: AMBER, title: "ยังไม่มีหัวหน้าทีมเข้างาน", desc: "มอบหมายหัวหน้าทีมในการ์ดนี้ แล้วทุกคนในทีมจึงบันทึกเข้างานของตัวเองได้" };
     const last = moment(ev.end || ev.start).subtract(ev.allDay && ev.end ? 1 : 0, "days").startOf("day");
     return moment().startOf("day").isAfter(last)
       ? { tone: AMBER, title: "เลยวันเข้างาน · ยังไม่กดเข้างาน", desc: `นัดเข้างาน ${dayText}${team ? ` · ทีม ${team}` : ""} — ตรวจสอบกับทีม` }
-      : { tone: ACCENT_TONE, title: "วันนี้ · รอทีมกดเข้างาน", desc: `${team ? `ทีม ${team} · ` : ""}หัวหน้าทีมกดเข้างานพร้อมถ่ายรูปหน้างาน` };
+      : { tone: ACCENT_TONE, title: "วันนี้ · รอทีมบันทึกเข้างาน", desc: `${team ? `ทีม ${team} · ` : ""}ทุกคนในทีมกดบันทึกเข้างานของตัวเอง พร้อมถ่ายรูปหน้างาน` };
   }
   return { tone: ACCENT_TONE, title: "ทำงาน → แนบเอกสาร → ขอปิดงาน", desc: "แนบเอกสารประจำงานให้ครบ แล้วกด “ขอปิดงาน”" };
 }

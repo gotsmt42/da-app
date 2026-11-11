@@ -1071,6 +1071,8 @@ const EventRowCard = ({
   const canAssignTeam = Boolean(onInputUpdate) && can(currentUser, "editAnyJob") && event.status !== "ดำเนินการเสร็จสิ้น";
   // open = กางรายละเอียดในการ์ด · expanded = กล่องเอกสาร/คุยกับช่าง/ประวัติ
   const [open,       setOpen]       = useState(defaultExpanded || inlineDetails);
+  // 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้าการดำเนินงานให้แสดงเอกสารต่อลงมาเลย แค่ให้ย่อ/ขยายได้ ตั้งต้นให้ขยายเปิดไว้")
+  const [docsOpen,   setDocsOpen]   = useState(true);
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "กดตรวจสอบแล้ว ยังต้องมากดเปิดเพื่อดูปุ่มอีก ไม่สะดวก") — ถูกสั่งให้กาง (ไฮไลต์) ทีหลัง = กางทันที
   useEffect(() => { if (defaultExpanded) setOpen(true); }, [defaultExpanded]);
   const [expanded,   setExpanded]   = useState(false);
@@ -1220,44 +1222,14 @@ const EventRowCard = ({
       {extra}
     </Stack>
   );
-  const expandedContent = (
+  /**
+   * 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้าการดำเนินงานให้แสดงเอกสารต่อลงมาเลย แค่ให้ย่อ/ขยายได้ ตั้งต้นให้ขยายเปิดไว้ ให้ดูสวยงาม")
+   *    รายการเอกสารอยู่ใต้กล่องสรุปทันที (ไม่ซ้ำไว้ท้ายการ์ด) · ปุ่มในกล่องสรุป = ย่อ/ขยายรายการ
+   */
+  const docsSheetContent = (
     <Grid container spacing={1.25}>
-      {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") — description คือช่องเดียว · workNote = บันทึกเดิมก่อนรวม */}
-      {(event.description || event.workNote) && (
-        <Grid item xs={12} sx={{ mb: 0.75 }}>
-          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "รายละเอียดงานที่ทำ")}
-          <Box sx={{ px: 1.75, py: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-            {event.description && (
-              <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>{event.description}</Typography>
-            )}
-            {event.workNote && (
-              <Typography sx={{ fontSize: "0.8rem", color: MUTED, whiteSpace: "pre-line", lineHeight: 1.6, mt: event.description ? 0.75 : 0 }}>
-                <b>บันทึกเดิมจากช่าง:</b> {event.workNote}
-              </Typography>
-            )}
-          </Box>
-        </Grid>
-      )}
+      {/* หัวข้อ "เอกสารประจำงาน x/4" อยู่ในกล่องสรุปด้านบนแล้ว — ไม่ซ้ำ */}
 
-      {(!hideDocuments || showDocsOverride) && (
-        <Grid item xs={12} sx={{ mb: -0.25 }}>
-          {sectionLabel(<Description sx={{ fontSize: 17, color: MUTED }} />, "เอกสารประจำงาน", (
-            <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: docDone === JOB_DOC_TYPES.length ? "#15803d" : MUTED }}>
-              {docDone}/{JOB_DOC_TYPES.length} รายการ{docDone === JOB_DOC_TYPES.length ? " · พร้อมปิดงาน" : ""}
-            </Typography>
-          ))}
-        </Grid>
-      )}
-
-      {hideDocuments && !showDocsOverride && (
-        <Grid item xs={12}>
-          <Button size="small" onClick={() => setShowDocsOverride(true)}
-            sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
-            <Description sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
-            เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
-          </Button>
-        </Grid>
-      )}
       {/* ✅ (10 พ.ย. 2569) ใบเสนอราคาแยกที่อิงงานนี้ — สถานะ + กดเปิดในหน้าติดตามใบเสนอราคา */}
       {(!hideDocuments || showDocsOverride) && <RefQuotesGrid event={event} />}
       {(!hideDocuments || showDocsOverride) && (
@@ -1320,6 +1292,38 @@ const EventRowCard = ({
           currentUser={currentUser}
         />
       </Grid>
+      )}
+
+    </Grid>
+  );
+
+  const expandedContent = (
+    <Grid container spacing={1.25}>
+      {/* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") — description คือช่องเดียว · workNote = บันทึกเดิมก่อนรวม */}
+      {(event.description || event.workNote) && (
+        <Grid item xs={12} sx={{ mb: 0.75 }}>
+          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "รายละเอียดงานที่ทำ")}
+          <Box sx={{ px: 1.75, py: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+            {event.description && (
+              <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>{event.description}</Typography>
+            )}
+            {event.workNote && (
+              <Typography sx={{ fontSize: "0.8rem", color: MUTED, whiteSpace: "pre-line", lineHeight: 1.6, mt: event.description ? 0.75 : 0 }}>
+                <b>บันทึกเดิมจากช่าง:</b> {event.workNote}
+              </Typography>
+            )}
+          </Box>
+        </Grid>
+      )}
+
+      {hideDocuments && !showDocsOverride && (
+        <Grid item xs={12}>
+          <Button size="small" onClick={() => { setShowDocsOverride(true); setDocsOpen(true); }}
+            sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
+            <Description sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
+            เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
+          </Button>
+        </Grid>
       )}
 
       {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) · ✅ (25 ต.ค. 2569 perf) วาดหลังส่วนเอกสาร แบ่งงานเป็นช่วงสั้นๆ ไม่ให้จอค้างทีเดียวนาน */}
@@ -1786,8 +1790,19 @@ const EventRowCard = ({
               เดิมเป็นแถบบางๆ ท้ายการ์ด — ตอนนี้เป็นกล่องเด่นต่อจากขั้นตอนงาน (ชุดเดียวกับฝั่งช่าง):
               จำนวนที่ครบ · รายการ 4 ชนิดพร้อมเครื่องหมายถูก · ปุ่มหลัก "ดู / ตรวจเอกสาร" (ครบแล้วกล่องเป็นสีเขียว) */}
           {!hideDocuments && !docsUnlocked(event) && <DocsLockedRow event={event} />}
-          {!hideDocuments && docsUnlocked(event) && (
-            <JobDocsSummaryCard event={event} onOpen={inlineDetails ? undefined : () => setExpanded(true)} />
+          {(!hideDocuments || showDocsOverride) && docsUnlocked(event) && (
+            <>
+              <JobDocsSummaryCard event={event} expanded={o ? docsOpen : undefined}
+                openLabel={o ? (docsOpen ? "ย่อรายการเอกสาร" : "ดู / ตรวจเอกสาร") : "ดู / ตรวจเอกสาร"}
+                onOpen={() => (o ? setDocsOpen((v) => !v) : setOpen(true))} />
+              {o && (
+                <Collapse in={docsOpen} timeout={220} unmountOnExit>
+                  {/* ✅ (11 พ.ย. 2569 ผู้ใช้: "ป้องกันการหน่วงแลค หน้าจอกระพริบ") วาดรายการเอกสาร (ภาพย่อหลายรูป) หลังแผ่นเปิดเสร็จ
+                        กันเฟรมแรกหนัก · ที่ว่างสูงคงที่ระหว่างรอ หน้าไม่กระโดด */}
+                  <Box sx={{ mt: 1.25 }}><LazyMount delay={SHEET_DURATION.enter + 120} minHeight={260}>{docsSheetContent}</LazyMount></Box>
+                </Collapse>
+              )}
+            </>
           )}
 
 

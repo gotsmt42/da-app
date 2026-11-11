@@ -5,15 +5,16 @@
  * ✅ (26 ต.ค. 2569 ผู้ใช้: "อยากให้การแสดงแบบนี้ไปอยู่ใน editEvent ด้วย") แยกเป็นตัวกลาง ใช้ทั้งการ์ดงานและฟอร์มแก้ไขงานบนปฏิทิน
  * @param event    งาน (ต้องมีฟิลด์ไฟล์เอกสาร + *Applicable)
  * @param onOpen   กด "ดู / ตรวจเอกสาร" · ไม่ส่ง = ไม่มีปุ่ม
+ * @param expanded (ไม่บังคับ) true/false = ปุ่มเป็นตัวย่อ/ขยายรายการเอกสารใต้กล่อง (มีลูกศรบอกสถานะ)
  */
 import { Box, Stack, Typography, Button, LinearProgress } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircleRounded as CheckCircle, RadioButtonUncheckedRounded as RadioButtonUnchecked, DescriptionRounded as Description, TaskAltRounded as TaskAlt } from "@mui/icons-material";
+import { CheckCircleRounded as CheckCircle, RadioButtonUncheckedRounded as RadioButtonUnchecked, DescriptionRounded as Description, TaskAltRounded as TaskAlt, ExpandMoreRounded as ExpandMore } from "@mui/icons-material";
 import { INK, MUTED, ACCENT } from "@/shared/ui/PageKit";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";
 
-export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู / ตรวจเอกสาร", sx }) {
+export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู / ตรวจเอกสาร", expanded, sx }) {
   const done = JOB_DOC_TYPES.filter((t) => isDocComplete(event, t.key)).length;
   const total = JOB_DOC_TYPES.length;
   const allDone = done === total;
@@ -54,7 +55,10 @@ export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู 
       </Box>
       {onOpen && (
         <Button fullWidth variant="outlined" disableElevation onClick={onOpen}
-          startIcon={<Description />} sx={{ ...MBTN.outline(tone), mt: 1.5 }}>
+          startIcon={<Description />}
+          endIcon={expanded === undefined ? undefined : <ExpandMore sx={{ transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "none" }} />}
+          aria-expanded={expanded === undefined ? undefined : expanded}
+          sx={{ ...MBTN.outline(tone), mt: 1.5 }}>
           {openLabel}
         </Button>
       )}

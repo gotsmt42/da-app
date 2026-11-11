@@ -88,17 +88,17 @@ const addTable = (ws, columns, rows, moneyKeys = [], { countKeys = [], totals = 
 const GROUP_COLS = [
   { key: "count", header: "จำนวนใบ", width: 10 },
   { key: "requested", header: "ยอดขอเบิก", width: 14 },
-  { key: "advanced", header: "จ่ายล่วงหน้าให้พนักงาน", width: 20 },
-  { key: "actual", header: "ใช้จริง (อนุมัติแล้ว)", width: 18 },
-  { key: "outstanding", header: "ยังไม่เคลียร์ (อยู่กับพนักงาน)", width: 24 },
-  { key: "refundDue", header: "รอพนักงานคืนเงินบริษัท", width: 20 },
-  { key: "extraDue", header: "รอบริษัทจ่ายเพิ่มให้พนักงาน", width: 24 },
+  { key: "advanced", header: "เบิกล่วงหน้า (บริษัทจ่ายก่อน)", width: 22 },
+  { key: "actual", header: "ใช้จริง (เคลมแล้ว)", width: 18 },
+  { key: "outstanding", header: "ค้างเคลม (เงินยังอยู่กับพนักงาน)", width: 26 },
+  { key: "refundDue", header: "รอพนักงานคืนเงิน", width: 18 },
+  { key: "extraDue", header: "รอบริษัทจ่ายเพิ่ม", width: 18 },
   { key: "refunded", header: "พนักงานคืนบริษัทแล้ว", width: 20 },
   { key: "extraPaid", header: "บริษัทจ่ายเพิ่มแล้ว", width: 18 },
   // ── ใบสำรองจ่าย (ไม่มี Advance) ────────────────────────────────────
   { key: "reimburseCount", header: "จำนวนใบสำรองจ่าย", width: 16 },
-  { key: "reimburse", header: "พนักงานสำรองจ่าย (อนุมัติ)", width: 22 },
-  { key: "reimburseDue", header: "รออนุมัติเบิกจ่ายคืนพนักงาน", width: 24 },
+  { key: "reimburse", header: "สำรองจ่าย (พนักงานจ่ายก่อน · อนุมัติแล้ว)", width: 28 },
+  { key: "reimburseDue", header: "รอจ่ายคืนสำรองจ่าย", width: 20 },
   { key: "reimbursePaid", header: "จ่ายคืนพนักงานแล้ว", width: 18 },
 ];
 /** ⚠️ ช่องที่เป็น "จำนวนใบ" ต้องไม่ถูกจัดรูปแบบเป็นเงิน ไม่งั้นจะอ่านเป็น 3.00 ใบ */
@@ -114,7 +114,7 @@ const disburserOf = (d) => {
   return done && d.payment?.by ? personFullName(d.payment.by) : "";
 };
 
-export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานการเบิก", ledger = [] } = {}) {
+export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานเบิก-เคลม", ledger = [] } = {}) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA App";
   wb.created = new Date();
@@ -122,7 +122,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
   // ── สรุป ─────────────────────────────────────────────────────────────
   const ws = wb.addWorksheet("สรุป");
   ws.columns = [{ width: 30 }, { width: 18 }];
-  ws.addRow(["รายงานการเบิกเงินล่วงหน้า (Advance) และเคลียร์ค่าใช้จ่าย"]).font = { bold: true, size: 14 };
+  ws.addRow(["รายงานเบิก-เคลม — เบิกล่วงหน้า (Advance) · ใบเคลม · สำรองจ่าย"]).font = { bold: true, size: 14 };
   ws.addRow([`ช่วงเวลา: ${periodLabel || "ทั้งหมด"} · ส่งออกเมื่อ ${thaiDate(new Date())}`]).font = { color: { argb: "FF64748B" } };
   ws.addRow([]);
   const t = report.totals;
@@ -133,9 +133,13 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     ["ยังไม่ผ่านอนุมัติ (รอตรวจสอบ/รออนุมัติ/ตีกลับ)", t.pending],
     ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติ", t.reviewing],
     ["อนุมัติแล้ว รออนุมัติเบิกจ่าย Advance", t.toPay],
-    ["จ่ายล่วงหน้าให้พนักงานแล้ว", t.advanced],
-    ["ใช้จริงตามใบเคลมที่อนุมัติ", t.actual],
-    ["เงินที่ยังอยู่กับพนักงาน (ยังไม่เคลียร์)", t.outstanding],
+    ["ค่าใช้จ่ายจริงรวม (ใช้จริง + สำรองจ่าย)", t.actual + t.reimburse],
+    ["เบิกล่วงหน้า (บริษัทจ่ายก่อน · จ่ายแล้ว)", t.advanced],
+    ["ใช้จริง (เคลมแล้ว)", t.actual],
+    ["ค้างเคลม (เงินยังอยู่กับพนักงาน)", t.outstanding],
+    // ✅ (11 พ.ย. 2569) ใบข้ามเดือน (โหมดนับตามวันที่ใบเคลม) — ตรวจย้อนยอดได้
+    ["— ในใช้จริง: ใบเคลมของ Advance ก่อนช่วงนี้", t.carriedIn || 0],
+    ["Advance ในช่วงนี้ที่เคลมหลังช่วง (เคลียร์แล้ว ไม่นับเป็นค้างเคลม)", t.claimedLater || 0],
     ["ใบที่เลยกำหนดเคลียร์", t.overdue],
     ["รอพนักงานคืนเงินบริษัท (รอยืนยันรับเงินคืน)", t.refundDue],
     ["รอบริษัทจ่ายเพิ่มให้พนักงาน (รออนุมัติเบิกจ่าย)", t.extraDue],
@@ -144,8 +148,8 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     ["จำนวนใบสำรองจ่าย (พนักงานออกเงินเอง)", t.reimburseCount],
     ["ใบสำรองจ่ายที่ยังไม่ผ่านอนุมัติ", t.reimbursePending],
     ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติ", t.reimburseReviewing],
-    ["พนักงานสำรองจ่าย (อนุมัติแล้ว)", t.reimburse],
-    ["รออนุมัติเบิกจ่ายคืนพนักงาน", t.reimburseDue],
+    ["สำรองจ่าย (พนักงานจ่ายก่อน · อนุมัติแล้ว)", t.reimburse],
+    ["รอจ่ายคืนสำรองจ่าย", t.reimburseDue],
     ["บริษัทจ่ายคืนพนักงานแล้ว", t.reimbursePaid],
   ].forEach(([label, value], i) => {
     const row = ws.addRow([label, value]);
@@ -198,10 +202,10 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
       { key: "onSlips", header: "ยอดในใบที่เป็นผู้เบิก", width: 18 },
       { key: "claimedByOthers", header: "คนอื่นเคลมให้ (ใช้จริง)", width: 18 },
       { key: "claimedForOthers", header: "เคลมให้คนอื่น (ใช้จริง)", width: 18 },
-      { key: "advanced", header: "จ่ายล่วงหน้าแล้ว (Advance)", width: 20 },
-      { key: "actual", header: "ใช้จริง (ใบเคลมอนุมัติ)", width: 20 },
+      { key: "advanced", header: "เบิกล่วงหน้า (จ่ายแล้ว)", width: 20 },
+      { key: "actual", header: "ใช้จริง (เคลมแล้ว)", width: 20 },
       { key: "reimburse", header: "สำรองจ่าย (อนุมัติ)", width: 18 },
-      { key: "approvedCost", header: "ค่าใช้จ่ายอนุมัติรวม", width: 18 },
+      { key: "approvedCost", header: "ค่าใช้จ่ายจริงรวม (ใช้จริง + สำรองจ่าย)", width: 26 },
       { key: "categories", header: "แยกตามหมวด (ยอดขอเบิก)", width: 44 },
     ], ledger.map((p) => ({
       label: p.label,
@@ -356,7 +360,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
 
   addTable(wb.addWorksheet("ตามหมวด"), [
     { key: "label", header: "หมวดค่าใช้จ่าย", width: 24 },
-    { key: "planned", header: "ตั้งเบิก (Advance ที่จ่ายแล้ว)", width: 22 },
+    { key: "planned", header: "เบิกล่วงหน้า (จ่ายแล้ว)", width: 22 },
     { key: "actual", header: "ใช้จริง (ใบเคลมที่อนุมัติ)", width: 22 },
     { key: "reimburse", header: "สำรองจ่าย (อนุมัติ)", width: 20 },
   ], report.byCategory.map((c) => ({ ...c, label: categoryMeta(c.key).label })), ["planned", "actual", "reimburse"]);

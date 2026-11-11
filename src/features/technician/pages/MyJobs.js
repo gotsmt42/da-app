@@ -18,9 +18,10 @@ import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from 
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useSearchParams } from "react-router-dom";
 import { HistoryRounded as History } from "@mui/icons-material";
-import { isRespOrHead, isResponsibleOf, ackTracked, isClosedJob } from "@/shared/utils/jobFlow";
+import { isParticipant, isResponsibleOf, ackTracked, isClosedJob } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
+import AttendanceService from "@/shared/services/AttendanceService";
 import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
@@ -56,7 +57,7 @@ const STATUS_TONE = { "กำลังรอยืนยัน": "#d97706", "ย
  * ปุ่มในแถว = "สิ่งที่ต้องทำต่อ" ของงานนั้น (ผู้ใช้: "เปลี่ยนให้เป็นปุ่มดำเนินการ เช่น บันทึก รับทราบ หรืออื่นๆ ที่เกี่ยวข้อง")
  * กดแล้วกางการ์ดใต้แถว ซึ่งมีปุ่มทำขั้นนั้นจริง (รับทราบ · ยืนยันนัด · เข้างาน · แนบเอกสาร · ขอปิดงาน)
  */
-const nextActionOf = (a, uid, fname) => {
+const nextActionOf = (a, uid, fname, myToday) => {
   const DOCS = ["reportFiles", "completionFiles"];
   if (isClosedJob(a)) return { label: "ดูงาน", tone: "#64748b" };
   if (a.approvalStatus === "pending") return { label: "รออนุมัติ", tone: "#d97706", wait: true };
@@ -65,21 +66,27 @@ const nextActionOf = (a, uid, fname) => {
   if (ackTracked(a) && !(a.acks || []).length) return { label: "รับทราบงาน", tone: "#2563eb", primary: true };
   if (a.status === "กำลังรอยืนยัน" && isResponsibleOf(a, uid, fname)) return { label: "ยืนยันนัดหมาย", tone: "#2563eb", primary: true };
   if (moment().startOf("day").isBefore(moment(a.start).startOf("day"))) return { label: "ดูรายละเอียด", tone: "#475569" };
-  // 🐛 (19 ต.ค. 2569 ผู้ใช้: "มีปุ่มบันทึกเข้างาน แต่กดแล้วไม่ให้บันทึก") — บันทึกเข้างานได้เฉพาะหัวหน้าทีม
-  //    ผู้รับผิดชอบที่ไม่ได้เป็นหัวหน้าทีมจึงเห็น "รอหัวหน้าทีมเข้างาน" (ปุ่มรอง) แทนปุ่มที่กดแล้วทำไม่ได้
+  /**
+   * 🔁 (11 พ.ย. 2569 ผู้ใช้: "บังคับทุกคนที่มีชื่อในงานบันทึกเข้างานเอง ไม่ใช่แค่หัวหน้าทีม")
+   *    หัวหน้าทีม + ลูกทีม = ทุกคนมีปุ่ม "บันทึกเข้างาน" ของตัวเอง ในวันทำงานที่ยังไม่ได้บันทึก (myToday = งานที่ฉันบันทึกแล้ววันนี้)
+   *    ผู้รับผิดชอบที่ไม่ได้อยู่ในทีม = รอทีมบันทึกเข้างาน (กดเองไม่ได้)
+   */
+  const onCrew = String(a.resPerson || "") === String(uid || "x") || (Boolean(fname) && a.team === fname)
+    || (a.teamMembers || []).some((m) => String(m?.userId || "") === String(uid || "x") || (Boolean(fname) && m?.name === fname));
+  const lastDay = moment(a.end || a.start).subtract(a.allDay && a.end ? 1 : 0, "days").startOf("day");
+  const workDay = !moment().startOf("day").isAfter(lastDay);
+  const inToday = Boolean(myToday && (myToday.has(String(a._id)) || (a.jobGroupId && myToday.has(`g:${a.jobGroupId}`))));
+  if (onCrew && workDay && !inToday && (a.team || a.resPerson)) return { label: "บันทึกเข้างาน", tone: "#2563eb", primary: true };
   if (!a.checkedInAt) {
-    const isHead = String(a.resPerson || "") === String(uid || "x") || (Boolean(fname) && a.team === fname);
-    if (isHead) return { label: "บันทึกเข้างาน", tone: "#2563eb", primary: true };
-    return a.team
-      ? { label: "รอหัวหน้าทีมเข้างาน", tone: "#475569", wait: true, hint: `รอ ${a.team} บันทึกเข้างาน` }
-      : { label: "เลือกหัวหน้าทีม", tone: "#d97706", hint: "ยังไม่มีหัวหน้าทีมเข้างาน" };
+    if (!a.team && !a.resPerson) return { label: "เลือกหัวหน้าทีม", tone: "#d97706", hint: "ยังไม่มีหัวหน้าทีมเข้างาน" };
+    return { label: "รอทีมบันทึกเข้างาน", tone: "#475569", wait: true, hint: `รอทีม ${a.team || ""} บันทึกเข้างาน (ทุกคนกดของตัวเอง)` };
   }
   if (!DOCS.some((k) => (a[k] || []).length)) return { label: "แนบเอกสาร", tone: "#7c3aed", primary: true };
   return { label: "ขอปิดงาน", tone: "#16a34a", primary: true };
 };
 
 
-function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, uid, fname }) {
+function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, uid, fname, myToday }) {
   // 🔁 (19 ต.ค. 2569 ผู้ใช้: "กดแล้วแสดงปุ่มหรือฟอร์มขึ้นมาเลย ไม่ต้องกดขยายลงไป") — กดแถว/ปุ่ม = เปิดกล่องงานนั้นทับหน้าเลย
   //    กล่องอ่านข้อมูลสดจากรายการทั้งหมด (allGroups) — กดรับทราบ/เข้างานแล้วสถานะในกล่องเปลี่ยนตามทันที
   const [openId, setOpenId] = useState("");
@@ -161,7 +168,7 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap", textAlign: "right" }}>
                   {(() => {
-                    const act = nextActionOf(a, uid, fname);
+                    const act = nextActionOf(a, uid, fname, myToday);
                     return (
                       <Button size="small" title={act.hint} onClick={(e) => { e.stopPropagation(); toggle(id); }}
                         sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none", minWidth: 104, whiteSpace: "nowrap",
@@ -326,6 +333,7 @@ const matchesGroup = (event, group, daysPastDueMap, todayKeys) => {
 export default function MyJobs() {
   const { userData } = useAuth() || {};
   const [events, setEvents] = useState([]);
+  const [myToday, setMyToday] = useState(null); // งานที่ฉันบันทึกเข้างานแล้ววันนี้ (eventId / g:jobGroupId)
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setLastRefreshed] = useState(null);
@@ -357,8 +365,18 @@ export default function MyJobs() {
       //    แอดมิน/ผู้จัดการได้งานทั้งระบบจาก API — หน้านี้คัดเหลือเฉพาะงานที่ "ฉัน" ถูกมอบหมาย
       //    (ผู้รับผิดชอบ · หัวหน้าทีม · ลูกทีม) ให้ทุกตำแหน่งเห็นงานของตัวเองที่นี่ที่เดียว
       const uid = String(userData?.userId || "");
-      // ✅ (11 ต.ค. 2569) เฉพาะงานที่ฉันเป็น "ผู้รับผิดชอบ" หรือ "หัวหน้าทีม" (ลูกทีมไม่นับ)
-      setEvents((res?.userEvents || []).filter((e) => isRespOrHead(e, uid, userData?.fname)));
+      // 🔁 (11 พ.ย. 2569 ผู้ใช้: "ช่างทุกคนต้องกดดูงานที่ตัวเองมีรายชื่อ และแก้ไขเอกสารประจำงานได้ทุกคนที่มีชื่อ") — นับลูกทีมด้วย (isParticipant)
+      //    ทุกงานที่ฉันมีชื่อ: ผู้รับผิดชอบ · หัวหน้าทีม · ลูกทีม (เดิมลูกทีมไม่เห็นงานของตัวเองในหน้านี้)
+      setEvents((res?.userEvents || []).filter((e) => isParticipant(e, uid, userData?.fname)));
+      // งานที่ฉันบันทึกเข้างานแล้ววันนี้ — ปุ่ม "บันทึกเข้างาน" ของแต่ละคนหายเมื่อบันทึกแล้ว
+      const today = moment().format("YYYY-MM-DD");
+      AttendanceService.list({ from: today, to: today, userId: uid })
+        .then((r) => {
+          const m = new Set();
+          (r?.attendance || []).filter((x) => String(x.userId) === uid).forEach((x) => { m.add(String(x.eventId)); if (x.jobGroupId) m.add(`g:${x.jobGroupId}`); });
+          setMyToday(m);
+        })
+        .catch(() => {});
       setLastRefreshed(new Date());
     } catch (err) {
       console.error(err);
@@ -848,7 +866,7 @@ export default function MyJobs() {
       ) : (
         view === "table" ? (
           <>
-            <MyJobsTable groups={pg.rows} allGroups={jobGroups} highlightJob={highlightJob} renderCard={renderGroup} uid={String(userData?.userId || "")} fname={userData?.fname}
+            <MyJobsTable groups={pg.rows} allGroups={jobGroups} highlightJob={highlightJob} renderCard={renderGroup} uid={String(userData?.userId || "")} fname={userData?.fname} myToday={myToday}
               overdueOf={(ss) => {
                 const raw = group === "closed" ? null : daysPastDueMap.get(ss[0]._id)?.days ?? null;
                 return isFlaggedDays(raw) ? { days: raw, severe: isSevereDays(raw) } : null;

@@ -23,6 +23,8 @@ import SelectField from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import ViewTiles from "@/shared/ui/ViewTiles";
+import ExpenseBulkPrint from "./ExpenseBulkPrint";
+import ExportPdfButton from "@/shared/ui/ExportPdfButton";
 import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -304,6 +306,7 @@ export default function ExpenseList({
   }, [viewAll]);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState([]);
+  const [bulkOpen, setBulkOpen] = useState(false); // ✅ (11 พ.ย. 2569) พิมพ์หลายใบพร้อมกัน
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -564,6 +567,12 @@ export default function ExpenseList({
       )}
       {peoplePanel}
       {isDesktop && statusTiles}
+      {/* ✅ (11 พ.ย. 2569) พิมพ์หลายใบพร้อมกัน — ใช้ใบชุดเดียวกับที่แสดงตามตัวกรอง */}
+      {kind && !loading && visible.length > 0 && (
+        <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
+          <ExportPdfButton onClick={() => setBulkOpen(true)} label="พิมพ์ PDF ทั้งหมด" count={visible.filter((e) => e.status !== "cancelled").length} compact={false} />
+        </Stack>
+      )}
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading ? (
         <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
@@ -607,6 +616,11 @@ export default function ExpenseList({
           <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
             {pageCount > 1 ? `แสดง ${(curPage - 1) * PAGE_SIZE + 1}–${(curPage - 1) * PAGE_SIZE + pageRows.length} จาก ` : ""}{visible.length} ใบ · รวม {baht(visible.filter((e) => e.status !== "cancelled").reduce((s, e) => s + (Number(e.total) || 0), 0))} (ไม่รวมใบที่ยกเลิก)
           </Typography>
+          {kind && (
+            <ExpenseBulkPrint open={bulkOpen} onClose={() => setBulkOpen(false)} docs={visible}
+              kind={kind === "claim" && claimType === "reimburse" ? "reimburse" : kind}
+              label={kind === "contractor" ? "ใบค่าจ้างผู้รับเหมา" : kind === "claim" ? (claimType === "reimburse" ? "ใบสำรองจ่าย" : "ใบเคลม") : "ใบ Advance"} />
+          )}
         </>
       ) : (
         empty(

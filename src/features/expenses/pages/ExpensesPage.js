@@ -87,7 +87,7 @@ export const VIEW_META = {
   },
   inbox: {
     path: "/expenses/approvals",
-    title: "รอดำเนินการ",
+    title: "รออนุมัติเบิก-เคลม",
     icon: FactCheck,
     color: INBOX_COLOR,
     dark: "#b45309",
@@ -97,7 +97,7 @@ export const VIEW_META = {
   },
   report: {
     path: "/expenses/report",
-    title: "รายงานการเบิก",
+    title: "รายงานเบิก-เคลม",
     icon: Insights,
     color: REPORT_COLOR,
     dark: "#1e3a8a",
@@ -292,7 +292,7 @@ export default function ExpensesPage({ view: viewProp }) {
     { key: "claim", to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.color },
     // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำในแถบให้สื่อความหมาย ไม่ใช่ ผรม. อย่างเดียว")
     { key: "contractor", to: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", color: KIND_META.contractor.color },
-    ...(canHandle ? [{ key: "inbox", to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR }] : []),
+    ...(canHandle ? [{ key: "inbox", to: "/expenses/approvals", label: "รออนุมัติ", color: INBOX_COLOR }] : []),
     { key: "report", to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR },
   ];
 

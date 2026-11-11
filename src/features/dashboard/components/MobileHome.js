@@ -82,7 +82,7 @@ const HUB_TONES = [
  * @param {Array<{text:string, tone?:string}>} props.summary  สรุปวันนี้ (หน้าแม่คำนวณ)
  * @param {object} [props.badges]            ตัวเลขที่หน้าแม่มีสดกว่า เช่น { quotations }
  */
-export default function MobileHome({ userData, rankText, dateText, summary = [], badges = {}, showMyJobs = false }) {
+export default function MobileHome({ userData, rankText, dateText, summary = [], badges = {}, showMyJobs = false, todayCard = null }) {
   const { badges: shared } = useAppBadges(userData);
   const counts = { ...shared, ...badges };
   const countOf = (it) => (it.badgeKey ? Number(counts[it.badgeKey]) || 0 : 0);
@@ -165,6 +165,9 @@ export default function MobileHome({ userData, rankText, dateText, summary = [],
           </span>
         </div>
       )}
+
+      {/* ✅ (11 พ.ย. 2569) บันทึกเข้างานวันนี้ — ใต้การ์ดงานของฉัน (แสดงเฉพาะวันที่มีงานที่ฉันอยู่ในทีม) */}
+      {todayCard && <div className="mh-today">{todayCard}</div>}
 
       {/* ── ต้องดำเนินการ — 🔁 (1 พ.ย. 2569 ผู้ใช้: "ย้ายมาแทรกด้านบนให้ดูง่ายชัดเจน") ใต้งานของฉัน ก่อนปุ่มหลัก ── */}
       {todo.length > 0 && (

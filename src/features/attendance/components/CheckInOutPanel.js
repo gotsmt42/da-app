@@ -409,7 +409,11 @@ ${text}`);
   const myAllDone = plannedDays.length > 0
     && (plannedDays.every((d) => myRecordedDays.has(d.format("YYYY-MM-DD"))) || myRecordedDays.size >= plannedDays.length);
   const canMeCheckIn = isWorker && !myCheckin && (todayPlanned || !myAllDone);
-  const teamText = workers.length > 1 ? `ทีมเข้างานแล้ว ${teamIn}/${workers.length} คน` : "";
+  // ✅ (11 พ.ย. 2569 ผู้ใช้: "บังคับทุกคนในทีมบันทึกเข้างานเอง") บอกชื่อคนที่ยังไม่บันทึกวันนี้ — ขอปิดงานได้เมื่อทุกคนบันทึกแล้ว
+  const notInToday = workers.filter((n) => !rowOfWorker(n));
+  const teamText = workers.length > 1
+    ? `ทีมเข้างานแล้ว ${teamIn}/${workers.length} คน${notInToday.length && notInToday.length < workers.length ? ` · ยังไม่บันทึก: ${notInToday.join(", ")}` : ""}`
+    : "";
   /** รายชื่อผู้ปฏิบัติงานวันนี้ — ใครเข้างานแล้ว (เวลา) · ใครยังไม่เข้า */
   const roster = workers.length > 0 && (
     <Box sx={{ mt: 1.25, p: 1.25, borderRadius: "12px", border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
@@ -537,7 +541,13 @@ ${text}`);
     const a = data?.attendance;
     const b = locationBadge(a?.checkIn);
     const workDay = a?.checkIn?.at ? formatThai(moment(a.checkIn.at).utcOffset(7), "D MMMM YYYY") : "วันนี้";
-    notify({ title: `บันทึกเข้างานวันที่ ${workDay} แล้ว`, text: [b?.text, "วันทำงานถัดไปบันทึกเพิ่มได้"].filter(Boolean).join(" · "), timer: 2400 });
+    // ✅ (11 พ.ย. 2569) วันนี้อยู่อีกช่วงของงานเดียวกัน → server บันทึกลงช่วงนั้นให้ (ไม่ขึ้นเป็น "นอกแผน" ของช่วงที่กด)
+    const moved = data?.redirected?.to?.label;
+    notify({
+      title: `บันทึกเข้างานวันที่ ${workDay} แล้ว`,
+      text: [moved ? `บันทึกไว้ที่ช่วง ${moved} (ช่วงของวันนี้)` : "", b?.text, moved ? "" : "วันทำงานถัดไปบันทึกเพิ่มได้"].filter(Boolean).join(" · "),
+      timer: moved ? 4200 : 2400,
+    });
   };
 
   // ── เนื้อหาของขั้นปัจจุบัน (ปุ่มหลักปุ่มเดียว) ──

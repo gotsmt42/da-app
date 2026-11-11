@@ -12,12 +12,11 @@ import React, { useState, useRef, useMemo, useCallback } from "react";
 import {
   Box, Typography, Stack, Button, Divider, Menu, MenuItem, ListItemIcon, ListItemText,
 } from "@mui/material";
-import { DescriptionRounded as Description, CloudUploadRounded as CloudUpload, CheckCircleRounded as CheckCircle, DeleteRounded as Delete, DownloadRounded as Download, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, PrintRounded as Print, ShareRounded as Share, RemoveCircleOutlineRounded as RemoveCircleOutline, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, RadioButtonUncheckedRounded as RadioButtonUnchecked } from "@mui/icons-material";
+import { DescriptionRounded as Description, CloudUploadRounded as CloudUpload, CheckCircleRounded as CheckCircle, DeleteRounded as Delete, DownloadRounded as Download, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, AssignmentTurnedInRounded as AssignmentTurnedIn, PrintRounded as Print, ShareRounded as Share, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank } from "@mui/icons-material";
 import { isDocRequired, isDocComplete } from "@/shared/utils/jobDocTypes";
 import { sortQuoteFiles, quoteFileTag, isOldQuoteFile } from "@/shared/utils/quotationTracking";
-import { INK, INK_2, MUTED, FAINT, LINE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
-import { BTN as MBTN } from "@/shared/ui/modernUi";
 import { confirmDelete } from "@/shared/ui/swal";
 import AttachmentList from "@/shared/ui/AttachmentList";
 import ServiceReportAiBar from "@/features/documents/components/ServiceReportAiBar";
@@ -37,13 +36,13 @@ const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
 export const DOCUMENT_TYPES = [
   {
     type: "report", label: "Service Report", color: "#2563eb", alwaysRequired: true,
-    icon: <Description sx={{ fontSize: 18 }} />,
+    icon: <Description sx={{ fontSize: 20 }} />,
     desc: "ใบรายงานผลการเข้าปฏิบัติงานครั้งนี้ — ทุกงานต้องแนบก่อนขอปิดงาน",
   },
   {
     // 🔁 (26 ต.ค. 2569 ผู้ใช้) "ใบเสนอราคาเพิ่มเติม" — ไม่ใช่ใบเสนอราคาของงานนี้เอง กันสับสน
     type: "quotation", label: "ใบเสนอราคาเพิ่มเติม", color: "#d97706", alwaysRequired: false,
-    icon: <RequestQuote sx={{ fontSize: 18 }} />,
+    icon: <RequestQuote sx={{ fontSize: 20 }} />,
     desc: "ใบเสนอราคาที่ต้องเสนอลูกค้าเพิ่มจากงานนี้ เช่น อะไหล่ที่ต้องเปลี่ยน หรืองานซ่อมเพิ่มเติมที่พบหน้างาน",
     question: "งานนี้ต้องเสนอราคางานเพิ่มเติมให้ลูกค้าไหม?",
     yesLabel: "ต้องเสนอราคา",
@@ -53,7 +52,7 @@ export const DOCUMENT_TYPES = [
   },
   {
     type: "invoice", label: "เอกสารการเงิน", color: "#0891b2", alwaysRequired: false,
-    icon: <ReceiptLong sx={{ fontSize: 18 }} />,
+    icon: <ReceiptLong sx={{ fontSize: 20 }} />,
     desc: "ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ — แนบแล้วบันทึกการวางบิลและการรับเงินได้ในช่องนี้",
     question: "งานนี้ต้องวางบิลลูกค้าไหม?",
     yesLabel: "ต้องวางบิล",
@@ -63,7 +62,7 @@ export const DOCUMENT_TYPES = [
   },
   {
     type: "completion", label: "ใบส่งมอบงาน", color: "#059669", alwaysRequired: false,
-    icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} />,
+    icon: <AssignmentTurnedIn sx={{ fontSize: 20 }} />,
     desc: "ใบส่งมอบงานที่ลูกค้าเซ็นรับงานเรียบร้อยแล้ว",
     question: "งานนี้มีใบส่งมอบงานที่ลูกค้าเซ็นรับไหม?",
     yesLabel: "มี ลูกค้าเซ็นแล้ว",
@@ -102,8 +101,9 @@ const downloadFile = async (url, fileName) => {
 // ─── DocumentFileList ─────────────────────────────────────────────────
 // รายการไฟล์ที่แนบ (แนบได้หลายไฟล์) + ปุ่มเพิ่มไฟล์อีก (ใช้ร่วมกันทั้ง required เสมอ และ "มี")
 // embedded = อยู่บนฟอร์ม Swal (หน้า Event) — ห้ามเปิด Swal ซ้อน (จะปิดฟอร์มทิ้ง) → ยืนยันลบด้วย window.confirm · เมนูอยู่ชั้นบนแผ่นเอกสาร
-const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked, embedded = false }) => {
-  const fileRef = useRef();
+const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked, embedded = false, inputRef }) => {
+  const ownRef = useRef();
+  const fileRef = inputRef || ownRef;
   const isQuote = type === "quotation";
   const fileList = useMemo(() => (isQuote ? sortQuoteFiles(files) : files || []), [isQuote, files]);
   // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ต่อใน แผงงานของช่างและหน้างานของฉัน" — โมดูลไฟล์ชุดเดียวทั้งแอป)
@@ -171,9 +171,10 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
         ]}
       </Menu>
 
-      {isLocked || isUploading ? null : (
+      {/* ช่องเลือกไฟล์ (ซ่อน) — ปุ่ม "+ แนบ" อยู่หัวการ์ด (inputRef) */}
+      <input ref={fileRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
+      {isLocked || isUploading || inputRef ? null : (
         <>
-          <input ref={fileRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
           {/* ✅ ปุ่มแนบไฟล์แบบกล่องเส้นประ — บอกชนิดไฟล์ที่รับได้ในตัว ไม่ต้องเดา */}
           <Box component="button" type="button" onClick={() => fileRef.current?.click()}
             sx={{
@@ -230,24 +231,7 @@ const DocumentChecklistItem = ({
     : alwaysRequired && hasFiles ? { text: "รอยืนยัน", fg: "#b45309" }
     : required || applicable === true ? { text: "ต้องแนบไฟล์", fg: "#b45309" }
     : { text: "รอตอบ", fg: MUTED };
-  const statusIcon = notApplicable ? <RemoveCircleOutline sx={{ fontSize: 22, color: FAINT }} />
-    : complete ? <CheckCircle sx={{ fontSize: 22, color: SUCCESS }} />
-    : <RadioButtonUnchecked sx={{ fontSize: 22, color: "#cbd5e1" }} />;
   const sub = requiredByJobType && !complete ? "งาน PM ต้องแนบทุกครั้ง" : !complete ? desc : "";
-  const fileList = (
-    <>
-      <DocumentFileList
-        type={type} files={files}
-        isUploading={isUploading} uploadProgress={uploadProgress}
-        onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
-        isLocked={isLocked} embedded={embedded}
-      />
-      {/* ✅ (25 ต.ค. 2569) Service Report: ให้ AI อ่านใบแล้วสรุป → ตรวจ/แก้ → ออก PDF สรุปรายงานบริการ (ใช้ Swal — ไม่แสดงบนฟอร์มหน้า Event) */}
-      {type === "report" && hasFiles && !embedded && <ServiceReportAiBar event={event} sx={{ mt: 0.5 }} />}
-      {/* ✅ (4 พ.ย. 2569) ใบวางบิล: แนบแล้วบันทึกการวางบิล (เลขที่/ยอด) ต่อได้ทันที — เชื่อมหน้า "วางบิล / รับเงิน" */}
-      {type === "invoice" && hasFiles && <InvoiceBillingBar event={event} filesCount={files.length} zIndex={embedded ? 20030 : undefined} sx={{ mt: 0.5 }} />}
-    </>
-  );
   const linkBtn = (text, onClick) => (
     <Button size="small" onClick={onClick}
       sx={{ textTransform: "none", fontSize: "0.76rem", fontWeight: 700, minWidth: "auto", px: 0.75, py: 0.25, color: ACCENT, flexShrink: 0 }}>
@@ -255,68 +239,95 @@ const DocumentChecklistItem = ({
     </Button>
   );
 
+  // 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้างานของฉันตรงแนบเอกสาร ให้มองง่าย ใช้ง่ายกว่านี้ ยังดูรก ไม่เข้าธีมระบบ")
+  //    หน้าตาเดียวกับการ์ดเอกสารของระบบ (หน้าการดำเนินงาน): กรอบไอคอนสีประจำชนิด · ชื่อ (* บังคับ) · บรรทัดสถานะ (จุดสี · บังคับ/ถ้ามี)
+  //    · ปุ่ม "+ แนบ / + เพิ่ม" มุมขวา · แถวไฟล์ภาพย่อด้านล่าง · ครบแล้วกรอบเขียวอ่อน
+  const canAttach = !isLocked && !isUploading && (alwaysRequired || requiredByJobType || applicable === true);
+  const pickRef = useRef(null);
+  const tone = notApplicable ? MUTED : complete ? "#16a34a" : state.fg === "#b45309" ? "#d97706" : "#94a3b8";
+  const reqText = alwaysRequired ? "บังคับ" : requiredByJobType ? "บังคับงาน PM" : "ถ้ามี";
   return (
-    <Box sx={{ borderRadius: "14px", bgcolor: "#fff", border: `1px solid ${LINE}`, px: 1.5, py: 1.35 }}>
-      {/* ── หัว: วงกลมสถานะ · ชื่อ (* = บังคับ) · ข้อความสถานะ ── */}
-      <Stack direction="row" alignItems="center" gap={1.1}>
-        {statusIcon}
-        <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: "0.92rem", color: notApplicable ? MUTED : INK, lineHeight: 1.3 }}>
-          {label}{required && <Box component="span" sx={{ color: "#dc2626", ml: 0.25 }}>*</Box>}
-        </Typography>
-        <Typography sx={{ fontSize: "0.74rem", fontWeight: 600, color: state.fg, whiteSpace: "nowrap" }}>{state.text}</Typography>
+    <Box sx={{ borderRadius: "14px", bgcolor: "#fff", border: "1px solid", borderColor: complete && !notApplicable ? "#bbf7d0" : LINE, px: 1.5, py: 1.25,
+      transition: "border-color .15s", ...(complete && !notApplicable ? { boxShadow: "0 1px 2px rgba(22,163,74,.06)" } : {}) }}>
+      {/* ── หัว: กรอบไอคอน · ชื่อ + สถานะ · ปุ่มแนบ ── */}
+      <Stack direction="row" alignItems="center" gap={1.25}>
+        <Box sx={{ width: 38, height: 38, borderRadius: "11px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: notApplicable ? "#f1f5f9" : `${color}14`, color: notApplicable ? FAINT : color }}>
+          {complete && !notApplicable ? <CheckCircle sx={{ fontSize: 20, color: "#16a34a" }} /> : icon}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: notApplicable ? MUTED : INK, lineHeight: 1.3 }}>
+            {label}{required && <Box component="span" sx={{ color: "#dc2626", ml: 0.25 }}>*</Box>}
+          </Typography>
+          <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 0.2, minWidth: 0 }}>
+            <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: tone, flexShrink: 0 }} />
+            <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: state.fg }}>{state.text}</Typography>
+            <Typography noWrap sx={{ fontSize: "0.74rem", color: FAINT }}>· {reqText}</Typography>
+          </Stack>
+        </Box>
+        {canAttach && (
+          <Button size="small" onClick={() => pickRef.current?.click()} startIcon={<CloudUpload sx={{ fontSize: "17px !important" }} />}
+            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, fontSize: "0.8rem", borderRadius: "10px", px: 1.5, minHeight: 34,
+              bgcolor: ACCENT_SOFT, color: ACCENT, "&:hover": { bgcolor: "#dbeafe" } }}>
+            {hasFiles ? "เพิ่ม" : "แนบ"}
+          </Button>
+        )}
       </Stack>
 
-      {/* 🔁 (6 พ.ย. 2569) มือถือ: ไฟล์/ปุ่มเต็มความกว้างการ์ด (เดิมเยื้อง 34px ทำให้กล่องวางบิลแคบ ข้อความตกบรรทัด) · จอคอมเยื้องตรงชื่อเหมือนเดิม */}
-      <Box sx={{ pl: { xs: 0, sm: "34px" } }}>
-        {sub && (
-          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mt: 0.25, pl: { xs: "34px", sm: 0 },
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{sub}</Typography>
-        )}
+      {/* คำอธิบายสั้น — เฉพาะช่องที่ยังไม่เสร็จ */}
+      {sub && (
+        <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.5, mt: 0.75,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{sub}</Typography>
+      )}
 
-        {alwaysRequired ? (
-          <Box sx={{ mt: 1 }}>
-            {fileList}
-            {/* การยืนยัน — ช่องติ๊กบรรทัดเดียว (ไม่ทำเป็นกล่อง ไม่ให้ดูเหมือนปุ่ม) */}
-            <Stack direction="row" alignItems="center" gap={0.75} role="checkbox" aria-checked={checked}
-              onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
-              sx={{ mt: 0.75, py: 0.4, cursor: isLocked ? "default" : "pointer", opacity: isLocked ? 0.7 : 1, width: "fit-content" }}>
-              {checked ? <CheckBox sx={{ fontSize: 21, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 21, color: FAINT }} />}
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2 }}>ยืนยันว่า Service Report ครบถ้วนแล้ว</Typography>
-            </Stack>
-            {checked && !hasFiles && (
-              <Typography sx={{ fontSize: "0.72rem", color: "#b45309", fontWeight: 600 }}>ยังไม่มีไฟล์ — แนบไฟล์ก่อนจึงจะนับว่าครบ</Typography>
-            )}
-          </Box>
-        ) : requiredByJobType ? (
-          <Box sx={{ mt: 1 }}>{fileList}</Box>
-        ) : applicable === null || applicable === undefined ? (
-          <Box sx={{ mt: 0.85 }}>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2, mb: 0.75 }}>
-              {question || "งานนี้มีเอกสารนี้หรือไม่?"}
-            </Typography>
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-              {[["yes", yesLabel || "มี"], ["no", noLabel || "ไม่มี"]].map(([v, text]) => (
-                <Button key={v} variant="outlined" disabled={isLocked} onClick={() => onSetApplicable(type, v === "yes")}
-                  sx={{ ...MBTN.outline(v === "yes" ? ACCENT : "#64748b"), minHeight: 36, fontSize: "0.8rem" }}>
-                  {text}
-                </Button>
-              ))}
-            </Box>
-          </Box>
-        ) : applicable === false ? (
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.25, pl: { xs: "34px", sm: 0 } }}>
-            <Typography sx={{ fontSize: "0.78rem", color: MUTED }}>{noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}</Typography>
-            {!isLocked && linkBtn("เปลี่ยน", () => onSetApplicable(type, true))}
+      {/* ── เนื้อหา: ไฟล์ · ยืนยัน · คำถาม มี/ไม่มี ── */}
+      {alwaysRequired ? (
+        <Box sx={{ mt: 1 }}>
+          <DocumentFileList type={type} files={files} isUploading={isUploading} uploadProgress={uploadProgress}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview} isLocked={isLocked} embedded={embedded} inputRef={pickRef} />
+          {type === "report" && hasFiles && !embedded && <ServiceReportAiBar event={event} sx={{ mt: 0.5 }} />}
+          <Stack direction="row" alignItems="center" gap={0.75} role="checkbox" aria-checked={checked}
+            onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
+            sx={{ mt: 0.75, px: 1, py: 0.6, borderRadius: "10px", cursor: isLocked ? "default" : "pointer", opacity: isLocked ? 0.7 : 1,
+              bgcolor: checked ? ACCENT_SOFT : "#f8fafc", border: "1px solid", borderColor: checked ? ACCENT_LINE : LINE }}>
+            {checked ? <CheckBox sx={{ fontSize: 21, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 21, color: FAINT }} />}
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: checked ? ACCENT : INK_2 }}>ยืนยันว่า Service Report ครบถ้วนแล้ว</Typography>
           </Stack>
-        ) : (
-          <Box sx={{ mt: 1 }}>
-            {fileList}
-            {!hasFiles && !isLocked && (
-              <Box sx={{ mt: 0.5, ml: -0.75 }}>{linkBtn(noLabel ? `เปลี่ยนเป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี", () => onSetApplicable(type, false))}</Box>
-            )}
+          {checked && !hasFiles && (
+            <Typography sx={{ mt: 0.5, fontSize: "0.74rem", color: "#b45309", fontWeight: 600 }}>ยังไม่มีไฟล์ — แนบไฟล์ก่อนจึงจะนับว่าครบ</Typography>
+          )}
+        </Box>
+      ) : requiredByJobType || applicable === true ? (
+        <Box sx={{ mt: hasFiles || isUploading ? 1 : 0 }}>
+          <DocumentFileList type={type} files={files} isUploading={isUploading} uploadProgress={uploadProgress}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview} isLocked={isLocked} embedded={embedded} inputRef={pickRef} />
+          {type === "invoice" && hasFiles && <InvoiceBillingBar event={event} filesCount={files.length} zIndex={embedded ? 20030 : undefined} sx={{ mt: 0.5 }} />}
+          {!requiredByJobType && !hasFiles && !isLocked && (
+            <Box sx={{ mt: 0.5, ml: -0.75 }}>{linkBtn(noLabel ? `เปลี่ยนเป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี", () => onSetApplicable(type, false))}</Box>
+          )}
+        </Box>
+      ) : applicable === null || applicable === undefined ? (
+        <Box sx={{ mt: 1, p: 1, borderRadius: "10px", bgcolor: "#f8fafc", border: `1px solid ${LINE}` }}>
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK_2, mb: 0.75 }}>
+            {question || "งานนี้มีเอกสารนี้หรือไม่?"}
+          </Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
+            {[["yes", yesLabel || "มี"], ["no", noLabel || "ไม่มี"]].map(([v, text]) => (
+              <Button key={v} variant={v === "yes" ? "contained" : "outlined"} disableElevation disabled={isLocked} onClick={() => onSetApplicable(type, v === "yes")}
+                sx={v === "yes"
+                  ? { minHeight: 36, borderRadius: "10px", textTransform: "none", fontWeight: 800, fontSize: "0.8rem", bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8" } }
+                  : { minHeight: 36, borderRadius: "10px", textTransform: "none", fontWeight: 700, fontSize: "0.8rem", color: INK_2, borderColor: LINE, bgcolor: "#fff" }}>
+                {text}
+              </Button>
+            ))}
           </Box>
-        )}
-      </Box>
+        </Box>
+      ) : (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.75 }}>
+          <Typography sx={{ fontSize: "0.78rem", color: MUTED }}>{noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}</Typography>
+          {!isLocked && linkBtn("เปลี่ยน", () => onSetApplicable(type, true))}
+        </Stack>
+      )}
     </Box>
   );
 };

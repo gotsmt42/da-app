@@ -30,7 +30,7 @@ import { countPendingJobs } from "@/shared/utils/approvalStatus";
 import { countOverdueContracts, countDueSoonContracts } from "@/shared/utils/contractOverdue";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
-import { isRespOrHead, needsMyAction, isResponsibleOf } from "@/shared/utils/jobFlow";
+import { isParticipant, needsMyAction, isResponsibleOf } from "@/shared/utils/jobFlow";
 
 /**
  * คำอธิบายของแต่ละป้าย — ใช้เป็น aria-label ให้ผู้ใช้ screen reader รู้ว่าเลขนั้นคือเรื่องอะไร
@@ -262,7 +262,7 @@ const computeBadges = (userData, data) => {
     })(),
     // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายไม่เข้ามางานของฉัน — แอดมิน กับ ผู้รับผิดชอบงาน")
     //    นับงานที่ "ฉัน" ถูกมอบหมาย (ผู้รับผิดชอบ/หัวหน้าทีม/ลูกทีม) ทุกตำแหน่ง ไม่ใช่เฉพาะช่าง
-    myJobs: !(can(userData, "receiveDispatch") || can(userData, "viewAllJobs")) ? 0 : countDistinctJobs(events, (e) => isRespOrHead(e, userId, userData.fname)
+    myJobs: !(can(userData, "receiveDispatch") || can(userData, "viewAllJobs")) ? 0 : countDistinctJobs(events, (e) => isParticipant(e, userId, userData.fname)
       && ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested && !e.unscheduled),
     quotations,
     /**

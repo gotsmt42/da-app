@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import useTodayCheckins from "@/shared/hooks/useTodayCheckins";
 import { attentionOf } from "@/shared/utils/myJobAttention";
-import { isRespOrHead } from "@/shared/utils/jobFlow";
+import { isParticipant } from "@/shared/utils/jobFlow";
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 
 export default function useMyAttention(events, userData) {
@@ -23,7 +23,8 @@ export default function useMyAttention(events, userData) {
       out[k].push(e);
     });
     // งานค้าง (เกณฑ์เดียวกับแท็บ "ค้างงาน" — เลยวันสุดท้ายเกิน 7 วัน) ของงานที่ฉันเป็นผู้รับผิดชอบ/หัวหน้าทีม · 1 งานต่อกลุ่ม
-    const mine = (events || []).filter((e) => isRespOrHead(e, userData?.userId, userData?.fname) && !e.unscheduled);
+    // 🔁 (11 พ.ย. 2569 ผู้ใช้: "ช่างทุกคนต้องกดดูงานที่ตัวเองมีรายชื่อ และแก้ไขเอกสารประจำงานได้ทุกคนที่มีชื่อ") — นับลูกทีมด้วย (isParticipant)
+    const mine = (events || []).filter((e) => isParticipant(e, userData?.userId, userData?.fname) && !e.unscheduled);
     const due = buildDaysPastDueMap(mine);
     const seenG = new Set();
     out.overdue = mine

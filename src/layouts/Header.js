@@ -169,8 +169,8 @@ const Header = ({ toggleMobileSidebar }) => {
     { href: "/expenses/advances", label: "ใบ Advance", icon: AppIcon.Advance, badge: badges.advance },
     { href: "/expenses/claims", label: "ใบเคลม (Claim)", icon: AppIcon.Claim, badge: badges.claim },
     { href: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", icon: AppIcon.Contractor, badge: badges.contractorPay },
-    ...(canExpenseInbox ? [{ href: "/expenses/approvals", label: "รออนุมัติเบิก", icon: AppIcon.Approve, badge: badges.expenseInbox }] : []),
-    { href: "/expenses/report", label: "รายงานการเบิก", icon: AppIcon.Report, badge: 0 },
+    ...(canExpenseInbox ? [{ href: "/expenses/approvals", label: "รออนุมัติเบิก-เคลม", icon: AppIcon.Approve, badge: badges.expenseInbox }] : []),
+    { href: "/expenses/report", label: "รายงานเบิก-เคลม", icon: AppIcon.Report, badge: 0 },
   ];
   const activeExpense = expenseItems.find((it) => location.pathname.startsWith(it.href));
   const expenseBadge = expenseItems.reduce((n, it) => n + (Number(it.badge) || 0), 0);

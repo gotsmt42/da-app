@@ -35,10 +35,11 @@ import {
 import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/contractOverdue";
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
-import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHead } from "@/shared/utils/jobFlow";
+import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isParticipant } from "@/shared/utils/jobFlow";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
+import TodayCheckInCard from "@/features/attendance/components/TodayCheckInCard";
 import MobileHome from "../components/MobileHome";
 import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
 import { ExpandMoreRounded as ExpandMore, TodayRounded as Today, EventRounded, EngineeringRounded, RequestQuoteRounded, EventRepeatRounded, EditCalendarRounded, ApartmentRounded, GroupsRounded, ScheduleRounded, NotificationsActiveRounded, ErrorOutlineRounded as ErrorOutline } from "@mui/icons-material";
@@ -255,7 +256,8 @@ const Dashboard = () => {
       .sort((a, b) => new Date(a.fu.reportedAt) - new Date(b.fu.reportedAt));
   })();
   // ✅ (11 ต.ค. 2569) การ์ด "งานของฉัน" นับเฉพาะงานที่เป็นผู้รับผิดชอบ/หัวหน้าทีม (ตรงกับหน้างานของฉัน)
-  const myEvents = events.filter((e) => isRespOrHead(e, userData?.userId, userData?.fname));
+  // 🔁 (11 พ.ย. 2569 ผู้ใช้: "ช่างทุกคนต้องกดดูงานที่ตัวเองมีรายชื่อ และแก้ไขเอกสารประจำงานได้ทุกคนที่มีชื่อ") — นับลูกทีมด้วย (isParticipant)
+  const myEvents = events.filter((e) => isParticipant(e, userData?.userId, userData?.fname));
   const myOverdueCount = countFlaggedJobs(
     myEvents,
     daysPastDueMap,
@@ -683,6 +685,7 @@ const Dashboard = () => {
                 dateText={formatThai(moment().locale("th"), "D MMMM YYYY")}
                 summary={phoneSummary}
                 showMyJobs={showMyJobsHero}
+                todayCard={<TodayCheckInCard events={todayJobs} userData={userData} />}
                 badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
               />
             ) : (
@@ -726,6 +729,8 @@ const Dashboard = () => {
                 </ButtonBase>
               )}
             </Box>
+            {/* ✅ (11 พ.ย. 2569) บันทึกเข้างานวันนี้ — แสดงเฉพาะวันที่มีงานที่ฉันอยู่ในทีม */}
+            <TodayCheckInCard events={todayJobs} userData={userData} sx={{ mb: 2 }} />
 
             {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
           เซลเปิดแอปมาเพื่อดูท่อขายกับนัดหมายของตัวเอง ไม่ใช่ตารางงานช่าง จึงต้องเป็นสิ่งแรกที่เห็น ─── */}
