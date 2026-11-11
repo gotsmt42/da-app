@@ -59,7 +59,7 @@ function injectStyles() {
       max-height: 95vh !important;
       display: flex !important;
       flex-direction: column !important;
-      font-family: 'Inter', system-ui, sans-serif !important;
+      font-family: var(--app-font) !important; /* ฟอนต์หลักของแอป (IBM Plex Sans Thai) — เดิม 'Inter' ที่ไม่ได้โหลด */
       box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
     }
     .swal-edit-event .swal2-html-container {
@@ -1272,7 +1272,7 @@ function injectAttachStyles() {
   style.textContent = `
     .swal-ee-attach.swal2-popup {
       padding: 0 !important; border-radius: 16px !important; overflow: hidden !important;
-      width: min(94vw, 480px) !important; font-family: 'Inter', system-ui, sans-serif !important;
+      width: min(94vw, 480px) !important; font-family: var(--app-font) !important; /* ฟอนต์หลักของแอป (IBM Plex Sans Thai) — เดิม 'Inter' ที่ไม่ได้โหลด */
       box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
     }
     .swal-ee-attach .swal2-html-container { margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
@@ -2244,7 +2244,7 @@ export const getEditEvent = async ({
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
           <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;min-width:180px;">เปิด Google Maps → ค้นหาหน้างาน → แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
           <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e6e9ef;cursor:pointer;">ยกเลิก</button>
-          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#0891b2;border:none;cursor:pointer;">บันทึก</button>
+          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#2563eb;border:none;cursor:pointer;">บันทึก</button>
         </div>
       </div>` : ""}
     </div>
@@ -2321,43 +2321,53 @@ export const getEditEvent = async ({
          ✅ ใช้ <details> ของเบราว์เซอร์ตรงๆ — พับได้โดยไม่ต้องเขียน JS เพิ่มสักบรรทัด และยังทำงาน
          ได้แม้ JS ส่วนอื่นพัง · หัวข้อสรุปเลขที่สัญญา/จำนวนครั้งให้เห็นเลยโดยไม่ต้องกาง
          ⚠️ ไม่ใส่ open — ปิดเป็นค่าเริ่มต้นตามที่ผู้ใช้สั่ง */""}
-    <details class="ee-contract-box">
+    <details class="ee-contract-box ee-form">
       <summary class="ee-contract-box-label">
-        <span class="ee-contract-sum">📑 ข้อมูลสัญญา</span>
-        <span class="ee-contract-peek">${[
-          eventContractNo ? attrHtml(eventContractNo) : null,
-          eventVisitCount ? `${attrHtml(String(eventVisitCount))} ครั้ง` : null,
-        ].filter(Boolean).join(" · ")}</span>
-        <span class="ee-contract-hint">${isAdminOrManagerUser ? "แตะเพื่อดู/แก้" : "แตะเพื่อดู"}</span>
+        <span class="ee-card-ico" aria-hidden="true">📑</span>
+        <span class="ee-card-titles">
+          <h4>ข้อมูลสัญญา</h4>
+          <span class="ee-contract-peek">${[
+            eventContractNo ? attrHtml(eventContractNo) : null,
+            eventVisitCount ? `${attrHtml(String(eventVisitCount))} ครั้ง` : null,
+          ].filter(Boolean).join(" · ") || (isAdminOrManagerUser ? "แตะเพื่อดู/แก้" : "แตะเพื่อดู")}</span>
+        </span>
       </summary>
-      <p class="ee-contract-note">${isAdminOrManagerUser ? `แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน` : `ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น`}</p>
-      <div class="ee-grid ee-grid-3">
+      <div class="ee-card-body">
+      <div class="ee-lock-note"><span aria-hidden="true">${isAdminOrManagerUser ? "ℹ️" : "🔒"}</span><span>${isAdminOrManagerUser ? `แก้ที่นี่ = อัปเดต <b>ทุกครั้งในสัญญานี้</b> พร้อมกัน` : `<b>ดูได้อย่างเดียว</b> — แก้ไขได้เฉพาะแอดมิน/manager`}</span></div>
+      ${/* เรียงเป็นคู่ที่อ่านด้วยกัน: เลขที่เอกสาร · ช่วงสัญญา · รอบการเข้า · มูลค่า */""}
+      <div class="ee-info-grid">
         <div class="ee-field">
-          <label>📄 เลขที่สัญญา</label>
+          <label>เลขที่สัญญา</label>
           <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>🧾 เลขที่ใบเสนอราคา</label>
+          <label>เลขที่ใบเสนอราคา</label>
           <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
+      </div>
+      <div class="ee-info-grid ee-info-grid--pair">
         <div class="ee-field">
-          <label>🔁 เข้าทุกกี่เดือน</label>
-          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-        <div class="ee-field">
-          <label>📅 วันที่เริ่มสัญญา</label>
+          <label>วันที่เริ่มสัญญา</label>
           <input id="editContractStart" type="date" value="${eventContractStart}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>📅 วันที่สิ้นสุดสัญญา</label>
+          <label>วันที่สิ้นสุดสัญญา</label>
           <input id="editContractEnd" type="date" value="${eventContractEnd}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
+      </div>
+      <div class="ee-info-grid ee-info-grid--pair">
         <div class="ee-field">
-          <label>🔢 จำนวนครั้ง</label>
+          <label>จำนวนครั้งทั้งหมด</label>
           <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>มูลค่างาน (บาท)</label>
+          <label>เข้าทุกกี่เดือน</label>
+          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3" ${isAdminOrManagerUser ? "" : "disabled"}>
+        </div>
+      </div>
+      <div class="ee-info-grid">
+        <div class="ee-field">
+          <label>มูลค่างานทั้งสัญญา (บาท)</label>
           <div class="ee-money-input">
             <span class="ee-money-symbol">฿</span>
             <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
@@ -2375,6 +2385,7 @@ export const getEditEvent = async ({
          title="เปิดหน้าภาพรวมงาน พร้อมค้นหาสัญญานี้ให้อัตโนมัติ">
         📊 ดูสัญญานี้ในภาพรวมงาน
       </a>
+      </div>
     </details>
     ` : ""}
 
@@ -2388,11 +2399,158 @@ export const getEditEvent = async ({
       #ee-editGroup { display:flex; flex-direction:column; gap:12px; margin:0 0 12px; }
       #ee-editGroup > .ee-eg-head { display:none; }
       #ee-editGroup .ee-card { margin:0; }
+      /* 🔁 (11 พ.ย. 2569 ผู้ใช้: "ข้อมูลตรงนี้ยังจัดวางดูไม่ค่อยสวย ดูยาก เล็กไป" → "ให้รูปแบบฟอร์มเหมือนกันด้วย
+         เน้นให้ดูง่าย จัดการง่าย ไม่สับสน") รูปแบบฟอร์มกลาง .ee-form — ใช้กับทุกการ์ดข้อมูล
+         (ข้อมูลสัญญา · ข้อมูลงาน · ผู้ติดต่อ · วันที่และเวลา · การแสดงผลบนปฏิทิน)
+         · ตาราง 2 คอลัมน์เท่ากัน ช่องที่เป็นคู่กันอยู่แถวเดียวกัน · ป้ายชื่อ 13.5px หนา · ช่องสูง 46px ตัว 15px เท่ากันทุกช่อง
+         · คำอธิบายตัวเทาใต้ช่อง · ข้อความแจ้ง (ล็อก/ดูอย่างเดียว) เป็นแถบเทาอ่อนแบบเดียวกัน
+         · ช่องที่แก้ไม่ได้ยังอ่านชัด (พื้นเทาอ่อน ไม่จาง) */
+      .swal-edit-event .ee-form .ee-card-body { padding: 10px 18px 2px; }
+      .swal-edit-event .ee-form .ee-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; margin: 0 0 16px; }
+      .swal-edit-event .ee-form .ee-field { gap: 6px; min-width: 0; }
+      .swal-edit-event .ee-form .ee-field > label { font-size: 13.5px; font-weight: 700; color: #334155; line-height: 1.3; }
+      .swal-edit-event .ee-form .ee-field > label .req { color: #dc2626; }
+      .swal-edit-event .ee-form .ts-wrapper .ts-control,
+      .swal-edit-event .ee-form .ee-field > select,
+      .swal-edit-event .ee-form .ee-field > input,
+      .swal-edit-event .ee-form .ee-money-input > input {
+        min-height: 46px; padding: 11px 14px !important; font-size: 15px !important; line-height: 1.4;
+        border: 1.5px solid #e2e8f0 !important; border-radius: 10px !important; color: #0f172a; background: #fff;
+      }
+      .swal-edit-event .ee-form .ts-wrapper.focus .ts-control,
+      .swal-edit-event .ee-form .ee-field > input:focus,
+      .swal-edit-event .ee-form .ee-money-input > input:focus {
+        border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important;
+      }
+      .swal-edit-event .ee-form .ts-wrapper .ts-control > .item { font-size: 15px; font-weight: 600; color: #0f172a; }
+      .swal-edit-event .ee-form .ts-wrapper.disabled { opacity: 1; }
+      .swal-edit-event .ee-form .ts-wrapper.disabled .ts-control,
+      .swal-edit-event .ee-form .ee-field > select:disabled,
+      .swal-edit-event .ee-form .ee-field > input:disabled,
+      .swal-edit-event .ee-form .ee-money-input > input:disabled {
+        opacity: 1; background: #f8fafc !important; border-color: #e6e9ef !important; cursor: default;
+      }
+      .swal-edit-event .ee-form .ts-wrapper.disabled .ts-control > .item,
+      .swal-edit-event .ee-form .ee-field > select:disabled,
+      .swal-edit-event .ee-form .ee-field > input:disabled,
+      .swal-edit-event .ee-form .ee-money-input > input:disabled { color: #334155; -webkit-text-fill-color: #334155; }
+      .swal-edit-event .ee-form .ee-money-input .ee-money-symbol { left: 14px; font-size: 15px; color: #64748b; }
+      .swal-edit-event .ee-form .ee-money-input > input { padding-left: 32px !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .swal-edit-event .ee-form .ee-hint { font-size: 12px; color: #64748b; line-height: 1.45; }
+      .swal-edit-event .ee-form .ee-lock-note {
+        display: flex; align-items: flex-start; gap: 8px; margin: 0 0 16px; padding: 9px 12px;
+        border-radius: 10px; background: #f8fafc; border: 1px solid #e6e9ef;
+        font-size: 12.5px; line-height: 1.5; color: #475569;
+      }
+      .swal-edit-event .ee-form .ee-lock-note b { color: #0f172a; }
+      .swal-edit-event .ee-form .ee-checkbox-row { font-size: 14px; font-weight: 600; color: #334155; margin: 0 0 16px; gap: 10px; }
+      .swal-edit-event .ee-form .ee-checkbox-row input { width: 18px !important; height: 18px; accent-color: #2563eb; flex-shrink: 0; }
+      @media (max-width: 600px) {
+        .swal-edit-event .ee-form .ee-card-body { padding: 8px 12px 0; }
+        .swal-edit-event .ee-form .ee-info-grid { grid-template-columns: 1fr; gap: 14px; margin-bottom: 14px; }
+        .swal-edit-event .ee-form .ee-info-grid--pair { grid-template-columns: 1fr 1fr; gap: 14px 10px; }
+        .swal-edit-event .ee-form .ee-info-grid--pair .ee-field > label { font-size: 13px; }
+      }
+
+      /* กล่องข้อมูลสัญญา — หน้าตาเดียวกับการ์ดอื่น (พื้นขาว หัวข้อใหญ่ ช่องกรอกแบบเดียวกัน) ยังพับ/กางได้เหมือนเดิม */
+      .swal-edit-event .ee-contract-box.ee-form {
+        background: #fff; border: 1px solid #e6e9ef; border-radius: 14px; padding: 0; margin: 0 0 12px;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04); overflow: hidden;
+      }
+      .swal-edit-event .ee-contract-box.ee-form .ee-contract-box-label {
+        padding: 14px 16px; gap: 12px; flex-wrap: nowrap; font-size: inherit; color: inherit;
+      }
+      .swal-edit-event .ee-contract-box.ee-form .ee-contract-box-label::after { color: #64748b; font-size: 18px; }
+      .swal-edit-event .ee-contract-box.ee-form[open] .ee-contract-box-label { padding-bottom: 6px; }
+      .swal-edit-event .ee-contract-box.ee-form .ee-contract-peek {
+        display: inline-block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #1d4ed8;
+        background: #eff6ff; border-radius: 999px; padding: 2px 9px;
+      }
+      .swal-edit-event .ee-contract-box.ee-form .ee-contract-link {
+        margin: 0 0 16px; padding: 8px 14px; font-size: 13px; color: #2563eb; border: 1.5px solid #bfdbfe; border-radius: 10px;
+      }
+      .swal-edit-event .ee-contract-box.ee-form .ee-contract-link:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+      .swal-edit-event .ee-contract-box.ee-form .ee-field > label { color: #334155; }
+
+      /* กล่องถามก่อนปิด (ยังไม่บันทึก) */
+      .ee-leave { max-width: 440px; }
+      .ee-leave-head { display: flex; gap: 12px; align-items: flex-start; padding: 18px 18px 8px; }
+      .ee-leave-warn { width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; display: grid; place-items: center; color: #d97706; background: #fffbeb; }
+      .ee-leave-title { font-size: 17px; font-weight: 800; color: #0f172a; line-height: 1.35; }
+      .ee-leave-sub { margin-top: 3px; font-size: 13.5px; color: #64748b; line-height: 1.5; }
+      .ee-leave-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 18px 6px 74px; }
+      .ee-leave-chips span { font-size: 12.5px; font-weight: 600; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 10px; }
+      .ee-leave-actions { display: grid; gap: 8px; padding: 12px 18px 18px; }
+      .ee-leave-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 8px 16px; border-radius: 12px; font: inherit; text-align: left; cursor: pointer; transition: background .12s, border-color .12s, box-shadow .12s; }
+      .ee-leave-btn > svg { flex-shrink: 0; }
+      .ee-leave-btn span { display: flex; flex-direction: column; min-width: 0; }
+      .ee-leave-btn b { font-size: 15px; font-weight: 700; line-height: 1.3; }
+      .ee-leave-btn small { font-size: 12.5px; line-height: 1.35; opacity: .85; }
+      .ee-leave-btn--save { background: #2563eb; border: 1.5px solid #2563eb; color: #fff; box-shadow: 0 2px 8px -2px rgba(37,99,235,.5); }
+      .ee-leave-btn--save:hover { background: #1d4ed8; border-color: #1d4ed8; }
+      .ee-leave-btn--drop { background: #fff; border: 1.5px solid #fecaca; color: #dc2626; }
+      .ee-leave-btn--drop:hover { background: #fef2f2; border-color: #dc2626; }
+      .ee-leave-btn--back { min-height: 44px; justify-content: center; background: #f1f5f9; border: 1.5px solid transparent; color: #334155; }
+      .ee-leave-btn--back:hover { background: #e2e8f0; }
+      @media (max-width: 600px) { .ee-leave-chips { padding-left: 18px; } }
+
+      /* ── ส่วนบนของฟอร์ม (หัวกล่อง · สถานะ · ตำแหน่งหน้างาน) ขนาดตัวหนังสือ/ช่องเลือกชุดเดียวกับการ์ดด้านล่าง ──
+         ป้าย 12.5–13px · ค่า 15px · ช่องเลือก/ปุ่มสูง 42px มุมโค้ง 10px ขอบ 1.5px · ปุ่มหลักสีน้ำเงินของแอป */
+      .swal-edit-event #ee-head-meta { gap: 10px; }
+      .swal-edit-event #ee-head-meta .ee-hm-item { padding: 10px 12px; gap: 6px; border-radius: 12px; border-color: #e6e9ef; }
+      .swal-edit-event #ee-head-meta .ee-hm-label { font-size: 12.5px; font-weight: 700; color: #475569; }
+      .swal-edit-event #ee-head-meta .ee-hm-label i { font-size: 15px; }
+      .swal-edit-event #ee-head-meta .ee-hm-value { font-size: 15px; font-weight: 700; }
+      .swal-edit-event #ee-head-meta .ee-pick-btn,
+      .swal-edit-event #ee-head-meta #ee-respSelect, .swal-edit-event #ee-head-meta #ee-teamSelect {
+        height: 42px; border-radius: 10px; border: 1.5px solid #e2e8f0; font-size: 14.5px;
+      }
+      .swal-edit-event #ee-head-meta .ee-pick-btn:hover:not(:disabled) { border-color: #2563eb; }
+      /* ค่าที่แก้ไม่ได้ (เช่น ประเภทงาน) — กล่องสูงเท่าช่องเลือกข้างๆ ข้อความอยู่กึ่งกลางแนวเดียวกัน ไม่ลอยชิดบน */
+      .swal-edit-event #ee-head-meta .ee-hm-value:not(.ee-hm-value--edit) {
+        display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 0 12px; box-sizing: border-box;
+        border-radius: 10px; background: #fff; border: 1.5px solid #eef2f7;
+      }
+      .swal-edit-event .ee-hm-dates .MuiOutlinedInput-root { height: 42px; border-radius: 10px; }
+      .swal-edit-event .ee-hm-dates .MuiOutlinedInput-input, .swal-edit-event .ee-hm-dates input { font-size: 14.5px !important; }
+      .swal-edit-event .ee-hm-dates fieldset { border-width: 1.5px !important; border-color: #e2e8f0; }
+      .swal-edit-event .ee-hm-dash { line-height: 42px; }
+      .swal-edit-event #ee-head-status .ee-pick-btn--status { height: 42px; font-size: 14.5px; }
+      .swal-edit-event .ee-status-unlock { height: 42px; padding: 0 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13.5px; }
+      .swal-edit-event .ee-head-owner { font-size: 12.5px; }
+      #ee-mapCard .ee-map-bar { padding: 14px 16px; }
+      #ee-mapCard .ee-map-ico { width: 40px; height: 40px; }
+      #ee-mapCard .ee-map-name { font-size: 14px; }
+      #ee-mapCard .ee-map-note { font-size: 12px; }
+      #ee-mapCard .ee-map-go, #ee-mapCard .ee-map-edit, #ee-mapCard .ee-map-toggle {
+        height: 40px; padding: 0 14px; border-radius: 10px; font-size: 13.5px; font-weight: 700; gap: 6px;
+      }
+      #ee-mapCard .ee-map-edit, #ee-mapCard .ee-map-toggle { background: #fff; color: #334155; border: 1.5px solid #e2e8f0; }
+      #ee-mapCard .ee-map-edit:hover, #ee-mapCard .ee-map-toggle:hover { border-color: #2563eb; color: #2563eb; background: #fff; }
+      #ee-mapCard .ee-map-go { background: #2563eb; }
+      #ee-mapCard .ee-map-go:hover { background: #1d4ed8; }
+      .swal-edit-event .ee-link-card { padding: 14px 16px; }
+      .swal-edit-event .ee-link-ico { width: 40px; height: 40px; }
+      .swal-edit-event .ee-link-text small { font-size: 13px; }
+      @media (max-width: 600px) {
+        .swal-edit-event #ee-head-meta { gap: 0; }
+        .swal-edit-event #ee-head-meta .ee-hm-item { padding: 8px 12px; min-height: 52px; border-radius: 0; }
+        .swal-edit-event #ee-head-meta .ee-hm-label { flex: 0 0 112px; font-size: 13px; }
+        .swal-edit-event #ee-head-meta .ee-hm-value { font-size: 14.5px; }
+        .swal-edit-event #ee-head-meta .ee-hm-value:not(.ee-hm-value--edit) { min-height: 40px; }
+        .swal-edit-event #ee-head-meta .ee-pick-btn,
+        .swal-edit-event #ee-head-meta #ee-respSelect, .swal-edit-event #ee-head-meta #ee-teamSelect { height: 40px; font-size: 14px; }
+        .swal-edit-event .ee-hm-dates .MuiOutlinedInput-root { height: 40px; }
+        .swal-edit-event .ee-hm-dates .MuiOutlinedInput-input, .swal-edit-event .ee-hm-dates input { font-size: 13.5px !important; }
+        .swal-edit-event .ee-hm-dash { line-height: 40px; }
+        .swal-edit-event #ee-head-status .ee-pick-btn--status, .swal-edit-event .ee-status-unlock { height: 40px; }
+        #ee-mapCard .ee-map-bar { padding: 12px; }
+      }
     </style>
     <div id="ee-editGroup">
       <div class="ee-eg-head"><b>รายละเอียดงาน</b><small>${isViewOnly ? "ดูได้อย่างเดียว" : "กดที่ช่องเพื่อแก้ไขได้ทันที"}</small></div>
     <!-- section: โครงการ -->
-    <section class="ee-card">
+    <section class="ee-card ee-form">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">🏗️</span>
         <div class="ee-card-titles"><h4>ข้อมูลงาน</h4><p>งานนี้ของลูกค้ารายไหน เป็นงานอะไร</p></div>
@@ -2403,16 +2561,11 @@ export const getEditEvent = async ({
          แก้ไขได้ด้วย (canEditTeamAssignment ด้านบน) ส่วนที่เหลือ (บริษัท/โครงการ/ประเภทงาน/ระบบ ฯลฯ)
          แก้ได้เฉพาะแอดมิน/manager เท่านั้นเสมอ -->
     ${!isAdminOrManagerUser ? `
-    <p style="font-size:11px;color:#64748b;margin:0 0 10px;">
-      🔒 ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น (ช่างแก้ไขได้เฉพาะ "วันที่/เวลา" และ "สถานะงาน" ด้านล่าง${canEditTeamAssignment ? ` และ "หัวหน้าทีมเข้างาน"/"ลูกทีม" ในฐานะผู้รับผิดชอบงานนี้` : ""})
-    </p>
+    <div class="ee-lock-note"><span aria-hidden="true">🔒</span><span><b>ดูได้อย่างเดียว</b> — แก้ไขได้เฉพาะแอดมิน/manager (ช่างแก้ได้เฉพาะ "วันที่/เวลา" และ "สถานะงาน" ด้านล่าง${canEditTeamAssignment ? ` และ "หัวหน้าทีมเข้างาน"/"ลูกทีม" ในฐานะผู้รับผิดชอบงานนี้` : ""})</span></div>
     ` : eventContractGroupId ? `
-    <p style="font-size:11px;color:#b91c1c;margin:0 0 10px;">
-      🔒 งานนี้เป็นส่วนหนึ่งของสัญญา — ล็อกบริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่ไว้ไม่ให้แก้ตรงนี้
-      กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
-    </p>
+    <div class="ee-lock-note"><span aria-hidden="true">🔒</span><span><b>งานนี้อยู่ในสัญญา</b> — บริษัท · โครงการ · ประเภทงาน · ระบบงาน ล็อกไว้ให้ตรงกับครั้งอื่นในสัญญาเดียวกัน</span></div>
     ` : ""}
-    <div class="ee-grid ee-grid-2">
+    <div class="ee-info-grid">
       <div class="ee-field">
         <label>ชื่อบริษัท</label>
         <select id="editCompany" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
@@ -2422,7 +2575,7 @@ export const getEditEvent = async ({
         <select id="editSite" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
       </div>
     </div>
-    <div class="ee-grid ee-grid-auto">
+    <div class="ee-info-grid ee-info-grid--pair">
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
         <select id="editTitle" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
@@ -2431,18 +2584,18 @@ export const getEditEvent = async ({
         <label><span class="req">*</span> ระบบงาน</label>
         <select id="editSystem" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
       </div>
+    </div>
+    <div class="ee-info-grid${eventContractGroupId ? "" : " ee-info-grid--pair"}">
       <!-- ✅ งานสัญญา: เลือกครั้งที่ได้จากรายการครั้งที่ยังว่างของสัญญานั้นจริงๆ (ดู contractRoundOpts)
            งานทั่วไป/โปรเจค: รายการเดิม 1-4 + พิมพ์เองได้ ไม่เปลี่ยนแปลง -->
       <div class="ee-field">
         <label>ครั้งที่</label>
         ${canEditContractRound ? `
         <select id="editTime">${contractRoundOpts}</select>
-        <span style="font-size:10.5px;color:#94a3b8;">
-          สัญญานี้มี ${contractTotalRounds} ครั้ง · ว่างอยู่ ${freeRoundCount} ครั้ง — ย้ายงานนี้ไปครั้งที่ว่างได้เลย
-        </span>
+        <span class="ee-hint">สัญญานี้มี ${contractTotalRounds} ครั้ง · ว่าง ${freeRoundCount} ครั้ง — ย้ายไปครั้งที่ว่างได้</span>
         ` : `
         <select id="editTime" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
-        ${eventContractGroupId ? `<span style="font-size:10.5px;color:#94a3b8;">แก้ครั้งที่ไม่ได้ — สัญญานี้ยังไม่ได้ระบุ "จำนวนครั้งทั้งหมด" ไว้ (กรอกในแผงข้อมูลสัญญาด้านบนก่อน)</span>` : ""}
+        ${eventContractGroupId ? `<span class="ee-hint">แก้ครั้งที่ได้เมื่อสัญญาระบุ "จำนวนครั้งทั้งหมด" แล้ว (กรอกในแผงสัญญาด้านบน)</span>` : ""}
         `}
       </div>
       <!-- ✅ มูลค่างานสำหรับ "งานทั่วไป/งานโปรเจค" (งานที่ไม่ได้อยู่ในสัญญา) — เดิมกรอกได้เฉพาะงานสัญญา
@@ -2460,7 +2613,7 @@ export const getEditEvent = async ({
           <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
                  placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
-        <span class="ee-hint">ยอดรวมของงาน (หน้าภาพรวมงาน) — คนละช่องกับ “มูลค่างานครั้งนี้”</span>
+        <span class="ee-hint">ยอดรวมทั้งงาน · แสดงในหน้าภาพรวมงาน</span>
       </div>
       ` : ""}
     </div>
@@ -2470,13 +2623,13 @@ export const getEditEvent = async ({
       </div>
     </section>
 
-    <section class="ee-card">
+    <section class="ee-card ee-form">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">📞</span>
         <div class="ee-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div>
       </div>
       <div class="ee-card-body">
-      <div class="ee-grid ee-grid-2">
+      <div class="ee-info-grid">
         <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
              แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
              ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
@@ -2495,7 +2648,7 @@ export const getEditEvent = async ({
     </section>
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <section class="ee-card">
+    <section class="ee-card ee-form">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">📅</span>
         <div class="ee-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
@@ -2503,26 +2656,26 @@ export const getEditEvent = async ({
       </div>
       <div class="ee-card-body">
     ${readOnly ? `
-    <p style="font-size:11px;color:#6d28d9;margin:0 0 10px;">
-      👁️ คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
+    <div class="ee-lock-note"><span aria-hidden="true">👁️</span><span>
+      คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
       (ถ้าต้องการให้ช่างเข้างาน ให้เปิด <b>ใบแจ้งงาน</b>)
-    </p>
+    </span></div>
     ` : isPendingForTech ? `
-    <p style="font-size:11px;color:#b45309;margin:0 0 10px;">
-      🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
-    </p>
+    <div class="ee-lock-note"><span aria-hidden="true">🔒</span><span>
+      งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
+    </span></div>
     ` : isClosedForTech ? `
-    <p style="font-size:11px;color:#059669;margin:0 0 10px;">
-      ✅ งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
-    </p>
+    <div class="ee-lock-note"><span aria-hidden="true">✅</span><span>
+      งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
+    </span></div>
     ` : isTeamMemberViewer ? `
-    <p style="font-size:11px;color:#0369a1;margin:0 0 10px;">
-      👥 คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
+    <div class="ee-lock-note"><span aria-hidden="true">👥</span><span>
+      คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
       ${canEditDocFields
         ? `และแก้ได้เฉพาะ <b>สีบนปฏิทิน · เลขที่อ้างอิงเอกสาร · รายละเอียดงาน</b>
            ส่วนวันที่/ทีม/ข้อมูลโครงการ ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้`
         : `แต่แก้ไขไม่ได้ (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)`}
-    </p>
+    </span></div>
     ` : ""}
 
     <label class="ee-checkbox-row">
@@ -2535,7 +2688,7 @@ export const getEditEvent = async ({
     </label>
 
     <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
-      <div class="ee-grid ee-grid-datetime">
+      <div class="ee-info-grid ee-info-grid--pair">
         <div class="ee-field">
           <label>วันที่เริ่ม</label>
           <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
@@ -2560,7 +2713,7 @@ export const getEditEvent = async ({
       ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
     </div>
 
-    <div class="ee-grid ee-grid-datetime">
+    <div class="ee-info-grid ee-info-grid--pair">
       <div class="ee-field">
         <label>เวลาเริ่ม</label>
         <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isViewOnly ? "disabled" : ""}>
@@ -2579,7 +2732,7 @@ export const getEditEvent = async ({
     <!-- ✅ เพิ่มหัวข้อกำกับให้กลุ่มสี — เดิมเป็นบล็อกลอยไม่มีหัวข้อ อยู่คั่นระหว่าง "วันที่ & เวลา" กับ
          "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
          และเป็นหมวดเดียวในฟอร์มที่ไม่มีหัวข้อ ทำให้จังหวะการอ่านสะดุด -->
-    <section class="ee-card">
+    <section class="ee-card ee-form">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">🎨</span>
         <div class="ee-card-titles"><h4>การแสดงผลบนปฏิทิน</h4><p>สีของการ์ดงานบนปฏิทิน</p></div>
@@ -2592,7 +2745,7 @@ export const getEditEvent = async ({
       text: ev.textColor || "#ffffff",
       disabled: !canEditColor,
     })}
-
+      <div style="height:16px"></div>
       </div>
     </section>
 
@@ -2849,6 +3002,8 @@ export const getEditEvent = async ({
         //    • แก้ช่องไหน = ขอบส้ม + แถบ "แก้ไขแล้ว N รายการ ยังไม่บันทึก" + ปุ่มบันทึกบอกจำนวน · ยกเลิกการแก้ไขได้
         //    • กดปิดทั้งที่ยังไม่บันทึก = ถามก่อน (ทิ้งการแก้ไข / กลับไปแก้ต่อ / บันทึก)
         const popupEl = Swal.getPopup();
+        // ⚠️ กรอบนอก (overflow:hidden) ห้ามเลื่อน — โฟกัสช่องใกล้ขอบทำให้เบราว์เซอร์เลื่อนกรอบนอก หัวกล่อง/แถบปุ่มหลุดตำแหน่ง
+        [popupEl, Swal.getHtmlContainer()].forEach((n) => n?.addEventListener("scroll", () => { if (n.scrollTop) n.scrollTop = 0; }));
         // แสดงเนื้อหาเมื่อช่องเลือก/ปฏิทิน/แผงต่างๆ จัดตัวเสร็จ (หลังร่างข้อมูลเริ่มทำงาน 300ms + เฟรมถัดไป) — ไม่เห็นการจัดตัวทีละส่วน
         setTimeout(() => requestAnimationFrame(() => popupEl?.querySelector("#ee-modal-inner")?.classList.remove("ee-booting")), 360);
         const labelOf = (el) => (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
@@ -2858,7 +3013,7 @@ export const getEditEvent = async ({
           keys.forEach((k) => {
             const el = k.startsWith("radio:") ? popupEl.querySelector(`input[type="radio"][name="${CSS.escape(k.slice(6))}"]`) : popupEl.querySelector(`#${CSS.escape(k)}`);
             if (!el) return;
-            const target = el.tomselect?.wrapper || el.closest(".ee-hm-value")?.querySelector(".ee-pick-btn") || el.closest(".ee-field") || el;
+            const target = el.tomselect?.wrapper || el.closest(".ee-hm-value")?.querySelector(".ee-pick-btn") || el.closest(".ee-money-input") || el.closest(".ee-field") || el;
             target.classList.add("ee-dirty-mark");
             const n = labelOf(el);
             if (n && !names.includes(n)) names.push(n);
@@ -4384,23 +4539,38 @@ export const getEditEvent = async ({
         const popup = Swal.getPopup();
         if (!keys.length || !popup) { Swal.close(); return; }
         if (popup.querySelector(".ee-st-overlay")) return;
+        // 🔁 (11 พ.ย. 2569 ผู้ใช้: "กดปิดให้ดูแยกง่าย และดูง่ายกว่านี้ · icon หรืออะไรให้ดูง่าย")
+        //    ไอคอนเตือนบนหัว · บอกชื่อช่องที่แก้ · 3 ทางเลือกแยกสี+ไอคอนชัด: บันทึก (น้ำเงินทึบ) · ทิ้ง (ขอบแดง) · กลับไปแก้ต่อ (เทา)
+        const changed = [];
+        keys.forEach((k) => {
+          const el = k.startsWith("radio:") ? popup.querySelector(`input[type="radio"][name="${CSS.escape(k.slice(6))}"]`) : popup.querySelector(`#${CSS.escape(k)}`);
+          const n = el && (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
+          if (n && !changed.includes(n)) changed.push(n);
+        });
+        const icoSave = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z"/></svg>';
+        const icoDrop = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm13-15h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>';
+        const icoBack = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm17.71-10.21a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg>';
         const ov = document.createElement("div");
         ov.className = "ee-st-overlay";
         ov.innerHTML = `
-          <div class="ee-st-card" role="dialog" aria-label="ยังไม่บันทึกการแก้ไข">
-            <div class="ee-st-head">
-              <div class="ee-st-title">ยังไม่ได้บันทึกการแก้ไข</div>
-              <div class="ee-st-sub">แก้ไขไว้ ${keys.length} รายการ — ถ้าปิดตอนนี้ ค่าที่แก้จะไม่ถูกบันทึก</div>
+          <div class="ee-st-card ee-leave" role="dialog" aria-label="ยังไม่บันทึกการแก้ไข">
+            <div class="ee-leave-head">
+              <span class="ee-leave-warn" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg></span>
+              <div>
+                <div class="ee-leave-title">ยังไม่ได้บันทึกการแก้ไข</div>
+                <div class="ee-leave-sub">แก้ไขไว้ ${keys.length} รายการ — ถ้าปิดตอนนี้ ค่าที่แก้จะหายไป</div>
+              </div>
             </div>
-            <div class="ee-st-list">
-              <button type="button" class="ee-st-opt" data-a="save" style="--c:#2563eb;--soft:#eff6ff"><span class="ee-st-txt"><b>บันทึกการแก้ไข</b><small>บันทึกแล้วค่อยปิด</small></span></button>
-              <button type="button" class="ee-st-opt" data-a="drop" style="--c:#dc2626;--soft:#fef2f2"><span class="ee-st-txt"><b>ทิ้งการแก้ไข แล้วปิด</b><small>ค่าที่บันทึกไว้เดิมไม่เปลี่ยน</small></span></button>
+            ${changed.length ? `<div class="ee-leave-chips">${changed.slice(0, 6).map((n) => `<span>${escapeHtml(n)}</span>`).join("")}${changed.length > 6 ? `<span>+${changed.length - 6}</span>` : ""}</div>` : ""}
+            <div class="ee-leave-actions">
+              <button type="button" class="ee-leave-btn ee-leave-btn--save" data-a="save">${icoSave}<span><b>บันทึก แล้วปิด</b><small>เก็บค่าที่แก้ไว้</small></span></button>
+              <button type="button" class="ee-leave-btn ee-leave-btn--drop" data-a="drop">${icoDrop}<span><b>ไม่บันทึก ปิดเลย</b><small>ทิ้งค่าที่แก้ · ข้อมูลเดิมไม่เปลี่ยน</small></span></button>
+              <button type="button" class="ee-leave-btn ee-leave-btn--back" data-a="back">${icoBack}<span><b>กลับไปแก้ต่อ</b></span></button>
             </div>
-            <div class="ee-st-foot"><span class="ee-st-note"></span><button type="button" class="ee-st-cancel">กลับไปแก้ต่อ</button></div>
           </div>`;
         const close = () => ov.remove();
         ov.addEventListener("click", (ev) => { if (ev.target === ov) close(); });
-        ov.querySelector(".ee-st-cancel").addEventListener("click", close);
+        ov.querySelector('[data-a="back"]').addEventListener("click", close);
         ov.querySelector('[data-a="save"]').addEventListener("click", () => { close(); document.getElementById("btnConfirm")?.click(); });
         ov.querySelector('[data-a="drop"]').addEventListener("click", () => { formDraftCtl?.discard?.(); close(); Swal.close(); });
         popup.style.position = popup.style.position || "relative";

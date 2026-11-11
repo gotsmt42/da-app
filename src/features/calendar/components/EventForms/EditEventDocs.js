@@ -17,7 +17,7 @@ import { Box, Stack, Typography, LinearProgress } from "@mui/material";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import EventService from "@/shared/services/EventService";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
-import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
+import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import { FileUploadSection, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
 import { JobDocChecklist, jobDocProgress } from "@/features/technician/components/JobDocChecklist";
 import { isRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
@@ -75,11 +75,12 @@ export default function EditEventDocs({ event: initial, currentUser, onChanged }
 
   return (
     <>
-      <JobDocsSummaryCard event={event} onOpen={() => setOpen(true)} openLabel="ดู / ตรวจเอกสาร" sx={{ mt: 0, mb: 1.5 }} />
+      <JobDocsSummaryCard event={event} onOpen={() => setOpen(true)} openLabel="ดู / ตรวจเอกสาร"
+        sx={{ mt: 0, mb: 1.5, borderRadius: "14px", borderColor: "#e6e9ef", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }} />
       <MobileSheet open={open} onClose={() => setOpen(false)} zIndex={20010} maxWidth="md"
         title="เอกสารประจำงาน"
         subtitle={[event.title, event.system, event.site].filter(Boolean).join(" · ")}>
-        <Stack spacing={1.25} sx={{ p: { xs: 1.25, sm: 2 } }}>
+        <Stack spacing={1.5} sx={{ p: { xs: 1.25, sm: 2.5 } }}>
           {err && <Typography sx={{ fontSize: "0.8rem", color: "#b91c1c", px: 0.5 }}>{err}</Typography>}
           {techView && (() => {
             const pr = jobDocProgress(event);
@@ -106,10 +107,32 @@ export default function EditEventDocs({ event: initial, currentUser, onChanged }
               </>
             );
           })()}
-          {!techView && JOB_DOC_TYPES.map((t) => (
-            <Box key={t.key}>
+          {/* 🔁 (11 พ.ย. 2569 ผู้ใช้: "กดเปิดเอกสารประจำงานทำให้ดูดีกว่านี้ จัดการง่าย ดูง่าย ยังดูเล็กๆไปหน้าจอคอม")
+              ฝั่งแอดมิน: แถบความคืบหน้า x/4 บนสุด · การ์ดเอกสารขนาดใหญ่ (roomy) · จอคอมวาง 2 คอลัมน์ เห็นครบ 4 ชนิดในจอเดียว */}
+          {!techView && (() => {
+            const done = JOB_DOC_TYPES.filter((t) => isDocComplete(event, t.key)).length;
+            const all = done === JOB_DOC_TYPES.length;
+            return (
+              <Box sx={{ px: { xs: 0.5, sm: 0.25 } }}>
+                <Stack direction="row" alignItems="center" gap={1.5}>
+                  <LinearProgress variant="determinate" value={(done / JOB_DOC_TYPES.length) * 100}
+                    sx={{ flex: 1, height: 8, borderRadius: 5, bgcolor: "#e2e8f0", "& .MuiLinearProgress-bar": { bgcolor: all ? "#16a34a" : "#2563eb", borderRadius: 5 } }} />
+                  <Typography sx={{ fontSize: { xs: "0.88rem", sm: "0.95rem" }, fontWeight: 800, color: all ? "#15803d" : "#0f172a", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                    ครบ {done}/{JOB_DOC_TYPES.length} รายการ
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: { xs: "0.76rem", sm: "0.82rem" }, color: "#64748b", mt: 0.6 }}>
+                  {all ? "เอกสารครบทุกรายการแล้ว" : "กด “แนบ” ที่การ์ด หรือลากไฟล์มาวางบนการ์ดได้เลย · PDF · รูป · Word · Excel"}
+                </Typography>
+              </Box>
+            );
+          })()}
+          {!techView && (
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: { xs: 1.25, md: 1.5 } }}>
+          {JOB_DOC_TYPES.map((t) => (
+            <Box key={t.key} sx={{ minWidth: 0 }}>
               <FileUploadSection
-                card embedded event={event}
+                card embedded roomy event={event}
                 eventId={event._id} type={t.key} label={LABEL[t.key] || t.label}
                 files={event[t.field]}
                 applicable={t.key === "report" ? undefined : event[`${t.key}Applicable`]}
@@ -120,6 +143,8 @@ export default function EditEventDocs({ event: initial, currentUser, onChanged }
               />
             </Box>
           ))}
+          </Box>
+          )}
         </Stack>
       </MobileSheet>
       <FilePreviewDialog zIndex={20020} previewUrl={preview.url} previewFileName={preview.name} previewIndex={preview.index} gallery={preview.gallery}

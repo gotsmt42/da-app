@@ -19,7 +19,7 @@
  * @param user      ผู้ใช้ปัจจุบัน — ส่งมาเองเมื่อ mount นอก AuthProvider (เช่นในฟอร์ม EditEvent ที่เป็น SweetAlert)
  * @param embedded  อยู่ในฟอร์ม SweetAlert — ห้ามเรียก Swal ซ้อน (จะปิดฟอร์มที่เปิดอยู่ทิ้ง) ใช้ข้อความในกล่องแทน
  */
-import { useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import moment from "moment";
 import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Collapse, Dialog, DialogContent, TextField } from "@mui/material";
@@ -70,7 +70,16 @@ const Note = ({ icon, tone = MUTED, children }) => (
  *    ผ่านแล้ว = วงเขียวทึบ ✓ + เส้นเขียว · ขั้นปัจจุบัน = วงน้ำเงินทึบมีเลข + วงแหวน + ป้ายตัวหนาน้ำเงิน · ยังไม่ถึง = วงขาวขอบเทา มีเลข
  */
 const DONE_C = "#16a34a";
+/**
+ * ✅ (11 พ.ย. 2569 ผู้ใช้: "หน้า event ให้รูปแบบเหมือนกัน ... ใช้ฟอนต์ให้เหมาะสม ดูง่าย สวยงาม")
+ * ขนาดใหญ่สำหรับกล่องในฟอร์มแก้ไขงาน (embedded) — ตัวหนังสือ/จุดขั้นตอน/ป้ายวันใหญ่ขึ้นให้เท่ากับการ์ดอื่นในฟอร์ม
+ * การ์ดงานในหน้าการดำเนินงาน/งานของฉันยังใช้ขนาดเดิม (ไม่ได้ครอบ Provider)
+ */
+const RoomyCtx = createContext(false);
+
 export function MiniSteps({ current, labels = STEPS, dates }) {
+  const big = useContext(RoomyCtx);
+  const dot = big ? 22 : 16;
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${labels.length}, 1fr)` }}>
       {labels.map((label, i) => {
@@ -80,23 +89,23 @@ export function MiniSteps({ current, labels = STEPS, dates }) {
         const lineR = i < labels.length - 1 ? (i < current ? DONE_C : "#e6e9ef") : "transparent";
         return (
           <Stack key={label} alignItems="center" sx={{ minWidth: 0 }}>
-            <Box sx={{ position: "relative", width: "100%", height: 16, display: "grid", placeItems: "center" }}>
-              <Box sx={{ position: "absolute", top: 7, left: 0, width: "50%", height: 2, bgcolor: lineL }} />
-              <Box sx={{ position: "absolute", top: 7, right: 0, width: "50%", height: 2, bgcolor: lineR }} />
+            <Box sx={{ position: "relative", width: "100%", height: dot, display: "grid", placeItems: "center" }}>
+              <Box sx={{ position: "absolute", top: dot / 2 - 1, left: 0, width: "50%", height: 2, bgcolor: lineL }} />
+              <Box sx={{ position: "absolute", top: dot / 2 - 1, right: 0, width: "50%", height: 2, bgcolor: lineR }} />
               <Box sx={{
-                position: "relative", width: 16, height: 16, borderRadius: "50%", display: "grid", placeItems: "center",
-                fontSize: "0.6rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                position: "relative", width: dot, height: dot, borderRadius: "50%", display: "grid", placeItems: "center",
+                fontSize: big ? "0.74rem" : "0.6rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
                 bgcolor: done ? DONE_C : on ? ACCENT : "#fff",
                 color: done || on ? "#fff" : "#94a3b8",
                 border: done || on ? "none" : "1.5px solid #cbd5e1",
                 boxShadow: on ? `0 0 0 3px ${alpha(ACCENT, 0.16)}` : "none",
               }}>
-                {done ? <CheckRounded sx={{ fontSize: 12 }} /> : i + 1}
+                {done ? <CheckRounded sx={{ fontSize: big ? 15 : 12 }} /> : i + 1}
               </Box>
             </Box>
-            <Typography noWrap sx={{ mt: 0.25, fontSize: labels.length > 5 ? "0.62rem" : "0.68rem", lineHeight: 1.25, maxWidth: "100%",
+            <Typography noWrap sx={{ mt: big ? 0.5 : 0.25, fontSize: big ? "0.8rem" : labels.length > 5 ? "0.62rem" : "0.68rem", lineHeight: 1.25, maxWidth: "100%",
               fontWeight: on ? 700 : 500, color: on ? ACCENT : done ? "#15803d" : "#94a3b8" }}>{label}</Typography>
-            {dates && <Typography noWrap sx={{ fontSize: "0.62rem", color: MUTED, lineHeight: 1.3, minHeight: "0.8rem" }}>{dates[i] || ""}</Typography>}
+            {dates && <Typography noWrap sx={{ fontSize: big ? "0.72rem" : "0.62rem", color: MUTED, lineHeight: 1.3, minHeight: "0.8rem" }}>{dates[i] || ""}</Typography>}
           </Stack>
         );
       })}
@@ -176,6 +185,7 @@ function recordedAttendanceDayKeys(rows) {
 
 /** แสดงความคืบหน้าการบันทึกแยกตามวัน เมื่องานเดียวมีหลายวันเข้างาน */
 function MultiDayAttendanceProgress({ event, rows }) {
+  const big = useContext(RoomyCtx);
   if (!Array.isArray(rows)) return null;
   const days = scheduledAttendanceDays(event);
   if (days.length < 2) return null;
@@ -187,24 +197,24 @@ function MultiDayAttendanceProgress({ event, rows }) {
   const visibleDays = days.length > 10 ? days.slice(0, 9) : days;
 
   return (
-    <Box sx={{ mt: 0.75, px: 1, py: 0.8, borderRadius: 1.5, bgcolor: "#f8fafc", border: `1px solid ${LINE}` }}>
+    <Box sx={{ mt: big ? 1.25 : 0.75, px: big ? 1.5 : 1, py: big ? 1.25 : 0.8, borderRadius: big ? "12px" : 1.5, bgcolor: "#f8fafc", border: `1px solid ${LINE}` }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: INK_2 }}>บันทึกเข้างานรายวัน</Typography>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: checked.size ? "#15803d" : ACCENT, whiteSpace: "nowrap" }}>
+        <Typography sx={{ fontSize: big ? "0.9rem" : "0.72rem", fontWeight: 700, color: INK }}>บันทึกเข้างานรายวัน</Typography>
+        <Typography sx={{ fontSize: big ? "0.86rem" : "0.72rem", fontWeight: 700, color: checked.size ? "#15803d" : ACCENT, whiteSpace: "nowrap" }}>
           บันทึกแล้ว {checked.size} วัน
         </Typography>
       </Stack>
-      <Typography sx={{ mt: 0.2, fontSize: "0.66rem", color: MUTED }}>
+      <Typography sx={{ mt: 0.2, fontSize: big ? "0.8rem" : "0.66rem", color: MUTED }}>
         ตรงตามแผน {completedByPlan} / {days.length} วัน
       </Typography>
-      <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.65 }}>
+      <Stack direction="row" gap={big ? 0.75 : 0.5} flexWrap="wrap" sx={{ mt: big ? 1 : 0.65 }}>
         {visibleDays.map((day) => {
           const done = checked.has(day.format("YYYY-MM-DD"));
           return (
             <Box key={day.format("YYYY-MM-DD")} title={done ? `บันทึกแล้ว ${formatThai(day, "D MMM YYYY")}` : `ยังไม่ได้บันทึก ${formatThai(day, "D MMM YYYY")}`}
-              sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, px: 0.7, py: 0.25, borderRadius: 99,
+              sx={{ display: "inline-flex", alignItems: "center", gap: big ? 0.5 : 0.35, px: big ? 1.1 : 0.7, py: big ? 0.45 : 0.25, borderRadius: 99,
                 bgcolor: done ? "#ecfdf5" : "#fff", border: `1px solid ${done ? "#bbf7d0" : LINE}`,
-                color: done ? "#15803d" : MUTED, fontSize: "0.67rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+                color: done ? "#15803d" : INK_2, fontSize: big ? "0.8rem" : "0.67rem", fontWeight: 600, whiteSpace: "nowrap" }}>
               {done ? <CheckRounded sx={{ fontSize: 13 }} /> : <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#cbd5e1" }} />}
               {formatThai(day, "D MMM")}
             </Box>
@@ -266,13 +276,16 @@ function DeclineDialog({ open, onClose, onSubmit, busy }) {
 }
 
 /** บรรทัดสถานะแบบย่อ — ไอคอนเล็ก + ข้อความ (+ ปุ่มข้อความทางขวา) */
-const Line = ({ icon, tone = MUTED, children, right }) => (
-  <Stack direction="row" alignItems="center" gap={0.75}>
-    <Box sx={{ color: tone, display: "grid", flexShrink: 0, "& svg": { fontSize: 17 } }}>{icon}</Box>
-    <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", color: INK_2, lineHeight: 1.45 }}>{children}</Typography>
-    {right}
-  </Stack>
-);
+const Line = ({ icon, tone = MUTED, children, right }) => {
+  const big = useContext(RoomyCtx);
+  return (
+    <Stack direction="row" alignItems="center" gap={big ? 1 : 0.75}>
+      <Box sx={{ color: tone, display: "grid", flexShrink: 0, "& svg": { fontSize: big ? 20 : 17 } }}>{icon}</Box>
+      <Typography sx={{ flex: 1, minWidth: 0, fontSize: big ? "0.9rem" : "0.8rem", color: INK_2, lineHeight: 1.5 }}>{children}</Typography>
+      {right}
+    </Stack>
+  );
+};
 
 const Hint = ({ children }) => (
   <Typography sx={{ mt: 0.85, textAlign: "center", fontSize: "0.76rem", color: MUTED }}>{children}</Typography>
@@ -667,7 +680,7 @@ ${text}`);
       // ✅ แต่ละคนกดของตัวเอง — ปุ่มของฉัน + ความคืบหน้าของทีมวันนี้
       line = (
         <Box>
-          <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
+          <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: embedded ? 46 : 42, fontSize: embedded ? "0.95rem" : undefined }}>
             บันทึกเข้างานของฉัน{plannedDays.length > 1 ? ` · วันที่ ${todayDayNo || Math.min(myRecordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
           </Button>
           {teamText && <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.72rem", color: MUTED }}>{teamText} · ทุกคนกดของตัวเอง</Typography>}
@@ -789,11 +802,13 @@ ${text}`);
           </Box>
         )}
         {showSteps ? (
-          <Box sx={{ px: 1, py: 0.75, borderRadius: "12px", border: `1px solid ${LINE}` }}>
+          <Box sx={embedded
+            ? { px: { xs: 1.5, sm: 2 }, py: { xs: 1.5, sm: 1.75 }, borderRadius: "14px", border: "1px solid #e6e9ef", bgcolor: "#fff", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }
+            : { px: 1, py: 0.75, borderRadius: "12px", border: `1px solid ${LINE}` }}>
             {statusSteps ? <MiniSteps {...statusStepsOf(event)} /> : <MiniSteps current={pendingApproval ? 0 : current} />}
             {/* งานปิดแล้วที่ไม่มีบันทึกเข้างาน (งานก่อนเริ่มใช้ระบบ) — ไม่แสดง "บันทึกแล้ว 0 วัน" ให้ดูเหมือนตกหล่น */}
             {!(closed && !(rows || []).length) && <MultiDayAttendanceProgress event={event} rows={rows} />}
-            <Box sx={{ mt: 0.75, pt: 0.75, borderTop: `1px solid ${LINE}` }}>{line}</Box>
+            <Box sx={{ mt: embedded ? 1.5 : 0.75, pt: embedded ? 1.5 : 0.75, borderTop: `1px solid ${LINE}` }}>{line}</Box>
           </Box>
         ) : (rows || []).length > 0 && (
           <Line icon={<HistoryRounded />} right={logLink}>บันทึกแล้ว {rows.length} วัน</Line>
@@ -808,7 +823,7 @@ ${text}`);
         <DeclineDialog open={declineOpen} busy={acking} onClose={() => setDeclineOpen(false)} onSubmit={decline} />
       </Box>
     );
-    return embedded ? <ThemeProvider theme={EMBEDDED_THEME}>{out}</ThemeProvider> : out;
+    return embedded ? <ThemeProvider theme={EMBEDDED_THEME}><RoomyCtx.Provider value>{out}</RoomyCtx.Provider></ThemeProvider> : out;
   }
 
   const body = (

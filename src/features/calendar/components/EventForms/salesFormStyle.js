@@ -14,7 +14,7 @@ export const SALES_FORM_CSS = `
     padding: 0 !important; border-radius: 18px !important; overflow: hidden !important;
     width: min(96vw, 640px) !important; max-height: 92vh !important;
     display: flex !important; flex-direction: column !important;
-    font-family: 'IBM Plex Sans Thai', system-ui, sans-serif !important;
+    font-family: var(--app-font) !important;
     box-shadow: 0 24px 60px rgba(15,23,42,.22) !important;
   }
   .swal-sales-appt .swal2-html-container {

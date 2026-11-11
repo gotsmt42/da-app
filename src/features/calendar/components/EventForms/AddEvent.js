@@ -41,7 +41,7 @@ function injectAddStyles() {
       max-height: 95vh !important;
       display: flex !important;
       flex-direction: column !important;
-      font-family: 'Inter', system-ui, sans-serif !important;
+      font-family: var(--app-font) !important; /* ฟอนต์หลักของแอป (IBM Plex Sans Thai) — เดิม 'Inter' ที่ไม่ได้โหลด */
       box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
     }
     .swal-add-event .swal2-html-container {
@@ -491,6 +491,50 @@ function injectAddStyles() {
       #ae-action-bar .ae-btn-ghost { flex: 1 1 0; }
       #ae-action-bar .ae-btn-success { flex: 2 1 0; }
     }
+
+    /* 🔁 (11 พ.ย. 2569 ผู้ใช้: "แก้ให้หน้าลงงานรูปแบบเหมือนกันด้วย") ขนาดฟอร์มชุดเดียวกับหน้าแก้ไขงาน (.ee-form ใน EditEvent.js)
+       ป้าย 13.5px หนา · ช่องสูง 46px ตัว 15px มุมโค้ง 10px ขอบ 1.5px · ระยะห่าง 16/18px · คำอธิบายเทา 12px */
+    .swal-add-event .ae-card .ae-card-body { padding: 10px 18px 2px; }
+    .swal-add-event .ae-card .ae-grid { gap: 16px 18px; margin-bottom: 16px; }
+    .swal-add-event .ae-card-body > .ae-field { margin-bottom: 16px !important; }
+    .swal-add-event .ae-card .ae-field { gap: 6px; min-width: 0; }
+    .swal-add-event .ae-card .ae-field > label { font-size: 13.5px; font-weight: 700; color: #334155; line-height: 1.3; }
+    .swal-add-event .ae-card .ae-field > label .req { color: #dc2626; }
+    .swal-add-event .ae-card .ae-field label .ae-opt { font-size: 12px; font-weight: 500; color: #94a3b8; }
+    .swal-add-event .ae-card .ts-wrapper .ts-control,
+    .swal-add-event .ae-card .ae-field > select,
+    .swal-add-event .ae-card .ae-field > input:not([type=checkbox]):not([type=radio]),
+    .swal-add-event .ae-card .ae-field > textarea {
+      min-height: 46px; padding: 11px 14px !important; font-size: 15px !important; line-height: 1.45;
+      border: 1.5px solid #e2e8f0 !important; border-radius: 10px !important; color: #0f172a; background: #fff;
+    }
+    .swal-add-event .ae-card .ts-wrapper.focus .ts-control,
+    .swal-add-event .ae-card .ae-field > input:focus,
+    .swal-add-event .ae-card .ae-field > textarea:focus {
+      border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important;
+    }
+    .swal-add-event .ae-card .ts-wrapper .ts-control > .item { font-size: 15px; font-weight: 600; color: #0f172a; }
+    .swal-add-event .ae-card .ae-checkbox-row { font-size: 14px; font-weight: 600; color: #334155; margin: 0 0 16px; gap: 10px; }
+    .swal-add-event .ae-card .ae-checkbox-row input { width: 18px !important; height: 18px; accent-color: #2563eb; flex-shrink: 0; }
+    .swal-add-event .ae-card .ae-char-count { font-size: 12px; color: #64748b; }
+    @media (max-width: 600px) {
+      .swal-add-event .ae-card .ae-card-body { padding: 8px 12px 0; }
+      .swal-add-event .ae-card .ae-grid { gap: 14px 10px; margin-bottom: 14px; }
+    }
+    /* ช่องที่ยังกรอกไม่ครบ — กรอบแดงชั่วครู่ ให้เห็นทันทีว่าต้องแก้ช่องไหน */
+    .swal-add-event .ae-card .ae-field > .ae-invalid, .swal-add-event .ae-card .ae-field > .ae-invalid:focus,
+    .swal-add-event .ae-card .ae-invalid .ts-control, .swal-add-event .ae-invalid { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.15) !important; border-radius: 10px; }
+    /* แถบแจ้งข้อผิดพลาด — อยู่ในแถบปุ่มด้านล่าง ข้างปุ่ม "ลงงาน" (เดิมไปโผล่ใต้แถบปุ่ม มองไม่เห็น เหมือนกดแล้วไม่เกิดอะไร) */
+    #ae-error {
+      display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; margin-right: auto;
+      padding: 9px 12px; border-radius: 10px; background: #fef2f2; border: 1px solid #fecaca;
+      color: #b91c1c; font-size: 13.5px; font-weight: 700; line-height: 1.45;
+      animation: ae-shake .32s ease;
+    }
+    #ae-error[hidden] { display: none; }
+    #ae-error svg { flex-shrink: 0; }
+    @keyframes ae-shake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    @media (max-width: 520px) { #ae-action-bar { flex-wrap: wrap !important; } #ae-error { flex: 1 1 100%; order: -1; } }
   `;
   document.head.appendChild(style);
 }
@@ -942,6 +986,7 @@ export const getAddEvent = async ({
 
   <!-- Action bar (sticky) -->
   <div id="ae-action-bar">
+    <div id="ae-error" role="alert" aria-live="assertive" hidden></div>
     <div class="ae-btn-spacer"></div>
     <button class="ae-btn ae-btn-ghost" id="ae-btnCancel">ยกเลิก</button>
     <button class="ae-btn ae-btn-success" id="ae-btnConfirm">${isAdminOrManagerUser ? "💾 ลงงาน" : "📨 ส่งคำขอลงงาน"}</button>
@@ -1331,6 +1376,53 @@ export const getAddEvent = async ({
       /* buttons */
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
+      /**
+       * 🐛 (11 พ.ย. 2569 ผู้ใช้: "กดลงงานไม่ได้ และช่างกดขอลงงานไม่ได้")
+       *    เดิมใช้ Swal.showValidationMessage — ข้อความไปโผล่ "ใต้" แถบปุ่ม (นอกพื้นที่ที่มองอยู่) และไม่บอกว่าช่องไหน
+       *    กดแล้วเหมือนไม่เกิดอะไร (เช่น ยังไม่กรอกรายละเอียดงาน ซึ่งอยู่ล่างสุดของฟอร์ม)
+       *    → แถบแดงข้างปุ่ม "ลงงาน" + เลื่อนไปที่ช่องนั้น + กรอบแดง · พิมพ์แก้แล้วแถบหายเอง
+       */
+      const errBox = document.getElementById("ae-error");
+      const errIco = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>';
+      const clearErr = () => {
+        if (errBox) errBox.hidden = true;
+        Swal.getPopup()?.querySelectorAll(".ae-invalid").forEach((n) => n.classList.remove("ae-invalid"));
+      };
+      const showErr = (msg, fieldId) => {
+        clearErr();
+        if (errBox) {
+          errBox.innerHTML = `${errIco}<span></span>`;
+          errBox.querySelector("span").textContent = msg;
+          errBox.hidden = false;
+          // เล่นแอนิเมชันสั่นใหม่ทุกครั้งที่กด
+          errBox.style.animation = "none"; void errBox.offsetWidth; errBox.style.animation = "";
+        } else {
+          Swal.showValidationMessage(msg);
+        }
+        const el = fieldId && document.getElementById(fieldId);
+        if (el) {
+          const target = el.tomselect?.wrapper || el.closest(".ae-field")?.querySelector(".MuiOutlinedInput-root") || el;
+          target.classList.add("ae-invalid");
+          // ⚠️ ไม่ใช้ scrollIntoView — มันเลื่อนกรอบนอก (overflow:hidden) ไปด้วย ทั้งกล่องเลื่อนขึ้นเหลือที่ว่างด้านล่าง
+          //    เลื่อนเฉพาะพื้นที่เนื้อหา (#ae-body) ให้ช่องอยู่กลางจอ
+          const body = document.getElementById("ae-body");
+          if (body) {
+            const top = target.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+            body.scrollTo({ top: Math.max(0, top - body.clientHeight / 2 + target.offsetHeight / 2), behavior: "smooth" });
+          }
+          if (el.tomselect) el.tomselect.focus(); else el.focus?.({ preventScroll: true });
+          // focus ของ TomSelect อาจเลื่อนกรอบนอก — คืนตำแหน่งกรอบนอกไว้ที่เดิมเสมอ
+          [Swal.getPopup(), Swal.getHtmlContainer(), document.getElementById("ae-modal-inner")].forEach((n) => { if (n) n.scrollTop = 0; });
+        }
+      };
+      // ⚠️ กรอบนอก (overflow:hidden) ห้ามเลื่อน — โฟกัสช่องใกล้ขอบ (TomSelect/ปฏิทิน) ทำให้เบราว์เซอร์เลื่อนกรอบนอก
+      //    ทั้งกล่องขยับขึ้น แถบปุ่มลอย เหลือที่ว่างด้านล่าง → ล็อกไว้ที่ 0 เสมอ (เนื้อหาเลื่อนใน #ae-body)
+      [Swal.getPopup(), Swal.getHtmlContainer(), document.getElementById("ae-modal-inner")].forEach((n) => {
+        n?.addEventListener("scroll", () => { if (n.scrollTop) n.scrollTop = 0; });
+      });
+      Swal.getPopup()?.addEventListener("input", clearErr);
+      Swal.getPopup()?.addEventListener("change", clearErr);
+
       document.getElementById("ae-btnConfirm")?.addEventListener("click", async (clickEvt) => {
         if (isSavingEvent) return; // ✅ กันกรณี listener ถูก attach/ยิงซ้ำ ไม่ให้บันทึกซ้ำ
 
@@ -1361,47 +1453,49 @@ export const getAddEvent = async ({
         const showSaveError = (error) => {
           console.error("❌ Error saving event:", error);
           stopSaving();
-          Swal.showValidationMessage(error?.response?.data?.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+          const data = error?.response?.data;
+          showErr((typeof data === "string" ? "" : data?.message) || (error?.code === "ECONNABORTED" ? "เซิร์ฟเวอร์ตอบช้าเกินไป กรุณาลองใหม่อีกครั้ง" : !error?.response ? "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่" : `บันทึกไม่สำเร็จ (รหัส ${error.response.status}) กรุณาลองใหม่อีกครั้ง`));
         };
 
         const jobType = document.querySelector('input[name="ae-jobType"]:checked')?.value || "general";
 
         // ⛔ (4 พ.ย. 2569 ผู้ใช้: "ต้องบังคับให้กรอกรายละเอียดงานที่ทำทุกๆงานที่ขอลง ให้ละเอียดสมบูรณ์ ดูและเช็คได้ง่าย")
         //    ทุกงานที่ลง/ขอลง ต้องมีรายละเอียดงาน (อย่างน้อย 10 ตัวอักษร) — ทั้งงานทั่วไปและงานตามสัญญา
-        const descText = getVal("description");
-        if (descText.replace(/\s+/g, "").length < 10) {
-          Swal.showValidationMessage("กรุณากรอกรายละเอียดงานที่ทำ (อย่างน้อย 10 ตัวอักษร) — เช่น ทำอะไร จุดไหน อุปกรณ์อะไร");
-          document.getElementById("description")?.focus();
-          return;
-        }
+        // ตรวจตามลำดับช่องในฟอร์ม (บน → ล่าง) — รายละเอียดงานอยู่ล่างสุด จึงตรวจหลังช่องอื่น
+        const descMissing = () => {
+          if (getVal("description").replace(/\s+/g, "").length >= 10) return false;
+          showErr("กรุณากรอกรายละเอียดงานที่ทำ อย่างน้อย 10 ตัวอักษร (ทำอะไร จุดไหน อุปกรณ์อะไร)", "description");
+          return true;
+        };
 
         /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น เพิ่มครั้งถัดไป
            หรือ "ต่อวันที่ไม่ต่อเนื่อง" ให้ครั้งที่ลงตารางแล้วก็ได้ (ดู renderRoundGrid ด้านบน) ── */
         if (jobType === "contract") {
           const contractId = getVal("ae-contractPick");
-          if (!contractId) { Swal.showValidationMessage("กรุณาเลือกสัญญา"); return; }
+          if (!contractId) { showErr("กรุณาเลือกสัญญา", "ae-contractPick"); return; }
           const c = contractMap.get(contractId);
-          if (!c) { Swal.showValidationMessage("ไม่พบสัญญาที่เลือก กรุณาเลือกใหม่"); return; }
+          if (!c) { showErr("ไม่พบสัญญาที่เลือก กรุณาเลือกใหม่", "ae-contractPick"); return; }
           // ✅ อ่านครั้งที่จากตาราง "เลือกครั้งที่" ที่ผู้ใช้กดเลือกไว้ แทนการนับจำนวน+1 แบบเดิม —
           // กันเคสครั้งกลางๆ เคยถูกลบทิ้งไปแล้ว ตัวเลขจะได้ตรงกับที่ตาราง ContractOverview.js แสดงจริง
           const selectedRound = Number(getVal("ae-selectedRound"));
-          if (!selectedRound) { Swal.showValidationMessage("กรุณาเลือกครั้งที่ที่ต้องการลงวันที่"); return; }
+          if (!selectedRound) { showErr("กรุณาเลือกครั้งที่ที่ต้องการลงวันที่", "ae-roundGrid"); return; }
           // ✅ isExtend = ผู้ใช้กดเลือกครั้งที่ "ลงตารางแล้ว" (chip สีเขียว) ตั้งใจต่อวันที่ไม่ต่อเนื่อง
           // ให้ครั้งเดิม ไม่ใช่เพิ่มครั้งใหม่ — ไม่กินโควตาจำนวนครั้งเพิ่ม จึงต้องข้ามเช็ค usedVisits
           // ด้านล่าง (ครั้งสุดท้ายของสัญญาที่ครบจำนวนแล้วก็ยังต่อวันที่ไม่ต่อเนื่องให้ได้)
           const isExtend = document.getElementById("ae-selectedRound")?.dataset.extend === "1";
           if (!isExtend && c.usedVisits >= c.visitCount) {
-            Swal.showValidationMessage("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว");
+            showErr("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว", "ae-roundGrid");
             return;
           }
 
           const cpStart = getVal("ae-cpStart");
           const cpEnd = getVal("ae-cpEnd") || cpStart;
-          if (!cpStart) { Swal.showValidationMessage("กรุณาระบุวันที่เข้างาน"); return; }
+          if (!cpStart) { showErr("กรุณาระบุวันที่เข้างาน", "ae-cpStart"); return; }
           if (moment(cpEnd).isBefore(moment(cpStart))) {
-            Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+            showErr("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม", "ae-cpEnd");
             return;
           }
+          if (descMissing()) return;
 
           startSaving();
           try {
@@ -1467,9 +1561,9 @@ export const getAddEvent = async ({
         const title  = getVal("eventTitle");
         const system = getVal("eventSystem");
 
-        if (!site)   { Swal.showValidationMessage("กรุณาระบุชื่อโครงการ");  return; }
-        if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
-        if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
+        if (!site)   { showErr("กรุณาเลือกหรือพิมพ์ชื่อโครงการ", "eventSite");  return; }
+        if (!title)  { showErr("กรุณาเลือกหรือพิมพ์ประเภทงาน", "eventTitle");   return; }
+        if (!system) { showErr("กรุณาเลือกหรือพิมพ์ระบบงาน", "eventSystem");    return; }
 
         const isMultiDate = Boolean(multiToggle?.checked);
         let dateRanges = [];
@@ -1482,7 +1576,7 @@ export const getAddEvent = async ({
             const e = row.querySelector(".ae-range-end")?.value || s;
             if (!s) continue;
             if (moment(e).isBefore(moment(s))) {
-              Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
+              showErr("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
               return;
             }
             // ✅ ทีมเฉพาะของช่วงนี้ (ติ๊ก "ใช้ทีมเดียวกับงานหลัก" ไว้ = ไม่ส่งอะไร ใช้ค่าของงาน)
@@ -1501,7 +1595,7 @@ export const getAddEvent = async ({
             });
           }
           if (dateRanges.length === 0) {
-            Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
+            showErr("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
             return;
           }
         } else {
@@ -1509,10 +1603,11 @@ export const getAddEvent = async ({
           const startVal = getVal("start");
           const endVal   = getVal("end");
           if (startVal && endVal && moment(endVal).isBefore(moment(startVal))) {
-            Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+            showErr("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม", "end");
             return;
           }
         }
+        if (descMissing()) return;
 
         startSaving();
 

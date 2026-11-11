@@ -814,7 +814,7 @@
   max-width: 100%;
   /* font-weight: 500; */
   line-height: 1.5; /* ป้องกันวรรณยุกต์ทับกัน */
-  font-family: "Noto Sans Thai", sans-serif; /* ใช้ฟอนต์ที่รองรับภาษาไทย */
+  font-family: var(--app-font); /* ฟอนต์หลักของแอป (รองรับไทย) */
 }
 
 .fc-daygrid-event {
@@ -832,7 +832,7 @@
   /* border-radius: 8px; */
   min-height: 2px; /* ป้องกันการบีบตัวอักษร */
   
-  font-family: "Noto Sans Thai", sans-serif;
+  font-family: var(--app-font);
   
 }
 

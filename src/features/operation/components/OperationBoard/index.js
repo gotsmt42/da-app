@@ -731,6 +731,8 @@ export const FileUploadSection = ({
   embedded = false,
   // งานที่ใช้เช็คสิทธิ์ เมื่อไม่ได้ส่ง event มา (เช่น หน้าติดตามใบเสนอราคา — ไม่อยากให้ป้าย/สถานะเปลี่ยน)
   permEvent = null,
+  // ✅ (11 พ.ย. 2569 ผู้ใช้: "เปิดเอกสารประจำงาน ... ยังดูเล็กๆไปหน้าจอคอม") roomy = การ์ดขนาดใหญ่ (หน้าต่างเอกสารในหน้า Event)
+  roomy = false,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
@@ -799,32 +801,33 @@ export const FileUploadSection = ({
       sx={card ? {
         borderRadius: "14px", bgcolor: dragging ? ACCENT_SOFT : "#fff",
         border: `1px solid ${dragging ? ACCENT : hasFiles && !reportUnconfirmed ? "#bbf7d0" : "#e8edf3"}`,
-        boxShadow: "none", px: 1.5, py: 1.15,
+        boxShadow: "none", px: roomy ? { xs: 1.5, sm: 2 } : 1.5, py: roomy ? { xs: 1.25, sm: 1.6 } : 1.15,
+        ...(roomy ? { height: "100%", boxSizing: "border-box" } : {}),
       } : undefined}>
       {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "รูปแบบยังไม่สวย ดูล้าสมัย ปุ่มใหญ่เกินไป จัดวางให้พอดี")
           หัวแถวเดียว: ไอคอน · ชื่อ + สถานะ/บังคับเป็นบรรทัดเล็กใต้ชื่อ · ปุ่ม "แนบ" เล็กชิดขวา
           (เดิมป้ายสถานะ + ป้ายบังคับ + ปุ่มแนบใหญ่ + ข้อความชนิดไฟล์ แยกกัน 2 แถว ดูรก) */}
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ mb: hasFiles || notApplicable || uploading || (!card && canEdit) ? 1 : 0 }}>
         <Box sx={{
-          width: card ? 34 : 30, height: card ? 34 : 30, borderRadius: "10px", flexShrink: 0,
+          width: roomy ? 44 : card ? 34 : 30, height: roomy ? 44 : card ? 34 : 30, borderRadius: roomy ? "12px" : "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           bgcolor: alpha(meta.color, 0.1), color: meta.color,
         }}>
-          <TypeIcon sx={{ fontSize: card ? 19 : 17 }} />
+          <TypeIcon sx={{ fontSize: roomy ? 23 : card ? 19 : 17 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
+          <Typography noWrap sx={{ fontWeight: 800, fontSize: roomy ? "1.02rem" : "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
           {/* ✅ (4 พ.ย. 2569) เอกสารการเงิน: บอกว่าแนบอะไรได้บ้าง */}
           {type === "invoice" && (
-            <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.35 }}>ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ</Typography>
+            <Typography sx={{ fontSize: roomy ? "0.8rem" : "0.74rem", color: MUTED, lineHeight: 1.35 }}>ใบวางบิล / ใบกำกับภาษี / ใบเสร็จ</Typography>
           )}
-          <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 0.15 }}>
+          <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: roomy ? 0.35 : 0.15 }}>
             {pill.icon
-              ? <CheckCircle sx={{ fontSize: 13, color: pill.fg }} />
-              : <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: pill.dot, flexShrink: 0 }} />}
-            <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: pill.fg }}>{pill.text}</Typography>
+              ? <CheckCircle sx={{ fontSize: roomy ? 15 : 13, color: pill.fg }} />
+              : <Box component="span" sx={{ width: roomy ? 8 : 6, height: roomy ? 8 : 6, borderRadius: "50%", bgcolor: pill.dot, flexShrink: 0 }} />}
+            <Typography noWrap sx={{ fontSize: roomy ? "0.84rem" : "0.74rem", fontWeight: 700, color: pill.fg }}>{pill.text}</Typography>
             {card && (
-              <Typography noWrap sx={{ fontSize: "0.74rem", color: FAINT }}>
+              <Typography noWrap sx={{ fontSize: roomy ? "0.82rem" : "0.74rem", color: FAINT }}>
                 · {required ? (type === "report" ? "บังคับ" : "บังคับงาน PM") : "ถ้ามี"}
               </Typography>
             )}
@@ -834,8 +837,8 @@ export const FileUploadSection = ({
           <>
             <input ref={inputRef} type="file" hidden multiple
               onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
-            <Button size="small" startIcon={<Add sx={{ fontSize: "17px !important" }} />} onClick={() => inputRef.current?.click()}
-              sx={{ flexShrink: 0, minHeight: 32, px: 1.25, borderRadius: "10px", textTransform: "none", fontWeight: 800, fontSize: "0.8rem",
+            <Button size="small" startIcon={<Add sx={{ fontSize: roomy ? "19px !important" : "17px !important" }} />} onClick={() => inputRef.current?.click()}
+              sx={{ flexShrink: 0, minHeight: roomy ? 40 : 32, px: roomy ? 1.75 : 1.25, borderRadius: "10px", textTransform: "none", fontWeight: 800, fontSize: roomy ? "0.9rem" : "0.8rem",
                 color: ACCENT, bgcolor: dragging ? "#dbeafe" : ACCENT_SOFT, "&:hover": { bgcolor: "#dbeafe" },
                 "& .MuiButton-startIcon": { mr: 0.4 } }}>
               {dragging ? "วางไฟล์" : hasFiles ? "เพิ่ม" : "แนบ"}
@@ -870,7 +873,8 @@ export const FileUploadSection = ({
       )}
 
       {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
-      <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
+      {/* 🐛 (11 พ.ย. 2569 ผู้ใช้: "กด more ที่ไฟล์ไม่ขึ้น") ในหน้าต่างเอกสารของหน้า Event (zIndex 20010) เมนูชั้นปกติ (1300) ไปอยู่ใต้หน้าต่าง → ดันขึ้นบน */}
+      <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu} sx={embedded ? { zIndex: 20030 } : undefined}
         PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
         <MenuItem onClick={() => { downloadFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
           <ListItemIcon><Download fontSize="small" /></ListItemIcon>

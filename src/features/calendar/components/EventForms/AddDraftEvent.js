@@ -29,7 +29,7 @@ function injectAddDraftStyles() {
       max-height: 95vh !important;
       display: flex !important;
       flex-direction: column !important;
-      font-family: 'Inter', system-ui, sans-serif !important;
+      font-family: var(--app-font) !important; /* ฟอนต์หลักของแอป (IBM Plex Sans Thai) — เดิม 'Inter' ที่ไม่ได้โหลด */
       box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
     }
     /* ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้าจอคอมขยายขนาดฟอร์มอีก") ฟอร์มรับงานกว้างขึ้นบนจอคอม — มือถือยังเต็มจอเหมือนเดิม */
