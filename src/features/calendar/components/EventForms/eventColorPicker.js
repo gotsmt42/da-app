@@ -1,3 +1,4 @@
+import { bindSheetDrag } from "@/shared/utils/sheetPicker";
 /* ═════════════════════════════════════════════════════════════════════════════
    ตัวเลือกสีงานบนปฏิทิน — ใช้ร่วมกันทั้งฟอร์ม "เพิ่มแผนงาน" (AddEvent) และ "แก้ไขงาน" (EditEvent)
 
@@ -800,6 +801,12 @@ function setupOne(root) {
     overlay.hidden = true;
     renderTrigger();
   };
+  // ✅ (12 พ.ย. 2569 ผู้ใช้: "ตรงนี้ก็ให้เลื่อนปัดลงปิดได้ด้วย") ลากหัวแผง (หรือเนื้อหาตอนอยู่บนสุด) ลงเพื่อปิดแผงสี
+  {
+    const sheetEl = q(".ecp-sheet");
+    if (sheetEl && !sheetEl.querySelector(".tt-sheet-grip")) sheetEl.insertAdjacentHTML("afterbegin", '<div class="tt-sheet-grip" aria-hidden="true"></div>');
+    if (sheetEl) bindSheetDrag(overlay, sheetEl, els.body, closeSheet);
+  }
   const onTrigger = () => openSheet();
   els.trigger.addEventListener("click", onTrigger);
 

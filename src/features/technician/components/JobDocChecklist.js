@@ -247,7 +247,7 @@ const DocumentChecklistItem = ({
   const tone = notApplicable ? MUTED : complete ? "#16a34a" : state.fg === "#b45309" ? "#d97706" : "#94a3b8";
   const reqText = alwaysRequired ? "บังคับ" : requiredByJobType ? "บังคับงาน PM" : "ถ้ามี";
   return (
-    <Box sx={{ borderRadius: "14px", bgcolor: "#fff", border: "1px solid", borderColor: complete && !notApplicable ? "#bbf7d0" : LINE, px: 1.5, py: 1.25,
+    <Box sx={{ borderRadius: "14px", bgcolor: "#fff", border: "1px solid", borderColor: LINE, px: 1.5, py: 1.25,
       transition: "border-color .15s", ...(complete && !notApplicable ? { boxShadow: "0 1px 2px rgba(22,163,74,.06)" } : {}) }}>
       {/* ── หัว: กรอบไอคอน · ชื่อ + สถานะ · ปุ่มแนบ ── */}
       <Stack direction="row" alignItems="center" gap={1.25}>

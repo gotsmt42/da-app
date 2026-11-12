@@ -28,6 +28,8 @@ import { styled, alpha } from "@mui/material/styles";
 import { BuildRounded as Build, AssignmentRounded as Assignment, VisibilityRounded as Visibility, WarningRounded as Warning, DescriptionRounded as Description, EditRounded as Edit, CheckCircleRounded as CheckCircle, ExpandMoreRounded as ExpandMore, ExpandLessRounded as ExpandLess, ChevronRightRounded as ChevronRight, HistoryRounded as History, TaskAltRounded as TaskAlt, HourglassTopRounded as HourglassTop, NoteAddRounded as NoteAdd, CloseRounded as Close, CancelRounded as Cancel, SendRounded as Send, ChatRounded as Chat, LinkRounded as LinkIcon, CalendarMonthRounded as CalendarMonth, LockRounded as Lock, RadioButtonUncheckedRounded as RadioButtonUnchecked } from "@mui/icons-material";
 import { INK, INK_2, MUTED, LINE, SURFACE, ACCENT, SUCCESS } from "@/shared/ui/PageKit";
 import InfoLine from "@/shared/ui/InfoLine";
+import JobInfoPanel from "@/shared/ui/JobInfoPanel";
+import TelLink from "@/shared/components/TelLink";
 import WorkValueField from "@/shared/ui/WorkValueField";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
@@ -611,11 +613,13 @@ const TechnicianJobCard = ({
 
   const Wrapper = noOuterCard ? React.Fragment : JobCard;
   // ✅ แถบสีสถานะด้านซ้ายของการ์ด — กวาดตาแยกสถานะได้ทันที (ผู้ใช้: "สีสันจืด")
-  const wrapperProps = noOuterCard ? {} : { sx: { borderLeft: `4px solid ${statusColor}` } };
+  // 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้างานของฉันด้วย — ยังดูรก ตาลาย") ตัดแถบสีสถานะหนาซ้ายการ์ดบนมือถือ (สถานะมีป้ายบอกอยู่แล้ว) · จอคอมคงไว้บางๆ
+  const wrapperProps = noOuterCard ? {} : { sx: { borderLeft: { xs: "1px solid #e6e9ef", sm: `3px solid ${statusColor}` } } };
 
   return (
     <Wrapper {...wrapperProps}>
-      <CardContent sx={{ px: { xs: 1.75, sm: 2.5 }, py: { xs: 1.75, sm: 2.5 }, "&:last-child": { pb: { xs: 1.75, sm: 2.5 } } }}>
+      {/* 🔁 (12 พ.ย. 2569) ในแผ่นรายละเอียด (มือถือ) ขอบในแคบลง — การ์ดข้างในกว้างขึ้น แบบเดียวกับหน้าการดำเนินงาน */}
+      <CardContent sx={{ px: { xs: inSheet ? 1.25 : 1.75, sm: 2.5 }, py: { xs: inSheet ? 1.25 : 1.75, sm: 2.5 }, "&:last-child": { pb: { xs: inSheet ? 1.25 : 1.75, sm: 2.5 } } }}>
 
         {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "งานของฉัน ให้เป็นรูปแบบเดียวกับหน้ารับงาน — หน้าแรกข้อมูลไม่เยอะแต่สำคัญ ไม่กินพื้นที่")
             มือถือตอนพับ = หัวการ์ดย่อ · กดแล้วกางการ์ดเต็ม (ขั้นตอน/เข้างาน · เอกสาร · ขอปิดงาน) · งานวันนี้กางไว้ให้เลย */}
@@ -680,22 +684,26 @@ const TechnicianJobCard = ({
 
               {/* ✅ ตัดวงเล็บ [ ] ครอบชื่องานออก ให้ตรงกับการ์ดงานหน้าอื่นที่ตัดออกไปแล้ว — ไม่ได้สื่อ
                   ความหมายอะไร เป็นแค่สัญลักษณ์ส่วนเกินที่โผล่ทุกการ์ด */}
-              {event.title && (
-                <Typography fontWeight={800} fontSize="1rem" sx={{ letterSpacing: "-0.01em" }}>
-                  {event.title}
+              {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "รูปแบบหน้างานของฉันก็ให้เหมือนกันด้วย") หัวการ์ดแบบเดียวกับหน้าการดำเนินงาน:
+                  ชื่องาน · ระบบ · ครั้งที่ บรรทัดเดียว (ในแผ่นรายละเอียดอยู่หัวแผ่นแล้ว) · ข้อมูลงานในกล่องเดียว ย่อ/ขยายได้ */}
+              {!inSheet && (event.title || event.system) && (
+                <Typography fontWeight={800} fontSize="1.05rem" sx={{ letterSpacing: "-0.01em", lineHeight: 1.4 }}>
+                  {event.title || "งาน"}
+                  {event.system && <Box component="span" sx={{ fontWeight: 600, color: "#334155" }}>{` · ${event.system}`}</Box>}
+                  {event.time && <Box component="span" sx={{ fontWeight: 600, color: "#64748b", fontSize: "0.92rem" }}>{` · ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}`}</Box>}
                 </Typography>
               )}
-              {/* ✅ เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ */}
-              <JobFlowChips event={event} />
-              <Stack spacing={0.35} sx={{ mt: 0.6 }}>
-                {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
+              {/* ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ (เลข Job อยู่หัวแผ่นแล้ว) */}
+              <JobFlowChips event={event} hideJobNo={inSheet} />
+              <JobInfoPanel sx={{ mt: 1 }}>
+              <Stack spacing={0}>
                 {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
-                <InfoLine label="โครงการ">
-                  {/* 🔁 (25 ต.ค. 2569 ผู้ใช้: "ให้แสดงชื่อโครงการ ไม่ใช่บริษัท") ชื่อบริษัทยาวดันโครงการตกขอบ */}
-                  {event.site || event.company || "ไม่ระบุโครงการ"}
-                </InfoLine>
-                {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
+                {!inSheet && (
+                  <InfoLine label="โครงการ">
+                    {/* 🔁 (25 ต.ค. 2569 ผู้ใช้: "ให้แสดงชื่อโครงการ ไม่ใช่บริษัท") ชื่อบริษัทยาวดันโครงการตกขอบ */}
+                    {event.site || event.company || "ไม่ระบุโครงการ"}
+                  </InfoLine>
+                )}
                 {(event.startTime || event.endTime) && (
                   <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
@@ -717,19 +725,33 @@ const TechnicianJobCard = ({
                           ? <PersonChip name={event.responsiblePerson} size={20} strong title={`ผู้รับผิดชอบงาน: ${event.responsiblePerson}`} />
                           : <span style={{ color: "#b45309" }}>ยังไม่มอบหมาย</span>}
                       </InfoLine>
-                      {(head || members.length > 0 || isResponsible) && (
-                        <InfoLine label="ทีม" center>
+                      {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ข้อมูลงานควรแสดงรูปแบบเดียวกับหน้าดำเนินงาน · ไม่ผิดพลาดเรื่องสิทธิ์")
+                          หัวหน้าทีม / ลูกทีม แยกแถว + ผู้ติดต่อ แบบเดียวกับหน้าการดำเนินงาน
+                          ⚠️ สิทธิ์คงเดิม: เปลี่ยนหัวหน้าทีมได้เฉพาะผู้รับผิดชอบงาน · ไม่แสดงมูลค่างาน (ข้อมูลการเงิน) ในการ์ดของช่าง */}
+                      <InfoLine label="หัวหน้าทีม" center>
+                        <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 0.5 }}>
+                          {head ? <PersonChip name={head} size={20} title={`หัวหน้าทีมเข้างาน: ${head}`} /> : <span style={{ color: "#b45309" }}>ยังไม่มอบหมาย</span>}
+                          {isResponsible && event.status !== "ดำเนินการเสร็จสิ้น" && (
+                            <ButtonBase onClick={(e) => { e.stopPropagation(); setTeamAnchor(e.currentTarget); }}
+                              sx={{ ml: 0.5, px: 1, py: 0.35, borderRadius: 1.5, color: "#2563eb", bgcolor: "#eff6ff", fontSize: "0.74rem", fontWeight: 800 }}>
+                              {head ? "เปลี่ยน" : "มอบหมาย"}
+                            </ButtonBase>
+                          )}
+                        </Box>
+                      </InfoLine>
+                      {members.length > 0 && (
+                        <InfoLine label="ลูกทีม" center>
                           <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", gap: 0.5 }}>
-                            {head && <PersonChip name={head} size={20} badge="หัวหน้า" title={`หัวหน้าทีมเข้างาน: ${head}`} />}
-                            {members.map((n) => <PersonChip key={n} name={n} size={20} title={`ลูกทีม: ${n}`} />)}
-                            {!head && isResponsible && <span style={{ color: "#b45309" }}>ยังไม่ได้มอบหมายหัวหน้าทีม</span>}
-                            {isResponsible && event.status !== "ดำเนินการเสร็จสิ้น" && (
-                              <ButtonBase onClick={(e) => { e.stopPropagation(); setTeamAnchor(e.currentTarget); }}
-                                sx={{ ml: 0.5, px: 1, py: 0.35, borderRadius: 1.5, color: "#2563eb", bgcolor: "#eff6ff", fontSize: "0.74rem", fontWeight: 800 }}>
-                                {head ? "เปลี่ยนหัวหน้าทีม" : "มอบหมายหัวหน้าทีม"}
-                              </ButtonBase>
-                            )}
+                            {members.map((n) => <PersonChip key={n} name={n} size={18} title={`ลูกทีม: ${n}`} />)}
                           </Box>
+                        </InfoLine>
+                      )}
+                      {(event.contactName || event.contactTel) && (
+                        <InfoLine label="ผู้ติดต่อ">
+                          <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
+                            {event.contactName && <span>{event.contactName}</span>}
+                            {event.contactTel && <TelLink tel={event.contactTel} />}
+                          </Stack>
                         </InfoLine>
                       )}
                       {isResponsible && (
@@ -750,12 +772,14 @@ const TechnicianJobCard = ({
                   );
                 })()}
               </Stack>
+              </JobInfoPanel>
             </Box>
           </Stack>
           {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกว่ากดดูรายละเอียดได้ ตัวกดจริงคือทั้งแถว
               Header (คลิกบับเบิลขึ้นมาถึงเอง) — เดิมใช้ลูกศรชี้ลง/ขึ้นสื่อถึงการกางเนื้อหาลงในหน้า
               แต่ตอนนี้เปิดเป็น Dialog ทับขึ้นมาแทนแล้ว เปลี่ยนเป็นลูกศรชี้ขวาให้ตรงกับพฤติกรรมจริง */}
-          <ChevronRight sx={{ fontSize: 22, color: "#94a3b8", flexShrink: 0, mt: 0.25 }} />
+          {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "การ์ดส่วนหัวดูไม่เต็ม") ในแผ่นรายละเอียดไม่ต้องมีลูกศร (เปิดอยู่แล้ว) — กล่องข้อมูลงานกว้างเต็มการ์ด */}
+          {!inSheet && <ChevronRight sx={{ fontSize: 22, color: "#94a3b8", flexShrink: 0, mt: 0.25 }} />}
         </Stack>
 
         <Box sx={{ display: { xs: mOpen ? "block" : "none", sm: "block" } }}>
@@ -939,9 +963,10 @@ const TechnicianJobCard = ({
 
       {!inSheet && (
         <MobileSheet open={sheetOpen} onClose={() => setSheetOpen(false)}
-          title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
-          subtitle={[event.jobNo, event.site || event.company].filter(Boolean).join(" · ")}>
-          <Box sx={{ m: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
+          // 🔁 (12 พ.ย. 2569) หัวแผ่น = ชื่อโครงการ (เด่น) · บรรทัดรอง = งาน · ระบบ · ครั้งที่ · เลข Job — แบบเดียวกับหน้าการดำเนินงาน
+          title={event.site || event.company || event.title || "งาน"}
+          subtitle={[[event.title, event.system].filter(Boolean).join(" · "), event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : "", event.jobNo].filter(Boolean).join(" · ")}>
+          <Box sx={{ m: { xs: 0.75, sm: 1.25 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
             <TechnicianJobCard event={event} userData={userData} employees={employees} onInputUpdate={onInputUpdate} onStatusUpdate={onStatusUpdate}
               onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview} uploadingState={uploadingState} isUploadingState={isUploadingState}
               uploadProgressState={uploadProgressState} hideDocuments={hideDocuments} noOuterCard onPatched={onPatched} inSheet />
@@ -967,10 +992,16 @@ const TechnicianJobCard = ({
           </Stack>
         </Box>
         <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
-          <SitePhotos event={event} canEdit={!isLocked && isApproved(event)} onPreview={onPreview} sx={{ mt: 0 }} />
-          <Box sx={{ ...CARD, mt: 1.5, p: { xs: 1.75, sm: 2 } }}>
+          <Box sx={{ ...CARD, mt: 0, p: { xs: 1.75, sm: 2 } }}>
             {expandedContent}
           </Box>
+          {/* 🔁 (12 พ.ย. 2569) แยก "ไฟล์อื่นๆ" ออกจากเอกสารประจำงานให้ชัด */}
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2.25, mb: 1 }}>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0" }} />
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: "#64748b", whiteSpace: "nowrap" }}>ไฟล์อื่นๆ · นอกเหนือเอกสารประจำงาน</Typography>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0" }} />
+            </Stack>
+          <SitePhotos event={event} canEdit={!isLocked && isApproved(event)} onPreview={onPreview} sx={{ mt: 0, bgcolor: "#f8fafc" }} />
         </DialogContent>
       </Dialog>
 

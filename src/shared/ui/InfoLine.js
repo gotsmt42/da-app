@@ -1,5 +1,5 @@
-import { Stack, Typography } from "@mui/material";
-import { ApartmentRounded as Apartment, AssignmentIndRounded as AssignmentInd, GroupsRounded as Groups, CategoryRounded as Category, DescriptionRounded as Description, CalendarMonthRounded as CalendarMonth, SendRounded as Send, NumbersRounded as Numbers, AccessTimeRounded as AccessTime, PersonRounded as Person } from "@mui/icons-material";
+import { Box, Stack, Typography } from "@mui/material";
+import { PaymentsRounded as Payments, ApartmentRounded as Apartment, AssignmentIndRounded as AssignmentInd, GroupsRounded as Groups, CategoryRounded as Category, DescriptionRounded as Description, CalendarMonthRounded as CalendarMonth, SendRounded as Send, NumbersRounded as Numbers, AccessTimeRounded as AccessTime, PersonRounded as Person } from "@mui/icons-material";
 
 /**
  * InfoLine.js — บรรทัดข้อมูล "ไอคอน + ป้ายกำกับ + ค่า" ของการ์ดงาน
@@ -34,24 +34,34 @@ const ICON = {
   หัวหน้าทีมเข้างาน: Groups,
   หัวหน้าทีม: Groups,
   ลูกทีม: Groups,
+  มูลค่างาน: Payments,
+  มูลค่างานรวม: Payments,
+  มูลค่าครั้งนี้: Payments,
+  "เลข Job": Numbers,
 };
 
 /** @param center จัดป้ายกึ่งกลางแนวตั้งกับค่า — ใช้กับแถวที่ค่าเป็นชิปรูปคน (สูงกว่าตัวหนังสือ) ให้ป้ายไม่ลอยสูงกว่า */
+/**
+ * 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้างานของฉัน ดำเนินงาน ส่วนหัวการ์ด จัดรูปแบบให้ดูง่ายกว่านี้ ยังดูไม่ลงตัว")
+ *    ไอคอนทุกแถวขนาด/สีเดียวกัน (เดิมบางแถวไม่มีไอคอน ป้ายเลยเยื้อง) · ป้ายกว้างคงที่ 100px · ค่าตัวใหญ่ขึ้น
+ *    · แถวสูงเท่ากัน (ใช้คู่กับกล่องพื้นเทาอ่อนมีเส้นคั่นในหัวการ์ด — class "tt-info-panel")
+ */
 const InfoLine = ({ label, children, center = false }) => {
   const Icon = ICON[label];
   return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: center ? "center" : "flex-start" }}>
+    <Stack direction="row" spacing={1} className="tt-info-line" sx={{ alignItems: center ? "center" : "flex-start", minHeight: 34, py: 0.4 }}>
       <Stack
-        direction="row" alignItems="center" spacing={0.4}
-        sx={{ flexShrink: 0, whiteSpace: "nowrap", color: "text.disabled", minWidth: 84 }}
+        direction="row" alignItems="center" spacing={0.6}
+        sx={{ flexShrink: 0, whiteSpace: "nowrap", color: "#64748b", width: 100, minHeight: 26 }}
       >
-        {/* ⚠️ mt เล็กน้อยให้ไอคอนอยู่กึ่งกลางบรรทัดแรกของตัวหนังสือ ไม่ลอยสูงกว่า */}
-        {Icon && <Icon sx={{ fontSize: 13, mt: "1px" }} />}
-        <Typography variant="caption" component="span">{label}</Typography>
+        <Box component="span" sx={{ width: 18, display: "inline-flex", justifyContent: "center", flexShrink: 0 }}>
+          {Icon && <Icon sx={{ fontSize: 16, color: "#94a3b8" }} />}
+        </Box>
+        <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b" }}>{label}</Typography>
       </Stack>
       <Typography
-        variant="caption"
-        sx={{ minWidth: 0, color: "text.primary", fontWeight: 500, lineHeight: 1.5 }}
+        component="div"
+        sx={{ flex: 1, minWidth: 0, color: "#0f172a", fontSize: "0.86rem", fontWeight: 600, lineHeight: 1.5, alignSelf: center ? "center" : "flex-start", pt: center ? 0 : "3px" }}
       >
         {children}
       </Typography>

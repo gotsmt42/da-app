@@ -340,9 +340,11 @@
   box-shadow: none !important;
   border-bottom: 8px solid #f2f4f7 !important;
 }
-.dash-phone .dw-head { border-bottom: 0 !important; padding: 16px 12px 4px !important; }
-/* ทุกแถวในกล่อง (หัว · แถบสรุป · รายการ · ตัวแบ่งหน้า) ขอบซ้ายขวา 12px เท่าส่วนบนของหน้า */
-.dash-phone .dw > * { padding-left: 12px !important; padding-right: 12px !important; }
+.dash-phone .dw-head { border-bottom: 0 !important; padding: 16px 16px 4px !important; }
+/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ระยะขอบให้พอดี") เดิมบังคับ padding 12px ให้ลูกตรงทุกตัว — กล่องที่ห่อแถวไว้อีกชั้น
+   (งานค้างของช่าง ฯลฯ) ได้ 12 + 16 ของแถวซ้อนกัน แถวเยื้องเข้าไปไม่ตรงแนว
+   → หัว/แถบสรุป 16px · แถวรายการใช้ระยะของตัวเอง (16px) ทุกกล่องตรงแนวเดียวกัน */
+.dash-phone .dw-summary { padding-left: 16px !important; padding-right: 16px !important; }
 .dash-phone .dw-icon { display: none !important; }
 .dash-phone .dw-title { font-size: 1.12rem !important; font-weight: 700 !important; }
 /* ไอคอนหัวกล่องซ่อนอยู่ แต่ Stack spacing ยังเว้นระยะให้ตัวถัดไป → ชื่อเยื้อง 10px · ตัดออกให้ตรงแนวส่วนบน */

@@ -86,7 +86,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
   const ct = init.contract;
   const inputHtml = `
     <div class="ee-value-box">
-      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
+      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
         value="${amount === null ? "" : fmt(amount)}" ${dis}>
       <span class="ee-value-unit">บาท</span>
     </div>`;
@@ -113,7 +113,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
     </div>`;
   return `
     <div class="ee-value-box">
-      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="เช่น 15,000"
+      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
         value="${amount === null ? "" : fmt(amount)}" ${dis}>
       <span class="ee-value-unit">บาท</span>
     </div>

@@ -1,4 +1,5 @@
 import Swal from "@/shared/ui/swal";
+import { Capacitor } from "@capacitor/core";
 
 // ✅ ตรวจว่าเป็นมือถือ/แท็บเล็ตหรือไม่ — ใช้ตัดสินใจว่าจะเสนอปุ่มไหนเป็นตัวหลักในเมนูแชร์
 // เหตุผล: navigator.share ฝั่ง "แชร์ไฟล์จริง" ใช้ได้ดีบนมือถือเท่านั้น (Android/iOS ที่แอป
@@ -54,63 +55,97 @@ export const printFile = async (url, fileName) => {
   }
 };
 
-// ✅ แชร์ไฟล์จริง (ตัวรูป/PDF) ไม่ใช่แค่ลิงก์ — ใช้ Web Share API level 2 (navigator.share
-// รับ files ได้) แอปปลายทาง (LINE ฯลฯ) จะได้ไฟล์แนบจริงเหมือนเลือกรูปจากเครื่องส่งเอง
-// ไม่ใช่แค่การ์ดพรีวิวลิงก์
-//
-// สำคัญ: ทุกขั้นตอนแยก try/catch ของตัวเอง ไม่ใช่ try ก้อนเดียวทั้งฟังก์ชัน — เดิมถ้าขั้น
-// "แชร์ไฟล์จริง" throw (เช่น NotAllowedError เพราะ user-activation ของเบราว์เซอร์หมดอายุ
-// ไปแล้วตอนที่ await fetch() เสร็จ โดยเฉพาะ Safari/iOS ที่เข้มงวดเรื่องนี้มาก) โค้ดจะกระโดด
-// ไป catch ก้อนนอกแล้วแจ้ง "แชร์ไม่สำเร็จ" ทันที โดยไม่เคยลองแชร์ลิงก์ต่อเลย ทำให้ดูเหมือน
-// "แชร์ไม่ได้" ทั้งที่จริงๆ ยังมีทางแชร์ลิงก์สำรองที่ใช้ได้อยู่ — ตอนนี้ไล่ลองทีละชั้นจนกว่า
-// จะสำเร็จ จบท้ายด้วยการเปิดไฟล์ในแท็บใหม่เป็นทางเลือกสุดท้ายที่ไม่มีวันล้มเหลว
+// ✅ แชร์ไฟล์จริง (ตัวรูป/PDF) ไม่ใช่แค่ลิงก์ — Web Share API level 2 (navigator.share รับ files) · LINE ฯลฯ ได้ไฟล์แนบจริง
+/**
+ * 🐛 (12 พ.ย. 2569 ผู้ใช้: "กดแชร์ไม่ได้ ไม่ขึ้นแชร์ แต่ไปกดเป็นเปิดแทน")
+ *    เดิมเมื่อแชร์ไม่ได้ทุกชั้น ตกไปที่ window.open (เปิดไฟล์) แบบเงียบๆ — เกิดได้ 3 กรณี:
+ *      1) ในแอปมือถือ (Capacitor WebView) ไม่มี navigator.share → ใช้แผงแชร์ของเครื่องผ่าน deliverFile แทน
+ *      2) เว็บที่ไม่ใช่ https (เช่น ที่อยู่ทดสอบ http://10.x.x.x) เบราว์เซอร์ปิด share/clipboard ทั้งหมด → บอกตรงๆ + ดาวน์โหลดให้
+ *      3) โหลดไฟล์นานจนหมดจังหวะแตะ (NotAllowedError) → ถามซ้ำด้วยปุ่ม "แชร์" ให้แตะอีกครั้ง (ได้จังหวะแตะใหม่)
+ *    ✅ ไม่เปิดไฟล์แทนการแชร์อีก
+ */
+const fetchAsFile = async (url, fileName) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Fetch failed");
+  const rawBlob = await response.blob();
+  const mime = guessMimeType(fileName) || rawBlob.type || "application/octet-stream";
+  const blob = mime !== rawBlob.type ? new Blob([rawBlob], { type: mime }) : rawBlob;
+  return { blob, file: new File([blob], fileName || "file", { type: mime }) };
+};
+
+const canShareFiles = (file) => {
+  try { return Boolean(navigator.canShare?.({ files: [file] })); } catch { return false; }
+};
+
+const saveBlob = (blob, fileName) => {
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl; a.download = fileName || "download";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+};
+
 export const shareFile = async (url, fileName) => {
   if (!url) return;
   const title = fileName || "ไฟล์เอกสาร";
 
-  // ── ชั้นที่ 1: แชร์ไฟล์จริง ──
-  try {
-    const response = await fetch(url);
-    if (response.ok) {
-      const rawBlob = await response.blob();
-      const mime = guessMimeType(fileName) || rawBlob.type || "application/octet-stream";
-      const blob = mime && mime !== rawBlob.type ? new Blob([rawBlob], { type: mime }) : rawBlob;
-      const file = new File([blob], fileName || "file", { type: mime });
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title });
-        return; // สำเร็จ
-      }
-    }
-  } catch (err) {
-    if (err?.name === "AbortError") return; // ผู้ใช้กดยกเลิกเอง ไม่ต้องลองวิธีอื่นต่อ
-    console.warn("shareFile: แชร์ไฟล์จริงไม่สำเร็จ ลองแชร์ลิงก์แทน —", err);
-  }
-
-  // ── ชั้นที่ 2: แชร์ลิงก์ผ่าน Web Share API ──
-  if (navigator.share) {
+  // ── ในแอปมือถือ: แผงแชร์ของเครื่อง (LINE ฯลฯ ได้ไฟล์จริง) ──
+  if (Capacitor.isNativePlatform()) {
     try {
-      await navigator.share({ title, url });
-      return; // สำเร็จ
+      const { blob } = await fetchAsFile(url, fileName);
+      const { deliverFile } = await import("@/native/nativeBridge");
+      await deliverFile(blob, fileName);
     } catch (err) {
-      if (err?.name === "AbortError") return;
-      console.warn("shareFile: แชร์ลิงก์ไม่สำเร็จ ลองคัดลอกแทน —", err);
+      console.warn("shareFile(native):", err);
+      Swal.fire({ toast: true, position: "top", icon: "error", title: "แชร์ไม่สำเร็จ ลองใหม่อีกครั้ง", showConfirmButton: false, timer: 2500 });
     }
+    return;
   }
 
-  // ── ชั้นที่ 3: คัดลอกลิงก์ใส่คลิปบอร์ด ──
-  if (navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(url);
-      Swal.fire({ title: "คัดลอกลิงก์ไฟล์แล้ว", text: "เบราว์เซอร์นี้ไม่รองรับแชร์ไฟล์โดยตรง", icon: "success", timer: 1800, showConfirmButton: false });
-      return; // สำเร็จ
-    } catch (err) {
-      console.warn("shareFile: คัดลอกคลิปบอร์ดไม่สำเร็จ —", err);
+  // ── เว็บที่ไม่ใช่ https / เบราว์เซอร์ไม่รองรับแชร์ ──
+  if (typeof navigator.share !== "function") {
+    const insecure = !window.isSecureContext;
+    try { saveBlob((await fetchAsFile(url, fileName)).blob, fileName); } catch { /* ดาวน์โหลดไม่ได้ก็แจ้งอย่างเดียว */ }
+    if (!insecure && navigator.clipboard) {
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
     }
+    Swal.fire({
+      icon: "info",
+      title: "เครื่องนี้แชร์ตรงไม่ได้",
+      text: insecure
+        ? "หน้านี้เปิดจากที่อยู่ทดสอบ (http) เบราว์เซอร์จึงปิดการแชร์ — ดาวน์โหลดไฟล์ให้แล้ว · ใช้งานจริงที่ da-app.vercel.app หรือในแอปแชร์ได้ปกติ"
+        : "ดาวน์โหลดไฟล์ให้แล้ว และคัดลอกลิงก์ไว้ให้ — แนบส่งเองได้เลย",
+      confirmButtonText: "ตกลง",
+    });
+    return;
   }
 
-  // ── ทางเลือกสุดท้าย: เปิดไฟล์ในแท็บใหม่ให้ผู้ใช้บันทึก/แชร์เอง ──
-  window.open(url, "_blank");
+  // ── แชร์ไฟล์จริง (รูป/PDF) ──
+  let file = null;
+  try { ({ file } = await fetchAsFile(url, fileName)); } catch (err) { console.warn("shareFile: โหลดไฟล์ไม่สำเร็จ แชร์ลิงก์แทน —", err); }
+  const data = file && canShareFiles(file) ? { files: [file], title } : { title, url };
+  const tryShare = async (d) => {
+    try { await navigator.share(d); return "ok"; } catch (err) {
+      if (err?.name === "AbortError") return "ok"; // ผู้ใช้ปิดแผงแชร์เอง
+      if (err?.name === "NotAllowedError") return "again";
+      // บาง Android ไม่รับ title คู่กับไฟล์ → ลองไฟล์อย่างเดียว
+      if (d.files) { try { await navigator.share({ files: d.files }); return "ok"; } catch (e2) { if (e2?.name === "AbortError") return "ok"; if (e2?.name === "NotAllowedError") return "again"; } }
+      return "fail";
+    }
+  };
+  const r = await tryShare(data);
+  if (r === "ok") return;
+  if (r === "again") {
+    // โหลดไฟล์นานจนเบราว์เซอร์ไม่นับว่าเป็นการแตะ — ให้แตะปุ่มแชร์อีกครั้ง (ไฟล์โหลดเสร็จแล้ว)
+    const res = await Swal.fire({
+      title: "ไฟล์พร้อมแล้ว", text: title, icon: "success",
+      showCancelButton: true, confirmButtonText: "แชร์", cancelButtonText: "ยกเลิก",
+      preConfirm: () => tryShare(data),
+    });
+    if (!res.isConfirmed || res.value === "ok") return;
+  }
+  if (file) saveBlob(file, fileName);
+  Swal.fire({ icon: "info", title: "แชร์ไม่สำเร็จ", text: "ดาวน์โหลดไฟล์ให้แล้ว — แนบส่งเองได้เลย", confirmButtonText: "ตกลง" });
 };
 
 // ✅ แชร์ "ลิงก์" ไปยัง LINE โดยเฉพาะผ่าน LINE it! share endpoint ทางการ — นี่คือทางเดียวที่

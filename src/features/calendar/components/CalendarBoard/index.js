@@ -1002,7 +1002,8 @@ function EventCalendar() {
   };
 
   const saveEventToDB = async (newEvent) => {
-    await getSaveEventToDB({ newEvent, EventService });
+    // ✅ คืนงานที่สร้าง — ฟอร์มลงงานใช้อัปโหลดไฟล์แนบเข้างานนั้นต่อ
+    return getSaveEventToDB({ newEvent, EventService });
   };
 
   // ✅ ใช้จากปุ่ม "คัดลอกงานนี้" ใน EditEvent.js — เก็บ template ของงานไว้ใน state แล้วแจ้งเตือนสั้นๆ ว่าคัดลอกแล้ว

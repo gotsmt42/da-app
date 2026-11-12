@@ -1,4 +1,5 @@
 import { countUsedRounds, totalRoundsOf } from "@/shared/utils/contractRounds";
+import { attachSheetPicker } from "@/shared/utils/sheetPicker";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
@@ -287,6 +288,12 @@ function injectAddDraftStyles() {
       display: inline-grid; place-items: center; background: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 900;
     }
     .ade-intake .ade-section-label .ade-sec-hint { font-weight: 600; font-size: 12px; color: #94a3b8; }
+    /* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ฟอร์มรับงานด้วย ให้ปรับปรุงให้สอดคล้อง ทำได้ง่าย การจัดวาง · select เหมือนหน้า event")
+       หัวข้อไม่ถูกบีบจนตัดคำ ("ข้อมูล / Job") · ส่วน "ข้อมูล Job" แยกเป็นช่วงของตัวเอง (แถบเทาคั่น) ไม่ซ้อนกับไฟล์แนบ */
+    .ade-intake .ade-section-label .ade-sec-title { white-space: nowrap; flex-shrink: 0; }
+    .ade-sec-sub { margin: -8px 0 12px; font-size: 12px; color: #64748b; }
+    .ade-intake #ade-jobInfoBlock { margin: 18px -16px 0; padding: 14px 16px 4px; border-top: 8px solid #f5f7fa; }
+    @media(max-width:600px) { .ade-intake #ade-jobInfoBlock { margin: 16px -14px 0; padding: 12px 14px 4px; } }
     .ade-intake .ade-seg span i { display: none; }
     #ade-header-icon svg { width: 22px; height: 22px; color: #2563eb; }
     /* 🐛 (19 ต.ค. 2569 ผู้ใช้: "ตรงประเภทงานมันดูกลมกลืน นึกว่าไม่มีช่องนี้") — ช่องเลือก/พิมพ์ (TomSelect) ขอบเข้มขึ้น + ลูกศรลง ให้รู้ว่าเป็นช่องกรอก */
@@ -875,12 +882,14 @@ export const getAddDraftEvent = async ({
         // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
         Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
         bindJobInfo(Swal.getPopup());
+        // 🔁 (12 พ.ย. 2569) ช่องเลือกเปิดเป็นแผ่นรายการแบบเดียวกับหน้าลงงาน/แก้ไขงาน (ค้นหาบนสุด · เรียง ก-ฮ · ปัดลงปิด)
+        const TS_TITLE = { "#adeCompany": "บริษัท", "#adeSite": "โครงการ", "#adeTitle": "ประเภทงาน", "#adeSystem": "ระบบงาน", "#adeTime": "ครั้งที่" };
         const mkTs = (id, placeholder = "") => {
           // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อ/ตัวเลือกที่มีเกิน 7 รายการทิ้งไปเงียบๆ (ห้องสมุด TomSelect
           // ค่า default จริงคือ 50 อยู่แล้ว) ทำให้ dropdown บริษัท/โครงการ/ประเภทงาน/ระบบงาน "หาไม่เจอ"
           // เป็นบางที เวลารายการมีมากกว่า 7 รายการ — ผู้เรียกควรส่ง length ของรายการจริงมาแทน
           try {
-            return new TomSelect(id, {
+            const ts = new TomSelect(id, {
               create: true,
               maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
               placeholder,
@@ -888,6 +897,8 @@ export const getAddDraftEvent = async ({
               allowEmptyOption: true,
               dropdownParent: "body", // ✅ กันพื้นที่เลื่อน (overflow-y:auto) ตัดขอบ dropdown
             });
+            attachSheetPicker(ts, { title: TS_TITLE[id] });
+            return ts;
           } catch { return null; }
         };
 
@@ -955,7 +966,7 @@ export const getAddDraftEvent = async ({
               </div>
             </div>`;
           try {
-            new TomSelect("#adeResp", {
+            const respTs = new TomSelect("#adeResp", {
               options: [{ value: "", text: "ยังไม่มอบหมาย", img: "", sub: "" },
                 ...respUsers.map((u) => ({ value: u.fname, text: [u.fname, u.lname].filter(Boolean).join(" "), img: u.imageUrl || "", sub: u.jobTitle || "" }))],
               items: [initialResp],
@@ -965,6 +976,7 @@ export const getAddDraftEvent = async ({
               dropdownParent: "body",
               render: { option: (d) => row(d, false), item: (d) => row(d, true) },
             });
+            attachSheetPicker(respTs, { title: "ผู้รับผิดชอบงาน" });
           } catch { /* ใช้ select ปกติ */ }
         }
 
@@ -1018,6 +1030,7 @@ export const getAddDraftEvent = async ({
             render: { option: renderContractOption, item: renderContractItem },
             dropdownParent: "body", // ✅ กันพื้นที่เลื่อน (overflow-y:auto) ตัดขอบ dropdown
           });
+          attachSheetPicker(contractTs, { title: "เลือกสัญญา" });
         } catch { contractTs = null; }
 
         const contractPickInfo = document.getElementById("ade-contractPickInfo");

@@ -86,6 +86,7 @@ import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUncheckedRounded";
 import Add from "@mui/icons-material/AddRounded";
 import InfoLine from "@/shared/ui/InfoLine";
+import JobInfoPanel from "@/shared/ui/JobInfoPanel";
 // ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับที่ระบบใบแจ้งงานใช้ (ดูหัวไฟล์ SiteMapLink.js)
 // ⚠️ หน้านี้ใช้แค่ hook ไม่ใช้ตัวคอมโพเนนต์ — ลิงก์แผนที่ผูกไว้กับ "ชื่อโครงการ" บนการ์ดเลย
 // ไม่มีปุ่ม/กล่องของตัวเอง (ดูเหตุผลตรงจุดที่ใช้)
@@ -717,6 +718,62 @@ const FileRow = React.memo(
 );
 
 /**
+ * มูลค่างานรวม (jobValue · ยอดทั้งงาน/ทั้งสัญญา) แก้ได้ในหัวการ์ด
+ * ✅ (12 พ.ย. 2569 ผู้ใช้: "มูลค่ารวมให้แก้ตรงนี้ได้ด้วย ให้สอดคล้อง · งานของผู้รับผิดชอบนั้นๆ")
+ *    แอดมิน/manager หรือผู้รับผิดชอบงานนั้น · บันทึกแล้วอัปเดตทุกวัน/ทุกครั้งในกลุ่มเดียวกัน (PUT /events/basic-info)
+ */
+const JobValueEdit = ({ event, canEdit }) => {
+  const [val, setVal] = useState(event.jobValue);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => { setVal(event.jobValue); }, [event.jobValue]);
+  const has = Number(val) > 0;
+  const start = () => { setText(has ? Number(val).toLocaleString("en-US") : ""); setErr(""); setEditing(true); };
+  const save = async () => {
+    const raw = text.replace(/[^\d.]/g, "");
+    const n = raw === "" ? null : Number(raw);
+    if (n !== null && (!Number.isFinite(n) || n < 0)) { setErr("ตัวเลขไม่ถูกต้อง"); return; }
+    setSaving(true); setErr("");
+    try {
+      await EventService.UpdateBasicInfo([event._id], { jobValue: n === null ? "" : n });
+      setVal(n); setEditing(false);
+    } catch (e) {
+      setErr(e?.response?.data?.message || "บันทึกไม่สำเร็จ");
+    }
+    setSaving(false);
+  };
+  if (editing) {
+    return (
+      <Stack spacing={0.75} sx={{ width: "100%" }}>
+        <TextField size="small" autoFocus fullWidth value={text} disabled={saving} placeholder="ยังไม่ระบุ"
+          onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+          inputProps={{ inputMode: "decimal", style: { fontSize: "1rem", fontWeight: 700 } }}
+          InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment>, endAdornment: <InputAdornment position="end">{event.contractGroupId ? "ทั้งสัญญา" : "ทั้งงาน"}</InputAdornment> }}
+          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }} />
+        <Stack direction="row" spacing={1}>
+          <Button variant="contained" disableElevation size="small" onClick={save} disabled={saving}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: "10px", minHeight: 36, px: 2 }}>{saving ? "กำลังบันทึก…" : "บันทึก"}</Button>
+          <Button size="small" onClick={() => setEditing(false)} disabled={saving} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>ยกเลิก</Button>
+        </Stack>
+        {err && <Typography sx={{ fontSize: "0.76rem", color: "#dc2626", fontWeight: 700 }}>{err}</Typography>}
+      </Stack>
+    );
+  }
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.75}>
+      {has
+        ? <span>฿{Number(val).toLocaleString("th-TH")}<Box component="span" sx={{ color: MUTED, fontWeight: 500, fontSize: "0.8rem" }}>{event.contractGroupId ? " · ทั้งสัญญา" : " · ทั้งงาน"}</Box></span>
+        : <Box component="span" sx={{ color: MUTED, fontWeight: 500 }}>ยังไม่ระบุ</Box>}
+      {canEdit && (
+        <IconButton size="small" onClick={start} aria-label="แก้มูลค่างานรวม" sx={{ color: MUTED }}><Edit sx={{ fontSize: 17 }} /></IconButton>
+      )}
+    </Stack>
+  );
+};
+
+/**
  * ✅ (3 ต.ค. 2569) ผู้ใช้: "หน้าของแอดมินด้วย ให้สอดคล้อง ดูง่าย รายละเอียดครบถ้วน มืออาชีพ"
  *    card=true → การ์ดขาวแบบเดียวกับหน้าแนบเอกสารของช่าง: ไอคอน · ชื่อ + ป้ายบังคับ/ถ้ามี · คำอธิบาย · ป้ายสถานะ
  *    event (ถ้าส่งมา) ใช้ตัดสินว่าบังคับไหม (งาน PM) และสถานะครบหรือยัง — ตรรกะเดียวกับฝั่งช่าง (isDocComplete)
@@ -798,9 +855,11 @@ export const FileUploadSection = ({
       onDragOver={card && canEdit ? (e) => { e.preventDefault(); setDragging(true); } : undefined}
       onDragLeave={card && canEdit ? () => setDragging(false) : undefined}
       onDrop={card && canEdit ? handleDrop : undefined}
+      className={card ? "tt-doc-card" : undefined}
       sx={card ? {
         borderRadius: "14px", bgcolor: dragging ? ACCENT_SOFT : "#fff",
-        border: `1px solid ${dragging ? ACCENT : hasFiles && !reportUnconfirmed ? "#bbf7d0" : "#e8edf3"}`,
+        // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ยังดูรกนิดหน่อย สีสันยังไม่ลงตัว") ขอบเทาเดียวกันทุกการ์ด — สถานะ (แนบแล้ว/ยังไม่แนบ) บอกด้วยบรรทัดสถานะ
+        border: `1px solid ${dragging ? ACCENT : "#e6e9ef"}`,
         boxShadow: "none", px: roomy ? { xs: 1.5, sm: 2 } : 1.5, py: roomy ? { xs: 1.25, sm: 1.6 } : 1.15,
         ...(roomy ? { height: "100%", boxSizing: "border-box" } : {}),
       } : undefined}>
@@ -1400,7 +1459,8 @@ const EventRowCard = ({
             มือถือตอนพับ = หัวการ์ดย่อ (ปฏิทิน · ชื่องาน · โครงการ · ผู้รับผิดชอบ + สถานะ · ขั้นถัดไป) · กดแล้วกางหัวการ์ดเต็ม + รายละเอียด */}
         {!o && <Box sx={{ display: { xs: "block", sm: "none" } }}>{mobileSummary}</Box>}
         <Box onClick={() => { if (inlineDetails) setOpen((p) => !p); else if (!o) setOpen(true); }} sx={{ cursor: o && !inlineDetails ? "default" : "pointer", display: { xs: o ? "block" : "none", sm: "block" } }} role="button" aria-expanded={o}>
-          <Stack direction="row" alignItems="flex-start" gap={1.5}>
+          {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ทำให้พอดีการ์ด เหมือนส่วนอื่นๆ") ปุ่ม ⋮/ย่อ ลอยมุมขวาบน — เนื้อหาหัวการ์ด (กล่องข้อมูล) กว้างเต็มการ์ด */}
+          <Stack direction="row" alignItems="flex-start" gap={1.5} sx={{ position: "relative" }}>
             <Avatar sx={{
               display: { xs: "none", sm: "flex" },
               width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
@@ -1413,7 +1473,7 @@ const EventRowCard = ({
               })}
             </Avatar>
             <Box minWidth={0} flex={1}>
-              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ pr: (canEdit ? 5 : 0) + (inlineDetails || !o ? 4 : 0) }}>
                 <Tooltip title="เปลี่ยนสถานะ">
                   <Box onClick={e => { e.stopPropagation(); canEdit && setAnchorEl(e.currentTarget); }} sx={{ cursor: canEdit ? "pointer" : "default" }}>
                     <StatusBadge color={OP_COLOR[localStatus]}>
@@ -1460,8 +1520,9 @@ const EventRowCard = ({
                   <Box
                     onClick={openDateEdit}
                     sx={{
+                      // 🔁 (12 พ.ย. 2569 ผู้ใช้: "จัดวางส่วนบนใหม่ให้ดูดีกว่านี้") วันที่เป็นป้ายทรงเดียวกับป้ายสถานะ — แถวบนเรียงเสมอกัน
                       display: "flex", alignItems: "center", gap: 0.5,
-                      px: 0.5, mx: -0.5, py: 0.25, borderRadius: 1.5,
+                      px: 1, height: 26, borderRadius: 999, bgcolor: "#f8fafc", border: "1px solid #e6e9ef",
                       cursor: canEdit ? "pointer" : "default",
                       transition: "background-color 0.15s ease",
                       "&:hover": canEdit ? { bgcolor: alpha(theme.palette.primary.main, 0.08) } : {},
@@ -1515,21 +1576,25 @@ const EventRowCard = ({
                 </Stack>
               </Popover>
 
-              <Typography fontWeight={800} fontSize="1rem" noWrap sx={{ letterSpacing: "-0.01em", mt: 0.5, color: INK }}>
+              {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ครั้งที่ให้เข้ามาต่อตรง Fire Alarm") ชื่องาน · ระบบ · ครั้งที่ อยู่บรรทัดเดียว (ยาวเกินตัดบรรทัดได้) */}
+              {/* 🧹 (12 พ.ย. 2569 ผู้ใช้: "ตรงนี้ควรตัดไปแสดงด้านบนสุดเลย ดูซ้ำซ้อน") ในแผ่นรายละเอียด ชื่องาน/ครั้งที่/เลข Job อยู่หัวแผ่นแล้ว */}
+              {!(o && !inlineDetails) && <Typography fontWeight={800} fontSize="1.05rem" sx={{ letterSpacing: "-0.01em", mt: 0.75, color: INK, lineHeight: 1.4 }}>
                 {event.title || "ไม่ระบุประเภทงาน"}
                 {event.system && <Box component="span" sx={{ fontWeight: 600, color: INK_2 }}>{` · ${event.system}`}</Box>}
-              </Typography>
-              <Typography noWrap sx={{ fontSize: "0.84rem", color: MUTED, fontWeight: 600 }}>
-                {companySite(event.company, event.site)}
-                {event.time ? ` · ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : ""}
-              </Typography>
-              {/* ✅ เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · ช่างรับงานแล้วหรือยัง */}
-              <JobFlowChips event={event} showAck />
+                {event.time && <Box component="span" sx={{ fontWeight: 600, color: MUTED, fontSize: "0.92rem" }}>{` · ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}`}</Box>}
+              </Typography>}
+              {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "โครงการก็ใส่คำว่าโครงการก่อน · เลข Job หาที่จัดวางให้ดูดีกว่านี้")
+                  โครงการ/ครั้งที่ และเลข Job ย้ายเข้าแถวข้อมูลในกล่องด้านล่าง (มีป้ายกำกับ) · ชิปเหลือเฉพาะสถานะ (ด่วน/ครบกำหนด/รับทราบ) */}
+              <JobFlowChips event={event} showAck hideJobNo={o && !inlineDetails} />
               {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ข้อมูลงานควรอยู่ตรง header เลย จัดวางให้ดีๆ ไม่กินพื้นที่")
                   ผู้รับผิดชอบ · หัวหน้าทีมเข้างาน (+ลูกทีม) · ผู้ติดต่อ อยู่ในหัวการ์ด เห็นโดยไม่ต้องกาง
                   (เดิมอยู่ในส่วนกางใต้หัวข้อ "ข้อมูลงาน") · มอบหมายได้ตรงนี้เลย */}
-              <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 0.85, cursor: "default" }}>
-                <Box sx={{ display: "grid", rowGap: 0.5 }}>
+              {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ส่วนหัวการ์ด จัดรูปแบบให้ดูง่ายกว่านี้") ข้อมูลคน/มูลค่า/ผู้ติดต่อ อยู่ในกล่องเดียว
+                  พื้นเทาอ่อน มีเส้นคั่นทุกแถว — อ่านไล่ลงเป็นตาราง ไม่ลอยปนกับชื่องาน */}
+              <JobInfoPanel sx={{ mt: 1.25 }}>
+                <Box sx={{ display: "grid", rowGap: 0 }}>
+                  {!(o && !inlineDetails) && <InfoLine label="โครงการ">{companySite(event.company, event.site)}</InfoLine>}
+
                   <InfoLine label="ผู้รับผิดชอบ" center>
                     <AssignableResponsible responsible={event.responsiblePerson} avatars={avatarMap} size={20} onAssign={canAssign ? setAssignAnchor : undefined} />
                   </InfoLine>
@@ -1553,8 +1618,17 @@ const EventRowCard = ({
                   })()}
                   {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ (ไม่บังคับ)
                       แอดมิน/manager แก้ได้แม้งานปิดแล้ว (เติมงานเก่าย้อนหลัง) · ช่างแก้ได้จนกว่างานปิด */}
+                  {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "มูลค่างาน ต้องแสดงมูลค่างานครั้งนี้ และมูลค่างานรวม แยกให้สมบูรณ์ ให้สอดคล้อง")
+                      มูลค่าครั้งนี้ (workValue · แก้ได้ที่นี่) · มูลค่างานรวม (jobValue · ยอดทั้งงาน/สัญญา — แก้ที่ฟอร์มงาน/ภาพรวมงาน) */}
                   {event.department !== "sales" && (
-                    <InfoLine label="มูลค่างาน" center>
+                    <InfoLine label="มูลค่างานรวม" center>
+                      <JobValueEdit event={event} canEdit={can(currentUser, "editContracts")
+                        || (currentUser?.userId && String(event.responsiblePersonId || "") === String(currentUser.userId))
+                        || (currentUser?.fname && event.responsiblePerson === currentUser.fname)} />
+                    </InfoLine>
+                  )}
+                  {event.department !== "sales" && (
+                    <InfoLine label="มูลค่าครั้งนี้" center>
                       <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
                         disabled={!onStatusUpdate || (!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น")}
                         onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
@@ -1587,12 +1661,12 @@ const EventRowCard = ({
                     คอลัมน์ให้กว้างเกินแล้วตกขอบการ์ด แทนที่จะตัดด้วย ellipsis */}
                 <Box
                   sx={{
-                    mt: 0.5,
+                    mt: 0,
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" },
-                    columnGap: 2.5,
-                    rowGap: 0.35,
+                    gridTemplateColumns: "1fr",
+                    rowGap: 0,
                     alignItems: "start",
+                    "&:empty": { display: "none" },
                   }}
                 >
                   {/* 🧹 (10 ต.ค. 2569 ผู้ใช้: "หน้าดำเนินงานข้อมูลมันดูซ้ำซ้อนและยาวรกเกินไป") — ตัด "ระบบ" (อยู่ในหัวการ์ดแล้ว) · โครงการเหลือแค่ลิงก์นำทาง (ชื่ออยู่ในหัวการ์ดแล้ว)
@@ -1650,15 +1724,16 @@ const EventRowCard = ({
                     )
                   )}
                 </Box>
-              </Box>
+              </JobInfoPanel>
             </Box>
-            <Stack direction="row" alignItems="center" gap={0.25} flexShrink={0} sx={{ mt: -0.5, mr: -0.75 }}>
+            <Stack direction="row" alignItems="center" gap={0.25} flexShrink={0} sx={{ position: "absolute", top: -4, right: -6 }}>
             {canEdit && (
               <IconButton onClick={e => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 1 }}>
                 <MoreVert fontSize="small" />
               </IconButton>
             )}
-              <ExpandMore sx={{ fontSize: 22, color: MUTED, transition: "transform .2s", transform: o ? "rotate(180deg)" : "none" }} />
+              {/* 🧹 (12 พ.ย. 2569 ผู้ใช้: "ตัว ^ ไม่ให้ใช้งานก็ตัดออก") ในแผ่นรายละเอียด (กางเต็มแล้ว ย่อไม่ได้) ไม่ต้องมีลูกศร */}
+              {(inlineDetails || !o) && <ExpandMore sx={{ fontSize: 22, color: MUTED, transition: "transform .2s", transform: o ? "rotate(180deg)" : "none" }} />}
             </Stack>
           </Stack>
 
@@ -1796,16 +1871,13 @@ const EventRowCard = ({
           {!hideDocuments && !docsUnlocked(event) && <DocsLockedRow event={event} />}
           {(!hideDocuments || showDocsOverride) && docsUnlocked(event) && (
             <>
+              {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ทำให้เอกสารงานอยู่ในกรอบเดียว ให้สังเกตง่าย") เอกสาร 4 ชนิดอยู่ในกรอบสรุปเดียวกัน
+                  ✅ (11 พ.ย. 2569) วาดรายการเอกสาร (ภาพย่อหลายรูป) หลังแผ่นเปิดเสร็จ กันเฟรมแรกหนัก · ที่ว่างสูงคงที่ระหว่างรอ */}
               <JobDocsSummaryCard event={event} expanded={o ? docsOpen : undefined}
-                openLabel={o ? (docsOpen ? "ย่อรายการเอกสาร" : "ดู / ตรวจเอกสาร") : "ดู / ตรวจเอกสาร"}
-                onOpen={() => (o ? setDocsOpen((v) => !v) : setOpen(true))} />
-              {o && (
-                <Collapse in={docsOpen} timeout={220} unmountOnExit>
-                  {/* ✅ (11 พ.ย. 2569 ผู้ใช้: "ป้องกันการหน่วงแลค หน้าจอกระพริบ") วาดรายการเอกสาร (ภาพย่อหลายรูป) หลังแผ่นเปิดเสร็จ
-                        กันเฟรมแรกหนัก · ที่ว่างสูงคงที่ระหว่างรอ หน้าไม่กระโดด */}
-                  <Box sx={{ mt: 1.25 }}><LazyMount delay={SHEET_DURATION.enter + 120} minHeight={260}>{docsSheetContent}</LazyMount></Box>
-                </Collapse>
-              )}
+                openLabel="ดู / ตรวจเอกสาร"
+                onOpen={() => (o ? setDocsOpen((v) => !v) : setOpen(true))}>
+                {o ? <LazyMount delay={SHEET_DURATION.enter + 120} minHeight={260}>{docsSheetContent}</LazyMount> : null}
+              </JobDocsSummaryCard>
             </>
           )}
 
@@ -1916,7 +1988,13 @@ const EventRowCard = ({
 
             {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างานที่ช่างแนบ — แอดมินดู/เพิ่ม/ลบได้ (ย้ายลงมาใต้เอกสาร/คำขอปิดงาน 11 ต.ค. 2569) */}
             {/* ✅ (25 ต.ค. 2569 perf) ส่วนล่าง (รูป/ไฟล์ · เอกสาร · คุยกับช่าง · ประวัติ) วาดหลังแผ่นเลื่อนขึ้นเสร็จ — ดู LazyMount */}
-            <LazyMount minHeight={80}><SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} sx={{ mt: 1.5 }} /></LazyMount>
+            {/* 🔁 (12 พ.ย. 2569) เส้นคั่นแยก "ไฟล์อื่นๆ" ออกจากเอกสารประจำงาน 4 ชนิด — กันเข้าใจผิดว่าเป็นเอกสารชนิดที่ 5 */}
+            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2.25, mb: 1 }}>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0" }} />
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: "#64748b", whiteSpace: "nowrap" }}>ไฟล์อื่นๆ · นอกเหนือเอกสารประจำงาน</Typography>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0" }} />
+            </Stack>
+            <LazyMount minHeight={80}><SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} sx={{ mt: 0, bgcolor: "#f8fafc" }} /></LazyMount>
 
             {/* เอกสาร/คุยกับช่าง/ประวัติ — แผงด้านข้างแสดงต่อท้ายเลย (การ์ดในรายการ: แถบ "สรุปงาน" อยู่ท้ายการ์ดเสมอ ดูด้านล่าง) */}
             {inlineDetails && (
@@ -2008,9 +2086,11 @@ const EventRowCard = ({
         {sheet && isXs ? mobileSummary : cardBody}
       </CardContent>
       <MobileSheet open={sheet} onClose={() => setOpen(false)} maxWidth="lg"
-        title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
-        subtitle={[event.jobNo, companySite(event.company, event.site)].filter(Boolean).join(" · ")}>
-        <Box sx={{ m: { xs: 1.25, sm: 2 }, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{sheetShown ? renderBody(true) : null}</Box>
+        // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ควรแสดงชื่อโครงการให้ชัดเจน ให้ดูง่าย") หัวแผ่น = ชื่อโครงการ · บรรทัดรอง = งาน · ระบบ · ครั้งที่ · เลข Job
+        title={companySite(event.company, event.site) || event.title || "งาน"}
+        subtitle={[[event.title, event.system].filter(Boolean).join(" · "), event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : "", event.jobNo].filter(Boolean).join(" · ")}>
+        {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ลดระยะห่างขอบ ขยายการ์ดกว้างขึ้นอีก") มือถือ: ขอบนอก 6px · ขอบใน 10px (เดิม 10 + 16) */}
+        <Box sx={{ m: { xs: 0.75, sm: 2 }, p: { xs: 1.25, sm: 2 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{sheetShown ? renderBody(true) : null}</Box>
       </MobileSheet>
 
       {!inlineDetails && (
@@ -4020,31 +4100,34 @@ const Operation = () => {
                       const req = sessions.find((e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น");
                       if (!req) return null;
                       return (
-                        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={{ xs: 1, sm: 1.5 }}
+                        <Stack direction="row" alignItems="center" gap={1.25}
                           sx={{
-                            mb: -1.25, pb: 2, pt: 1.1, px: 1.5, borderRadius: "14px 14px 0 0",
-                            bgcolor: "#ecfeff", border: "1px solid #a5f3fc", borderBottom: 0,
+                            // 🔁 (12 พ.ย. 2569 ผู้ใช้: "คำขอปิดงานให้ห่างจากการ์ดงานให้ดูดีไม่สับสน · ยังดูรก ตาลาย")
+                            //    แถบแยกจากการ์ด (มีช่องไฟ) บรรทัดเดียว · ปุ่ม "ตรวจสอบ" เล็กชิดขวา (เดิมปุ่มน้ำเงินเต็มแถว)
+                            mb: 1, py: 1, px: 1.25, borderRadius: "12px",
+                            // 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้าแรก ... สีสัน ... ตาลาย") โทนน้ำเงินของแอป (เดิมฟ้าอมเขียว) ไม่เพิ่มสีใหม่ในหน้า
+                            bgcolor: "#eff6ff", border: "1px solid #bfdbfe",
                           }}>
                           <Stack direction="row" alignItems="center" gap={1} sx={{ flex: 1, minWidth: 0 }}>
-                            <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: "#0891b2", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                            <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
                               <AssignmentTurnedIn sx={{ fontSize: 17 }} />
                             </Box>
                             <Box sx={{ minWidth: 0 }}>
-                              <Typography sx={{ fontSize: "0.88rem", fontWeight: 900, color: "#155e75", lineHeight: 1.3 }}>ช่างขอปิดงาน · รอคุณตรวจสอบ</Typography>
-                              <Typography noWrap sx={{ fontSize: "0.74rem", color: "#0e7490" }}>
+                              <Typography noWrap sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#1e3a8a", lineHeight: 1.3 }}>ช่างขอปิดงาน</Typography>
+                              <Typography noWrap sx={{ fontSize: "0.74rem", color: "#475569" }}>
                                 {req.closeRequestedBy || "ช่าง"}{req.closeRequestedAt ? ` · ขอเมื่อ ${moment(req.closeRequestedAt).locale("th").fromNow()}` : ""}
                               </Typography>
                             </Box>
                           </Stack>
-                          <Button variant="contained" disableElevation startIcon={<Visibility sx={{ fontSize: 17 }} />}
+                          <Button variant="contained" disableElevation
                             onClick={() => {
                               setDetailJobId(sessions[0]._id);
                               // เลื่อนแผงไปที่กล่องคำขอปิดงาน (อยู่ในการ์ดหลักของกลุ่ม = sessions[0])
                               setTimeout(() => document.getElementById(`close-req-${sessions[0]._id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 450);
                             }}
-                            sx={{ flexShrink: 0, height: 38, px: 2, borderRadius: 2.5, textTransform: "none", fontWeight: 800, fontSize: "0.85rem",
-                              bgcolor: "#0891b2", "&:hover": { bgcolor: "#0e7490" }, width: { xs: "100%", sm: "auto" } }}>
-                            ตรวจสอบและอนุมัติ
+                            sx={{ flexShrink: 0, height: 36, px: 1.75, borderRadius: "10px", textTransform: "none", fontWeight: 800, fontSize: "0.84rem",
+                              bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
+                            ตรวจสอบ
                           </Button>
                         </Stack>
                       );
@@ -4052,8 +4135,9 @@ const Operation = () => {
                     {daysPastDue !== null && daysPastDue !== undefined && (
                       <Stack direction="row" alignItems="center" gap={0.75}
                         sx={{
-                          mb: -1.25, pb: { xs: 1.6, sm: 1.75 }, pt: { xs: 0.5, sm: 0.75 }, px: 1.5, borderRadius: "14px 14px 0 0",
-                          bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
+                          mb: 0.75, py: 0.6, px: 1.25, borderRadius: "10px", width: "fit-content",
+                          // 🔁 (12 พ.ย. 2569) แถบค้างงานเบาลง: พื้นขาว ขอบ/ตัวหนังสือสีเตือน (เดิมพื้นชมพูทั้งแถบ ตาลาย)
+                          bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: 0,
                         }}>
                         <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />
                         <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: severeOverdue ? "#b91c1c" : "#92400e" }}>

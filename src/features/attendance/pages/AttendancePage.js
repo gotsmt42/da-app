@@ -104,6 +104,23 @@ export default function AttendancePage() {
     }
   }, [from, to, person, isApprover, includeClosed]);
   useEffect(() => { load(); }, [load]);
+  /**
+   * ✅ (12 พ.ย. 2569 ผู้ใช้: "ข้อมูลอยู่ใน push กดแล้วเจอ แต่กดเข้ารายละเอียดตรงนั้นไม่ได้")
+   *    ลิงก์แจ้งเตือน ?open=<id> — เดิมหาเฉพาะในรายการที่โหลดอยู่ (ตัดงานที่ปิดแล้ว/คนที่เลือก/ช่วงวัน) หาไม่เจอ = ไม่เปิดอะไรเลย
+   *    → หาไม่เจอในรายการ ดึงวันนั้นใหม่แบบรวมงานที่ปิดแล้ว ทุกคน แล้วเปิดรายละเอียด
+   */
+  const [linkRow, setLinkRow] = useState(null);
+  const listRow = openParam ? (rows || []).find((r) => String(r._id) === openParam) || null : null;
+  useEffect(() => {
+    if (!openParam || rows === null || listRow) { setLinkRow(null); return; }
+    let alive = true;
+    const day = linkDate || from || fmt(moment());
+    AttendanceService.list({ from: linkDate || from || day, to: linkDate || to || day, includeClosed: 1 })
+      .then((r) => { if (alive) setLinkRow((r?.attendance || []).find((x) => String(x._id) === openParam) || null); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [openParam, rows, listRow, linkDate, from, to]);
+  const openRow = listRow || linkRow;
   useRealtime("attendance", () => { load(); });
   useEffect(() => {
     if (!seeAll) return;
@@ -112,31 +129,41 @@ export default function AttendancePage() {
 
   // ตัวกรองฝั่งจอ — ค้นหา (ชื่อ/โครงการ/งาน/เลขที่งาน) · ตำแหน่ง
   const isOff = (r) => r.checkIn?.gps !== "ok" || (r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M);
-  const view$ = useMemo(() => {
+  /**
+   * 🔁 (12 พ.ย. 2569 ผู้ใช้: "การกดแสดงผลต่างๆ ยังดูใช้งานไม่ได้ · ข้อมูลให้กระชับและสมบูรณ์")
+   *    กล่องตัวเลขทุกกล่องกดกรองรายการได้ (เดิมกดได้แค่ 2 กล่อง และ "ห่างหน้างาน" กรองรวมไม่มี GPS ตัวเลขไม่ตรงรายการ)
+   *    · ตัวเลขในกล่องนับจากรายการก่อนกรองตามกล่อง — กดกล่องหนึ่งแล้วกล่องอื่นไม่กลายเป็น 0
+   */
+  const isFar = (r) => r.checkIn?.gps === "ok" && r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M;
+  const PLACE_TEST = {
+    on: (r) => !isOff(r),
+    off: (r) => isOff(r),
+    far: isFar,
+    gps: (r) => r.checkIn?.gps !== "ok",
+    offsched: (r) => Boolean(r.offSchedule),
+    pend: (r) => Boolean(r.hasPendingCorrection),
+  };
+  const base$ = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return (rows || []).filter((r) => {
-      if (place === "on" && isOff(r)) return false;
-      if (place === "off" && !isOff(r)) return false;
-      if (kw && ![r.userName, r.job?.site, r.job?.company, r.job?.title, r.job?.system, r.jobLabel, r.jobNo, r.team?.head, ...(r.team?.members || [])]
-        .some((v) => String(v || "").toLowerCase().includes(kw))) return false;
-      return true;
-    });
-  }, [rows, q, place]);
+    return (rows || []).filter((r) => !kw || [r.userName, r.job?.site, r.job?.company, r.job?.title, r.job?.system, r.jobLabel, r.jobNo, r.team?.head, ...(r.team?.members || [])]
+      .some((v) => String(v || "").toLowerCase().includes(kw)));
+  }, [rows, q]);
+  const view$ = useMemo(() => (PLACE_TEST[place] ? base$.filter(PLACE_TEST[place]) : base$), [base$, place]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = useMemo(() => {
-    const list = view$;
+    const list = base$;
     return {
       visits: list.length,
       jobs: new Set(list.map((r) => String(r.jobGroupId || r.eventId))).size,
       people: new Set(list.map((r) => String(r.userId))).size,
       days: new Set(list.map((r) => moment(r.checkIn?.at).format("YYYY-MM-DD"))).size,
       onSite: list.filter((r) => !isOff(r)).length,
-      far: list.filter((r) => r.checkIn?.gps === "ok" && r.checkIn?.distanceM != null && r.checkIn.distanceM > ON_SITE_M).length,
+      far: list.filter(isFar).length,
       noGps: list.filter((r) => r.checkIn?.gps !== "ok").length,
       pending: list.filter((r) => r.hasPendingCorrection).length,
       offSchedule: list.filter((r) => r.offSchedule).length,
     };
-  }, [view$]);
+  }, [base$]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // สรุปรายคน (เรียงตามจำนวนครั้ง)
   const byPerson = useMemo(() => {
@@ -192,7 +219,7 @@ export default function AttendancePage() {
   const periodLabel = periodText(period.preset, from, to);
   const personName = person !== "all" ? (people.find((p) => p.id === person)?.name || "") : "";
   const filterLabel = [personName ? `ผู้บันทึก: ${personName}` : (seeAll ? "ทุกคน" : ""), q.trim() ? `ค้นหา: ${q.trim()}` : "",
-    place === "on" ? "เฉพาะตรงหน้างาน" : place === "off" ? "เฉพาะตำแหน่งไม่ตรง" : "", includeClosed ? "รวมงานที่ปิดแล้ว" : ""].filter(Boolean).join(" · ");
+    ({ on: "เฉพาะตรงหน้างาน", off: "เฉพาะตำแหน่งไม่ตรง", far: "เฉพาะห่างหน้างาน", gps: "เฉพาะไม่มี GPS", offsched: "เฉพาะนอกวันที่ลงตาราง", pend: "เฉพาะรอแก้เวลา" })[place] || "", includeClosed ? "รวมงานที่ปิดแล้ว" : ""].filter(Boolean).join(" · ");
   const doExport = async () => {
     setExporting(true);
     try {
@@ -282,10 +309,13 @@ export default function AttendancePage() {
                 <Stat key="on" label="ตรงหน้างาน" value={`${stats.onSite} ครั้ง`} tone={stats.onSite ? "#059669" : undefined}
                   active={place === "on"} onClick={() => setPlace(place === "on" ? "all" : "on")} />,
                 <Stat key="far" label="ห่างหน้างาน" value={`${stats.far} ครั้ง`} tone={stats.far ? "#b45309" : undefined}
-                  active={place === "off"} onClick={() => setPlace(place === "off" ? "all" : "off")} />,
-                <Stat key="gps" label="ไม่มี GPS" value={`${stats.noGps} ครั้ง`} tone={stats.noGps ? "#b45309" : undefined} />,
-                <Stat key="off" label="นอกวันที่ลงตาราง" value={`${stats.offSchedule} ครั้ง`} />,
-                <Stat key="pend" label="รอแก้เวลา" value={`${stats.pending} ครั้ง`} tone={stats.pending ? "#dc2626" : undefined} />,
+                  active={place === "far"} onClick={() => setPlace(place === "far" ? "all" : "far")} />,
+                <Stat key="gps" label="ไม่มี GPS" value={`${stats.noGps} ครั้ง`} tone={stats.noGps ? "#b45309" : undefined}
+                  active={place === "gps"} onClick={() => setPlace(place === "gps" ? "all" : "gps")} />,
+                <Stat key="off" label="นอกวันที่ลงตาราง" value={`${stats.offSchedule} ครั้ง`}
+                  active={place === "offsched"} onClick={() => setPlace(place === "offsched" ? "all" : "offsched")} />,
+                <Stat key="pend" label="รอแก้เวลา" value={`${stats.pending} ครั้ง`} tone={stats.pending ? "#dc2626" : undefined}
+                  active={place === "pend"} onClick={() => setPlace(place === "pend" ? "all" : "pend")} />,
               ]}
               note={!includeClosed && closedHidden > 0
                 ? <>ไม่รวมงานที่ปิดแล้ว {closedHidden} ครั้ง — <ButtonBase onClick={() => setIncludeClosed(true)} sx={{ fontFamily: "inherit", fontSize: "inherit", fontWeight: 800, color: "#2563eb", verticalAlign: "baseline" }}>แสดงด้วย</ButtonBase></>
@@ -347,7 +377,7 @@ export default function AttendancePage() {
           )}
 
           <AttendanceDetailDialog
-            row={openParam ? (rows || []).find((r) => String(r._id) === openParam) || null : null}
+            row={openRow}
             onClose={() => { const p = new URLSearchParams(params); p.delete("open"); setParams(p, { replace: true }); }}
             me={me} isApprover={isApprover} onChanged={onChanged} />
           <Typography sx={{ mt: 2, fontSize: "0.72rem", color: MUTED, textAlign: "center" }}>

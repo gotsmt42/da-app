@@ -569,8 +569,16 @@ export default function ExpenseList({
       {isDesktop && statusTiles}
       {/* ✅ (11 พ.ย. 2569) พิมพ์หลายใบพร้อมกัน — ใช้ใบชุดเดียวกับที่แสดงตามตัวกรอง */}
       {kind && !loading && visible.length > 0 && (
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
-          <ExportPdfButton onClick={() => setBulkOpen(true)} label="พิมพ์ PDF ทั้งหมด" count={visible.filter((e) => e.status !== "cancelled").length} compact={false} />
+        // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ปุ่ม PDF ดูวางเกะกะ ไม่สวย หาจุดวางให้เหมาะสม")
+        //    แถวสรุปหัวรายการ: ซ้าย = จำนวนใบ · ยอดรวม · ขวา = ปุ่ม PDF เล็ก (เดิมปุ่มใหญ่ลอยอยู่แถวเดียวโดดๆ)
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, px: 0.25 }}>
+          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.84rem", color: TEXT_SUB }} noWrap>
+            <Box component="span" sx={{ fontWeight: 800, color: TEXT_MAIN }}>{visible.length.toLocaleString()} ใบ</Box>
+            {" · รวม "}{baht(visible.filter((e) => e.status !== "cancelled").reduce((sum, e) => sum + (Number(e.total) || 0), 0))}
+            <Box component="span" sx={{ color: "#94a3b8" }}> (ไม่รวมใบยกเลิก)</Box>
+          </Typography>
+          <ExportPdfButton onClick={() => setBulkOpen(true)} label="PDF ทั้งหมด" count={visible.filter((e) => e.status !== "cancelled").length} compact={false}
+            sx={{ height: 34, px: 1.25, fontSize: "0.8rem", borderRadius: 99 }} />
         </Stack>
       )}
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
@@ -613,9 +621,12 @@ export default function ExpenseList({
                 sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             </Stack>
           )}
-          <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
-            {pageCount > 1 ? `แสดง ${(curPage - 1) * PAGE_SIZE + 1}–${(curPage - 1) * PAGE_SIZE + pageRows.length} จาก ` : ""}{visible.length} ใบ · รวม {baht(visible.filter((e) => e.status !== "cancelled").reduce((s, e) => s + (Number(e.total) || 0), 0))} (ไม่รวมใบที่ยกเลิก)
-          </Typography>
+          {/* ยอดรวมย้ายไปแถวสรุปหัวรายการแล้ว — ท้ายรายการบอกแค่ช่วงที่แสดงเมื่อมีหลายหน้า */}
+          {pageCount > 1 && (
+            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
+              แสดง {(curPage - 1) * PAGE_SIZE + 1}–{(curPage - 1) * PAGE_SIZE + pageRows.length} จาก {visible.length} ใบ
+            </Typography>
+          )}
           {kind && (
             <ExpenseBulkPrint open={bulkOpen} onClose={() => setBulkOpen(false)} docs={visible}
               kind={kind === "claim" && claimType === "reimburse" ? "reimburse" : kind}

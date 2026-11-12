@@ -5,6 +5,7 @@ import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
+import { attachSheetPicker } from "@/shared/utils/sheetPicker";
 import { getApprovalState } from "@/shared/utils/approvalStatus";
 import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
@@ -1186,6 +1187,12 @@ function injectStyles() {
     .ee-st-note { font-size: 11.5px; color: #94a3b8; }
     .ee-st-cancel { height: 36px; padding: 0 16px; border-radius: 10px; border: 1px solid #e6e9ef; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #334155; cursor: pointer; }
     .ee-st-changed { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #b45309; }
+    /* 🐛 (12 พ.ย. 2569 ผู้ใช้: "เลือกแก้สถานะ แล้วมองไม่เห็น มันเพี้ยน") ข้อความ "เปลี่ยนแล้ว — กดบันทึก" ไม่ยอมหด
+       เลยบีบปุ่มสถานะจนเหลือแค่ลูกศร → ปุ่มสถานะกว้างขั้นต่ำ · ข้อความแจ้งลงบรรทัดใหม่เต็มแถว */
+    .swal-edit-event #ee-head-status { flex-wrap: wrap; row-gap: 8px; }
+    .swal-edit-event #ee-status-select-wrap { flex: 1 1 170px !important; min-width: 150px !important; max-width: 280px; }
+    .swal-edit-event #ee-head-status .ee-st-changed { flex: 1 1 100%; order: 10; white-space: normal; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; }
+    .swal-edit-event #ee-head-status .ee-head-owner { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
@@ -2301,7 +2308,7 @@ export const getEditEvent = async ({
     <section class="ee-card ee-key-card">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">💰</span>
-        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้ · เลือกว่าเป็นยอดก่อนหรือรวม VAT"}</p></div>
+        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "ยอดของการเข้างานครั้งนี้เท่านั้น · เลือกก่อน/รวม VAT · เว้นว่างได้"}</p></div>
       </div>
       <div class="ee-card-body">
         ${workValueCardHtml(wvInit, { disabled: isViewOnly })}
@@ -2370,7 +2377,7 @@ export const getEditEvent = async ({
           <label>มูลค่างานทั้งสัญญา (บาท)</label>
           <div class="ee-money-input">
             <span class="ee-money-symbol">฿</span>
-            <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+            <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${isAdminOrManagerUser ? "" : "disabled"}>
           </div>
         </div>
       </div>
@@ -2472,6 +2479,22 @@ export const getEditEvent = async ({
       .swal-edit-event .ee-contract-box.ee-form .ee-contract-link:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
       .swal-edit-event .ee-contract-box.ee-form .ee-field > label { color: #334155; }
 
+      /* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ตรงนี้ยังดูจัดวางไม่สวย เพี้ยนๆ") การ์ดมูลค่างานครั้งนี้ + ไฟล์แนบ/หลักฐาน
+         · ไม่มีที่ว่างค้างท้ายการ์ด (กล่องข้อความว่างซ่อน) · ช่องยอดเต็มความกว้าง ตัวเลขใหญ่ · ปุ่ม VAT แบ่งครึ่งเต็มแถว
+         · ไฟล์แนบไม่มีกรอบซ้อนสองชั้น */
+      .swal-edit-event .ee-wv-break:empty, .swal-edit-event .ee-wv-ai:empty { display: none; }
+      .swal-edit-event #ee-keyGroup .ee-value-box { max-width: none; }
+      .swal-edit-event #ee-keyGroup .ee-value-box input { min-height: 48px; font-size: 18px !important; font-weight: 800; font-variant-numeric: tabular-nums; border-radius: 10px; }
+      .swal-edit-event #ee-keyGroup .ee-vat-seg { display: flex; width: 100%; box-sizing: border-box; }
+      .swal-edit-event #ee-keyGroup .ee-vat-seg label { flex: 1 1 0; }
+      .swal-edit-event #ee-keyGroup .ee-vat-seg label span { display: flex; justify-content: center; }
+      /* มูลค่างานรวม (ข้อมูลงาน) — เด่นแต่ไม่รก: เต็มแถว · พื้นฟ้าอ่อน · ตัวเลขใหญ่หนา */
+      .swal-edit-event .ee-form .ee-field--money { grid-column: 1 / -1; }
+      .swal-edit-event .ee-form .ee-field--money .ee-money-input > input { min-height: 52px; font-size: 19px !important; font-weight: 800; color: #0f172a; background: #f8fbff; border-color: #bfdbfe !important; }
+      .swal-edit-event .ee-form .ee-field--money .ee-money-input .ee-money-symbol { font-size: 18px; color: #2563eb; }
+      .swal-edit-event .ee-form .ee-field--money > label { color: #1d4ed8; }
+      .swal-edit-event .ee-money-input > input::placeholder, .swal-edit-event .ee-value-box input::placeholder { font-size: 15px; font-weight: 500; color: #94a3b8; }
+
       /* กล่องถามก่อนปิด (ยังไม่บันทึก) */
       .ee-leave { max-width: 440px; }
       .ee-leave-head { display: flex; gap: 12px; align-items: flex-start; padding: 18px 18px 8px; }
@@ -2544,7 +2567,16 @@ export const getEditEvent = async ({
         .swal-edit-event .ee-hm-dates .MuiOutlinedInput-input, .swal-edit-event .ee-hm-dates input { font-size: 13.5px !important; }
         .swal-edit-event .ee-hm-dash { line-height: 40px; }
         .swal-edit-event #ee-head-status .ee-pick-btn--status, .swal-edit-event .ee-status-unlock { height: 40px; }
-        #ee-mapCard .ee-map-bar { padding: 12px; }
+        /* 🐛 (12 พ.ย. 2569 ผู้ใช้: "ตรงตำแหน่งงานยังดูเพี้ยนๆ") ไอคอนหลุดไปอยู่บรรทัดเดียว ปุ่ม "บันทึกพิกัด" ตัดสองบรรทัด
+           → ตาราง: แถวบน = ไอคอน + ชื่อหน้างาน · แถวล่าง = ปุ่ม 3 ปุ่มเต็มความกว้าง สูงเท่ากัน ข้อความบรรทัดเดียว */
+        #ee-mapCard .ee-map-bar { padding: 12px; display: grid !important; grid-template-columns: 40px repeat(3, minmax(0, 1fr)); gap: 10px 8px; align-items: center; }
+        #ee-mapCard .ee-map-ico { grid-column: 1; grid-row: 1; }
+        #ee-mapCard .ee-map-info { grid-column: 2 / -1; grid-row: 1; flex: none !important; min-width: 0; }
+        #ee-mapCard .ee-map-edit { grid-column: 1 / 3; grid-row: 2; margin-left: 0 !important; }
+        #ee-mapCard .ee-map-go { grid-row: 2; }
+        #ee-mapCard .ee-map-toggle { grid-row: 2; }
+        #ee-mapCard .ee-map-bar:not(:has(.ee-map-edit)) .ee-map-go { grid-column: 1 / 3; }
+        #ee-mapCard .ee-map-go, #ee-mapCard .ee-map-edit, #ee-mapCard .ee-map-toggle { justify-content: center; white-space: nowrap; padding: 0 8px; font-size: 13px; min-width: 0; }
       }
     </style>
     <div id="ee-editGroup">
@@ -2606,14 +2638,14 @@ export const getEditEvent = async ({
            ✅ เฉพาะแอดมิน/manager เหมือนช่องมูลค่างานทุกจุดในแอป (เป็นข้อมูลการเงิน)
            ✅ วางไว้ในกลุ่ม "ข้อมูลโครงการ" คู่กับครั้งที่ — เป็นข้อมูลของ "ตัวงาน" เหมือนกัน ไม่ใช่ข้อมูลคน -->
       ${!eventContractGroupId ? `
-      <div class="ee-field">
+      <div class="ee-field ee-field--money">
         <label>มูลค่างานรวม (บาท)</label>
         <div class="ee-money-input">
           <span class="ee-money-symbol">฿</span>
           <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
-                 placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+                 placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
-        <span class="ee-hint">ยอดรวมทั้งงาน · แสดงในหน้าภาพรวมงาน</span>
+        <span class="ee-hint">ราคาทั้งงานที่ตกลงกับลูกค้า (ไม่ใช่ราคาต่อครั้ง) · เว้นว่างได้</span>
       </div>
       ` : ""}
     </div>
@@ -3060,7 +3092,7 @@ export const getEditEvent = async ({
             canEdit: !readOnly && !isPendingForTech && !isClosedForTech,
             onChange: () => { popup.__sitePhotosChanged = true; },
             confirmFn: (msg) => Promise.resolve(window.confirm(msg)),
-            sx: { mt: 0 },
+            sx: { mt: 0, border: 0, p: 0 },
           }));
         }
       }
@@ -3498,7 +3530,7 @@ export const getEditEvent = async ({
       };
       const mkTs = (id, placeholder = "", overrides = {}) => {
         try {
-          return new TomSelect(id, {
+          const ts = new TomSelect(id, {
             create: true,
             persist: false,
             closeAfterSelect: true,
@@ -3520,6 +3552,8 @@ export const getEditEvent = async ({
             dropdownParent: "body",
             ...overrides,
           });
+          attachSheetPicker(ts);
+          return ts;
         } catch {
           return null;
         }
@@ -3581,6 +3615,7 @@ export const getEditEvent = async ({
           // ✅ ลูกทีมแก้ไข/เพิ่ม/ลบได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ — ช่างทีมอื่นเห็น
           // รายชื่อได้แต่แตะไม่ได้ (เทียบสิทธิ์เดียวกับหัวหน้าทีมด้านบน — canEditTeamAssignment)
           if (!canEditTeamAssignment) ts.disable();
+          attachSheetPicker(ts);
           return ts;
         } catch { return null; }
       };
@@ -3623,6 +3658,7 @@ export const getEditEvent = async ({
             plugins: el.multiple ? ["remove_button"] : [],
           });
           ts.clear(true);   // ⚠️ กัน option แรกถูกเลือกอัตโนมัติตาม HTML spec (เทียบ mkTsCleared)
+          attachSheetPicker(ts);
           return ts;
         } catch { return null; }
       };

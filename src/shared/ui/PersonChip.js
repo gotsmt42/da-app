@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Avatar, Box, ButtonBase, Menu, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { Avatar, Box, ButtonBase, Drawer, IconButton, InputAdornment, Menu, MenuItem, Stack, TextField, Tooltip, Typography, useMediaQuery } from "@mui/material";
+import { CloseRounded, SearchRounded } from "@mui/icons-material";
+import { SORTER } from "@/shared/utils/sheetPicker";
 import { alpha } from "@mui/material/styles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -134,14 +136,72 @@ export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value
   const [q, setQ] = useState("");
   const avatars = useAvatarMap(employees);
   const names = useMemo(
-    () => [...new Set((employees || []).map((e) => e?.fname).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")),
+    () => [...new Set((employees || []).map((e) => e?.fname).filter(Boolean))].sort((a, b) => SORTER.compare(a, b)),
     [employees],
   );
   const shown = names.filter((n) => !q.trim() || n.toLowerCase().includes(q.trim().toLowerCase()));
-  const pick = (n) => { onPick(n); setQ(""); };
+  const [askClear, setAskClear] = useState(false);
+  const pick = (n) => { onPick(n); setQ(""); setAskClear(false); };
+  const mobile = useMediaQuery("(max-width:600px)");
+  // ✅ (12 พ.ย. 2569 ผู้ใช้: "ยกเลิกมอบหมายก็ให้มีคอนเฟิร์มให้กดก่อนด้วย") ถามยืนยันในหน้าต่างเดียวกันก่อนล้างค่า
+  const confirmBar = askClear && (
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ mx: mobile ? 1.75 : 1, mb: 1, px: 1.25, py: 1, borderRadius: "12px", bgcolor: "#fff7ed", border: "1px solid #fed7aa" }}>
+      <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 700, color: "#9a3412" }}>ยกเลิกการมอบหมาย “{value}” ?</Typography>
+      <ButtonBase onClick={() => pick("")} sx={{ height: 34, px: 1.5, borderRadius: "10px", bgcolor: "#dc2626", color: "#fff", fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 800 }}>ยืนยัน</ButtonBase>
+      <ButtonBase onClick={() => setAskClear(false)} sx={{ height: 34, px: 1.25, borderRadius: "10px", color: "#475569", fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 700 }}>ไม่</ButtonBase>
+    </Stack>
+  );
+  /**
+   * 🔁 (12 พ.ย. 2569 ผู้ใช้: "select ข้อมูลก็ทำให้เหมือนกับหน้า event ด้วย ทั้ง 2 หน้า ให้ดูง่าย จอมือถือ")
+   *    มือถือ = แผ่นเลือกจากล่าง แบบเดียวกับหน้าต่างเลือกในฟอร์มงาน (ช่องค้นหาติดบน · แถวใหญ่มีรูป · วงเลือกท้ายแถว · ลากลงปิดได้)
+   *    คอม = เมนูเดิม · เรียง A-Z แบบเดียวกัน (อังกฤษก่อน แล้วไทย ก-ฮ)
+   */
+  if (mobile) {
+    const close = () => { setQ(""); setAskClear(false); onClose(); };
+    return (
+      <Drawer anchor="bottom" open={Boolean(anchorEl)} onClose={close} onClick={(e) => e.stopPropagation()}
+        sx={{ zIndex: 20040 }}
+        PaperProps={{ sx: { height: "82%", borderRadius: "18px 18px 0 0", display: "flex", flexDirection: "column", overflow: "hidden" } }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.75, pt: 1.5, pb: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>{title}</Typography>
+            <Typography sx={{ fontSize: "0.8rem", color: "#64748b" }}>{names.length} คน</Typography>
+          </Box>
+          {value && (
+            <ButtonBase onClick={() => setAskClear(true)} sx={{ height: 40, px: 1.5, borderRadius: "12px", bgcolor: "#fff7ed", color: "#b45309", fontFamily: "inherit", fontSize: "0.84rem", fontWeight: 700 }}>ยกเลิกมอบหมาย</ButtonBase>
+          )}
+          <IconButton onClick={close} aria-label="ปิด" sx={{ width: 40, height: 40, borderRadius: "12px", bgcolor: "#f1f5f9" }}><CloseRounded /></IconButton>
+        </Stack>
+        {confirmBar}
+        <Box sx={{ px: 1.75, pb: 1.25 }} onKeyDown={(e) => e.stopPropagation()}>
+          <TextField fullWidth placeholder="ค้นหาชื่อ" value={q} onChange={(e) => setQ(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded sx={{ color: "#94a3b8" }} /></InputAdornment> }}
+            sx={{ "& .MuiOutlinedInput-root": { height: 48, borderRadius: "12px", bgcolor: "#f8fafc", fontSize: "0.95rem" } }} />
+        </Box>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", px: 1.75, pb: 2 }}>
+          {shown.length > 0 ? (
+            <Box sx={{ border: "1px solid #e6e9ef", borderRadius: "14px", overflow: "hidden" }}>
+              {shown.map((n, i) => {
+                const cur = n === value;
+                return (
+                  <ButtonBase key={n} onClick={() => pick(n)}
+                    sx={{ width: "100%", justifyContent: "flex-start", gap: 1.25, minHeight: 56, px: 1.5, fontFamily: "inherit", bgcolor: cur ? "#eff6ff" : "#fff", borderTop: i ? "1px solid #eef2f7" : 0 }}>
+                    <Avatar src={avatars.get(n)} sx={{ width: 36, height: 36, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(n) }}>{personInitial(n)}</Avatar>
+                    <Typography sx={{ flex: 1, textAlign: "left", fontSize: "0.95rem", fontWeight: cur ? 800 : 600, color: cur ? "#1d4ed8" : "#0f172a" }}>{n}</Typography>
+                    <Box sx={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, boxSizing: "border-box",
+                      ...(cur ? { bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 900 } : { border: "2px solid #cbd5e1" }) }}>{cur ? "✓" : ""}</Box>
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+          ) : <Typography sx={{ py: 4, textAlign: "center", fontSize: "0.9rem", color: "#64748b" }}>ไม่พบชื่อ</Typography>}
+        </Box>
+      </Drawer>
+    );
+  }
   return (
     <Menu
-      open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={() => { setQ(""); onClose(); }}
+      open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={() => { setQ(""); setAskClear(false); onClose(); }}
       onClick={(e) => e.stopPropagation()}
       anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}
       slotProps={{ paper: { sx: { borderRadius: 2.5, width: 260, mt: 0.5, border: "1px solid #e6e9ef", boxShadow: "0 12px 32px rgba(15,23,42,.14)" } } }}
@@ -159,16 +219,18 @@ export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value
           <MenuItem key={n} selected={n === value} onClick={() => pick(n)} sx={{ mx: 0.5, borderRadius: 1.5, gap: 1 }}>
             <Avatar src={avatars.get(n)} sx={{ width: 24, height: 24, fontSize: "0.72rem", fontWeight: 800, bgcolor: personColor(n) }}>{personInitial(n)}</Avatar>
             <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: n === value ? 800 : 500 }}>{n}</Typography>
-            {n === value && <Typography sx={{ fontSize: "0.8rem", color: "#dc2626", fontWeight: 800 }}>✓</Typography>}
+            {n === value && <Typography sx={{ fontSize: "0.8rem", color: "#2563eb", fontWeight: 800 }}>✓</Typography>}
           </MenuItem>
         ))}
         {shown.length === 0 && <Typography sx={{ px: 2, py: 1, fontSize: "0.8rem", color: "#94a3b8" }}>ไม่พบชื่อ</Typography>}
       </Box>
       {value && (
         <Box sx={{ borderTop: "1px solid #eef2f7", mt: 0.5, pt: 0.5 }}>
-          <MenuItem onClick={() => pick("")} sx={{ mx: 0.5, borderRadius: 1.5, color: "#b45309", fontSize: "0.8rem" }}>
-            ยกเลิกการมอบหมาย
-          </MenuItem>
+          {askClear ? confirmBar : (
+            <MenuItem onClick={() => setAskClear(true)} sx={{ mx: 0.5, borderRadius: 1.5, color: "#b45309", fontSize: "0.8rem" }}>
+              ยกเลิกการมอบหมาย
+            </MenuItem>
+          )}
         </Box>
       )}
     </Menu>

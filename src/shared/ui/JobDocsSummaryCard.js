@@ -6,22 +6,30 @@
  * @param event    งาน (ต้องมีฟิลด์ไฟล์เอกสาร + *Applicable)
  * @param onOpen   กด "ดู / ตรวจเอกสาร" · ไม่ส่ง = ไม่มีปุ่ม
  * @param expanded (ไม่บังคับ) true/false = ปุ่มเป็นตัวย่อ/ขยายรายการเอกสารใต้กล่อง (มีลูกศรบอกสถานะ)
+ * @param children (ไม่บังคับ) รายการเอกสาร — วางไว้ "ในกรอบเดียวกัน" ตอน expanded
+ *
+ * 🔁 (12 พ.ย. 2569 ผู้ใช้: "ทำให้เอกสารงาน ให้มันดูอยู่ในกรอบเดียว ให้สังเกตง่ายๆ")
+ *    ส่ง children มา = กรอบเดียว: หัวสรุป (กดย่อ/ขยาย) → การ์ดเอกสาร 4 ชนิดอยู่ข้างใน
+ *    เช็กลิสต์ 2×2 แสดงตลอด · ขยายอยู่ = ไม่มีปุ่มใหญ่ซ้ำ (ย่อได้จากหัวกรอบ)
  */
-import { Box, Stack, Typography, Button, LinearProgress } from "@mui/material";
+import { Box, Stack, Typography, Button, ButtonBase, Collapse, LinearProgress } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { CheckCircleRounded as CheckCircle, RadioButtonUncheckedRounded as RadioButtonUnchecked, DescriptionRounded as Description, TaskAltRounded as TaskAlt, ExpandMoreRounded as ExpandMore } from "@mui/icons-material";
 import { INK, MUTED, ACCENT } from "@/shared/ui/PageKit";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";
 
-export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู / ตรวจเอกสาร", expanded, sx }) {
+export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู / ตรวจเอกสาร", expanded, sx, children }) {
   const done = JOB_DOC_TYPES.filter((t) => isDocComplete(event, t.key)).length;
   const total = JOB_DOC_TYPES.length;
   const allDone = done === total;
   const tone = allDone ? "#16a34a" : ACCENT;
   return (
-    <Box sx={{ ...CARD, mt: 1.5, p: { xs: 1.75, sm: 2 }, borderColor: alpha(tone, 0.3), boxShadow: `0 1px 2px rgba(15,23,42,.04), 0 8px 20px -12px ${alpha(tone, 0.45)}`, ...sx }}>
-      <Stack direction="row" alignItems="center" gap={1.25}>
+    // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ระยะห่างขอบข้างการ์ดข้างในดูเยอะไป ลดลงให้พอดี") มีรายการเอกสารข้างใน = ขอบข้างแคบลง
+    <Box sx={{ ...CARD, mt: 1.5, p: children ? { xs: 1.25, sm: 1.75 } : { xs: 1.75, sm: 2 }, borderColor: alpha(tone, 0.3), boxShadow: `0 1px 2px rgba(15,23,42,.04), 0 8px 20px -12px ${alpha(tone, 0.45)}`, ...sx }}>
+      <Stack direction="row" alignItems="center" gap={1.25}
+        {...(children && onOpen ? { component: ButtonBase, onClick: onOpen, "aria-expanded": Boolean(expanded) } : {})}
+        sx={children && onOpen ? { width: "100%", textAlign: "left", fontFamily: "inherit", borderRadius: "10px" } : undefined}>
         <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.12), color: tone }}>
           {allDone ? <TaskAlt sx={{ fontSize: 22 }} /> : <Description sx={{ fontSize: 22 }} />}
         </Box>
@@ -34,9 +42,16 @@ export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู 
         <Typography sx={{ flexShrink: 0, fontSize: "1.35rem", fontWeight: 900, color: tone, fontVariantNumeric: "tabular-nums" }}>
           {done}/{total}
         </Typography>
+        {children && onOpen && (
+          <Stack alignItems="center" sx={{ flexShrink: 0, color: MUTED, ml: -0.25 }}>
+            <ExpandMore sx={{ fontSize: 22, transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "none" }} />
+            <Typography component="span" sx={{ fontSize: "0.66rem", fontWeight: 700, lineHeight: 1 }}>{expanded ? "ย่อ" : "แสดง"}</Typography>
+          </Stack>
+        )}
       </Stack>
       <LinearProgress variant="determinate" value={(done / total) * 100}
         sx={{ mt: 1.25, height: 6, borderRadius: 5, bgcolor: alpha(MUTED, 0.12), "& .MuiLinearProgress-bar": { bgcolor: tone, borderRadius: 5 } }} />
+      {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "เวลาขยาย ให้มันคงเหลือช่องติ๊กด้วย ให้ดูง่าย") เช็กลิสต์แสดงตลอด ทั้งย่อและขยาย */}
       <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
         {JOB_DOC_TYPES.map((t) => {
           const ok = isDocComplete(event, t.key);
@@ -53,7 +68,14 @@ export default function JobDocsSummaryCard({ event, onOpen, openLabel = "ดู 
           );
         })}
       </Box>
-      {onOpen && (
+      {children && (
+        <Collapse in={Boolean(expanded)} timeout={220} unmountOnExit>
+          {/* การ์ดเอกสารข้างในกรอบ — พื้นเทาอ่อน ไม่มีเงา แยกจากกรอบนอกชัด */}
+          <Box sx={{ mt: 1.25, pt: 1.25, mx: { xs: -0.5, sm: 0 }, borderTop: "1px solid #eef2f7",
+            "& .tt-doc-card": { bgcolor: "#f8fafc", borderColor: "#eef2f7", px: { xs: 1.1, sm: 1.5 }, borderRadius: "12px" } }}>{children}</Box>
+        </Collapse>
+      )}
+      {onOpen && !(children && expanded) && (
         <Button fullWidth variant="outlined" disableElevation onClick={onOpen}
           startIcon={<Description />}
           endIcon={expanded === undefined ? undefined : <ExpandMore sx={{ transition: "transform .2s", transform: expanded ? "rotate(180deg)" : "none" }} />}

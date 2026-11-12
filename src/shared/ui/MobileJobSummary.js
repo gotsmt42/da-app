@@ -7,7 +7,7 @@
  */
 import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMoreRounded, CheckRounded } from "@mui/icons-material";
+import { ExpandMoreRounded } from "@mui/icons-material";
 import moment from "moment";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
@@ -25,7 +25,8 @@ const ACCENT = "#2563eb";
 export const DateTile = ({ head, big, foot, color = "#475569", footColor = null, dashed = false, small = false }) => (
   <Box sx={{ width: 48, flexShrink: 0, borderRadius: 1.75, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
     border: `1px ${dashed ? "dashed" : "solid"} ${dashed ? "#cbd5e1" : "#d5dce5"}` }}>
-    <Box sx={{ py: 0.1, bgcolor: dashed ? SURFACE : "#475569", color: dashed ? MUTED : "#fff", fontSize: "0.58rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap" }}>{head}</Box>
+    {/* 🔁 (12 พ.ย. 2569 "ตาลาย") แถบเดือนสีเทาอ่อน (เดิมเทาเข้มทึบทุกการ์ด) */}
+    <Box sx={{ py: 0.1, bgcolor: dashed ? SURFACE : "#f1f5f9", color: dashed ? MUTED : "#475569", fontSize: "0.6rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap", borderBottom: "1px solid #e2e8f0" }}>{head}</Box>
     <Typography sx={{ fontSize: small ? "0.9rem" : "1.1rem", fontWeight: 900, lineHeight: 1.15, pt: small ? 0.35 : 0.15, color: dashed ? color : INK, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{big}</Typography>
     <Typography sx={{ fontSize: "0.56rem", fontWeight: 700, lineHeight: 1.3, pb: 0.3, color: footColor || (dashed ? color : MUTED), whiteSpace: "nowrap" }}>{foot}</Typography>
   </Box>
@@ -74,32 +75,26 @@ export const StatusPill = ({ label, color = MUTED }) => (
  *    แถบขั้นตอนแบบชิป: ขั้นที่ผ่านแล้ว = เขียว ✓ · ขั้นปัจจุบัน = น้ำเงิน · ขั้นที่เหลือ = เทาจาง (ไม่ใส่คำยาว)
  */
 const STEP_LABELS = ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน"];
+/**
+ * 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้าแรก ดูแล้วรกสับสน ตาลาย ไม่มีความเข้าใจ ทำให้ดูดี ดูง่ายกว่านี้")
+ *    จากชิป 5 อันสีเขียว/น้ำเงิน → แถบความคืบหน้าบางๆ สีเดียว + บอกขั้นปัจจุบันเป็นคำเดียว (ขั้น 3/5 · เข้างาน)
+ */
 export function StepChips({ step }) {
   if (step === null || step === undefined) return null;
-  const doneAll = step > STEP_LABELS.length; // jobStepOf: 6 = ปิดงานแล้ว
+  const total = STEP_LABELS.length;
+  const doneAll = step >= total;      // jobStepOf: 5 = ขอปิดงานแล้ว (รออนุมัติ) · 6 = ปิดงานแล้ว
+  const closed = step > total;
   return (
-    // แถวเดียว 5 ช่องเท่ากัน (ไม่ขึ้นบรรทัดใหม่) — ✓ = ผ่านแล้ว
-    <Box sx={{ mt: 0.9, display: "grid", gridTemplateColumns: doneAll ? "1fr" : `repeat(${STEP_LABELS.length}, minmax(0,1fr))`, gap: 0.4 }}>
-      {doneAll ? (
-        <Box component="span" sx={{ height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.35, borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, color: "#15803d", bgcolor: "#dcfce7" }}>
-          <CheckRounded sx={{ fontSize: 15 }} /> เสร็จสิ้นทุกขั้นตอน
-        </Box>
-      ) : STEP_LABELS.map((l, i) => {
-        const done = i < step;
-        const cur = i === step;
-        return (
-          <Box key={l} component="span" sx={{
-            minWidth: 0, height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.2, borderRadius: 99, fontSize: "0.64rem", whiteSpace: "nowrap", overflow: "hidden",
-            fontWeight: done || cur ? 800 : 600,
-            color: done ? "#15803d" : cur ? "#fff" : "#94a3b8",
-            bgcolor: done ? "#dcfce7" : cur ? ACCENT : "#f1f5f9",
-          }}>
-            {done && <CheckRounded sx={{ fontSize: 12, flexShrink: 0 }} />}
-            {l}
-          </Box>
-        );
-      })}
-    </Box>
+    <Stack direction="row" alignItems="center" gap={1.25} sx={{ mt: 1.1 }}>
+      <Box sx={{ flex: 1, display: "grid", gridTemplateColumns: `repeat(${total}, minmax(0,1fr))`, gap: "3px" }}>
+        {STEP_LABELS.map((l, i) => (
+          <Box key={l} title={l} sx={{ height: 6, borderRadius: 99, bgcolor: doneAll || i < step ? "#16a34a" : i === step ? ACCENT : "#e2e8f0" }} />
+        ))}
+      </Box>
+      <Typography noWrap sx={{ flexShrink: 0, fontSize: "0.74rem", fontWeight: 700, color: closed ? "#15803d" : doneAll ? "#b45309" : "#334155" }}>
+        {closed ? "ปิดงานแล้ว" : doneAll ? "รออนุมัติปิดงาน" : `${STEP_LABELS[step] || ""} · ${step + 1}/${total}`}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -141,20 +136,22 @@ export default function MobileJobSummary({ event, statusLabel, statusColor, next
       <Stack direction="row" gap={1.5} alignItems="flex-start">
         <EventDateTile event={event} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" sx={{ flexWrap: "wrap", columnGap: 0.6, mb: 0.3 }}>
-            <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
-            <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#475569", whiteSpace: "nowrap" }}>{meta.label}{round ? ` · ครั้งที่ ${round}` : ""}</Typography>
-            {event.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", whiteSpace: "nowrap" }}>· {event.jobNo}</Typography>}
-          </Stack>
+          {/* 🔁 (12 พ.ย. 2569) ลำดับอ่าน: ชื่อโครงการ (เด่น) → งาน · ระบบ · ครั้งที่ → ประเภทงาน · เลข Job (เล็ก จาง) */}
           <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.3, overflowWrap: "anywhere" }}>
-            {event.title || "งาน"}{event.system ? ` · ${event.system}` : ""}
+            {place || event.title || "งาน"}
           </Typography>
-          {place && <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#475569" }}>{place}</Typography>}
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#475569", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+            {[place ? event.title : "", event.system, round ? `ครั้งที่ ${round}` : ""].filter(Boolean).join(" · ")}
+          </Typography>
+          <Stack direction="row" alignItems="center" sx={{ flexWrap: "wrap", columnGap: 0.6, mt: 0.25 }}>
+            <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: "#94a3b8", whiteSpace: "nowrap" }}>{meta.label}{event.jobNo ? ` · ${event.jobNo}` : ""}</Typography>
+          </Stack>
           {alert && <Typography sx={{ mt: 0.3, fontSize: "0.74rem", fontWeight: 800, color: "#dc2626" }}>{alert}</Typography>}
         </Box>
         {right}
       </Stack>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.1, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0 }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.1, pt: 1.1, borderTop: `1px solid ${LINE}`, minWidth: 0 }}>
         {person ? (
           <Stack direction="row" alignItems="center" gap={0.9} sx={{ flex: 1, minWidth: 0 }}>
             <PersonPic name={person} src={personSrc} size={30} />

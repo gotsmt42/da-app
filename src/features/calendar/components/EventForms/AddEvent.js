@@ -1,5 +1,9 @@
 import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils/contractRounds";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import SitePhotos from "@/shared/ui/SitePhotos";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
+import { attachSheetPicker, bindSheetDrag, SORTER } from "@/shared/utils/sheetPicker";
 import { personTsRender, PERSON_TS_CSS } from "@/shared/utils/personTsRender";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
@@ -517,6 +521,7 @@ function injectAddStyles() {
     .swal-add-event .ae-card .ae-checkbox-row { font-size: 14px; font-weight: 600; color: #334155; margin: 0 0 16px; gap: 10px; }
     .swal-add-event .ae-card .ae-checkbox-row input { width: 18px !important; height: 18px; accent-color: #2563eb; flex-shrink: 0; }
     .swal-add-event .ae-card .ae-char-count { font-size: 12px; color: #64748b; }
+    .swal-add-event .ae-card .ae-field > label.ae-desc-hint { font-size: 12.5px; font-weight: 500; color: #64748b; }
     @media (max-width: 600px) {
       .swal-add-event .ae-card .ae-card-body { padding: 8px 12px 0; }
       .swal-add-event .ae-card .ae-grid { gap: 14px 10px; margin-bottom: 14px; }
@@ -535,6 +540,141 @@ function injectAddStyles() {
     #ae-error svg { flex-shrink: 0; }
     @keyframes ae-shake { 0%,100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
     @media (max-width: 520px) { #ae-action-bar { flex-wrap: wrap !important; } #ae-error { flex: 1 1 100%; order: -1; } }
+
+    /* ── เรียงการ์ดแบบหน้าแก้ไขงาน (ดู ORDER ใน didOpen) — กล่องโหมดใช้ display:contents ให้การ์ดข้างในเรียงร่วมกันได้ ── */
+    .swal-add-event #ae-body { display: flex; flex-direction: column; }
+    .swal-add-event #ae-body > *, .swal-add-event #ae-body section { flex-shrink: 0; }
+    .swal-add-event #ae-generalSection, .swal-add-event #ae-contractPickSection { display: contents; }
+
+    /* ── มูลค่างานรวม (ชุดเดียวกับหน้าแก้ไขงาน) ── */
+    .swal-add-event .ae-money-input { position: relative; }
+    .swal-add-event .ae-money-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 700; color: #2563eb; pointer-events: none; }
+    .swal-add-event .ae-card .ae-field--money .ae-money-input > input { width: 100%; box-sizing: border-box; min-height: 52px; padding: 11px 14px 11px 34px !important; font-size: 19px !important; font-weight: 800; font-variant-numeric: tabular-nums; color: #0f172a; background: #f8fbff; border: 1.5px solid #bfdbfe !important; border-radius: 10px; font-family: inherit; }
+    .swal-add-event .ae-card .ae-field--money .ae-money-input > input:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .swal-add-event .ae-card .ae-field--money > label { color: #1d4ed8; }
+    /* (12 พ.ย. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าเช่น — ดูสับสนว่ามีมูลค่าแล้ว") ข้อความในช่องว่าง = ตัวบาง สีจาง */
+    .swal-add-event .ae-field--money .ae-money-input > input::placeholder { font-size: 15px; font-weight: 500; color: #94a3b8; }
+    .swal-add-event .ae-money-hint { font-size: 12px; color: #64748b; }
+    @media (max-width: 600px) { .swal-add-event .ae-card .ae-grid.ae-grid-pair { grid-template-columns: 1fr 1fr; } }
+
+    /* ── ไฟล์แนบหน้างาน (เลือกไว้ก่อนลงงาน) ── */
+    .ae-files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .ae-files-grid:empty { display: none; }
+    .ae-file { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 1px solid #e6e9ef; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px; text-align: center; }
+    .ae-file img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .ae-file-ext { font-size: 13px; font-weight: 800; color: #2563eb; background: #eff6ff; border-radius: 6px; padding: 2px 8px; }
+    .ae-file-name { font-size: 11px; color: #475569; line-height: 1.3; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ae-file-del { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(15,23,42,.72); color: #fff; font-size: 14px; line-height: 28px; cursor: pointer; z-index: 1; }
+    .ae-files-add { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: 12px; border: 1.5px dashed #93c5fd; background: #eff6ff; color: #1d4ed8; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+    .ae-files-add:hover { border-style: solid; }
+    .ae-files-hint { margin: 8px 0 16px; font-size: 12.5px; color: #64748b; }
+
+    /* ── ปุ่มเลือกสัญญา (แทน dropdown) ── */
+    .ae-cpick-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 10px 14px;
+      border: 1.5px dashed #93c5fd; border-radius: 12px; background: #eff6ff; color: #1d4ed8;
+      font: inherit; font-size: 15px; font-weight: 700; text-align: left; cursor: pointer;
+    }
+    .ae-cpick-btn.is-set { border-style: solid; border-color: #e2e8f0; background: #fff; color: #0f172a; }
+    .ae-cpick-btn:disabled { cursor: not-allowed; opacity: .6; }
+    .ae-cpick-btn-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .ae-cpick-btn-txt b { font-size: 15px; font-weight: 700; line-height: 1.35; }
+    .ae-cpick-btn-txt small { font-size: 12.5px; font-weight: 500; color: #64748b; line-height: 1.35; }
+    .ae-cpick-btn-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #2563eb; color: #fff; }
+    .ae-cpick-btn.is-set .ae-cpick-btn-ico { background: #eff6ff; color: #2563eb; }
+
+    /* 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้าเลือกงานสัญญาจัดรูปแบบให้เหมือนตรงอื่นด้วย") ปุ่มเลือกสัญญา = หน้าตาเดียวกับช่องเลือกอื่น
+       (พื้นขาว ขอบเทา 1.5px มุม 10px) · ยังไม่เลือก = ข้อความเทาแบบ placeholder */
+    .swal-add-event .ae-cpick-btn { min-height: 46px; padding: 9px 10px 9px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff; color: #94a3b8; font-size: 15px; font-weight: 600; }
+    .swal-add-event .ae-cpick-btn:hover:not(:disabled) { border-color: #2563eb; }
+    .swal-add-event .ae-cpick-btn.is-set { color: #0f172a; }
+    .swal-add-event .ae-cpick-btn-ico { width: 32px; height: 32px; border-radius: 8px; background: #f1f5f9; color: #475569; }
+    .swal-add-event .ae-cpick-btn.is-set .ae-cpick-btn-ico { background: #f1f5f9; color: #475569; }
+
+    /* ── หน้าต่างเลือกสัญญา ── */
+    .ae-sheet { position: absolute; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15,23,42,.45); animation: ae-fade .15s ease; }
+    @keyframes ae-fade { from { opacity: 0; } to { opacity: 1; } }
+    .ae-sheet-panel { width: 100%; max-width: 620px; max-height: 100%; display: flex; flex-direction: column; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px -12px rgba(15,23,42,.45); }
+    .ae-sheet-head { display: flex; align-items: center; gap: 12px; padding: 14px 14px 8px; }
+    .ae-sheet-head > div { flex: 1; min-width: 0; text-align: left; }
+    .ae-sheet-title { font-size: 18px; font-weight: 800; color: #0f172a; }
+    .ae-sheet-sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+    .ae-sheet-close { width: 40px; height: 40px; flex-shrink: 0; border: 0; border-radius: 12px; background: #f1f5f9; color: #334155; font-size: 18px; cursor: pointer; }
+    .ae-sheet-search { position: relative; margin: 0 14px 10px; }
+    .ae-sheet-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .ae-sheet-search input { width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px 0 42px; border: 1.5px solid #e2e8f0; border-radius: 12px; font: inherit; font-size: 15px; color: #0f172a; background: #f8fafc; }
+    .ae-sheet-search input:focus { outline: none; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    /* ⚠️ grid ต้องกำหนดคอลัมน์ minmax(0,1fr) — ไม่งั้นข้อความยาว (nowrap) ดันการ์ดกว้างเกินจอ ต้องเลื่อนซ้ายขวา */
+    .ae-sheet-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; }
+    .ae-sheet-item { min-width: 0; max-width: 100%; box-sizing: border-box; }
+    .ae-sheet-item-main { overflow-wrap: anywhere; }
+    .ae-sheet-item { display: flex; flex-direction: row; align-items: stretch; gap: 10px; width: 100%; padding: 10px 12px; border: 1.5px solid #e6e9ef; border-radius: 14px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+    .ae-sheet-item:hover { border-color: #93c5fd; background: #f8fbff; }
+    .ae-sheet-item.is-cur { border-color: #2563eb; background: #eff6ff; }
+    .ae-sheet-item-main { font-size: 15.5px; font-weight: 700; color: #0f172a; line-height: 1.4; }
+    .ae-sheet-item-sub { font-size: 13px; color: #64748b; line-height: 1.4; }
+    .ae-sheet-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; }
+    .ae-sheet-badge { font-size: 12.5px; font-weight: 700; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 10px; }
+    .ae-sheet-next, .ae-sheet-resp { font-size: 12.5px; color: #475569; }
+    .ae-sheet-empty { padding: 30px 10px; text-align: center; color: #64748b; font-size: 14px; }
+    .ae-si-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+    .ae-si-body .ae-sheet-item-main { font-size: 15px; line-height: 1.3; }
+    .ae-si-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ae-si-tag { font-size: 12px; font-weight: 700; color: #334155; background: #f1f5f9; border-radius: 6px; padding: 1px 7px; }
+    .ae-si-line { font-size: 12.5px; color: #64748b; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ae-si-line b { color: #334155; font-weight: 600; }
+    .ae-sheet-list { display: block !important; overscroll-behavior: contain; }
+    .tt-sheet-group .ae-sheet-item { border: 0 !important; border-radius: 0 !important; align-items: center !important; padding: 12px 14px !important; background: #fff; }
+    .tt-sheet-group .ae-sheet-item + .ae-sheet-item { border-top: 1px solid #eef2f7 !important; }
+    .tt-sheet-group .ae-sheet-item:hover { background: #f8fafc; }
+    .tt-sheet-group .ae-sheet-item.is-cur { background: #eff6ff; }
+    .tt-sheet-group .ae-si-left { width: auto !important; flex-direction: row !important; padding: 3px 10px !important; border-radius: 999px !important; background: #f1f5f9 !important; color: #334155 !important; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+    .tt-sheet-group .ae-sheet-item.is-cur .ae-si-left { background: #dbeafe !important; color: #1d4ed8 !important; }
+    .ae-sheet-item.is-cur .tt-si-radio { border: 0; background: #2563eb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 14px no-repeat; }
+    .ae-sheet-item .tt-si-radio { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 2px solid #cbd5e1; box-sizing: border-box; }
+    .ae-si-left { flex-shrink: 0; width: 66px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; background: #eff6ff; color: #1d4ed8; padding: 6px 4px; }
+    .ae-si-left b { font-size: 22px; font-weight: 800; line-height: 1.1; }
+    .ae-si-left small { font-size: 10.5px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+    .ae-si-left em { font-style: normal; font-size: 10.5px; color: #475569; margin-top: 2px; text-align: center; }
+    .ae-sheet-item.is-cur .ae-si-left { background: #2563eb; color: #fff; }
+    .ae-sheet-item.is-cur .ae-si-left em { color: #dbeafe; }
+    @media (max-width: 600px) {
+      .ae-sheet { align-items: flex-end; padding: 0; }
+      .ae-sheet-panel { max-width: none; height: 88%; border-radius: 18px 18px 0 0; }
+    }
+
+    /* ── เลือกครั้งที่: ไทล์ "ครั้งที่ N" + สถานะ ── */
+    .swal-add-event .ae-round-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .swal-add-event .ae-round-chip {
+      flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+      min-width: 0; height: auto; min-height: 58px; padding: 9px 12px; border-radius: 12px; border-width: 1.5px; text-align: left;
+    }
+    .swal-add-event .ae-round-chip b { font-size: 15px; font-weight: 800; line-height: 1.25; }
+    .swal-add-event .ae-round-chip small { font-size: 12px; font-weight: 600; opacity: .85; line-height: 1.3; }
+    .swal-add-event button.ae-round-chip--open { border-color: #e2e8f0; color: #0f172a; background: #fff; }
+    .swal-add-event button.ae-round-chip--open small { color: #64748b; }
+    .swal-add-event button.ae-round-chip--open:hover { border-color: #2563eb; background: #f8fbff; }
+    .swal-add-event .ae-round-chip--selected { border: 2px solid #2563eb !important; background: #eff6ff !important; color: #1d4ed8 !important; box-shadow: 0 0 0 3px rgba(37,99,235,.15); transform: none; }
+    .swal-add-event .ae-round-chip--selected::after { background: #2563eb; }
+    .swal-add-event .ae-round-chip--selected-extend { transform: none; }
+    .swal-add-event .ae-round-picked-hint { font-size: 13.5px; font-weight: 700; margin: 0 0 16px; padding: 10px 12px; border-radius: 10px; }
+    .swal-add-event .ae-round-picked-hint:empty { display: none; }
+    .swal-add-event .ae-round-picked-hint.is-new { color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; }
+    .swal-add-event .ae-round-picked-hint.is-extend { color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; }
+    /* กล่องสรุปสัญญาที่เลือก — โทนน้ำเงินเดียวกับการเลือก */
+    /* 🔁 (12 พ.ย. 2569 ผู้ใช้: "เกะกะ รกเกินไป") ปุ่มเลือกสัญญาแสดงสรุปครบแล้ว — ไม่ต้องมีกล่องสรุปซ้ำด้านล่าง */
+    .swal-add-event .ae-contract-pick-info { display: none !important; }
+    .ae-cpick-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 12.5px; font-weight: 500; color: #475569; }
+    .swal-add-event .ae-round-grid { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)) !important; gap: 8px !important; margin-bottom: 8px !important; }
+    .swal-add-event .ae-round-chip { min-height: 50px !important; padding: 7px 10px !important; }
+    .swal-add-event .ae-round-chip b { font-size: 14px !important; }
+    /* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ในกรอบไม่อยากให้เกิน 2 แถว") ชื่อครั้ง 1 บรรทัด + สถานะ 1 บรรทัด (ยาวเกิน = ตัด …) */
+    .swal-add-event .ae-round-chip small, .swal-add-event .ae-round-chip b { font-size: 11.5px !important; display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .swal-add-event .ae-round-chip b { font-size: 14px !important; }
+    .swal-add-event .ae-round-picked-hint { padding: 0 !important; background: none !important; border: 0 !important; font-size: 13px !important; font-weight: 600 !important; margin: 0 0 14px !important; }
+    .swal-add-event .ae-contract-pick-info b { color: #0f172a; font-size: 15px; }
+    .swal-add-event .ae-contract-pick-info .ae-cpi-sub { font-size: 13px; }
+    .swal-add-event .ae-cpi-badge { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; font-size: 12px; }
   `;
   document.head.appendChild(style);
 }
@@ -776,15 +916,20 @@ export const getAddEvent = async ({
         <div class="ae-card-titles"><h4>ข้อมูลงาน</h4><p>งานนี้ของลูกค้ารายไหน เป็นงานอะไร</p></div>
       </div>
       <div class="ae-card-body">
+      ${/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ลงงานใหม่ให้มีระบุมูลค่างานรวมด้วยให้สอดคล้อง · ตรวจสอบความสอดคล้องข้อมูลให้ดี")
+           เรียงช่องแบบเดียวกับหน้าแก้ไขงาน: บริษัท | โครงการ · ประเภทงาน | ระบบงาน (มือถือคู่กัน) · มูลค่างานรวม (เต็มแถว เด่น)
+           มูลค่างานรวม = ฟิลด์ jobValue ตัวเดียวกับหน้าแก้ไขงาน/ภาพรวมงาน · เฉพาะแอดมิน/manager (ข้อมูลการเงิน) */""}
       <div class="ae-grid ae-grid-2">
-        <div class="ae-field">
-          <label><span class="req">*</span> ชื่อโครงการ</label>
-          <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
-        </div>
         <div class="ae-field">
           <label>ชื่อบริษัท</label>
           <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
         </div>
+        <div class="ae-field">
+          <label><span class="req">*</span> ชื่อโครงการ</label>
+          <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
+        </div>
+      </div>
+      <div class="ae-grid ae-grid-2 ae-grid-pair">
         <div class="ae-field">
           <label><span class="req">*</span> ประเภทงาน</label>
           <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
@@ -794,6 +939,15 @@ export const getAddEvent = async ({
           <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
         </div>
       </div>
+      ${isAdminOrManagerUser ? `
+      <div class="ae-field ae-field--money" style="margin-bottom:16px;">
+        <label>มูลค่างานรวม (บาท) <span class="ae-opt">ไม่บังคับ</span></label>
+        <div class="ae-money-input">
+          <span class="ae-money-symbol">฿</span>
+          <input id="eventJobValue" type="text" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด">
+        </div>
+        <span class="ae-money-hint">ราคาทั้งงานที่ตกลงกับลูกค้า (ไม่ใช่ราคาต่อครั้ง) · เว้นว่างได้</span>
+      </div>` : ""}
       </div>
     </section>
 
@@ -902,12 +1056,15 @@ export const getAddEvent = async ({
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
-        <div class="ae-card-titles"><h4>เลือกสัญญา</h4><p>สัญญาที่ยังเพิ่มครั้งได้</p></div>
+        <div class="ae-card-titles"><h4>เลือกสัญญา <span class="req">*</span></h4><p>สัญญาที่ยังเพิ่มครั้งได้</p></div>
       </div>
       <div class="ae-card-body">
-      <div class="ae-field" style="margin-bottom:10px;">
-        <label><span class="req">*</span> เลือกสัญญา</label>
-        <select id="ae-contractPick"><option value="" selected disabled>— เลือกสัญญา —</option>${contractOpts}</select>
+      <div class="ae-field" style="margin-bottom:16px;">
+        <select id="ae-contractPick" hidden><option value="" selected disabled>— เลือกสัญญา —</option>${contractOpts}</select>
+        <button type="button" class="ae-cpick-btn" id="ae-contractPickBtn" ${selectableContracts.length ? "" : "disabled"}>
+          <span class="ae-cpick-btn-txt" id="ae-contractPickBtnTxt">${selectableContracts.length ? "แตะเพื่อเลือกสัญญา" : "ไม่มีสัญญาที่เพิ่มครั้งได้"}</span>
+          <span class="ae-cpick-btn-ico" aria-hidden="true" title="เปลี่ยนสัญญา"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M10 18a8 8 0 1 1 5.3-14A8 8 0 0 1 10 18Zm0-2a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm7.6.2 4.1 4.1-1.4 1.4-4.1-4.1 1.4-1.4Z"/></svg></span>
+        </button>
       </div>
 
       <div class="ae-contract-pick-info" id="ae-contractPickInfo"></div>
@@ -959,25 +1116,30 @@ export const getAddEvent = async ({
           ⚠️ วางไว้นอกทั้ง #ae-generalSection และ #ae-contractPickSection เพื่อให้ใช้ได้ทั้งสองโหมด
           (ทั้งสองโหมดสร้าง event ด้วย field ชุดเดียวกัน backend รับ docNo/description ตั้งแต่ POST อยู่แล้ว)
           ทั้งคู่ไม่บังคับกรอก — เรื่องเอกสารมักตามมาทีหลัง จึงยังเว้นว่างแล้วมาเติมภายหลังได้ */""}
-    ${jobInfoSectionHtml()}
-
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
         <div class="ae-card-titles"><h4>รายละเอียดงานที่ทำ <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div><span class="ae-card-badge" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;">บังคับ</span>
       </div>
       <div class="ae-card-body">
-    <div class="ae-field" style="margin-bottom:12px;">
-      <label>เลขที่อ้างอิง (Doc No.)</label>
-      <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
-    </div>
+    ${/* 🧹 (12 พ.ย. 2569 ผู้ใช้: "เลขที่อ้างอิงตัดออกไป") — ตัดช่อง Doc No. · ป้ายชื่อซ้ำกับหัวการ์ด เหลือคำแนะนำสั้นๆ */""}
     <div class="ae-field" style="margin-bottom:16px;">
-      <label><span class="req">*</span> รายละเอียดงานที่ทำ <span class="ae-opt">ทำอะไร ที่ไหน อุปกรณ์/จุดไหน · อย่างน้อย 10 ตัวอักษร</span></label>
+      <label class="ae-desc-hint">ทำอะไร ที่ไหน อุปกรณ์/จุดไหน · อย่างน้อย 10 ตัวอักษร</label>
       <textarea id="description" rows="5" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector ที่แจ้งเสีย 2 จุด · ลูกค้าขอเข้าหลัง 10 โมง"></textarea>
       <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
     </div>
     </section>
+
+    ${/* ✅ (12 พ.ย. 2569 ผู้ใช้: "หน้าเพิ่มข้อมูลให้เพิ่มเลือกไฟล์แนบหลักฐาน แบบหน้าแก้ไขด้วย")
+         ชุดเดียวกับ "รูปและไฟล์หน้างาน" ในหน้าแก้ไขงาน (Events.sitePhotoFiles) — เลือกไว้ก่อน อัปโหลดหลังลงงานสำเร็จ
+         ⚠️ data-no-draft: ไฟล์ไม่เข้าระบบกู้คืนข้อมูลฟอร์ม */""}
+    <section class="ae-card" data-no-draft style="order:8;">
+      <div class="ae-card-body" style="padding:12px;"><div id="ae-sitePhotosMount"></div></div>
+    </section>
+
+    ${/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "สลับตำแหน่งวางกับข้อมูล Job") รายละเอียดงาน (บังคับ) + ไฟล์ขึ้นก่อน · ข้อมูล Job (ไม่บังคับ) ไว้ท้าย */""}
+    ${jobInfoSectionHtml()}
 
     <!-- hidden fontSize -->
     <input id="fontSize" type="hidden" value="8">
@@ -1014,6 +1176,7 @@ export const getAddEvent = async ({
       // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
       popup.__thaiDpCleanup?.();
       popup.__colorPickerCleanup?.();
+      { const r = popup.__sitePhotosRoot; popup.__sitePhotosRoot = null; if (r) setTimeout(() => r.unmount(), 0); }
       popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
     },
 
@@ -1042,7 +1205,7 @@ export const getAddEvent = async ({
       const personRender = personTsRender(new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""])));
       const mkTs = (id, placeholder = "", _maxOptions, overrides = {}) => {
         try {
-          return new TomSelect(id, {
+          const ts = new TomSelect(id, {
             create: true,
             maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             placeholder,
@@ -1059,6 +1222,8 @@ export const getAddEvent = async ({
             dropdownParent: "body",
             ...overrides,
           });
+          attachSheetPicker(ts);
+          return ts;
         } catch { return null; }
       };
 
@@ -1115,6 +1280,7 @@ export const getAddEvent = async ({
           // ("— เลือกลูกทีม —") ให้เองตาม HTML spec แล้ว TomSelect ก็หยิบมาแสดงเป็นค่าที่เลือกไว้
           // ทั้งที่ยังว่างเปล่า — เคลียร์ทิ้งให้ขึ้น placeholder จริงแทน (เทียบ mkTsCleared ใน EditEvent.js)
           ts.clear(true);
+          attachSheetPicker(ts);
           return ts;
         } catch { return null; }
       };
@@ -1162,6 +1328,7 @@ export const getAddEvent = async ({
             plugins: el.multiple ? ["remove_button"] : [],
           });
           ts.clear(true);
+          attachSheetPicker(ts);
           return ts;
         } catch { return null; }
       };
@@ -1241,42 +1408,87 @@ export const getAddEvent = async ({
         });
       });
 
-      /* ── เลือกสัญญาที่มีอยู่แล้ว — create:false เพราะห้ามพิมพ์เพิ่มเอง ต้องเลือกจากที่มีจริงเท่านั้น ──
-         ⚠️ เดิม dropdown โชว์แค่ข้อความยาวบรรทัดเดียว "บริษัท · โครงการ · ประเภทงาน (เลขที่)" อ่านยาก
-         ไล่สายตาหาสัญญาที่ต้องการไม่ออกเวลามีสัญญาเยอะๆ — ใช้ render.option/item ของ TomSelect วาด HTML
-         เอง แยกชื่อบริษัท/โครงการ (ตัวหนาใหญ่) ออกจากรายละเอียดย่อย (เบาๆ) พร้อมป้าย "เหลือ N ครั้ง"
-         แยกให้เห็นชัด — escape() ที่ TomSelect ส่งมาให้ป้องกัน HTML injection จากชื่อที่ผู้ใช้เคยพิมพ์เอง */
-      const renderContractOption = (data, escape) => {
-        const c = contractMap.get(data.value);
-        if (!c) return `<div class="ae-contract-option">${escape(data.text)}</div>`;
-        const remaining = c.visitCount - c.usedVisits;
-        return `
-          <div class="ae-contract-option">
-            <div class="ae-contract-option-main">${escape(contractDisplayName(c))}</div>
-            <div class="ae-contract-option-sub">
-              <span>${escape(c.title)} · ${escape(c.system)}${c.contractNo ? ` · เลขที่ ${escape(c.contractNo)}` : ""}</span>
-              <span class="ae-contract-option-badge">เหลือ ${remaining} ครั้ง</span>
+      /**
+       * 🔁 (12 พ.ย. 2569 ผู้ใช้: "ตอนเลือกสัญญาให้เด้งขึ้นมาเลย เพื่อให้คนหาได้ง่าย · UI ดูง่ายในมือถือ")
+       *    เดิมเป็น dropdown (TomSelect) เล็ก รายการยาวต้องเลื่อนในกล่องแคบ บนมือถือหาไม่เจอ
+       *    → แตะช่อง = หน้าต่างเลือกสัญญาเด้งขึ้น (มือถือ = แผ่นเต็มจอจากล่าง · คอม = กล่องกลาง)
+       *      ช่องค้นหาบนสุด (บริษัท/โครงการ/เลขที่/ระบบ/ผู้รับผิดชอบ) · การ์ดสัญญาละใบ มีป้าย "เหลือ N ครั้ง" + ครั้งถัดไป
+       *    ⚠️ <select id="ae-contractPick"> เดิมยังเป็นตัวเก็บค่า (โค้ดบันทึกอ่านจากตรงนี้) — แค่ซ่อนไว้
+       */
+      const contractTs = null;
+      const pickSelect = document.getElementById("ae-contractPick");
+      const pickBtnTxt = document.getElementById("ae-contractPickBtnTxt");
+      const nextRoundOf = (c) => {
+        for (let n = 1; n <= (c.visitCount || 0); n += 1) if (!c.visits.some((v) => Number(v.time) === n)) return n;
+        return null;
+      };
+      const searchText = (c) => [c.company, c.site, c.title, c.system, c.contractNo, c.responsiblePerson, c.team].filter(Boolean).join(" ").toLowerCase();
+      const openContractSheet = () => {
+        const popup = Swal.getPopup();
+        if (!popup || popup.querySelector(".ae-sheet")) return;
+        const ov = document.createElement("div");
+        ov.className = "ae-sheet";
+        ov.innerHTML = `
+          <div class="ae-sheet-panel" role="dialog" aria-label="เลือกสัญญา">
+            <div class="tt-sheet-grip" aria-hidden="true"></div>
+            <div class="ae-sheet-head">
+              <div><div class="ae-sheet-title">เลือกสัญญา</div><div class="ae-sheet-sub">${selectableContracts.length} สัญญาที่ยังเพิ่มครั้งได้</div></div>
+              <button type="button" class="ae-sheet-close" aria-label="ปิด">✕</button>
             </div>
+            <div class="ae-sheet-search">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M10 18a8 8 0 1 1 5.3-14A8 8 0 0 1 10 18Zm0-2a6 6 0 1 0 0-12 6 6 0 0 0 0 12Zm7.6.2 4.1 4.1-1.4 1.4-4.1-4.1 1.4-1.4Z"/></svg>
+              <input type="search" placeholder="ค้นหา บริษัท · โครงการ · เลขที่สัญญา · ระบบ" autocomplete="off">
+            </div>
+            <div class="ae-sheet-list"></div>
           </div>`;
-      };
-      // ✅ "item" (ค่าที่เลือกแล้ว โชว์ย่อในกล่องค้นหาเอง) ให้กระชับบรรทัดเดียว ต่างจาก "option" (รายการ
-      // ใน dropdown) ที่โชว์ได้เต็ม 2 บรรทัด — ไม่งั้นกล่องค้นหาจะสูงเกินจำเป็น
-      const renderContractItem = (data, escape) => {
-        const c = contractMap.get(data.value);
-        if (!c) return `<div>${escape(data.text)}</div>`;
-        return `<div>${escape(contractDisplayName(c))}${c.contractNo ? ` · ${escape(c.contractNo)}` : ""}</div>`;
-      };
-      let contractTs = null;
-      try {
-        contractTs = new TomSelect("#ae-contractPick", {
-          create: false,
-          maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
-          placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
-          sortField: { field: "text", direction: "asc" },
-          render: { option: renderContractOption, item: renderContractItem },
-          dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
+        const list = ov.querySelector(".ae-sheet-list");
+        const input = ov.querySelector("input");
+        const cur = pickSelect?.value || "";
+        const draw = () => {
+          const q = input.value.trim().toLowerCase();
+          const rows = selectableContracts.filter((c) => !q || q.split(/\s+/).every((w) => searchText(c).includes(w)))
+            .sort((a, b) => SORTER.compare(contractDisplayName(a), contractDisplayName(b)));
+          list.innerHTML = rows.length ? `<div class="tt-sheet-group">${rows.map((c) => {
+            const left = c.visitCount - c.usedVisits;
+            const nx = nextRoundOf(c);
+            // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ยังดูไม่เข้าธีม ตอนอ่านยังดูไม่คลีนตา") แถวในกลุ่มเดียวแบบหน้าต่างเลือกอื่น:
+            //    ชื่อ (เด่น) · บรรทัดรอง ประเภท · ระบบ · เลขที่ · ผู้รับผิดชอบ (เทา) · ขวา = "เหลือ N" สีกลาง + วงเลือก
+            return `<button type="button" class="ae-sheet-item${c.key === cur ? " is-cur" : ""}" data-key="${escapeHtml(c.key)}">
+              <span class="ae-si-body">
+                <span class="ae-sheet-item-main">${escapeHtml(contractDisplayName(c))}</span>
+                <span class="ae-si-line">${escapeHtml([c.title, c.system, c.contractNo].filter(Boolean).join(" · "))}</span>
+                ${c.responsiblePerson ? `<span class="ae-si-line">ผู้รับผิดชอบ ${escapeHtml(c.responsiblePerson)}</span>` : ""}
+              </span>
+              <span class="ae-si-left" title="${nx ? `ครั้งถัดไป ${nx}/${c.visitCount}` : ""}">เหลือ ${left}</span>
+              <span class="tt-si-radio" aria-hidden="true"></span>
+            </button>`;
+          }).join("")}</div>` : `<div class="ae-sheet-empty">ไม่พบสัญญาที่ตรงกับ “${escapeHtml(input.value)}”</div>`;
+        };
+        draw();
+        const close = () => ov.remove();
+        input.addEventListener("input", draw);
+        ov.addEventListener("click", (ev) => { if (ev.target === ov) close(); });
+        ov.querySelector(".ae-sheet-close").addEventListener("click", close);
+        bindSheetDrag(ov, ov.querySelector(".ae-sheet-panel"), list, close);
+        list.addEventListener("click", (ev) => {
+          const item = ev.target.closest(".ae-sheet-item");
+          if (!item || !pickSelect) return;
+          pickSelect.value = item.dataset.key;
+          pickSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          close();
         });
-      } catch { contractTs = null; }
+        popup.appendChild(ov);
+        // มือถือ: ไม่เด้งคีย์บอร์ดทันที (บังรายการ) · คอม: โฟกัสช่องค้นหาเลย
+        if (window.matchMedia("(min-width: 601px)").matches) setTimeout(() => input.focus(), 50);
+      };
+      document.getElementById("ae-contractPickBtn")?.addEventListener("click", openContractSheet);
+      pickSelect?.addEventListener("change", () => {
+        const c = contractMap.get(pickSelect.value);
+        if (pickBtnTxt && c) {
+          pickBtnTxt.innerHTML = `<b>${escapeHtml(contractDisplayName(c))}</b><small>${escapeHtml([c.title, c.system, c.contractNo].filter(Boolean).join(" · "))}</small><span class="ae-cpick-meta"><span class="ae-sheet-badge">เหลือ ${c.visitCount - c.usedVisits} ครั้ง</span>${c.responsiblePerson ? `<span>ผู้รับผิดชอบ ${escapeHtml(c.responsiblePerson)}</span>` : ""}</span>`;
+          pickBtnTxt.parentElement.classList.add("is-set");
+        }
+      });
       mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อผู้ปฏิบัติงาน", employeeList.length || 50, { render: personRender });
 
       // ตัวนับตัวอักษรของช่องรายละเอียดงาน — ให้เหมือนฟอร์มแก้ไขงาน
@@ -1309,9 +1521,9 @@ export const getAddEvent = async ({
         if (!round) { roundPickedHint.textContent = ""; return; }
         const label = formatRoundLabel(round, hintContract?.visitCount, hintContract);
         roundPickedHint.textContent = isExtend
-          ? `✅ กำลังเพิ่มวันที่ไม่ต่อเนื่องให้ "ครั้งที่ ${label}" (ครั้งเดิม ไม่นับเป็นครั้งใหม่)`
-          : `🆕 กำลังจะสร้าง "ครั้งที่ ${label}" เป็นครั้งใหม่`;
-        roundPickedHint.style.color = isExtend ? "#15803d" : "#b91c1c";
+          ? `เพิ่มวันเข้างานให้ "ครั้งที่ ${label}" (ครั้งเดิม · ไม่นับเป็นครั้งใหม่)`
+          : `จะลงเป็น "ครั้งที่ ${label}" (ครั้งใหม่)`;
+        roundPickedHint.className = `ae-round-picked-hint ${isExtend ? "is-extend" : "is-new"}`;
       };
 
       const renderRoundGrid = (c) => {
@@ -1326,14 +1538,14 @@ export const getAddEvent = async ({
           const scheduled = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
           if (scheduled) {
             const dateLabel = formatThai(moment(scheduled.start || scheduled.date), "DD MMM YY");
-            return `<button type="button" class="ae-round-chip ae-round-chip--scheduled" data-round="${n}" data-extend="1" title="ลงตารางแล้ว — ${dateLabel} · กดเพื่อเพิ่มวันที่ไม่ต่อเนื่องให้ครั้งนี้">✅ ${n}</button>`;
+            return `<button type="button" class="ae-round-chip ae-round-chip--scheduled" data-round="${n}" data-extend="1" title="ลงตารางแล้ว — ${dateLabel} · กดเพื่อเพิ่มวันที่ไม่ต่อเนื่องให้ครั้งนี้"><b>ครั้งที่ ${n}</b><small>ลงแล้ว ${formatThai(moment(scheduled.start || scheduled.date), "D MMM YY")}</small></button>`;
           }
           const pending = c.visits.find((v) => v.unscheduled && Number(v.time) === n);
           if (pending) {
-            return `<span class="ae-round-chip ae-round-chip--pending" title="มีแผนงานล่วงหน้าจองครั้งนี้ไว้แล้ว — ไปลงวันที่จริงที่แผงงานล่วงหน้าแทน">📌 ${n}</span>`;
+            return `<span class="ae-round-chip ae-round-chip--pending" title="มีแผนงานล่วงหน้าจองครั้งนี้ไว้แล้ว — ไปลงวันที่จริงที่แผงงานล่วงหน้าแทน"><b>ครั้งที่ ${n}</b><small>แผนล่วงหน้า</small></span>`;
           }
           if (defaultOpen === null) defaultOpen = n;
-          return `<button type="button" class="ae-round-chip ae-round-chip--open" data-round="${n}" data-extend="0">${n}</button>`;
+          return `<button type="button" class="ae-round-chip ae-round-chip--open" data-round="${n}" data-extend="0"><b>ครั้งที่ ${n}</b><small>ว่าง · ลงได้</small></button>`;
         }).join("");
         selectedRoundInput.value = defaultOpen || "";
         updateRoundPickedHint(defaultOpen, false);
@@ -1372,6 +1584,8 @@ export const getAddEvent = async ({
       };
       document.getElementById("ae-contractPick")?.addEventListener("change", (e) => showContractInfo(e.target.value));
       contractTs?.on("change", (val) => showContractInfo(val));
+      // ข้อมูลที่กู้คืนจากร่าง (เลือกสัญญาไว้แล้ว) — แสดงชื่อบนปุ่ม + ตารางครั้งที่ให้ตรง
+      if (pickSelect?.value) pickSelect.dispatchEvent(new Event("change", { bubbles: true }));
 
       /* buttons */
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
@@ -1382,6 +1596,51 @@ export const getAddEvent = async ({
        *    กดแล้วเหมือนไม่เกิดอะไร (เช่น ยังไม่กรอกรายละเอียดงาน ซึ่งอยู่ล่างสุดของฟอร์ม)
        *    → แถบแดงข้างปุ่ม "ลงงาน" + เลื่อนไปที่ช่องนั้น + กรอบแดง · พิมพ์แก้แล้วแถบหายเอง
        */
+      /**
+       * 🔁 (12 พ.ย. 2569 ผู้ใช้: "จัดวางจุดวางให้เหมือนกับหน้า edit ด้วย ให้ไม่สับสน")
+       *    เรียงการ์ดตามหน้าแก้ไขงาน: ผู้ปฏิบัติงาน → รายละเอียดงาน → รูป/ไฟล์ → ข้อมูลงาน → ผู้ติดต่อ → วันที่ → สีปฏิทิน → ข้อมูล Job
+       *    (โหมดสัญญา: เลือกสัญญา → ครั้งที่ → วันที่/ผู้ปฏิบัติงาน → รายละเอียด → ไฟล์)
+       *    ⚠️ เรียงด้วย CSS order (ไม่ย้าย DOM) — โค้ดอ่านค่า/สลับโหมดเดิมทำงานเหมือนเดิมทุกอย่าง
+       */
+      {
+        // 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้าเพิ่มให้ข้อมูลงานขึ้นก่อนรายละเอียด ไฟล์") ข้อมูลงานขึ้นก่อน → คน → รายละเอียด → ไฟล์
+        // ⚠️ "รูปและไฟล์หน้างาน" (ลำดับที่ 8) ตั้ง order ไว้ที่การ์ดเอง (การ์ดนั้นไม่มีหัวข้อ h4)
+        const ORDER = ["ประเภทงาน", "ข้อมูลงาน", "ผู้ปฏิบัติงาน", "เลือกสัญญา", "เลือกครั้งที่", "วันที่และผู้ปฏิบัติงาน", "รายละเอียดงานที่ทำ", "รูปและไฟล์หน้างาน", "ผู้ติดต่อหน้างาน", "วันที่และเวลา", "การแสดงผลบนปฏิทิน", "ข้อมูล Job"];
+        Swal.getPopup()?.querySelectorAll("#ae-body section").forEach((sec) => {
+          const t = (sec.querySelector("h4")?.firstChild?.textContent || "").trim();
+          const i = ORDER.indexOf(t);
+          if (i >= 0) sec.style.order = String(i + 1);
+        });
+      }
+
+      // ── ไฟล์แนบหน้างาน: เก็บไว้ในหน่วยความจำ แล้วอัปโหลดหลังลงงานสำเร็จ (ยังไม่มีงานให้แนบตอนกรอก) ──
+      let pendingFiles = [];
+      // ✅ (12 พ.ย. 2569 ผู้ใช้: "ช่องไฟล์แนบให้ใช้เป็นรูปแบบเดิม") การ์ด "ไฟล์แนบ / หลักฐาน" ตัวเดียวกับหน้าแก้ไขงาน
+      //    (SitePhotos โหมดเลือกไว้ก่อน — อัปโหลดหลังลงงานสำเร็จ)
+      {
+        const host = document.getElementById("ae-sitePhotosMount");
+        if (host) {
+          const root = createRoot(host);
+          Swal.getPopup().__sitePhotosRoot = root;
+          root.render(createElement(SitePhotos, {
+            event: { sitePhotoFiles: [] }, canEdit: true, sx: { mt: 0, border: 0, p: 0.5 },
+            onPendingChange: (list) => { pendingFiles = list; },
+          }));
+        }
+      }
+      /** อัปโหลดไฟล์ที่เลือกไว้เข้างานที่เพิ่งสร้าง (ช่วงวันแรก) — คืนจำนวนไฟล์ที่ไม่สำเร็จ */
+      const uploadPending = async (created) => {
+        const target = (Array.isArray(created) ? created : [created]).find((x) => x?._id);
+        if (!pendingFiles.length || !target) return 0;
+        let failed = 0;
+        for (const f of pendingFiles) {
+          // eslint-disable-next-line no-await-in-loop -- อัปทีละไฟล์ กันเน็ตมือถือหลุดกลางคันทั้งชุด
+          try { await EventService.Upload(target._id, f, "sitePhoto"); } catch { failed += 1; }
+        }
+        return failed;
+      };
+      const doneMsg = (failed) => (failed ? { icon: "warning", text: `ลงงานแล้ว แต่ไฟล์แนบอัปโหลดไม่สำเร็จ ${failed} ไฟล์ — แนบเพิ่มได้ในหน้าแก้ไขงาน`, timer: 3500 } : { icon: "success", timer: 1200 });
+
       const errBox = document.getElementById("ae-error");
       const errIco = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>';
       const clearErr = () => {
@@ -1421,6 +1680,14 @@ export const getAddEvent = async ({
         n?.addEventListener("scroll", () => { if (n.scrollTop) n.scrollTop = 0; });
       });
       Swal.getPopup()?.addEventListener("input", clearErr);
+      // มูลค่างานรวม: ใส่ลูกน้ำให้อ่านง่ายตอนพิมพ์ (ค่าที่ส่งตัดลูกน้ำออก)
+      {
+        const jv = document.getElementById("eventJobValue");
+        jv?.addEventListener("blur", () => {
+          const n = Number(String(jv.value).replace(/[^\d.]/g, ""));
+          jv.value = jv.value.trim() && Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "";
+        });
+      }
       Swal.getPopup()?.addEventListener("change", clearErr);
 
       document.getElementById("ae-btnConfirm")?.addEventListener("click", async (clickEvt) => {
@@ -1540,14 +1807,14 @@ export const getAddEvent = async ({
                 date: cpStart,
               }],
             };
-            await saveEventToDB(newEvent);
+            const created = await saveEventToDB(newEvent);
+            const failedFiles = await uploadPending(created);
             await fetchEventsFromDB();
             stopSaving();
             formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
             Swal.fire({
               title: isExtend ? `เพิ่มวันที่ต่อเนื่องให้ครั้งที่ ${nextIndex} สำเร็จ ✅` : `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`,
-              icon: "success",
-              timer: 1200,
+              ...doneMsg(failedFiles),
               showConfirmButton: false,
             });
           } catch (error) {
@@ -1627,6 +1894,11 @@ export const getAddEvent = async ({
             title,
             system,
             docNo:           getVal("docNo"),
+            ...(() => {
+              const raw = String(getVal("eventJobValue")).replace(/[^\d.]/g, "");
+              const n = raw ? Number(raw) : null;
+              return n && Number.isFinite(n) && n > 0 ? { jobValue: n } : {};
+            })(),
             description:     getVal("description"),
             contactName:     getVal("contactName"),
             contactTel:      getVal("contactTel"),
@@ -1703,7 +1975,8 @@ export const getAddEvent = async ({
           // (ยังไม่ถูกบันทึกจริง) ทำให้ถ้า saveEventToDB ด้านล่างล้มเหลว จะมี event ผีค้างอยู่ใน
           // ปฏิทินโดยไม่มีทางลบออก จนกว่าจะรีเฟรชหน้า — fetchEventsFromDB() หลังบันทึกสำเร็จ
           // ก็ดึงข้อมูลจริงมาแสดงอยู่แล้ว จึงตัด optimistic add ที่ไม่จำเป็นและเสี่ยงนี้ออก
-          await saveEventToDB(newEvent);
+          const created = await saveEventToDB(newEvent);
+          const failedFiles = await uploadPending(created);
           // ✅ จำคู่สีที่ใช้จริงไว้ให้เลือกซ้ำได้ในแถว "ใช้ล่าสุด" — จำตอนบันทึกสำเร็จเท่านั้น
           // ไม่ใช่ตอนลากสไลเดอร์ ไม่งั้นรายการจะเต็มไปด้วยสีระหว่างทางที่ไม่ได้ใช้จริง
           rememberEventColors(payload.backgroundColor, payload.textColor);
@@ -1716,8 +1989,7 @@ export const getAddEvent = async ({
           formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
           Swal.fire({
             title: isAdminOrManagerUser ? "ลงงานสำเร็จ ✅" : "ส่งคำขอลงงานแล้ว ✅",
-            icon: "success",
-            timer: 1200,
+            ...doneMsg(failedFiles),
             showConfirmButton: false,
           });
 

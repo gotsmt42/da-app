@@ -72,7 +72,8 @@ export function jobInfoSectionHtml(v = {}, cls = "ae", disabled = false) {
   if (cls === "ade") {
     return `${CSS}
     <hr class="ade-divider">
-    <p class="ade-section-label">ข้อมูล Job <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ${sub} · ไม่บังคับ</span></p>
+    <p class="ade-section-label"><span class="ade-sec-title">ข้อมูล Job</span> <span class="ade-sec-hint" style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
+    <p class="ade-sec-sub">${sub}</p>
     ${fields}`;
   }
   return `${CSS}

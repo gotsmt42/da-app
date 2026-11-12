@@ -54,14 +54,15 @@ const Chip = ({ color, solid, icon, children, title }) => {
 };
 
 /** ป้ายสถานะขั้นตอนงาน — ไม่มีอะไรให้แสดง = ไม่ render */
-export function JobFlowChips({ event, showAck = false, sx }) {
+/** @param hideJobNo ไม่แสดงชิปเลข Job (หัวการ์ดที่แสดงเลข Job เป็นแถวข้อมูลแล้ว) */
+export function JobFlowChips({ event, showAck = false, hideJobNo = false, sx }) {
   if (!event || event.department === "sales") return null;
   const due = dueInfo(event);
   const fu = openFollowUp(event);
   const acks = acksOf(event);
   const closed = isClosedJob(event);
   const items = [];
-  if (event.jobNo) items.push(<Chip key="no" color={MUTED} icon={<TagRounded />}>{event.jobNo}</Chip>);
+  if (event.jobNo && !hideJobNo) items.push(<Chip key="no" color={MUTED} icon={<TagRounded />}>{event.jobNo}</Chip>);
   if (isUrgent(event) && !closed) items.push(<Chip key="u" color={RED} solid icon={<BoltRounded />}>ด่วน</Chip>);
   if (due && !closed) {
     items.push(
