@@ -2168,3 +2168,14 @@
 }
 /* ✅ (26 ต.ค. 2569) ช่องเลือกช่าง/เซล (มีรูป + จำนวนงาน) กว้างกว่าช่องอื่น 1.5 เท่า — ชื่อไม่ถูกตัดเหลือ "ช่..." */
 .ec-wide-toolbar .event-toolbar-row > .event-filter-inline { grid-template-columns: minmax(0, 1.6fr); }
+
+/* 🐛 (12 พ.ย. 2569 ผู้ใช้: "ฟอนต์ในปฏิทินมือถือใหญ่กว่าอีกเครื่อง") การ์ดงานอยู่ในช่องวันที่แคบ — เบราว์เซอร์มือถือบางตัว
+   (Chrome/Samsung Internet) "ขยายตัวหนังสือให้เอง" เฉพาะกล่องแคบ ทำให้ข้อความในการ์ดใหญ่กว่าที่กำหนดทั้งที่ส่วนอื่นขนาดเท่าเดิม
+   → ตั้ง none ที่ตัวปฏิทินโดยตรง (ตั้งแค่ที่ html เป็น 100% ยังหลุดในบางรุ่น) */
+.modern-calendar-container,
+.modern-calendar-container .fc,
+.modern-calendar-container .fc * {
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  text-size-adjust: none;
+}
