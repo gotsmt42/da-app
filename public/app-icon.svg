@@ -4,22 +4,13 @@
     ⚠️ ไฟล์นี้ถูกสร้างจากสคริปต์ scripts/make-brand.js — ห้ามแก้ด้วยมือ (รันใหม่แล้วทับทันที)
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
   -->
-  <rect width="64" height="64" rx="15" fill="#0f172a"/>
-  <g transform="translate(5 5) scale(0.8438)">
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#dc2626" transform="rotate(-75.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#dc2626" transform="rotate(-45.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#dc2626" transform="rotate(-15.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#dc2626" transform="rotate(15.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(45.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(75.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(105.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(135.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(165.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(195.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(225.0 32 32)"/>
-  <rect x="57.55" y="29.11" width="5.2" height="5.78" rx="1.6" fill="#ffffff" transform="rotate(255.0 32 32)"/>
-  <circle cx="32" cy="32" r="24" fill="none" stroke="#ffffff" stroke-width="5.5"/>
-  <path d="M32 8 A24 24 0 0 1 52.78 44" fill="none" stroke="#dc2626" stroke-width="5.5"/>
-  <circle cx="32" cy="32" r="14" fill="#ffffff"/>
-  <path d="M25.5 32 L30 36.5 L38.8 27" fill="none" stroke="#0f172a" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <rect x=".75" y=".75" width="62.5" height="62.5" rx="14.25" fill="#ffffff" stroke="#e6e9ef" stroke-width="1.5"/>
+  <g transform="translate(5 5) scale(0.8438)"><g transform="translate(0 -2.5)">
+  <rect x="8" y="14" width="30" height="9" rx="2.5" fill="#0f172a"/>
+  <rect x="18.5" y="14" width="9" height="36" rx="2.5" fill="#0f172a"/>
+  <rect x="26" y="24" width="30" height="9" rx="2.5" fill="#dc2626" stroke="#ffffff" stroke-width="2.5" paint-order="stroke"/>
+  <rect x="36.5" y="24" width="9" height="22" rx="2.5" fill="#dc2626" stroke="#ffffff" stroke-width="2.5" paint-order="stroke"/>
+  <rect x="26" y="24" width="30" height="9" rx="2.5" fill="#dc2626"/>
+  <circle cx="41" cy="46" r="9" fill="#ffffff"/>
+  <path d="M36.5 46.2 l3.2 3.2 5.8-6.2" fill="none" stroke="#dc2626" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g></g>
 </svg>

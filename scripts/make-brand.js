@@ -23,6 +23,7 @@ const NAME = { head: "Tid", tail: "Tam", th: "ติดตาม" };
 /**
  * สองโทน: กรมท่า + แดง
  * • กรม #0f172a = สีเดียวกับแถบเมนูข้างของแอป (--bg-primary) · แดง #dc2626 = สีเน้นของทั้งระบบ
+ * ✅ โลโก้ใหม่ (12 พ.ย. 2569): พื้นขาว · T กรม + T แดง · ขอบเทา #e6e9ef (= ขอบการ์ดของแอป)
  * ⚠️ ห้ามใช้ไล่เฉด — แบรนด์นี้เป็นสีทึบล้วนทั้งชุด (พิมพ์ลงกระดาษ/ปั๊มสกรีนแล้วไม่เพี้ยน
  *    และตัวอักษรบนพื้นเข้มอ่านออกเท่ากันทุกจุด)
  */
@@ -30,6 +31,7 @@ const C = {
   navy: "#0f172a",
   red: "#dc2626",
   white: "#ffffff",
+  line: "#e6e9ef",
   subOnLight: "#64748b",
   subOnDark: "rgba(255,255,255,.7)",
 };
@@ -50,39 +52,28 @@ const NOTE = (what) => `
   -->`;
 
 // ══ เครื่องหมายประจำแอป ═════════════════════════════════════════════════════
-/** ขนาดของเฟือง (กริด 64×64) — รวมปลายฟันแล้วกว้าง ~61.5px เหลือขอบกันชนราว 1px ทุกด้าน */
-const GEAR = { r: 24, stroke: 5.5, teeth: 12, toothLen: 5.2, redFrom: -90, redTo: 30 };
-
 /**
- * เฟืองสองสี ครอบวงกลมทึบที่มีเครื่องหมายถูก
- * = "ติดตามงานจนจบ" — เฟือง = งานช่างที่เดินอยู่ · ช่วงแดง = รอบที่กำลังทำ · ถูก = ปิดงานได้
+ * "TT" = Tid + Tam — ตัว T กรม (Tid) กับตัว T แดง (Tam) ซ้อนเหลื่อมกัน
+ * ก้านของ T แดงจบลงที่วงกลมขาวมีเครื่องหมายถูก = "ติดตามจนงานเสร็จ"
+ * (ผู้ใช้เลือกแบบ X3 เมื่อ 12 พ.ย. 2569 · มุมมน rx 2.5 — ห้ามปรับสัดส่วนเอง)
  *
- * ⚠️ วงแหวนต้อง "ต่อเนื่อง" ไม่เว้นช่อง — เฟืองที่วงขาดอ่านเป็นเฟืองหัก (ลองมาแล้ว)
- *    สีที่สองบอกช่วงได้ด้วยส่วนโค้งแดง + ฟันแดงในช่วงเดียวกันอยู่แล้ว
- * ⚠️ ฟันต้องเยื้องครึ่งช่วง เพื่อให้ "รอยต่อสี" ตกระหว่างฟันพอดี ไม่ใช่ผ่ากลางฟัน
- * ⚠️ เครื่องหมายถูกต้องเป็นสีที่ตัดกับวงกลมทึบ ไม่ใช่สีแดง — แดงบนกรมที่ 16px จมหายทั้งอัน
- * @param {"onLight"|"onDark"|"mono"} way สำหรับพื้นสว่าง / พื้นเข้ม / พื้นสีแบรนด์ (ขาวล้วน)
+ * ⚠️ ขอบขาวรอบ T แดงคือ "ช่องว่างคั่น" ระหว่างสองตัว — บนพื้นแดง (mono) ต้องเป็นสีแดง ไม่ใช่ขาว
+ * @param {"onLight"|"mono"} way พื้นสว่าง / พื้นสีแบรนด์ (ขาวล้วน ช่องคั่นเป็นสีพื้นแดง)
  */
 const MARK = (way) => {
-  const base = way === "onLight" ? C.navy : C.white;
-  // แบบขาวล้วน: ทั้งเฟืองเป็นขาวหมด (บนพื้นสีแบรนด์ สีแดงจะจมหายไปกับพื้น)
-  const accent = way === "mono" ? C.white : C.red;
-  const discFill = way === "onLight" ? C.navy : C.white;
-  const checkColor = way === "onLight" ? C.white : C.navy;
-  const { r, stroke, teeth, toothLen, redFrom, redTo } = GEAR;
-  const inset = r + stroke / 2 - 1.2;                       // ฟันฝังเข้าไปในเนื้อวงเล็กน้อย กันเห็นรอยต่อ
-  const width = ((2 * Math.PI * r) / teeth) * 0.46;         // ความกว้างฟัน = 46% ของระยะห่างฟัน
-  const toothSvg = Array.from({ length: teeth }, (_, k) => {
-    const deg = redFrom + (360 / teeth) * (k + 0.5);
-    const fill = deg > redFrom && deg < redTo ? accent : base;
-    return `<rect x="${(32 + inset).toFixed(2)}" y="${(32 - width / 2).toFixed(2)}" width="${toothLen}" height="${width.toFixed(2)}" rx="1.6" fill="${fill}" transform="rotate(${deg.toFixed(1)} 32 32)"/>`;
-  }).join("\n  ");
-  return `
-  ${toothSvg}
-  <circle cx="32" cy="32" r="${r}" fill="none" stroke="${base}" stroke-width="${stroke}"/>
-  <path d="M32 8 A${r} ${r} 0 0 1 52.78 44" fill="none" stroke="${accent}" stroke-width="${stroke}"/>
-  <circle cx="32" cy="32" r="14" fill="${discFill}"/>
-  <path d="M25.5 32 L30 36.5 L38.8 27" fill="none" stroke="${checkColor}" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const t1 = way === "mono" ? C.white : C.navy;
+  const t2 = way === "mono" ? C.white : C.red;
+  const gap = way === "mono" ? C.red : C.white;
+  const checkColor = C.red;
+  const stem2 = `stroke="${gap}" stroke-width="2.5" paint-order="stroke"`;
+  return `<g transform="translate(0 -2.5)">
+  <rect x="8" y="14" width="30" height="9" rx="2.5" fill="${t1}"/>
+  <rect x="18.5" y="14" width="9" height="36" rx="2.5" fill="${t1}"/>
+  <rect x="26" y="24" width="30" height="9" rx="2.5" fill="${t2}" ${stem2}/>
+  <rect x="36.5" y="24" width="9" height="22" rx="2.5" fill="${t2}" ${stem2}/>
+  <rect x="26" y="24" width="30" height="9" rx="2.5" fill="${t2}"/>
+  <circle cx="41" cy="46" r="9" fill="${C.white}"/>
+  <path d="M36.5 46.2 l3.2 3.2 5.8-6.2" fill="none" stroke="${checkColor}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 };
 
 /**
@@ -93,11 +84,27 @@ const MARK = (way) => {
  */
 const iconSvg = ({ rx = 15, pad = 5, note = "ไอคอนแอป" } = {}) => {
   const s = (64 - pad * 2) / 64;
+  // พื้นขาวทึบ — ขอบเทาบางเฉพาะแบบมีมุมโค้ง (กันพื้นขาวกลืนไปกับหน้าจอสว่าง) · แบบเต็มใบ (rx=0) ระบบตัดมุมเอง ไม่ต้องมีขอบ
+  const tile = rx > 0
+    ? `<rect x=".75" y=".75" width="62.5" height="62.5" rx="${rx - 0.75}" fill="${C.white}" stroke="${C.line}" stroke-width="1.5"/>`
+    : `<rect width="64" height="64" fill="${C.white}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE(note)}
-  <rect width="64" height="64" rx="${rx}" fill="${C.navy}"/>
-  <g transform="translate(${pad} ${pad}) scale(${s.toFixed(4)})">${MARK("onDark")}</g>
+  ${tile}
+  <g transform="translate(${pad} ${pad}) scale(${s.toFixed(4)})">${MARK("onLight")}</g>
 </svg>`;
 };
+
+/** ป้ายแจ้งเตือน (Android ใช้เฉพาะความโปร่งใส) — T คู่สีขาวล้วน ช่องคั่นและเครื่องหมายถูกเจาะโปร่ง */
+const badgeSvg = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="96" height="96">
+  <defs>
+    <mask id="m1"><rect width="64" height="64" fill="#fff"/><rect x="26" y="24" width="30" height="9" rx="2.5" fill="#000" stroke="#000" stroke-width="5"/></mask>
+    <mask id="m2"><rect width="64" height="64" fill="#fff"/><path d="M36.5 46.2 l3.2 3.2 5.8-6.2" fill="none" stroke="#000" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></mask>
+  </defs>
+  <g transform="translate(0 -2.5)">
+    <g mask="url(#m1)"><rect x="8" y="14" width="30" height="9" rx="2.5" fill="#fff"/><rect x="18.5" y="14" width="9" height="36" rx="2.5" fill="#fff"/></g>
+    <g mask="url(#m2)"><rect x="26" y="24" width="30" height="9" rx="2.5" fill="#fff"/><circle cx="41" cy="46" r="9.5" fill="#fff"/><rect x="36.5" y="30" width="9" height="12" fill="#fff"/></g>
+  </g>
+</svg>`;
 
 /**
  * โลโก้ตัวอักษรล้วน (แถบบน · การ์ดฟอร์ม)
@@ -213,6 +220,8 @@ const buildIco = (pngs) => {
   write("app-icon-apple-180.png", await iconAt(180, iconSvg({ rx: 0, note: "ไอคอนสำหรับ iOS (หน้าจอโฮม)" })));
   // maskable: เครื่องหมายต้องอยู่ในวงปลอดภัย 80% กลางภาพ เผื่อระบบตัดเป็นวงกลม/หยดน้ำ
   write("app-icon-maskable-512.png", await iconAt(512, iconSvg({ rx: 0, pad: 10, note: "ไอคอนแบบ maskable (Android ตัดรูปทรงเอง)" })));
+
+  write("notification-badge.png", await shot(badgeSvg(), { w: 96, h: 96 }));
 
   console.log("\n── โลโก้ตัวอักษร (PNG) ──");
   const wm = wordmarkSvg();

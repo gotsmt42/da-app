@@ -16,7 +16,7 @@
  *   fullscreen = ตอนเปิดแอป/ตรวจสิทธิ์ (พื้นทึบทั้งจอ) · overlay = ทับกล่องที่ position:relative
  *   inline = ในกล่องเล็ก · bar = แถบบางบนสุด (โหลดซ้ำ ไม่บังข้อมูล)
  */
-export const WORDMARK_SRC = "/app-wordmark-dark.png?v=16";
+export const WORDMARK_SRC = "/app-wordmark-dark.png?v=18";
 
 const KEYFRAMES = `
 @keyframes tt-spin { to { transform: rotate(360deg); } }

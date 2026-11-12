@@ -16,7 +16,7 @@ const sharp = require("sharp");
 
 const ROOT = path.join(__dirname, "..");
 const OUT = path.join(ROOT, "assets");
-const NAVY = "#0f172a"; // = สีพื้นไอคอนใน make-brand.js
+const NAVY = "#ffffff"; // = สีพื้นไอคอนใน make-brand.js (โลโก้ใหม่พื้นขาว — ชื่อตัวแปรเดิมคงไว้)
 
 const svg = fs.readFileSync(path.join(ROOT, "public", "app-icon.svg"), "utf8");
 // เครื่องหมายล้วน (ไม่มีพื้นสี่เหลี่ยม) — กลุ่ม <g> ตัวแรกในไฟล์

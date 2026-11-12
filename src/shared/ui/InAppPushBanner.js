@@ -173,7 +173,7 @@ export default function InAppPushBanner() {
             onClick={() => { hide(); if (msg.nid) markInboxRead(msg.nid); if (msg.url) navigate(msg.url); }}
             sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 1.25, textAlign: "left", borderRadius: 2.5 }}
           >
-            <Box component="img" src="/app-icon-192.png?v=16" alt="" sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0 }} />
+            <Box component="img" src="/app-icon-192.png?v=18" alt="" sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0 }} />
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", lineHeight: 1.3 }}>TidTam · ตอนนี้</Typography>
               <Typography sx={{
