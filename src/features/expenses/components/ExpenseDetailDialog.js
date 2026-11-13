@@ -11,10 +11,11 @@ import moment from "moment";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Chip,
-  Alert, CircularProgress, useMediaQuery, TextField, MenuItem, Tooltip, Divider, Skeleton, Collapse,
+  Alert, CircularProgress, useMediaQuery, TextField, Tooltip, Divider, Skeleton, Collapse,
   Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import SheetSelectField, { FORM_FIELD_SX } from "@/shared/ui/SheetSelectField";
 import { CloseRounded as Close, PrintRounded as Print, EditRounded as Edit, CheckCircleRounded as CheckCircle, UndoRounded as Undo, BlockRounded as Block, PaymentsRounded as Payments, ReceiptLongRounded as ReceiptLong, AttachFileRounded as AttachFile, OpenInNewRounded as OpenInNew, LinkRounded as LinkIcon, HistoryRounded as History, TaskAltRounded as TaskAlt, WarningAmberRounded as WarningAmber, DescriptionRounded as Description, ExpandMoreRounded as ExpandMore, AccountBalanceWalletRounded as AccountBalanceWallet, ContentCopyRounded as ContentCopy, CheckRounded as Check, HistoryEduRounded as HistoryEdu, FactCheckRounded as FactCheck, DoneAllRounded as DoneAll, EngineeringRounded as Engineering, CalendarMonthRounded as CalendarMonth, BuildRounded as Build } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -521,7 +522,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
     //    กล่องจ่ายเงิน (มียอด · บัญชี · วันที่ · วิธีจ่าย · หลักฐาน) กว้างขึ้น (sm) และจัดช่องเป็น 2 คอลัมน์ · กล่องอื่นคงขนาดเดิม
     <Dialog open onClose={() => !busy && onCancel()} fullWidth maxWidth={payLike ? "sm" : "xs"}>
       <DialogTitle sx={{ fontWeight: 800, pb: 0.5 }}>{cfg.title}</DialogTitle>
-      <DialogContent>
+      <DialogContent sx={FORM_FIELD_SX}>
         <Typography variant="body2" sx={{ color: TEXT_SUB, mb: 2 }}>{cfg.body}</Typography>
         {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
         <Stack spacing={1.5}>
@@ -562,9 +563,9 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                   value={form.paidAt}
                   onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))}
                 />
-                <TextField select size="small" label={returningToCompany ? "รับคืนเป็น" : "จ่ายเป็น"} value={form.method || "transfer"} onChange={set("method")}>
-                  {PAYMENT_METHODS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
-                </TextField>
+                <SheetSelectField label={returningToCompany ? "รับคืนเป็น" : "จ่ายเป็น"} value={form.method || "transfer"} sort={false}
+                  options={PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))}
+                  onChange={(v) => setForm((f) => ({ ...f, method: v }))} />
               </Box>
               <TextField size="small" label="เลขอ้างอิง (ไม่บังคับ)"
                 placeholder={returningToCompany ? "เช่น เลขที่ใบเสร็จรับเงิน / เลขที่รายการโอนเข้า" : "เช่น ธนาคาร / เลขที่รายการ"}

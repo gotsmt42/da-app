@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Box, Stack, Typography, TextField, MenuItem, Button, IconButton, Radio, Chip, Alert,
+  Box, Stack, Typography, TextField, Button, IconButton, Radio, Chip, Alert,
   CircularProgress, Tooltip, Collapse, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -20,7 +20,8 @@ import { AccountBalanceRounded as AccountBalance, AddRounded as Add, CloseRounde
 
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import BankLogo from "./BankLogo";
-import { BANKS, bankMeta, digitsOnly, formatAccountNo, validateAccount } from "../bankMeta";
+import SheetSelectField from "@/shared/ui/SheetSelectField";
+import { BANKS, bankMeta, bankLogoUrl, digitsOnly, formatAccountNo, validateAccount } from "../bankMeta";
 import { TEXT_MAIN, TEXT_SUB, BORDER_MAIN, SURFACE_SUBTLE } from "../expenseMeta";
 
 const NONE = "";
@@ -253,29 +254,16 @@ export default function BankAccountPicker({
           {formError && <Alert severity="error" sx={{ mb: 1, borderRadius: 2, fontSize: "0.8rem" }}>{formError}</Alert>}
           <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
             {/* ✅ สัญลักษณ์ธนาคารทั้งในรายการที่เลือกได้และในช่องที่เลือกแล้ว — เห็นสีก็รู้ทันทีว่าเลือกถูกธนาคารไหม */}
-            <TextField select size="small" label="ธนาคาร *" value={form.bankCode}
-              onChange={(e) => setForm((f) => ({ ...f, bankCode: e.target.value }))}
-              SelectProps={{
-                renderValue: (code) => (
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <BankLogo code={code} size={22} />
-                    <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {bankMeta(code).name}
-                    </Box>
-                  </Stack>
-                ),
-                MenuProps: { PaperProps: { sx: { maxHeight: 360 } } },
-              }}>
-              {BANKS.map((b) => (
-                <MenuItem key={b.code} value={b.code} sx={{ gap: 1.25, py: 0.85 }}>
-                  <BankLogo code={b.code} size={26} />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.25 }}>{b.short}</Typography>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.25 }}>{b.name}</Typography>
-                  </Box>
-                </MenuItem>
-              ))}
-            </TextField>
+            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "ตรวจสอบรูปแบบหน้าต่างให้เหมือนกันให้ครบ") เลือกธนาคารจากแผ่นรายการแบบหน้าลงงาน */}
+            <SheetSelectField label="ธนาคาร" required value={form.bankCode} title="เลือกธนาคาร" sort={false}
+              options={BANKS.map((b) => ({ value: b.code, label: b.short, sub: b.name, icon: bankLogoUrl(b.code) ? `<img src="${bankLogoUrl(b.code)}" alt="" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;object-fit:contain;background:#fff">` : "" }))}
+              renderValue={(o, code) => (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <BankLogo code={code} size={22} />
+                  <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bankMeta(code).name}</Box>
+                </Stack>
+              )}
+              onChange={(v) => setForm((f) => ({ ...f, bankCode: v }))} />
             <TextField size="small" label="เลขบัญชี *" value={form.accountNo}
               onChange={(e) => setForm((f) => ({ ...f, accountNo: digitsOnly(e.target.value) }))}
               inputProps={{ inputMode: "numeric", maxLength: 13 }}

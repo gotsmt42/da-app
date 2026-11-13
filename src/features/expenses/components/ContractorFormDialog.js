@@ -14,11 +14,11 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
-  useMediaQuery, Autocomplete, MenuItem, Chip, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup,
+  useMediaQuery, Chip, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup,
   Checkbox, FormControlLabel, InputAdornment, LinearProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, EngineeringRounded as Engineering, AccountBalanceRounded as AccountBalance, PaymentsRounded as Payments, HistoryEduRounded as HistoryEdu, CheckBoxRounded as CheckBox, CheckBoxOutlineBlankRounded as CheckBoxOutlineBlank, BusinessRounded as Business, PersonRounded as Person, ReceiptRounded as Receipt, WorkRounded as Work } from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, EngineeringRounded as Engineering, AccountBalanceRounded as AccountBalance, PaymentsRounded as Payments, HistoryEduRounded as HistoryEdu, BusinessRounded as Business, PersonRounded as Person, ReceiptRounded as Receipt, WorkRounded as Work, DescriptionRounded as DescriptionIcon, NotesRounded as NotesIcon } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
@@ -27,10 +27,11 @@ import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import SignatureService from "@/shared/services/SignatureService";
-import KindBadge from "./KindBadge";
 import StatusBadge from "./StatusBadge";
 import BankLogo from "./BankLogo";
-import { BANKS, bankMeta, digitsOnly, validateAccount } from "../bankMeta";
+import { BANKS, bankMeta, bankLogoUrl, digitsOnly, validateAccount } from "../bankMeta";
+import SheetSelectField, { FORM_FIELD_SX } from "@/shared/ui/SheetSelectField";
+import { SheetPicker, SheetPickerRow, PickerField } from "@/shared/ui/SheetPicker";
 import {
   KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
   contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
@@ -50,17 +51,28 @@ const blankItem = () => ({ key: nextKey(), category: "labor", description: "", d
 /** แถวค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ผู้ใช้: "อยากได้ใส่วันที่ เพราะเขาเบิกเป็นวัน") */
 const DEFAULT_FROM = "08:30";
 const DEFAULT_TO = "17:30";
+/**
+ * ✅ (13 พ.ย. 2569 ผู้ใช้: "ผรม. ชุดเดียวกัน เข้างานเช้าและกลางคืนวันเดียวกัน เบิกในใบเดียว · ใส่วันที่ซ้ำไม่ได้ · กลางวัน/กลางคืนจำนวนคนไม่เท่ากัน")
+ *    แถวรายวันมี "กะ" — กลางวัน ("") / กลางคืน ("night") · วันเดียวกันมีได้กะละ 1 แถว (คน/เวลา/ค่าแรงแยกกัน)
+ *    ตรวจซ้ำด้วย วันที่ + กะ · นับ "วันทำงาน" ตามวันที่ไม่ซ้ำ · แรง รวมทุกกะ
+ */
+const NIGHT_FROM = "22:00"; // (13 พ.ย. 2569 ผู้ใช้: "เวลาเริ่มต้นของกลางคืนคือ 22 นาฬิกา")
+const NIGHT_TO = "05:00";
+// 🔁 (13 พ.ย. 2569 ผู้ใช้: "ให้ใช้คำว่าเข้างานกลางคืน ไม่ใช่กะกลางคืน")
+const SHIFT_LABEL = { "": "เข้างานกลางวัน", night: "เข้างานกลางคืน" };
+const shiftKey = (r) => `${r.workDate}|${r.shift === "night" ? "night" : ""}`;
+const byDateShift = (x, y) => String(x.workDate || "9").localeCompare(String(y.workDate || "9")) || (x.shift === "night") - (y.shift === "night");
 // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใส่จำนวนคนต่อวันได้ จะได้อ้างอิงได้" → "ไม่ต้องใส่ค่าแรง/คน ใส่รวมเลย บางทีค่าแรงต่อคนไม่เท่ากัน")
 //    1 แถว = 1 วัน · ยอดเงิน = ค่าแรงรวมของวันนั้น (qty 1) · จำนวนคนเก็บแยกไว้อ้างอิง (people)
 const dayItem = (workDate = "", unitPrice = "", auto = false, people = 1) => ({
   key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: 1, unit: "วัน", people: people || 1, unitPrice, workDate, auto,
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ใส่เวลาได้ด้วย default 08.30-17.30")
-  timeFrom: DEFAULT_FROM, timeTo: DEFAULT_TO,
+  timeFrom: DEFAULT_FROM, timeTo: DEFAULT_TO, shift: "",
 });
 const fromDoc = (it) => ({
   key: nextKey(), category: it.category || "labor", description: it.description || "", detail: it.detail || "",
   qty: it.qty ?? 1, unit: it.unit || "", unitPrice: it.unitPrice ?? "", workDate: it.workDate ? moment(it.workDate).format("YYYY-MM-DD") : "",
-  timeFrom: it.timeFrom || "", timeTo: it.timeTo || "", people: it.people || "",
+  timeFrom: it.timeFrom || "", timeTo: it.timeTo || "", people: it.people || "", shift: it.shift === "night" ? "night" : "",
   // ใบที่บันทึกแบบ "คน × ค่าแรงต่อคน" ช่วงสั้นๆ ก่อนเปลี่ยนเป็นยอดรวม → แปลงเป็นยอดรวมของวัน
   ...(it.workDate && it.unit === "คน" ? { people: it.qty, qty: 1, unit: "วัน", unitPrice: (Number(it.qty) || 0) * (Number(it.unitPrice) || 0) } : {}),
 });
@@ -79,18 +91,22 @@ const byStart = (a, b) => new Date(a.start || 0) - new Date(b.start || 0);
 const rangeChip = (o) => [Number(o.part) > 0 ? `ช่วง ${o.part}${o.partCount ? `/${o.partCount}` : ""}` : "", jobRangeDates(o)].filter(Boolean).join(" · ") || o.title || "";
 
 /** ⚠️ module scope — ประกาศในตัวฟอร์มจะทำให้ช่องกรอกหลุดโฟกัสทุกตัวอักษร (ดูเหตุผลใน ExpenseFormDialog) */
+// 🔁 (13 พ.ย. 2569 ผู้ใช้: "ปรับแก้การแสดงผลหน้าฟอร์มให้สวยงาม ดูง่าย จัดการได้ง่าย แบบธีมอื่นๆ")
+//    การ์ดหัวข้อแบบเดียวกับฟอร์มลงงาน/แก้ไขงาน: ช่องไอคอนพื้นอ่อน · ชื่อหัวข้อ · คำอธิบายบรรทัดเล็ก · เส้นคั่นใต้หัว
 const Section = ({ icon, title, hint, children, action }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2 }, mb: 1.75 }}>
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-      <Box sx={{ width: 4, height: 18, borderRadius: 1, bgcolor: ACCENT }} />
-      {icon}
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: "14px", mb: 1.5, overflow: "hidden" }}>
+    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, borderBottom: `1px solid #eef2f7` }}>
+      {icon && (
+        <Box sx={{ width: 34, height: 34, borderRadius: "10px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1),
+          "& svg": { fontSize: "19px !important", color: `${ACCENT} !important` } }}>{icon}</Box>
+      )}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{title}</Typography>
-        {hint && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.3 }}>{hint}</Typography>}
+        <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
+        {hint && <Typography sx={{ color: TEXT_SUB, fontSize: "0.74rem", lineHeight: 1.4, mt: 0.15 }}>{hint}</Typography>}
       </Box>
       {action}
     </Stack>
-    {children}
+    <Box sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 1.5, sm: 1.75 } }}>{children}</Box>
   </Box>
 );
 
@@ -126,6 +142,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [jobOptions, setJobOptions] = useState([]);
   const [jobQuery, setJobQuery] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
+  const [jobSheet, setJobSheet] = useState(false); // แผ่นเลือกงาน
   // ผู้รับเหมา
   const [known, setKnown] = useState([]);
   const [cName, setCName] = useState("");
@@ -328,9 +345,26 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   };
 
   const validItems = items.filter((it) => String(it.description).trim());
-  const dates = items.map((it) => it.workDate).filter(Boolean);
-  const dupDates = [...new Set(dates.filter((d, i) => dates.indexOf(d) !== i))];
-  const dayCount = rateMode === "daily" ? validItems.filter((it) => it.workDate).length : 0;
+  // ซ้ำ = วันที่เดียวกัน + กะเดียวกัน (กลางวัน/กลางคืนของวันเดียวกันไม่นับว่าซ้ำ)
+  const slotKeys = items.filter((it) => it.workDate).map(shiftKey);
+  const dupSlots = [...new Set(slotKeys.filter((k, i) => slotKeys.indexOf(k) !== i))];
+  const isDupRow = (r) => Boolean(r.workDate) && dupSlots.includes(shiftKey(r));
+  const dupText = dupSlots.map((k) => { const [d, sh] = k.split("|"); return `${thaiDate(d)} (${SHIFT_LABEL[sh]})`; }).join(", ");
+  const dayCount = rateMode === "daily" ? new Set(validItems.filter((it) => it.workDate).map((it) => it.workDate)).size : 0;
+  const nightCount = rateMode === "daily" ? validItems.filter((it) => it.workDate && it.shift === "night").length : 0;
+  /** เพิ่มกะกลางคืนของวันเดียวกัน (ต่อท้ายแถวกลางวัน) — คน/ค่าแรงแยกจากกะกลางวัน */
+  const addNightShift = (row) => setItems((rows) => {
+    const idx = rows.findIndex((r) => r.key === row.key);
+    const night = { ...dayItem(row.workDate, "", false, Number(row.people) || Number(dailyPeople) || 1), shift: "night", timeFrom: NIGHT_FROM, timeTo: NIGHT_TO, added: true, description: row.description || "ค่าแรง" };
+    const next = [...rows];
+    next.splice(idx + 1, 0, night);
+    return next.slice(0, MAX_ITEMS);
+  });
+  /** สลับกะของแถว — เวลาเปลี่ยนตามกะ ถ้ายังเป็นเวลาเริ่มต้นของกะเดิม */
+  const setShift = (row, shift) => {
+    const wasDefault = row.shift === "night" ? row.timeFrom === NIGHT_FROM && row.timeTo === NIGHT_TO : row.timeFrom === DEFAULT_FROM && row.timeTo === DEFAULT_TO;
+    setItem(row.key, { shift, auto: false, ...(wasDefault ? (shift === "night" ? { timeFrom: NIGHT_FROM, timeTo: NIGHT_TO } : { timeFrom: DEFAULT_FROM, timeTo: DEFAULT_TO }) : {}) });
+  };
   // แรงงานรวม (คน-วัน) — ไว้อ้างอิง/ตรวจกับใบลงเวลา
   const manDays = rateMode === "daily" ? validItems.filter((it) => it.workDate).reduce((n, it) => n + (Number(it.people) || 0), 0) : 0;
 
@@ -361,10 +395,12 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     //    ✅ วันของงาน = ตามช่วงงานที่เลือกเท่านั้น (ค่าที่แก้ไว้ของวันเดียวกันยังอยู่) · เก็บเพิ่มเฉพาะวันที่กด "เพิ่มวัน" เอง
     if (!days.length) return;
     setItems((rows) => {
-      const byDate = new Map(rows.filter((r) => r.workDate).map((r) => [r.workDate, r]));
+      const byDate = new Map(rows.filter((r) => r.workDate && r.shift !== "night").map((r) => [r.workDate, r]));
       const fromJobs = days.map((d) => byDate.get(d) || dayItem(d, dailyRate, true, Number(dailyPeople) || 1));
+      // กะกลางคืนที่เพิ่มไว้ของวันในช่วงงาน — เก็บไว้ (ไม่หายตอนสร้างแถวใหม่)
+      const nights = rows.filter((r) => r.shift === "night" && r.workDate && days.includes(r.workDate));
       const extra = rows.filter((r) => r.added && r.workDate && !days.includes(r.workDate));
-      return [...fromJobs, ...extra].sort((x, y) => String(x.workDate || "9").localeCompare(String(y.workDate || "9"))).slice(0, MAX_ITEMS);
+      return [...fromJobs, ...nights, ...extra].sort(byDateShift).slice(0, MAX_ITEMS);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- สร้างใหม่เฉพาะตอนช่วงงานที่เลือกเปลี่ยน
   }, [open, editing, rateMode, jobsKey]);
@@ -384,7 +420,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   if (!String(subject).trim()) problems.push("ระบุเรื่อง");
   if (!validItems.length) problems.push("เพิ่มรายการค่าจ้างอย่างน้อย 1 รายการ");
   if (rateMode === "daily" && validItems.some((it) => !it.workDate)) problems.push("ระบุวันที่ทำงานให้ครบทุกแถว");
-  if (dupDates.length) problems.push(`วันที่ซ้ำกัน (${dupDates.map((d) => thaiDate(d)).join(", ")})`);
+  if (dupSlots.length) problems.push(`วันที่และช่วงเข้างานซ้ำกัน (${dupText})`);
   if (gross <= 0) problems.push("ยอดค่าจ้างต้องมากกว่า 0");
   if (items.some((it) => String(it.description).trim() && Number(it.qty) <= 0)) problems.push("จำนวนต้องมากกว่า 0");
   if (calc.net < 0) problems.push("ยอดหักมัดจำมากกว่ายอดที่ต้องจ่าย");
@@ -413,9 +449,10 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       payAccountName: payMode === "transfer" ? String(accountName).trim() : "",
       // ✅ รายวัน: เรียงตามวันที่ก่อนส่ง — เอกสารอ่านไล่วันได้เสมอ · เหมางาน: ไม่ส่งวันที่
       items: [...validItems]
-        .sort((a, b) => (rateMode === "daily" ? String(a.workDate).localeCompare(String(b.workDate)) : 0))
-        .map(({ key, auto, ...it }) => ({
+        .sort((a, b) => (rateMode === "daily" ? byDateShift(a, b) : 0))
+        .map(({ key, auto, added, ...it }) => ({
           ...it, qty: Number(it.qty) || 0, unitPrice: Number(it.unitPrice) || 0, workDate: rateMode === "daily" ? it.workDate : "",
+          shift: rateMode === "daily" && it.shift === "night" ? "night" : "",
         })),
     };
     if (canPickPerson && requester?.userId) fields.requesterId = requester.userId;
@@ -448,20 +485,18 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
     >
       <DialogTitle sx={{ p: 0 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{
-          px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${alpha(ACCENT, 0.25)}`, borderTop: `5px solid ${ACCENT}`, bgcolor: META.soft,
+        {/* 🔁 (13 พ.ย. 2569) หัวฟอร์มพื้นขาวแบบฟอร์มอื่น — ชื่อเต็มไม่ถูกตัด (เดิมแถบสีหนา + ป้ายเบียดชื่อจนตัดคำ) */}
+        <Stack direction="row" alignItems="center" spacing={1.25} sx={{
+          px: { xs: 1.75, sm: 2.5 }, py: 1.25, borderBottom: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff",
         }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT, color: "#fff" }}>
-            <Engineering sx={{ fontSize: 21 }} />
+          <Box sx={{ width: 40, height: 40, borderRadius: "12px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
+            <Engineering sx={{ fontSize: 22 }} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-              <KindBadge kind="contractor" />
-              <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", lineHeight: 1.3, color: META.dark }} noWrap>
-                {editing ? `แก้ไข ${expense.docNo || ""}` : `ออก${META.label}ใหม่`}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
+            <Typography sx={{ fontWeight: 800, fontSize: { xs: "1rem", sm: "1.06rem" }, lineHeight: 1.3, color: TEXT_MAIN }}>
+              {editing ? `แก้ไข ${expense.docNo || ""}` : `ออก${META.label}`}
+            </Typography>
+            <Typography sx={{ color: TEXT_SUB, fontSize: "0.74rem", lineHeight: 1.35 }} component="div">
               เบิกค่าแรง/ค่าจ้างเหมาตามงวดงาน · หัก ณ ที่จ่ายและมัดจำให้อัตโนมัติ
             </Typography>
           </Box>
@@ -469,7 +504,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         </Stack>
       </DialogTitle>
 
-      <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+      {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "ux ui ยังเหมือนเดิม · การจัดวาง สีสัน ยังดูยาก") ช่องกรอกทุกช่องแบบเดียวกับฟอร์มลงงาน:
+          ป้ายชื่ออยู่เหนือช่อง (ไม่ลอยทับขอบ) · ช่องขาวขอบเทา 1.5px มุมมน 10 · สูง 44 · โฟกัสขอบน้ำเงิน */}
+      <DialogContent sx={{ bgcolor: "#f5f7fa", px: { xs: 1, sm: 2.5 }, pt: "12px !important", pb: 1, ...FORM_FIELD_SX }}>
         <DraftBanner draft={draft} />
         {resubmit && expense.rejectReason && (
           <Alert severity="warning" sx={{ mb: 1.75, borderRadius: 2 }}>
@@ -481,29 +518,15 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         <Section icon={<Engineering sx={{ fontSize: 18, color: ACCENT }} />} title="ผู้รับเหมา (ผู้รับเงิน)"
           hint="เลือกผู้รับเหมาที่เคยเบิกแล้ว ระบบเติมข้อมูลและบัญชีให้ · หรือพิมพ์ชื่อใหม่">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-            <Autocomplete
-              freeSolo options={known} sx={{ gridColumn: { sm: "1 / -1" } }}
-              value={cName} inputValue={cName}
-              onInputChange={(_, v, reason) => { if (reason !== "reset") setCName(v.slice(0, 150)); }}
-              onChange={(_, v) => (typeof v === "string" ? setCName(v) : pickKnown(v))}
-              getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
-              isOptionEqualToValue={(o, v) => o.name === (typeof v === "string" ? v : v?.name)}
-              renderOption={({ key, ...liProps }, o) => (
-                <li {...liProps} key={o.name}>
-                  {o.isCompany ? <Business sx={{ fontSize: 18, color: ACCENT, mr: 1 }} /> : <Person sx={{ fontSize: 18, color: ACCENT, mr: 1 }} />}
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }} noWrap>{o.name}</Typography>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-                      {[o.taxId ? `เลขภาษี ${o.taxId}` : "", o.phone, o.payTo?.accountNo ? `${bankMeta(o.payTo.bankCode).short} ${o.payTo.accountNo}` : ""].filter(Boolean).join(" · ") || "ไม่มีข้อมูลเพิ่มเติม"}
-                    </Typography>
-                  </Box>
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} size="small" label="ชื่อผู้รับเหมา / บริษัท *" placeholder="เช่น นายสมชาย ใจดี / หจก. ช่างดีการไฟฟ้า"
-                  error={touched && !String(cName).trim()} />
-              )}
-            />
+            {/* 🔁 (13 พ.ย. 2569) เลือกผู้รับเหมาจากแผ่นรายการ (ค้นหา · เรียง ก-ฮ) หรือพิมพ์ชื่อใหม่ในช่องค้นหา */}
+            <SheetSelectField label="ชื่อผู้รับเหมา / บริษัท" required sx={{ gridColumn: { sm: "1 / -1" } }}
+              value={cName} allowCreate placeholder="แตะเพื่อเลือก หรือพิมพ์ชื่อใหม่" title="เลือกผู้รับเหมา"
+              error={touched && !String(cName).trim()}
+              options={known.map((o) => ({
+                value: o.name, label: o.name, person: true,
+                sub: [o.isCompany ? "นิติบุคคล" : "บุคคลธรรมดา", o.taxId ? `เลขภาษี ${o.taxId}` : "", o.payTo?.accountNo ? `${bankMeta(o.payTo.bankCode).short} ${o.payTo.accountNo}` : ""].filter(Boolean).join(" · "),
+              }))}
+              onChange={(v, isNew) => { const k = !isNew && known.find((o) => o.name === v); if (k) pickKnown(k); else setCName(String(v).slice(0, 150)); }} />
             <ToggleButtonGroup exclusive size="small" value={cIsCompany ? "company" : "person"}
               onChange={(_, v) => v && setCIsCompany(v === "company")}
               sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 700, flex: 1, gap: 0.5 }, "& .Mui-selected": { color: `${ACCENT} !important`, bgcolor: `${alpha(ACCENT, 0.1)} !important` } }}>
@@ -524,52 +547,54 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         <Section icon={<Work sx={{ fontSize: 18, color: ACCENT }} />} title="งาน / งวดงาน"
           hint="ผูกงานแล้วระบบรวมยอดทุกงวดของผู้รับเหมาคนนี้ให้ เห็นว่าเบิกไปแล้วเท่าไรและเหลือเท่าไรตามสัญญา">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1.4fr" } }}>
-            <Autocomplete
-              multiple disableCloseOnSelect
-              sx={{ gridColumn: "1 / -1" }}
+            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "Select งานยังเป็นแบบเดิม") เลือกงานจากแผ่นรายการแบบหน้าลงงาน — ค้นหาบนสุด · ติ๊กได้หลายช่วง */}
+            {(() => {
               // ✅ เลือกช่วงแรกแล้ว เหลือให้เลือกเฉพาะช่วงอื่นของ "งานเดียวกัน" — ปนคนละงานไม่ได้
-              options={(() => {
+              const choices = (() => {
                 const merged = [...jobs, ...jobOptions.filter((o) => !jobs.some((j) => j._id === o._id))];
                 if (!job) return jobOptions;
                 return merged.filter((o) => jobs.some((j) => j._id === o._id) || (job.groupKey && o.groupKey === job.groupKey)).sort(byStart);
-              })()}
-              value={jobs} loading={jobLoading} filterOptions={(x) => x}
-              onChange={(_, v) => {
+              })();
+              const shown = [...jobs, ...choices.filter((o) => !jobs.some((j) => j._id === o._id))];
+              const applyJobs = (v) => {
                 const next = [...v].sort(byStart);
                 // เลือกช่วงแรกของงาน → ค้นด้วยเลขที่/ชื่องานนั้น ให้ช่วงอื่นของงานเดียวกันขึ้นมาครบให้ติ๊กต่อ
                 if (!jobs.length && next.length) setJobQuery(next[0].docNo || next[0].title || "");
                 if (!next.length) setJobQuery("");
                 setJobs(next);
-              }}
-              disabled={Boolean(presetJob) && !editing}
-              onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); }}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              getOptionLabel={(o) => (o ? [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ") : "")}
-              renderTags={(value, getTagProps) => value.map((o, i) => {
-                const { key, ...tagProps } = getTagProps({ index: i });
-                return <Chip key={key} {...tagProps} size="small" label={rangeChip(o)} sx={{ fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: META.dark }} />;
-              })}
-              noOptionsText={job ? "ไม่มีช่วงวันที่อื่นของงานนี้" : "ไม่พบงาน"}
-              renderOption={({ key, ...liProps }, o, { selected }) => (
-                <li {...liProps} key={o._id}>
-                  {job && (
-                    <Checkbox size="small" checked={selected} sx={{ mr: 0.5, p: 0.5, "&.Mui-checked": { color: ACCENT } }}
-                      icon={<CheckBoxOutlineBlank fontSize="small" />} checkedIcon={<CheckBox fontSize="small" />} />
-                  )}
-                  <JobOptionRow job={o} main={jobText(o) || o.title}
-                    extra={jobPartText(o) ? <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800 }} /> : null}
-                    sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} size="small" label="งาน / ช่วงวันที่ของงวดนี้ (แนะนำให้ผูก)"
-                  placeholder={job ? "เพิ่มช่วงวันที่ของงานนี้" : "ค้นหาชื่องาน / โครงการ / เลขที่"}
-                  helperText={job
-                    ? `${jobText(job)} · เลือก ${jobs.length} ช่วงวันที่${job.groupKey ? " — ติ๊กเพิ่มช่วงอื่นของงานเดียวกันได้ (ล้างทั้งหมดเพื่อเปลี่ยนงาน)" : " (งานนี้มีช่วงเดียว)"}`
-                    : "งวดเดียวเลือกได้หลายช่วงวันที่ของงานเดียวกัน"}
-                  InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
-              )}
-            />
+              };
+              return (
+                <>
+                  <PickerField label="งาน / ช่วงวันที่ของงวดนี้ (แนะนำให้ผูก)" placeholder="แตะเพื่อเลือกงาน" sx={{ gridColumn: "1 / -1" }}
+                    onClick={() => setJobSheet(true)} disabled={Boolean(presetJob) && !editing}
+                    helperText={job
+                      ? `${jobText(job)} · ${jobs.length} ช่วงวันที่${job.groupKey ? " — แตะเพื่อติ๊กช่วงอื่นของงานเดียวกัน (เอาออกหมดเพื่อเปลี่ยนงาน)" : " (งานนี้มีช่วงเดียว)"}`
+                      : "งวดเดียวเลือกได้หลายช่วงวันที่ของงานเดียวกัน"}>
+                    {jobs.length ? (
+                      <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                        {jobs.map((o) => <Chip key={o._id} size="small" label={rangeChip(o)} sx={{ fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: META.dark }} />)}
+                      </Stack>
+                    ) : null}
+                  </PickerField>
+                  <SheetPicker open={jobSheet} onClose={() => setJobSheet(false)}
+                    title={job ? "เลือกช่วงวันที่ของงานนี้" : "เลือกงาน"}
+                    subtitle={job ? `${jobText(job)} · ติ๊กได้หลายช่วง` : "ค้นหาชื่องาน / โครงการ / เลขที่"}
+                    query={jobQuery} onQuery={setJobQuery} loading={jobLoading} count={shown.length}
+                    emptyText={job ? "ไม่มีช่วงวันที่อื่นของงานนี้" : "ไม่พบงาน"}>
+                    {shown.map((o) => {
+                      const sel = jobs.some((j) => j._id === o._id);
+                      return (
+                        <SheetPickerRow key={o._id} multi selected={sel} onClick={() => applyJobs(sel ? jobs.filter((j) => j._id !== o._id) : [...jobs, o])}>
+                          <JobOptionRow job={o} main={jobText(o) || o.title}
+                            extra={jobPartText(o) ? <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800 }} /> : null}
+                            sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
+                        </SheetPickerRow>
+                      );
+                    })}
+                  </SheetPicker>
+                </>
+              );
+            })()}
             <TextField size="small" label="งวดที่" type="number" value={instNo} onChange={(e) => setInstNo(e.target.value)}
               inputProps={{ min: 0, max: 99, ...numberField }} />
             <TextField size="small" label="จากทั้งหมด (งวด)" type="number" value={instTotal} onChange={(e) => setInstTotal(e.target.value)}
@@ -625,24 +650,16 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         </Section>
 
         {/* ── ข้อมูลเอกสาร ─────────────────────────────────────────── */}
-        <Section title="ข้อมูลเอกสาร" hint="ผู้เบิก = พนักงานที่กรอกใบแทนผู้รับเหมา (รับผิดชอบเอกสารในสายอนุมัติ)">
+        <Section icon={<DescriptionIcon />} title="ข้อมูลเอกสาร" hint="ผู้เบิก = พนักงานที่กรอกใบแทนผู้รับเหมา (รับผิดชอบเอกสารในสายอนุมัติ)">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
             <ThaiDatePicker label="วันที่" value={docDate} onChange={(v) => setDocDate(v || moment().format("YYYY-MM-DD"))} />
-            <Autocomplete
-              freeSolo options={toOptions} value={to} inputValue={to}
-              onInputChange={(_, v) => setTo(v)} onChange={(_, v) => setTo(v || "")}
-              renderInput={(params) => <TextField {...params} size="small" label="ถึง (ผู้มีอำนาจอนุมัติ)" />}
-            />
+            <SheetSelectField label="ถึง (ผู้มีอำนาจอนุมัติ)" value={to} allowCreate placeholder="แตะเพื่อเลือก หรือพิมพ์ชื่อ"
+              options={toOptions.map((t) => ({ value: t, label: t, person: true, avatar: people.find((pp) => pp.fullName === t || pp.name === t)?.imageUrl }))} onChange={(v) => setTo(String(v || ""))} />
             {canPickPerson ? (
-              <Autocomplete
-                options={people}
-                value={people.find((p) => p.userId === requester?.userId) || (requester?.userId ? requester : null)}
-                onChange={(_, v) => { if (!v) return; setRequester(v); setPosition(v.position || ""); }}
-                isOptionEqualToValue={(o, v) => o.userId === v.userId}
-                getOptionLabel={(o) => o?.fullName || o?.name || ""}
-                disableClearable
-                renderInput={(params) => <TextField {...params} size="small" label="พนักงานผู้เบิก (กรอกแทน)" />}
-              />
+              <SheetSelectField label="พนักงานผู้เบิก (กรอกแทน)" value={requester?.userId || ""} title="เลือกพนักงานผู้เบิก"
+                options={people.map((p) => ({ value: p.userId, label: p.fullName || p.name || "", sub: p.position || "", person: true, avatar: p.imageUrl }))}
+                renderValue={(o) => o?.label || personFullName(requester) || ""}
+                onChange={(v) => { const pp = people.find((x) => x.userId === v); if (!pp) return; setRequester(pp); setPosition(pp.position || ""); }} />
             ) : (
               <TextField size="small" label="พนักงานผู้เบิก (กรอกแทน)" InputProps={{ readOnly: true }}
                 value={people.find((p) => p.userId === requester?.userId)?.fullName || personFullName(requester) || ""} />
@@ -656,7 +673,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
 
         {/* ── รายการค่าจ้าง ────────────────────────────────────────── */}
         <Section icon={<Receipt sx={{ fontSize: 18, color: ACCENT }} />} title="รายการค่าจ้างงวดนี้"
-          hint={rateMode === "daily" ? "ค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ไม่รวม VAT)" : "เนื้องานที่ส่งมอบในงวดนี้ · จำนวน × ราคาต่อหน่วย (ไม่รวม VAT)"}
+          hint={rateMode === "daily" ? "ค่าแรงรายวัน — 1 แถว = 1 วัน · วันเดียวกันเพิ่มเข้างานกลางคืนได้ (ไม่รวม VAT)" : "เนื้องานที่ส่งมอบในงวดนี้ · จำนวน × ราคาต่อหน่วย (ไม่รวม VAT)"}
           action={<Typography sx={{ fontWeight: 800, color: ACCENT, whiteSpace: "nowrap" }}>{baht(gross)}</Typography>}>
           <ToggleButtonGroup exclusive size="small" value={rateMode} onChange={(_, v) => v && setRateMode(v)}
             sx={{ mb: 1.5, "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 700, px: 2 }, "& .Mui-selected": { color: `${ACCENT} !important`, bgcolor: `${alpha(ACCENT, 0.1)} !important` } }}>
@@ -667,14 +684,16 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               ค่าเริ่มต้นทุกวัน (กล่องเทา) → การ์ดวันละใบ (หัว: วันที่ + ลบ · เวลา/คน/ค่าแรงรวม · งานที่ทำ · บันทึกเข้างานจริง) → สรุปท้าย */}
           {rateMode === "daily" && (
             <Box sx={{ mb: 1.5, p: 1.25, borderRadius: 2.5, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
-              <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mb: 1 }}>ค่าเริ่มต้นทุกวัน <Box component="span" sx={{ fontWeight: 500, color: TEXT_SUB }}>· แก้เฉพาะวันได้ในการ์ดด้านล่าง</Box></Typography>
-              <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1.4fr", sm: "140px 200px" } }}>
+              <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#0f172a", mb: 1 }}>ค่าเริ่มต้นทุกวัน <Box component="span" sx={{ fontWeight: 500, fontSize: "0.76rem", color: TEXT_SUB }}>· ใช้กับทุกการ์ดด้านล่าง แก้รายวันได้</Box></Typography>
+              <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "160px 220px" } }}>
                 <TextField size="small" label="จำนวนคน/วัน" type="number" value={dailyPeople}
                   onChange={(e) => applyDailyPeople(e.target.value)} inputProps={{ min: 1, step: 1, ...numberField }}
                   InputProps={{ endAdornment: <InputAdornment position="end">คน</InputAdornment> }} sx={{ bgcolor: "#fff" }} />
-                <TextField size="small" label="ค่าแรงรวม/วัน" type="number" value={dailyRate}
+                <TextField size="small" label="ค่าแรงรวม/วัน" type="number" value={dailyRate} placeholder="0"
                   onChange={(e) => applyDailyRate(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} sx={{ bgcolor: "#fff" }} />
+                  InputProps={{ startAdornment: <InputAdornment position="start"><Box component="span" sx={{ fontWeight: 900, color: ACCENT }}>฿</Box></InputAdornment>,
+                    endAdornment: <InputAdornment position="end">บาท</InputAdornment> }}
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: `${alpha(ACCENT, 0.5)} !important` }, "& .MuiInputBase-input": { fontSize: "1.05rem", fontWeight: 800 } }} />
               </Box>
               <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: TEXT_SUB }}>
                 {jobs.length
@@ -683,64 +702,96 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               </Typography>
             </Box>
           )}
-          {rateMode === "daily" && dupDates.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 1, py: 0 }}>วันที่ซ้ำกัน: {dupDates.map((d) => thaiDate(d)).join(", ")}</Alert>
+          {rateMode === "daily" && dupSlots.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 1, py: 0 }}>วันที่และช่วงเข้างานซ้ำกัน: {dupText} — ถ้าเข้างานทั้งกลางวันและกลางคืน ให้ตั้งแถวหนึ่งเป็น “เข้างานกลางคืน”</Alert>
           )}
           {gallery.dialog}
           <Stack spacing={rateMode === "daily" ? 1 : 1.25}>
-            {rateMode === "daily" && items.map((row, idx) => (
+            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "การจัดวางยังจัดการได้ยาก ดูยาก สับสน ทำงานยากในมือถือ")
+                การ์ดวันละใบ อ่านไล่จากบนลงล่าง:
+                  หัว: "วันที่ N" + กะ (ป้าย) · ยอดเงินของวัน · ลบ
+                  ① วันที่ (เต็มแถว) ② กะ กลางวัน/กลางคืน (ปุ่มแบ่งครึ่ง) ③ เวลาเริ่ม–ถึง ④ คน · ค่าแรงรวม ⑤ งานที่ทำ
+                ตัดปุ่ม ✕ ในช่องเวลา (ซ้อนกับไอคอนนาฬิกา รก) → ลิงก์ "ไม่ระบุเวลา" ลิงก์เดียว */}
+            {rateMode === "daily" && items.map((row, idx) => {
+              const night = row.shift === "night";
+              const tone = night ? "#334155" : ACCENT;
+              return (
               <Box key={row.key} sx={{
-                p: 1.25, bgcolor: "#fff", borderRadius: 2.5,
-                border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `4px solid ${ACCENT}`,
-                display: "grid", gap: 1, alignItems: "center",
-                gridTemplateColumns: { xs: "1fr 1fr", md: "minmax(0, 330px) 90px 200px 1fr" },
+                bgcolor: "#fff", borderRadius: "14px", overflow: "hidden",
+                border: `1.5px solid ${isDupRow(row) ? "#f59e0b" : night ? "#cbd5e1" : BORDER_MAIN}`,
               }}>
-                {/* หัวการ์ด: วันที่ + ลบ */}
-                <Stack direction="row" alignItems="center" gap={1} sx={{ gridColumn: "1 / -1" }}>
-                  <Box sx={{ minWidth: 26, height: 26, px: 0.75, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT, fontSize: "0.74rem", fontWeight: 900 }}>{idx + 1}</Box>
-                  <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 240 } }}>
+                {/* หัวการ์ด */}
+                <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 0.75, bgcolor: night ? "#f1f5f9" : alpha(ACCENT, 0.05), borderBottom: `1px solid ${BORDER_MAIN}` }}>
+                  <Box sx={{ minWidth: 24, height: 24, px: 0.6, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: tone, color: "#fff", fontSize: "0.72rem", fontWeight: 900 }}>{idx + 1}</Box>
+                  <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
+                    {row.workDate ? thaiDate(row.workDate) : "ยังไม่เลือกวันที่"}
+                    <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 800, color: tone }}>{night ? "เข้างานกลางคืน" : "เข้างานกลางวัน"}</Box>
+                  </Typography>
+                  <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: "#0f172a", whiteSpace: "nowrap" }}>{baht(itemAmount(row))}</Typography>
+                  <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1} sx={{ mr: -0.5 }}
+                    onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
+                </Stack>
+                <Box sx={{ p: 1.25, display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, minmax(0, 1fr))" }, alignItems: "end" }}>
+                  <Box sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }}>
                     <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
                       error={touched && !row.workDate} />
                   </Box>
-                  <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
-                  <Typography sx={{ display: { xs: "none", sm: "block" }, fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", whiteSpace: "nowrap" }}>{fmtMoney(itemAmount(row))} บาท</Typography>
-                  <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1}
-                    onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
-                </Stack>
-                {/* เวลา · คน · ค่าแรงรวม */}
-                {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "แก้ไขให้ เวลา สามารถแก้ไข หรือไม่ใส่ก็ได้") — แก้ได้ · กด ✕ ล้างได้ (ไม่ระบุเวลา)
-                    เดิมช่องเวลาแบบเลือกนาฬิกาลบค่าไม่ได้ในหลายเครื่อง ติดค่าเริ่มต้น 08:30–17:30 ตลอด */}
-                <Stack direction="row" alignItems="center" gap={0.5} sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}>
-                  {[["timeFrom", "เวลาเริ่ม"], ["timeTo", "ถึง"]].map(([k, label], i) => (
-                    <Fragment key={k}>
-                      {i === 1 && <Typography sx={{ color: TEXT_SUB }}>–</Typography>}
-                      <TextField size="small" label={label} type="time" value={row[k] || ""} placeholder="ไม่ระบุ"
-                        onChange={(e) => setItem(row.key, { [k]: e.target.value, auto: false })}
-                        InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1, minWidth: 0, "& input": { pr: 0 } }}
-                        InputProps={{ endAdornment: row[k] ? (
-                          <InputAdornment position="end" sx={{ ml: 0 }}>
-                            <IconButton size="small" aria-label={`ล้าง${label}`} title="ไม่ระบุเวลา" edge="end"
-                              onClick={() => setItem(row.key, { [k]: "", auto: false })} sx={{ p: 0.25 }}>
-                              <Close sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </InputAdornment>
-                        ) : null }} />
-                    </Fragment>
+                  {/* กะ: กลางวัน / กลางคืน — วันเดียวกันมีได้กะละแถว */}
+                  <Box sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }}>
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155", mb: 0.5 }}>ช่วงเวลาเข้างาน</Typography>
+                    <ToggleButtonGroup exclusive fullWidth value={night ? "night" : "day"} aria-label="ช่วงเวลาเข้างาน"
+                      onChange={(_, v) => v && setShift(row, v === "night" ? "night" : "")}
+                      sx={{ height: 44, "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 800, fontSize: "0.86rem", borderColor: "#cbd5e1", color: "#475569" },
+                        "& .Mui-selected": { color: "#fff !important", bgcolor: `${tone} !important` } }}>
+                      <ToggleButton value="day">☀ กลางวัน</ToggleButton>
+                      <ToggleButton value="night">☾ กลางคืน</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+                  {[["timeFrom", "เวลาเริ่ม"], ["timeTo", "เวลาเลิก"]].map(([k, label]) => (
+                    <TextField key={k} size="small" label={label} type="time" value={row[k] || ""}
+                      onChange={(e) => setItem(row.key, { [k]: e.target.value, auto: false })}
+                      InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} />
                   ))}
-                </Stack>
-                <TextField size="small" label="คน" type="number" value={row.people ?? ""} onChange={(e) => setItem(row.key, { people: e.target.value, auto: false })}
-                  inputProps={{ min: 0, step: 1, ...numberField }} />
-                {/* ค่าแรงรวมของวันนั้น (ทั้งทีม) — ค่าแรงแต่ละคนไม่เท่ากัน จึงกรอกยอดรวม */}
-                <TextField size="small" label="ค่าแรงรวมวันนี้" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, qty: 1, unit: "วัน", auto: false })}
-                  inputProps={{ min: 0, step: "any", ...numberField }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
-                <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
-                  inputProps={{ maxLength: 300 }} placeholder="เช่น เดินสาย ติดตั้งอุปกรณ์" error={touched && !String(row.description).trim()}
-                  sx={{ gridColumn: "1 / -1" }} />
-                {/* บันทึกเข้างานจริงของวันนั้น (งานที่อ้างอิง) — เวลา · ผู้บันทึก · รูปหน้างาน */}
-                {row.workDate && <AttendanceDayStrip entries={attByDay.get(row.workDate)} hasJobs={jobs.length > 0} onOpen={gallery.open} />}
+                  {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "ช่องค่าแรงควรให้มองง่าย เด่นชัดกว่านี้") คน (แคบ) · ค่าแรงรวม (กว้าง · พื้นฟ้าอ่อน ขอบน้ำเงิน ตัวเลขใหญ่) */}
+                  <Box sx={{ gridColumn: "1 / -1", display: "grid", gap: 1.25, gridTemplateColumns: { xs: "minmax(0, 0.75fr) minmax(0, 1.5fr)", md: "160px minmax(0, 1fr)" }, alignItems: "end" }}>
+                    <TextField size="small" label="จำนวนคน" type="number" value={row.people ?? ""} onChange={(e) => setItem(row.key, { people: e.target.value, auto: false })}
+                      inputProps={{ min: 0, step: 1, ...numberField }} InputProps={{ endAdornment: <InputAdornment position="end">คน</InputAdornment> }} />
+                    {/* ค่าแรงรวมของวันนั้น (ทั้งทีม) — ค่าแรงแต่ละคนไม่เท่ากัน จึงกรอกยอดรวม */}
+                    <TextField size="small" label="ค่าแรงรวม" type="number" value={row.unitPrice} placeholder="0"
+                      onChange={(e) => setItem(row.key, { unitPrice: e.target.value, qty: 1, unit: "วัน", auto: false })}
+                      inputProps={{ min: 0, step: "any", ...numberField }}
+                      InputProps={{ startAdornment: <InputAdornment position="start"><Box component="span" sx={{ fontWeight: 900, color: tone }}>฿</Box></InputAdornment>,
+                        endAdornment: <InputAdornment position="end">บาท</InputAdornment> }}
+                      sx={{
+                        "& > .MuiInputLabel-root": { color: `${tone} !important` },
+                        "& .MuiOutlinedInput-root": { bgcolor: alpha(tone, 0.05), minHeight: 50 },
+                        "& .MuiOutlinedInput-notchedOutline": { borderColor: `${alpha(tone, 0.55)} !important`, borderWidth: "2px !important" },
+                        "& .MuiInputBase-input": { fontSize: "1.2rem", fontWeight: 900, color: "#0f172a", fontVariantNumeric: "tabular-nums" },
+                      }} />
+                  </Box>
+                  <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
+                    inputProps={{ maxLength: 300 }} placeholder="เช่น เดินสาย ติดตั้งอุปกรณ์" error={touched && !String(row.description).trim()}
+                    sx={{ gridColumn: "1 / -1" }} />
+                  {/* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เวลา แก้ไข หรือไม่ใส่ก็ได้") ลิงก์เดียวล้างเวลาทั้งคู่ */}
+                  <Stack direction="row" alignItems="center" gap={1} sx={{ gridColumn: "1 / -1", mt: -0.5, flexWrap: "wrap" }}>
+                    {(row.timeFrom || row.timeTo) && (
+                      <Button size="small" onClick={() => setItem(row.key, { timeFrom: "", timeTo: "", auto: false })}
+                        sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.76rem", color: TEXT_SUB, px: 0.75, minWidth: 0 }}>ไม่ระบุเวลา</Button>
+                    )}
+                    {/* วันนี้ยังไม่มีกะกลางคืน → ปุ่มเพิ่ม (คน/ค่าแรงแยกจากกะกลางวัน) */}
+                    {row.workDate && !night && !items.some((r) => r.workDate === row.workDate && r.shift === "night") && items.length < MAX_ITEMS && (
+                      <Button size="small" startIcon={<Add />} onClick={() => addNightShift(row)}
+                        sx={{ ml: "auto", textTransform: "none", fontWeight: 800, fontSize: "0.78rem", color: "#334155", borderRadius: 99, px: 1.25, border: "1px solid #cbd5e1" }}>
+                        เพิ่มเข้างานกลางคืนวันนี้
+                      </Button>
+                    )}
+                  </Stack>
+                  {/* บันทึกเข้างานจริงของวันนั้น (งานที่อ้างอิง) — เวลา · ผู้บันทึก · รูปหน้างาน */}
+                  {row.workDate && <Box sx={{ gridColumn: "1 / -1" }}><AttendanceDayStrip entries={attByDay.get(row.workDate)} hasJobs={jobs.length > 0} onOpen={gallery.open} /></Box>}
+                </Box>
               </Box>
-            ))}
+              );
+            })}
             {rateMode === "lump" && items.map((row, idx) => (
               <Box key={row.key} sx={{ border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`, borderRadius: 2, p: 1.25, bgcolor: "#fff" }}>
                 <Box sx={{ display: "grid", gap: 1, alignItems: "start", gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 72px 90px 130px" } }}>
@@ -778,7 +829,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               {rateMode === "daily" ? "เพิ่มวัน" : "เพิ่มรายการ"}
             </Button>
             {rateMode === "daily" && dayCount > 0 && (
-              <Typography variant="caption" sx={{ color: TEXT_SUB, ml: "auto", fontWeight: 700 }}>รวม {dayCount} วัน · {manDays.toLocaleString()} แรง (คน-วัน) · {baht(gross)}</Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, ml: "auto", fontWeight: 700 }}>รวม {dayCount} วัน{nightCount ? ` (เข้างานกลางคืน ${nightCount})` : ""} · {manDays.toLocaleString()} แรง · {baht(gross)}</Typography>
             )}
           </Stack>
         </Section>
@@ -787,17 +838,14 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         <Section icon={<Payments sx={{ fontSize: 18, color: ACCENT }} />} title="ภาษีและรายการหัก"
           hint="หัก ณ ที่จ่ายคิดจากยอดก่อน VAT · หักมัดจำ/เบิกล่วงหน้าที่เคยจ่ายให้ผู้รับเหมาไปแล้ว">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
-            <TextField select size="small" label="ภาษีมูลค่าเพิ่ม (VAT)" value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))}
-              helperText={vatRate ? "ผู้รับเหมาจด VAT — แนบใบกำกับภาษี" : "ผู้รับเหมาไม่ได้จด VAT"}>
-              <MenuItem value={0}>ไม่มี VAT</MenuItem>
-              <MenuItem value={7}>VAT 7%</MenuItem>
-            </TextField>
-            <TextField select size="small" label="หัก ณ ที่จ่าย" value={whtIsPreset ? Number(whtRate) : "custom"}
-              onChange={(e) => setWhtRate(e.target.value === "custom" ? 1.5 : Number(e.target.value))}
-              helperText={cIsCompany ? "นิติบุคคล — ยื่น ภ.ง.ด.53" : "บุคคลธรรมดา — ยื่น ภ.ง.ด.3"}>
-              {WHT_PRESETS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-              <MenuItem value="custom">อัตราอื่น…</MenuItem>
-            </TextField>
+            <SheetSelectField label="ภาษีมูลค่าเพิ่ม (VAT)" value={vatRate} sort={false}
+              options={[{ value: 0, label: "ไม่มี VAT", sub: "ผู้รับเหมาไม่ได้จด VAT" }, { value: 7, label: "VAT 7%", sub: "ผู้รับเหมาจด VAT — แนบใบกำกับภาษี" }]}
+              onChange={(v) => setVatRate(Number(v))}
+              helperText={vatRate ? "ผู้รับเหมาจด VAT — แนบใบกำกับภาษี" : "ผู้รับเหมาไม่ได้จด VAT"} />
+            <SheetSelectField label="หัก ณ ที่จ่าย" value={whtIsPreset ? Number(whtRate) : "custom"} sort={false}
+              options={[...WHT_PRESETS.map((pp) => ({ value: pp.value, label: pp.label })), { value: "custom", label: "อัตราอื่น…", sub: "กรอกอัตราเอง" }]}
+              onChange={(v) => setWhtRate(v === "custom" ? 1.5 : Number(v))}
+              helperText={cIsCompany ? "นิติบุคคล — ยื่น ภ.ง.ด.53" : "บุคคลธรรมดา — ยื่น ภ.ง.ด.3"} />
             <TextField size="small" label="หักเงินมัดจำ / เบิกล่วงหน้า" type="number" value={deposit}
               onChange={(e) => setDeposit(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
               InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }}
@@ -832,15 +880,10 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
           </ToggleButtonGroup>
           {payMode === "transfer" && (
             <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-              <TextField select size="small" label="ธนาคาร *" value={bankCode} onChange={(e) => setBankCode(e.target.value)}
-                error={touched && !bankCode}
-                SelectProps={{ renderValue: (v) => (v ? <Stack direction="row" spacing={1} alignItems="center"><BankLogo code={v} size={20} /><span>{bankMeta(v).name}</span></Stack> : "") }}>
-                {BANKS.map((b) => (
-                  <MenuItem key={b.code} value={b.code}>
-                    <Stack direction="row" spacing={1} alignItems="center"><BankLogo code={b.code} size={22} /><span>{b.name}</span></Stack>
-                  </MenuItem>
-                ))}
-              </TextField>
+              <SheetSelectField label="ธนาคาร" required value={bankCode} title="เลือกธนาคาร" error={touched && !bankCode}
+                options={BANKS.map((b) => ({ value: b.code, label: b.name, icon: bankLogoUrl(b.code) ? `<img src="${bankLogoUrl(b.code)}" alt="" style="width:30px;height:30px;border-radius:50%;flex-shrink:0;object-fit:contain;background:#fff">` : "" }))}
+                renderValue={(o, v) => <Stack direction="row" spacing={1} alignItems="center"><BankLogo code={v} size={22} /><span>{bankMeta(v).name}</span></Stack>}
+                onChange={(v) => setBankCode(v)} />
               <TextField size="small" label="เลขที่บัญชี *" value={accountNo} onChange={(e) => setAccountNo(digitsOnly(e.target.value).slice(0, 15))}
                 inputProps={{ inputMode: "numeric" }} error={Boolean(bankCode && accountNo && bankError)}
                 helperText={bankCode && accountNo && bankError ? bankError : " "} />
@@ -868,7 +911,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         )}
 
         {/* ── หมายเหตุและหลักฐาน ───────────────────────────────────── */}
-        <Section title="หมายเหตุและหลักฐาน" hint="แนบใบแจ้งหนี้/ใบกำกับภาษี รูปผลงานที่ส่งมอบ และสำเนาบัตร/หนังสือรับรอง (ครั้งแรก)">
+        <Section icon={<NotesIcon />} title="หมายเหตุและหลักฐาน" hint="แนบใบแจ้งหนี้/ใบกำกับภาษี รูปผลงานที่ส่งมอบ และสำเนาบัตร/หนังสือรับรอง (ครั้งแรก)">
           <TextField size="small" fullWidth label="หมายเหตุ" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} inputProps={{ maxLength: 1000 }}
             placeholder="เช่น ส่งมอบงานชั้น 3–5 ครบตามแบบ ตรวจรับโดยหัวหน้างานแล้ว" />
           <input ref={fileInputRef} type="file" hidden multiple accept={ACCEPT_ALL}
@@ -896,10 +939,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                   <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{f.file.name}</Typography>
                   <Typography variant="caption" sx={{ color: TEXT_SUB }}>{formatBytes(f.file.size)}</Typography>
                 </Box>
-                <TextField select size="small" value={f.kind} onChange={(e) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: e.target.value } : x)))}
-                  sx={{ width: 130, "& .MuiInputBase-input": { py: 0.6, fontSize: "0.8rem" } }}>
-                  {FILE_KINDS.map((k) => <MenuItem key={k.value} value={k.value}>{k.label}</MenuItem>)}
-                </TextField>
+                <SheetSelectField dense value={f.kind} title="ชนิดไฟล์" sort={false} sx={{ width: 140, flexShrink: 0 }}
+                    options={FILE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                    onChange={(v) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: v } : x)))} />
                 <IconButton size="small" onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))}><Close fontSize="small" /></IconButton>
               </Stack>
             ))}
@@ -912,19 +954,19 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         </Section>
       </DialogContent>
 
-      <DialogActions sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
+      <DialogActions sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 1, bgcolor: "#fff" }}>
         {error ? (
           <Alert severity="error" sx={{ flex: 1, py: 0, "& .MuiAlert-message": { fontSize: "0.8rem" } }}>{error}</Alert>
         ) : (
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>ยอดจ่ายสุทธิ</Typography>
-            <Typography sx={{ fontWeight: 900, color: META.dark, lineHeight: 1.1 }}>{baht(Math.max(calc.net, 0))}</Typography>
+            <Typography sx={{ color: TEXT_SUB, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap" }}>ยอดจ่ายสุทธิ</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: TEXT_MAIN, lineHeight: 1.15, whiteSpace: "nowrap" }}>{baht(Math.max(calc.net, 0))}</Typography>
           </Box>
         )}
         <Button onClick={onClose} disabled={saving} sx={{ textTransform: "none", color: TEXT_SUB, display: { xs: error ? "none" : "inline-flex", sm: "inline-flex" } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={submit} disabled={saving}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : editing && !resubmit ? <Save sx={{ fontSize: 18 }} /> : <Send sx={{ fontSize: 17 }} />}
-          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5, boxShadow: "none", whiteSpace: "nowrap", bgcolor: ACCENT, "&:hover": { bgcolor: META.dark, boxShadow: "none" } }}>
+          sx={{ textTransform: "none", fontWeight: 800, borderRadius: "12px", px: 2.5, minHeight: 46, fontSize: "0.92rem", boxShadow: "none", whiteSpace: "nowrap", bgcolor: ACCENT, "&:hover": { bgcolor: META.dark, boxShadow: "none" } }}>
           {saving ? "กำลังบันทึก..." : resubmit ? "ส่งใหม่" : editing ? "บันทึก" : "ส่งขออนุมัติ"}
         </Button>
       </DialogActions>

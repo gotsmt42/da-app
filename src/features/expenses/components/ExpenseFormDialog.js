@@ -21,11 +21,11 @@ import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField,
-  IconButton, Alert, useMediaQuery, Autocomplete, MenuItem, Chip, Tooltip, CircularProgress, Avatar, Collapse,
-  Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel, createFilterOptions,
+  IconButton, Alert, useMediaQuery, MenuItem, InputAdornment, Chip, Tooltip, CircularProgress, Collapse,
+  Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, LinkRounded as LinkIcon, ReceiptLongRounded as ReceiptLong, PaymentsRounded as Payments, ExpandMoreRounded as ExpandMore, PrintRounded as Print, EditNoteRounded as EditNote, AccountBalanceWalletRounded as AccountBalanceWallet, GroupsRounded as Groups, PersonOutlineRounded as PersonOutline, AccountBalanceRounded as AccountBalance, HistoryEduRounded as HistoryEdu } from "@mui/icons-material";
+import { CloseRounded as Close, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, AttachFileRounded as AttachFile, SendRounded as Send, SaveRounded as Save, LinkRounded as LinkIcon, ReceiptLongRounded as ReceiptLong, PaymentsRounded as Payments, ExpandMoreRounded as ExpandMore, PrintRounded as Print, EditNoteRounded as EditNote, AccountBalanceWalletRounded as AccountBalanceWallet, GroupsRounded as Groups, PersonOutlineRounded as PersonOutline, AccountBalanceRounded as AccountBalance, HistoryEduRounded as HistoryEdu, DescriptionRounded as DescriptionIcon, NotesRounded as NotesIcon } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
@@ -35,9 +35,10 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import SignatureService from "@/shared/services/SignatureService";
 import AdvancePanel from "./AdvancePanel";
-import KindBadge from "./KindBadge";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import BankAccountPicker from "./BankAccountPicker";
+import SheetSelectField, { FORM_FIELD_SX } from "@/shared/ui/SheetSelectField";
+import { SheetPicker, SheetPickerRow, PickerField } from "@/shared/ui/SheetPicker";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
   differenceMeta, money, jobText, jobSubject, jobsSubject, jobChipText, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
@@ -46,8 +47,6 @@ import JobTypeChip, { JobOptionRow } from "@/shared/ui/JobTypeChip";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const MAX_ITEMS = 40;
-/** ค้นหาช่อง "ถึง" ได้ทั้งชื่อและตำแหน่ง */
-const toFilter = createFilterOptions({ stringify: (o) => `${o.label} ${o.position || ""}` });
 let keySeq = 0;
 const nextKey = () => `k${Date.now()}_${(keySeq += 1)}`;
 
@@ -87,18 +86,21 @@ const numberField = {
  * ⚠️ ต้องอยู่ module scope เท่านั้น — ถ้าประกาศไว้ในตัวฟอร์ม ทุกครั้งที่พิมพ์ 1 ตัวอักษรจะได้ component
  * ชนิดใหม่ React จะถอดช่องกรอกทั้งหมดแล้วสร้างใหม่ = เคอร์เซอร์หลุดจากช่องทุกตัวอักษรที่พิมพ์
  */
+// 🔁 (13 พ.ย. 2569 ผู้ใช้: "หน้าแอดวานซ์/ใบเคลม ให้รูปแบบการเลือกข้อมูลเหมือนหน้าอีเวนต์") การ์ดหัวข้อแบบเดียวกับฟอร์มลงงาน
 const Section = ({ accent, icon, title, hint, children, action }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2 }, mb: 1.75 }}>
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-      <Box sx={{ width: 4, height: 18, borderRadius: 1, bgcolor: accent }} />
-      {icon}
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: "14px", mb: 1.5, overflow: "hidden" }}>
+    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, borderBottom: "1px solid #eef2f7" }}>
+      {icon && (
+        <Box sx={{ width: 34, height: 34, borderRadius: "10px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(accent, 0.1),
+          "& svg": { fontSize: "19px !important", color: `${accent} !important` } }}>{icon}</Box>
+      )}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{title}</Typography>
-        {hint && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.3 }}>{hint}</Typography>}
+        <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
+        {hint && <Typography sx={{ color: TEXT_SUB, fontSize: "0.74rem", lineHeight: 1.4, mt: 0.15 }}>{hint}</Typography>}
       </Box>
       {action}
     </Stack>
-    {children}
+    <Box sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 1.5, sm: 1.75 } }}>{children}</Box>
   </Box>
 );
 
@@ -138,6 +140,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const [jobOptions, setJobOptions] = useState([]);
   const [jobQuery, setJobQuery] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
+  const [jobSheet, setJobSheet] = useState(false); // แผ่นเลือกงาน
   /** ใบ Advance ที่มีอยู่แล้วของงานที่เลือก (1 งานออกได้ใบเดียว) — null = ไม่มี (หรือยังตรวจไม่เสร็จ) */
   const [jobAdvance, setJobAdvance] = useState(null);
   const [jobAdvanceChecking, setJobAdvanceChecking] = useState(false);
@@ -526,24 +529,17 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     >
       <DialogTitle sx={{ p: 0 }}>
         {/* ✅ หัวกล่องเป็นสีประจำชนิดใบ (แถบบน + พื้นอ่อน + ป้าย ADVANCE/CLAIM) — เปิดขึ้นมาก็รู้ทันทีว่ากำลังกรอกใบไหน */}
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{
-          px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${alpha(accent, 0.25)}`,
-          borderTop: `5px solid ${accent}`, bgcolor: meta.soft,
+        <Stack direction="row" alignItems="center" spacing={1.25} sx={{
+          px: { xs: 1.75, sm: 2.5 }, py: 1.25, borderBottom: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff",
         }}>
-          <Box sx={{
-            width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-            bgcolor: accent, color: "#fff",
-          }}>
-            {isReimburseForm ? <AccountBalanceWallet sx={{ fontSize: 21 }} /> : isClaim ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
+          <Box sx={{ width: 40, height: 40, borderRadius: "12px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(accent, 0.1), color: accent }}>
+            {isReimburseForm ? <AccountBalanceWallet sx={{ fontSize: 22 }} /> : isClaim ? <ReceiptLong sx={{ fontSize: 22 }} /> : <Payments sx={{ fontSize: 22 }} />}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-              <KindBadge kind={slip} />
-              <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", lineHeight: 1.3, color: meta.dark }} noWrap>
-                {editing ? `แก้ไข ${expense.docNo || ""}` : `ออก${meta.label}ใหม่`}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
+            <Typography sx={{ fontWeight: 800, fontSize: { xs: "1rem", sm: "1.06rem" }, lineHeight: 1.3, color: TEXT_MAIN }}>
+              {editing ? `แก้ไข ${expense.docNo || ""}` : `ออก${meta.label}`}
+            </Typography>
+            <Typography sx={{ color: TEXT_SUB, fontSize: "0.74rem", lineHeight: 1.35 }} component="div">
               {isReimburseForm
                 ? "ค่าใช้จ่ายที่สำรองจ่ายไปก่อนแล้ว · แนบใบเสร็จให้ครบเพื่อขอเงินคืน"
                 : isClaim ? "สรุปค่าใช้จ่ายจริงพร้อมหลักฐาน เพื่อเคลียร์เงินเบิกล่วงหน้า" : "ขอเบิกเงินล่วงหน้าเพื่อใช้ในงาน · หัวหน้าจะได้รับแจ้งทันที"}
@@ -553,7 +549,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         </Stack>
       </DialogTitle>
 
-      <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+      <DialogContent sx={{ bgcolor: "#f5f7fa", px: { xs: 1, sm: 2.5 }, pt: "12px !important", pb: 1, ...FORM_FIELD_SX }}>
         <DraftBanner draft={draft} />
         <Box sx={{
           display: "grid", gap: 2, alignItems: "start",
@@ -586,32 +582,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
             {editing ? (
               <Typography sx={{ fontWeight: 700 }}>{advance?.docNo} · {advance?.subject} · {baht(advance?.total)}</Typography>
             ) : (
-              <Autocomplete
-                options={advanceOptions}
-                value={advance}
-                onChange={(_, v) => pickAdvance(v)}
-                isOptionEqualToValue={(o, v) => o._id === v._id}
-                getOptionLabel={(o) => (o ? `${o.docNo} · ${o.subject}` : "")}
-                noOptionsText="ไม่มีใบ Advance ที่รอเคลียร์"
-                renderOption={({ key, ...liProps }, o) => (
-                  <li {...liProps} key={o._id}>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography sx={{ fontWeight: 800, fontSize: "0.86rem" }}>{o.docNo}</Typography>
-                        <Box sx={{ flex: 1 }} />
-                        <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: accent }}>{baht(o.total)}</Typography>
-                      </Stack>
-                      <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-                        {o.requester?.name} · {o.subject}{o.payment?.at ? ` · รับเงิน ${thaiDate(o.payment.at)}` : ""}
-                      </Typography>
-                    </Box>
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField {...params} size="small" label="ใบ Advance *" placeholder="ค้นหาเลขที่ / เรื่อง"
-                    error={touched && !advance} />
-                )}
-              />
+              <SheetSelectField label="ใบ Advance" required value={advance?._id || ""} title="เลือกใบ Advance" placeholder="แตะเพื่อเลือกใบ Advance"
+                error={touched && !advance} helperText={advanceOptions.length ? "" : "ไม่มีใบ Advance ที่รอเคลียร์"}
+                options={advanceOptions.map((o) => ({ value: o._id, label: `${o.docNo} · ${o.subject}`, sub: [o.requester?.name, baht(o.total), o.payment?.at ? `รับเงิน ${thaiDate(o.payment.at)}` : ""].filter(Boolean).join(" · ") }))}
+                onChange={(v) => pickAdvance(advanceOptions.find((o) => o._id === v) || null)} />
             )}
             {advance?._id && (
               <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} sx={{ mt: 1.25 }} alignItems="center">
@@ -637,70 +611,26 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         )}
 
         {/* ── ข้อมูลเอกสาร ─────────────────────────────────────────── */}
-        <Section accent={accent} title="ข้อมูลเอกสาร" hint="ตรงกับหัวแบบฟอร์มกระดาษ ใบเบิกค่าใช้จ่าย">
+        <Section accent={accent} icon={<DescriptionIcon />} title="ข้อมูลเอกสาร" hint="ตรงกับหัวแบบฟอร์มกระดาษ ใบเบิกค่าใช้จ่าย">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
             <ThaiDatePicker label="วันที่" value={docDate} onChange={(v) => setDocDate(v || moment().format("YYYY-MM-DD"))} />
-            <Autocomplete
-              freeSolo
-              options={toChoices}
-              groupBy={(o) => o.group}
-              value={to}
-              inputValue={to}
-              onInputChange={(_, v) => setTo(v)}
-              onChange={(_, v) => setTo(typeof v === "string" ? v : v?.label || "")}
-              getOptionLabel={(o) => (typeof o === "string" ? o : o?.label || "")}
-              isOptionEqualToValue={(o, v) => o.label === (typeof v === "string" ? v : v?.label)}
-              // ✅ ค้นด้วยตำแหน่งได้ด้วย — พิมพ์ "กรรมการ" ก็เจอกรรมการผู้จัดการ ไม่ต้องจำชื่อ
-              filterOptions={toFilter}
-              renderOption={({ key, ...liProps }, o) => (
-                <li {...liProps} key={`${o.group}-${o.label}`}>
-                  <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined}
-                    sx={{ width: 28, height: 28, mr: 1.25, fontSize: 13, bgcolor: o.position ? alpha(accent, 0.18) : "#e6e9ef", color: o.position ? accent : TEXT_SUB }}>
-                    {(o.label || "?").charAt(0)}
-                  </Avatar>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }} noWrap>{o.label}</Typography>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-                      {o.position || "ไม่มีในระบบ · ชื่อที่เคยใช้ในใบก่อนหน้า"}
-                    </Typography>
-                  </Box>
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} size="small" label="ถึง (ผู้มีอำนาจอนุมัติ)" placeholder="เลือกจากรายชื่อ หรือพิมพ์ชื่อ"
-                  helperText={toPerson ? `ตำแหน่ง: ${toPerson.position}` : String(to || "").trim() ? "ชื่อนอกระบบ (พิมพ์เอง)" : "เลือกผู้มีอำนาจอนุมัติจากรายชื่อในระบบได้"} />
-              )}
-            />
+            <SheetSelectField label="ถึง (ผู้มีอำนาจอนุมัติ)" value={to} allowCreate title="เลือกผู้มีอำนาจอนุมัติ" placeholder="แตะเพื่อเลือก หรือพิมพ์ชื่อ"
+              options={toChoices.map((o) => ({ value: o.label, label: o.label, sub: o.position || "ชื่อที่เคยใช้ในใบก่อนหน้า", person: true, avatar: o.imageUrl }))}
+              onChange={(v) => setTo(String(v || ""))}
+              helperText={toPerson ? `ตำแหน่ง: ${toPerson.position}` : String(to || "").trim() ? "ชื่อนอกระบบ (พิมพ์เอง)" : "เลือกผู้มีอำนาจอนุมัติ"} />
             {canPickPerson ? (
-              <Autocomplete
-                options={people}
-                value={people.find((p) => p.userId === requester?.userId) || (requester?.userId ? requester : null)}
-                onChange={(_, v) => {
-                  if (!v) return;
-                  setRequester(v);
-                  setPosition(v.position || "");
-                  // ⚠️ เปลี่ยนผู้เบิก = บัญชีของคนเดิมใช้ไม่ได้แล้ว ล้างแล้วให้เลือกบัญชีหลักของคนใหม่ให้
+              <SheetSelectField label="ชื่อผู้เบิกเงิน" value={requester?.userId || ""} title="เลือกผู้เบิกเงิน"
+                options={people.map((pp) => ({ value: pp.userId, label: pp.fullName || pp.name || "", sub: pp.position || "", person: true, avatar: pp.imageUrl }))}
+                renderValue={(o) => o?.label || personFullName(requester) || ""}
+                onChange={(v) => {
+                  const pp = people.find((x) => x.userId === v);
+                  if (!pp) return;
+                  setRequester(pp);
+                  setPosition(pp.position || "");
+                  // ⚠️ เปลี่ยนผู้เบิก = บัญชีของคนเดิมใช้ไม่ได้แล้ว ล้างแล้วให้เลือกบัญชีหลักของคนใหม่
                   setPayToAccountId(undefined);
                 }}
-                isOptionEqualToValue={(o, v) => o.userId === v.userId}
-                getOptionLabel={(o) => o?.fullName || o?.name || ""}
-                disableClearable
-                renderOption={({ key, ...liProps }, o) => (
-                  <li {...liProps} key={o.userId}>
-                    <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined} sx={{ width: 26, height: 26, mr: 1, fontSize: 13 }}>
-                      {(o.name || "?").charAt(0)}
-                    </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.fullName}</Typography>
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>{o.position}</Typography>
-                    </Box>
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField {...params} size="small" label="ชื่อผู้เบิกเงิน"
-                    helperText={requester?.userId && requester.userId !== userData?.userId ? "เบิกแทน — ผู้เบิกจะได้รับแจ้งและต้องเป็นคนเคลียร์ใบนี้" : undefined} />
-                )}
-              />
+                helperText={requester?.userId && requester.userId !== userData?.userId ? "เบิกแทน — ผู้เบิกจะได้รับแจ้งและต้องเป็นคนเคลียร์ใบ" : ""} />
             ) : (
               <TextField size="small" label="ชื่อผู้เบิกเงิน"
                 // ✅ ชื่อ-นามสกุล (ผู้ใช้ขอ) — ใบใหม่ยังไม่มี fullName จาก server จึงหาจากรายชื่อพนักงานที่โหลดมาแทน
@@ -719,92 +649,71 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               error={touched && !String(subject).trim()}
               sx={{ gridColumn: { sm: "1 / -1" } }} inputProps={{ maxLength: 300 }}
             />
-            {!isClearClaim && (
-              <Autocomplete
-                sx={{ gridColumn: { sm: "1 / -1" } }}
-                // ✅ (24 ต.ค. 2569) เลือกได้หลายงาน — รายการเดียวกันอ้างอิงหลายงานพร้อมกัน · งานแรก = งานหลักของใบ
-                multiple
-                filterSelectedOptions
-                options={jobOptions}
-                value={jobs}
-                loading={jobLoading}
-                filterOptions={(x) => x}
-                onChange={(_, v) => {
-                  // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" — งานนั้นเอาออกไม่ได้ (เพิ่มงานอื่นได้)
-                  let next = v.slice(0, 20);
-                  if (presetJob && !editing && !next.some((j) => j._id === presetJob._id)) next = [presetJob, ...next];
-                  setJobs(next);
-                  // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
-                  const subj = jobsSubject(next, subjectPrefix);
-                  // ✅ (24 ต.ค. 2569 ผู้ใช้: "เรื่องควรลงงานที่เพิ่มเข้ามาด้วย") เรื่องที่ระบบเติมไว้ (แบบไหนก็ตาม) ปรับตามงานที่เลือกเสมอ
-                  //    เปลี่ยนเฉพาะเมื่อผู้ใช้ไม่ได้พิมพ์เรื่องเอง
-                  const autoForms = new Set([autoSubjectRef.current, jobsSubject(jobs, subjectPrefix), jobs[0] ? jobSubject(jobs[0], subjectPrefix) : ""].filter(Boolean));
-                  setSubject((cur) => (!String(cur).trim() || autoForms.has(cur) ? subj : cur));
-                  autoSubjectRef.current = subj;
-                }}
-                renderTags={(value, getTagProps) => value.map((o, i) => {
-                  const { key, ...tagProps } = getTagProps({ index: i });
-                  const locked = presetJob && !editing && o._id === presetJob._id;
-                  const taken = kind === "advance" && jobAdvance?.eventId === o._id;
-                  return (
-                    <Chip key={key} {...tagProps} size="small" onDelete={locked ? undefined : tagProps.onDelete}
-                      label={`${i === 0 && value.length > 1 ? "หลัก · " : ""}${jobChipText(o) || o.title || ""}`}
-                      sx={{ maxWidth: "100%", fontWeight: 700, ...(taken ? { bgcolor: alpha("#dc2626", 0.1), color: "#b91c1c" } : {}) }} />
-                  );
-                })}
-                onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); if (reason === "clear") setJobQuery(""); }}
-                isOptionEqualToValue={(o, v) => o._id === v._id}
-                // ✅ ค่าที่เลือกแล้วต้องเห็นช่วงวันที่ด้วย — งานที่เข้าหลายช่วง ชื่องานอย่างเดียวแยกไม่ออกว่าเป็นการเข้างานรอบไหน
-                getOptionLabel={(o) => (o ? [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ") : "")}
-                // 🔒 ใบ Advance: งานที่มีใบแล้วเลือกไม่ได้ (ยกเว้นงานของใบที่กำลังแก้อยู่เอง)
-                getOptionDisabled={(o) => kind === "advance" && Boolean(o.advance) && o.advance._id !== expense?._id}
-                noOptionsText="ไม่พบงาน"
-                renderOption={({ key, ...liProps }, o) => {
-                  const taken = kind === "advance" && o.advance && o.advance._id !== expense?._id;
-                  return (
-                    <li {...liProps} key={o._id}>
-                      {/* ✅ รายละเอียดงานครบแบบเดียวกับตอนเปิดจากหน้า Event (ผู้ใช้ขอ) — "PM Fire Alarm โครงการ ... ครั้งที่ ..."
-                          🐛 เดิมบรรทัดหลักมีแค่ "PM · Fire Alarm" ทุกงานหน้าตาเหมือนกันหมด ต้องอ่านบรรทัดเล็กถึงจะแยกออก
-                          และไม่มี "ครั้งที่" งาน PM ของโครงการเดียวกันหลายครั้งจึงแยกกันไม่ได้เลย
-                          ⚠️ ไม่ตัดคำ (noWrap) บรรทัดหลัก — ชื่อโครงการยาวต้องอ่านได้ครบ ไม่ใช่ถูกตัดเป็น "..." */}
-                      {/* 🎨 (27 ต.ค. 2569) ป้ายประเภทงานแยกสี (PM · Service · PO ...) — shared/ui/JobTypeChip.js */}
-                      <JobOptionRow job={o} main={jobText(o) || o.title}
-                        extra={jobPartText(o) ? (
-                          /* ✅ งานเดียวกันที่เข้าหลายช่วง จะขึ้นชื่อซ้ำกันหลายบรรทัด — ป้ายนี้คือสิ่งที่แยกแต่ละแถวออกจากกัน */
-                          <Chip size="small" label={jobPartText(o)}
-                            sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
-                        ) : null}
-                        sub={[
-                            // ✅ ช่วงวันที่เต็ม (เริ่ม–สิ้นสุด · กี่วัน) — แยกช่วงที่เข้าคนละรอบของงานเดียวกันออกจากกันได้
-                            jobRangeText(o),
-                            o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
-                            o.teamNames?.length ? `ผู้เข้างานช่วงนี้ ${o.teamNames.join(", ")}` : "",
-                            o.docNo ? `เลขที่ ${o.docNo}` : "",
-                            o.status || "",
-                          ].filter(Boolean).join(" · ")} />
-                      {taken && (
-                        <Chip size="small" label={`ช่วงนี้มีใบแล้ว ${o.advance.docNo}`}
-                          sx={{ ml: 1, flexShrink: 0, height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(KIND_META.advance.color, 0.12), color: KIND_META.advance.dark }} />
-                      )}
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField {...params} size="small"
+            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "Select งานยังเป็นแบบเดิม") ผูกงานจากแผ่นรายการแบบหน้าลงงาน — ค้นหาบนสุด · ติ๊กได้หลายงาน */}
+            {!isClearClaim && (() => {
+              const applyJobs = (v) => {
+                // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" — งานนั้นเอาออกไม่ได้ (เพิ่มงานอื่นได้)
+                let next = v.slice(0, 20);
+                if (presetJob && !editing && !next.some((j) => j._id === presetJob._id)) next = [presetJob, ...next];
+                setJobs(next);
+                // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
+                const subj = jobsSubject(next, subjectPrefix);
+                const autoForms = new Set([autoSubjectRef.current, jobsSubject(jobs, subjectPrefix), jobs[0] ? jobSubject(jobs[0], subjectPrefix) : ""].filter(Boolean));
+                setSubject((cur) => (!String(cur).trim() || autoForms.has(cur) ? subj : cur));
+                autoSubjectRef.current = subj;
+              };
+              const shown = [...jobs, ...jobOptions.filter((o) => !jobs.some((j) => j._id === o._id))];
+              const takenOf = (o) => kind === "advance" && o.advance && o.advance._id !== expense?._id;
+              return (
+                <>
+                  <PickerField sx={{ gridColumn: { sm: "1 / -1" } }} onClick={() => setJobSheet(true)} error={Boolean(jobAdvance)}
                     label={jobs.length > 1 ? `งานที่อ้างอิง (${jobs.length} งาน)` : presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ · เลือกได้หลายงาน)"}
-                    placeholder={jobs.length ? "+ เพิ่มงาน" : "ค้นหาชื่องาน / โครงการ / เลขที่"}
-                    error={Boolean(jobAdvance)}
+                    placeholder="แตะเพื่อเลือกงาน"
                     helperText={presetJob && !editing
                       ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว · เพิ่มงานอื่นที่ใช้ค่าใช้จ่ายร่วมกันได้"
                       : jobs.length > 1
                         ? "อ้างอิงหลายงานในใบเดียว — งานแรกเป็นงานหลักของใบ (ใช้ในรายงาน)"
                         : kind === "advance"
-                        ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
-                          : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน · ค่าใช้จ่ายรวมหลายงาน เลือกเพิ่มได้"}
-                    InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading || jobAdvanceChecking ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
-                )}
-              />
-            )}
+                          ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
+                          : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน · ค่าใช้จ่ายรวมหลายงาน เลือกเพิ่มได้"}>
+                    {jobs.length ? (
+                      <Stack direction="row" flexWrap="wrap" gap={0.5} alignItems="center">
+                        {jobs.map((o, i) => {
+                          const taken = kind === "advance" && jobAdvance?.eventId === o._id;
+                          return <Chip key={o._id} size="small" label={`${i === 0 && jobs.length > 1 ? "หลัก · " : ""}${jobChipText(o) || o.title || ""}`}
+                            sx={{ maxWidth: "100%", fontWeight: 700, ...(taken ? { bgcolor: alpha("#dc2626", 0.1), color: "#b91c1c" } : {}) }} />;
+                        })}
+                        {(jobLoading || jobAdvanceChecking) && <CircularProgress size={14} />}
+                      </Stack>
+                    ) : null}
+                  </PickerField>
+                  <SheetPicker open={jobSheet} onClose={() => setJobSheet(false)} title="เลือกงาน" subtitle="ค้นหาชื่องาน / โครงการ / เลขที่ · ติ๊กได้หลายงาน"
+                    query={jobQuery} onQuery={setJobQuery} loading={jobLoading} count={shown.length} emptyText="ไม่พบงาน">
+                    {shown.map((o) => {
+                      const sel = jobs.some((j) => j._id === o._id);
+                      const locked = presetJob && !editing && o._id === presetJob._id;
+                      const taken = takenOf(o);
+                      return (
+                        <SheetPickerRow key={o._id} multi selected={sel} disabled={(!sel && Boolean(taken)) || Boolean(locked)}
+                          onClick={() => applyJobs(sel ? jobs.filter((j) => j._id !== o._id) : [...jobs, o])}>
+                          <JobOptionRow job={o} main={jobText(o) || o.title}
+                            extra={jobPartText(o) ? (
+                              <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
+                            ) : null}
+                            sub={[
+                              jobRangeText(o),
+                              o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
+                              o.teamNames?.length ? `ผู้เข้างานช่วงนี้ ${o.teamNames.join(", ")}` : "",
+                              o.docNo ? `เลขที่ ${o.docNo}` : "",
+                              taken ? `ช่วงนี้มีใบแล้ว ${o.advance.docNo}` : o.status || "",
+                            ].filter(Boolean).join(" · ")} />
+                        </SheetPickerRow>
+                      );
+                    })}
+                  </SheetPicker>
+                </>
+              );
+            })()}
             {!isClearClaim && jobAdvance && (
               <Alert
                 severity="warning"
@@ -838,34 +747,47 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               const amount = itemAmount(row);
               const planned = isClaim && Number.isInteger(row.advanceItemIndex) ? advance?.items?.[row.advanceItemIndex] : null;
               const plannedDiff = planned ? money(amount - (planned.amount || 0)) : 0;
+              /**
+               * 🔁 (13 พ.ย. 2569 ผู้ใช้: "รูปแบบรายการจัดวางให้ดูง่าย สวยงาม ใช้งานง่าย") การ์ดรายการแบบเดียวกับการ์ดรายวันของใบค่าจ้าง:
+               *    หัว: เลขรายการ · หมวด (จุดสี) · ยอดเงิน · ลบ
+               *    ① หมวด ② รายการ ③ จำนวน · หน่วย ④ ราคา/หน่วย (เด่น) ⑤ เลขที่ใบเสร็จ (ใบเคลม) ⑥ พนักงาน · รายละเอียดเพิ่มเติม
+               */
               return (
-                <Box key={row.key} sx={{
-                  border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${cat.color}`, borderRadius: 2, p: 1.25, bgcolor: "#fff",
-                }}>
-                  <Box sx={{
-                    display: "grid", gap: 1, alignItems: "start",
-                    gridTemplateColumns: {
-                      xs: "1fr 1fr",
-                      md: isClaim ? "150px 1fr 70px 80px 110px 110px" : "160px 1fr 72px 84px 120px",
-                    },
-                  }}>
-                    <TextField
-                      select size="small" label={`#${idx + 1} หมวด`} value={row.category}
-                      onChange={(e) => onCategory(row, e.target.value)}
-                      sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}
-                    >
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <MenuItem key={c.value} value={c.value}>
-                          <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: c.color, mr: 1, display: "inline-block" }} />
-                          {c.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                <Box key={row.key} sx={{ bgcolor: "#fff", borderRadius: "14px", overflow: "hidden", border: `1.5px solid ${BORDER_MAIN}` }}>
+                  <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 0.75, bgcolor: alpha(cat.color, 0.06), borderBottom: `1px solid ${BORDER_MAIN}` }}>
+                    <Box sx={{ minWidth: 24, height: 24, px: 0.6, borderRadius: 99, display: "grid", placeItems: "center", bgcolor: cat.color, color: "#fff", fontSize: "0.72rem", fontWeight: 900 }}>{idx + 1}</Box>
+                    <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
+                      {String(row.description || "").trim() || cat.label}
+                      <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 800, color: cat.color }}>{cat.label}</Box>
+                    </Typography>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: "#0f172a", whiteSpace: "nowrap" }}>{baht(amount)}</Typography>
+                      {planned && (
+                        <Typography sx={{ fontSize: "0.68rem", lineHeight: 1.1, color: plannedDiff === 0 ? TEXT_SUB : plannedDiff > 0 ? "#2563eb" : "#d97706", whiteSpace: "nowrap" }}>
+                          ตั้งเบิก {fmtMoney(planned.amount)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Tooltip title="ลบรายการ">
+                      <span>
+                        <IconButton size="small" aria-label="ลบรายการ" onClick={() => removeItem(row.key)} disabled={!isClearClaim && items.length === 1} sx={{ mr: -0.5 }}>
+                          <DeleteOutline fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                  <Box sx={{ p: 1.25, display: "grid", gap: 1.25, alignItems: "end", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, minmax(0, 1fr))" } }}>
+                    {/* หมวดเลือกจากแผ่นรายการแบบหน้าลงงาน · จุดสีประจำหมวด */}
+                    <SheetSelectField label="หมวด" value={row.category} title="เลือกหมวดค่าใช้จ่าย" sort={false}
+                      sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }}
+                      options={EXPENSE_CATEGORIES.map((c) => ({ value: c.value, label: c.label, icon: `<span style="flex-shrink:0;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:${c.color}1f"><span style="width:10px;height:10px;border-radius:50%;background:${c.color}"></span></span>` }))}
+                      renderValue={(o) => <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}><Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cat.color }} />{o?.label}</Box>}
+                      onChange={(v) => onCategory(row, v)} />
                     <TextField
                       size="small" label="รายการ *" value={row.description}
                       onChange={(e) => setItem(row.key, { description: e.target.value })}
                       error={touched && !String(row.description).trim()}
-                      sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} inputProps={{ maxLength: 300 }}
+                      sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }} inputProps={{ maxLength: 300 }}
                     />
                     <TextField
                       size="small" label="จำนวน" type="number" value={row.qty}
@@ -874,85 +796,52 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                       error={Number(row.qty) <= 0}
                     />
                     <TextField size="small" label="หน่วย" value={row.unit} onChange={(e) => setItem(row.key, { unit: e.target.value })} inputProps={{ maxLength: 30 }} />
+                    {/* ราคา/หน่วย — ช่องเงินเด่นแบบเดียวกับ "ค่าแรงรวม" ในใบค่าจ้าง */}
                     <TextField
-                      size="small" label="ราคา/หน่วย" type="number" value={row.unitPrice}
+                      size="small" label="ราคา/หน่วย" type="number" value={row.unitPrice} placeholder="0"
                       onChange={(e) => setItem(row.key, { unitPrice: e.target.value })}
                       inputProps={{ min: 0, step: "any", ...numberField }}
+                      InputProps={{ startAdornment: <InputAdornment position="start"><Box component="span" sx={{ fontWeight: 900, color: accent }}>฿</Box></InputAdornment>,
+                        endAdornment: <InputAdornment position="end">บาท</InputAdornment> }}
+                      sx={{
+                        gridColumn: { xs: "1 / -1", md: isClaim ? "span 1" : "span 2" },
+                        "& > .MuiInputLabel-root": { color: `${accent} !important` },
+                        "& .MuiOutlinedInput-root": { bgcolor: alpha(accent, 0.05), minHeight: 50 },
+                        "& .MuiOutlinedInput-notchedOutline": { borderColor: `${alpha(accent, 0.55)} !important`, borderWidth: "2px !important" },
+                        "& .MuiInputBase-input": { fontSize: "1.2rem", fontWeight: 900, color: "#0f172a", fontVariantNumeric: "tabular-nums" },
+                      }}
                     />
                     {isClaim && (
-                      <TextField size="small" label="เลขที่ใบเสร็จ" value={row.receiptNo} onChange={(e) => setItem(row.key, { receiptNo: e.target.value })} inputProps={{ maxLength: 60 }} />
+                      <TextField size="small" label="เลขที่ใบเสร็จ" value={row.receiptNo} onChange={(e) => setItem(row.key, { receiptNo: e.target.value })} inputProps={{ maxLength: 60 }}
+                        sx={{ gridColumn: { xs: "1 / -1", md: "span 1" } }} />
                     )}
-                  </Box>
-                  <Box sx={{
-                    mt: 1, display: "grid", gap: 1, alignItems: "center",
-                    gridTemplateColumns: { xs: "1fr auto auto", sm: "210px 1fr auto auto" },
-                  }}>
                     {/* ✅ พนักงานของรายการนี้ (ไม่บังคับ) — หัวหน้างานเบิกแทนลูกทีมได้ในใบเดียว แยกบรรทัดละคน
                         พิมพ์ชื่อคนนอกระบบได้ (น.ศ. ฝึกงาน/แรงงานรายวัน) · เลือกจากรายชื่อ = ผูกกับทะเบียนพนักงาน */}
-                    <Autocomplete
-                      freeSolo size="small" options={people}
-                      value={row.person?.name ? (people.find((p) => p.userId && p.userId === row.person.userId) || itemPersonName(row)) : null}
-                      getOptionLabel={(o) => (typeof o === "string" ? o : o?.fullName || o?.name || "")}
-                      isOptionEqualToValue={(o, v) => (typeof v === "string" ? o.fullName === v || o.name === v : o.userId === v.userId)}
-                      onChange={(_, v) => {
-                        if (!v) setItem(row.key, { person: null });
-                        else if (typeof v === "string") setItem(row.key, { person: { userId: "", name: v.trim().slice(0, 80) } });
-                        else setItem(row.key, { person: { userId: v.userId, name: v.fullName || v.name } });
-                      }}
-                      onInputChange={(_, v, reason) => {
-                        if (reason !== "input") return;
-                        const name = v.slice(0, 80);
-                        const match = people.find((p) => p.fullName === name.trim() || p.name === name.trim());
-                        setItem(row.key, { person: name.trim() ? { userId: match?.userId || "", name } : null });
-                      }}
-                      renderOption={({ key, ...liProps }, o) => (
-                        <li {...liProps} key={o.userId}>
-                          <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined} sx={{ width: 22, height: 22, mr: 1, fontSize: 11 }}>
-                            {(o.name || "?").charAt(0)}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontSize: "0.84rem", fontWeight: 700 }} noWrap>{o.fullName || o.name}</Typography>
-                            {o.position && <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{o.position}</Typography>}
-                          </Box>
-                        </li>
-                      )}
-                      sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
-                      renderInput={(params) => (
-                        <TextField {...params} variant="standard" placeholder="พนักงาน (ไม่บังคับ)"
-                          InputProps={{ ...params.InputProps, startAdornment: <PersonOutline sx={{ fontSize: 17, color: row.person?.name ? accent : TEXT_SUB, mr: 0.5 }} /> }}
-                          sx={{ "& input": { fontSize: "0.82rem" } }} />
-                      )}
-                    />
+                    <SheetSelectField label="พนักงาน (ไม่บังคับ)" value={row.person?.name || ""} allowCreate title="พนักงานของรายการนี้" placeholder="แตะเพื่อเลือก"
+                      sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }}
+                      startIcon={row.person?.name ? null : <PersonOutline sx={{ fontSize: 18, color: TEXT_SUB }} />}
+                      options={people.map((pp) => ({ value: pp.fullName || pp.name, label: pp.fullName || pp.name, sub: pp.position || "", person: true, avatar: pp.imageUrl }))}
+                      onChange={(v, isNew) => {
+                        const name = String(v || "").trim().slice(0, 80);
+                        const match = !isNew && people.find((pp) => (pp.fullName || pp.name) === name);
+                        setItem(row.key, { person: name ? { userId: match?.userId || "", name } : null });
+                      }} />
                     <TextField
-                      size="small" variant="standard" placeholder="รายละเอียดเพิ่มเติม เช่น ช่วงวันที่ / ทะเบียนรถ (ไม่บังคับ)"
+                      size="small" label="รายละเอียดเพิ่มเติม (ไม่บังคับ)" placeholder="เช่น ช่วงวันที่ / ทะเบียนรถ"
                       value={row.detail} onChange={(e) => setItem(row.key, { detail: e.target.value })}
-                      sx={{ minWidth: 0, "& input": { fontSize: "0.82rem" } }} inputProps={{ maxLength: 300 }}
+                      sx={{ gridColumn: { xs: "1 / -1", md: "span 2" } }} inputProps={{ maxLength: 300 }}
                     />
-                    <Box sx={{ textAlign: "right", minWidth: 96 }}>
-                      <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN }}>{fmtMoney(amount)}</Typography>
-                      {planned && (
-                        <Typography variant="caption" sx={{ display: "block", lineHeight: 1.1, color: plannedDiff === 0 ? TEXT_SUB : plannedDiff > 0 ? "#2563eb" : "#d97706" }}>
-                          ตั้งเบิก {fmtMoney(planned.amount)}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Tooltip title="ลบรายการ">
-                      <span>
-                        <IconButton size="small" aria-label="ลบรายการ" onClick={() => removeItem(row.key)} disabled={!isClearClaim && items.length === 1}>
-                          <DeleteOutline fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
                   </Box>
                 </Box>
               );
             })}
           </Stack>
-          <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mt: 1.25 }}>
-            <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => addItem("other")} disabled={items.length >= MAX_ITEMS}
-              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(accent, 0.5), color: accent }}>
-              เพิ่มรายการ
-            </Button>
+          {/* 🔁 (13 พ.ย. 2569) ปุ่มเพิ่มรายการเต็มแถว (กดง่ายบนมือถือ) · ทางลัดหมวดเป็นชิปเลื่อนข้างแถวเดียว */}
+          <Button fullWidth variant="outlined" startIcon={<Add />} onClick={() => addItem("other")} disabled={items.length >= MAX_ITEMS}
+            sx={{ mt: 1.25, height: 44, textTransform: "none", fontWeight: 800, borderRadius: "12px", borderStyle: "dashed", borderWidth: 1.5, borderColor: alpha(accent, 0.55), color: accent, "&:hover": { borderWidth: 1.5, borderStyle: "dashed" } }}>
+            เพิ่มรายการ
+          </Button>
+          <Stack direction="row" useFlexGap spacing={0.75} sx={{ mt: 1, flexWrap: { xs: "nowrap", sm: "wrap" }, overflowX: "auto", pb: 0.5, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, "& > *": { flexShrink: 0 } }}>
             {teamNames.length > 0 && !isClearClaim && (
               <Tooltip describeChild title={`เพิ่มรายการเบี้ยเลี้ยงให้ทุกคนในงานนี้ คนละบรรทัด: ${teamNames.join(", ")}`}>
                 <Chip size="small" icon={<Groups sx={{ fontSize: "16px !important" }} />} label={`เบี้ยเลี้ยงทีมงาน (${teamNames.length} คน)`}
@@ -1082,7 +971,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         )}
 
         {/* ── เพิ่มเติม ───────────────────────────────────────────── */}
-        <Section accent={accent} title="หมายเหตุและหลักฐาน" hint={isClaim ? "แนบรูปใบเสร็จ/บิลให้ครบ ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "แนบใบเสนอราคา/รูปประกอบได้ (ไม่บังคับ)"}>
+        <Section accent={accent} icon={<NotesIcon />} title="หมายเหตุและหลักฐาน" hint={isClaim ? "แนบรูปใบเสร็จ/บิลให้ครบ ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "แนบใบเสนอราคา/รูปประกอบได้ (ไม่บังคับ)"}>
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: isClaim ? "1fr" : "1fr 220px" } }}>
             <TextField size="small" label="หมายเหตุ" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} inputProps={{ maxLength: 1000 }}
               placeholder={isReimburseForm ? "เช่น จ่ายสดหน้างาน ใบเสร็จอยู่ในรูปที่แนบ" : isClaim ? "เช่น ไม่ได้ใช้เงินเพราะงานเลื่อน / ใบเสร็จบางใบสูญหาย" : ""} />
@@ -1133,10 +1022,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                     <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{f.file.name}</Typography>
                     <Typography variant="caption" sx={{ color: TEXT_SUB }}>{formatBytes(f.file.size)}</Typography>
                   </Box>
-                  <TextField select size="small" value={f.kind} onChange={(e) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: e.target.value } : x)))}
-                    sx={{ width: 130, "& .MuiInputBase-input": { py: 0.6, fontSize: "0.8rem" } }}>
-                    {FILE_KINDS.map((k) => <MenuItem key={k.value} value={k.value}>{k.label}</MenuItem>)}
-                  </TextField>
+                  <SheetSelectField dense value={f.kind} title="ชนิดไฟล์" sort={false} sx={{ width: 140, flexShrink: 0 }}
+                    options={FILE_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                    onChange={(v) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: v } : x)))} />
                   <IconButton size="small" onClick={(e) => { e.stopPropagation(); setFiles((cur) => cur.filter((x) => x.key !== f.key)); }}><Close fontSize="small" /></IconButton>
                 </Stack>
               ))}

@@ -162,7 +162,8 @@ const ContractorCard = ({ e, onOpen }) => {
   const manDays = days.reduce((n, it) => n + (Number(it.people) || 0), 0);
   const net = money(e.difference ?? e.total);
   const meta = [
-    days.length ? `${days.length} วัน${manDays ? ` · ${manDays} แรง` : ""}` : `${e.items?.length || 0} รายการ`,
+    // วันทำงาน = วันที่ไม่ซ้ำ (กลางวัน + กลางคืนของวันเดียวกัน = 1 วัน)
+    days.length ? `${new Set(days.map((it) => String(it.workDate).slice(0, 10))).size} วัน${days.some((it) => it.shift === "night") ? ` (เข้างานกลางคืน ${days.filter((it) => it.shift === "night").length})` : ""}${manDays ? ` · ${manDays} แรง` : ""}` : `${e.items?.length || 0} รายการ`,
     installmentText(e.installment),
   ].filter(Boolean).join(" · ");
   return (
