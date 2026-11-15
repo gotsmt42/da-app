@@ -23,6 +23,7 @@ import { ACCEPT_ALL } from "@/shared/utils/fileUpload";
 import { thaiDate, thaiDateFull, thaiDateTime } from "@/shared/utils/thaiDate";
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
+import { isSuperAdmin } from "@/shared/utils/roles";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import SignatureService from "@/shared/services/SignatureService";
 import ExpensePrintDialog from "./ExpensePrintDialog";
@@ -415,6 +416,17 @@ const STEP_OWNER = {
  * กล่องยืนยันการดำเนินการ (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย / ตีกลับ / ยกเลิก)
  * ⚠️ อยู่ module scope — ประกาศในตัว component หลักจะทำให้ช่องกรอกหลุดโฟกัสทุกตัวอักษร
  */
+/** ข้อความในกล่องย้อนขั้น — บอกว่าจากขั้นไหนไปขั้นไหน และผลที่เกิด */
+const revertBody = (e) => {
+  if (!e) return "";
+  const s = e.status;
+  if (s === "reviewed") return "ใบจะกลับไป “รอตรวจสอบ” — ล้างผลตรวจสอบและลายเซ็นผู้ตรวจสอบ";
+  if (s === "approved") return "ใบจะกลับไป “รออนุมัติ” — ล้างผลอนุมัติและลายเซ็นผู้อนุมัติ";
+  if (s === "paid") return "ใบจะกลับไป “รออนุมัติเบิกจ่าย” — ล้างข้อมูลการจ่ายเงินและลายเซ็นผู้อนุมัติเบิกจ่าย (สลิปที่แนบไว้ยังอยู่ในใบ)";
+  if (s === "settled") return "ใบจะกลับไปขั้นก่อนปิดรายการ — ล้างข้อมูลการจ่ายเงิน · ใบ Advance ที่อ้างถึงจะกลับไป “รอเคลียร์”";
+  return "";
+};
+
 const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const [form, setForm] = useState({});
   /** ลายเซ็นของผู้อนุมัติเอง — ✅ ติ๊กเลือกได้ว่าจะลงลายเซ็นในใบที่กำลังอนุมัติไหม (ผู้ใช้ขอ) */
@@ -477,6 +489,11 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         ? "ผู้เบิกจะได้รับแจ้งพร้อมเหตุผล และแก้ไขส่งใหม่ในใบเดิมได้"
         : "ผู้เบิกและผู้ที่ตรวจสอบ/อนุมัติไปแล้วจะได้รับแจ้งพร้อมเหตุผล — ผลตรวจสอบ อนุมัติ และลายเซ็นเดิมจะถูกล้าง เมื่อแก้ไขแล้วใบจะเริ่มที่ขั้นตรวจสอบใหม่",
     },
+    /** ✅ (15 พ.ย. 2569 ผู้ใช้: "ให้ย้อนกลับได้เวลากดอนุมัติผิด · เฉพาะ Super Admin") */
+    revert: {
+      title: "ย้อนขั้นอนุมัติ", color: "#7c3aed", button: "ยืนยันย้อนขั้น",
+      body: revertBody(expense),
+    },
     cancel: {
       title: "ยกเลิกใบนี้", color: "#64748b", button: "ยืนยันยกเลิก",
       // ⚠️ ใบสำรองจ่ายไม่มี Advance ให้คืนสถานะ — ข้อความของใบเคลมใช้กับมันไม่ได้
@@ -512,7 +529,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
           body: "ขั้นที่ 3 จาก 3 — ลงนามช่องผู้อนุมัติเบิกจ่ายเพื่อยืนยันว่าได้รับเงินคืนครบแล้ว ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
         },
   }[action];
-  const needReason = action === "reject";
+  const needReason = action === "reject" || action === "revert";
   const payLike = action === "pay" || action === "settle";
   /** ใบเคลมที่ผู้เบิกต้องคืนเงินบริษัท — ทิศทางเงินตรงข้ามกับการโอนเข้าบัญชีผู้เบิก */
   const returningToCompany = expense?.kind === "claim" && !reimburse && !ctr && money(expense?.difference) < 0;
@@ -587,9 +604,9 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
           )}
           {(needReason || action === "cancel") && (
             <TextField
-              size="small" label={needReason ? "เหตุผลที่ตีกลับ *" : "เหตุผล (ไม่บังคับ)"} value={form.reason || ""} onChange={set("reason")}
+              size="small" label={action === "revert" ? "เหตุผลที่ย้อนขั้น *" : needReason ? "เหตุผลที่ตีกลับ *" : "เหตุผล (ไม่บังคับ)"} value={form.reason || ""} onChange={set("reason")}
               multiline minRows={2} autoFocus inputProps={{ maxLength: 500 }}
-              placeholder={needReason ? "เช่น ใบเสร็จค่าน้ำมันไม่ชัด กรุณาแนบใหม่" : ""}
+              placeholder={action === "revert" ? "เช่น กดอนุมัติเบิกจ่ายผิดใบ" : needReason ? "เช่น ใบเสร็จค่าน้ำมันไม่ชัด กรุณาแนบใหม่" : ""}
             />
           )}
           {SIGN_ACTIONS.includes(action) && (
@@ -738,6 +755,9 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     || (editable && canActOnDoc)
     || (e.status === "reviewed" && (canReview || canApprove))
     || (e.status === "approved" && (canApprove || canDisburse)));
+  // ✅ (15 พ.ย. 2569) ย้อนขั้นอนุมัติ — เฉพาะ Super Admin · กติกาเดียวกับ server (POST /:id/revert)
+  const canRevert = e && isSuperAdmin(userData) && (
+    ["reviewed", "approved"].includes(e.status) || (kind === "advance" && e.status === "paid") || (kind === "claim" && e.status === "settled"));
   const canAddFiles = e && e.status !== "cancelled" && (isOwner || canActOnDoc);
   const canRemoveFile = e && (canActOnDoc ? e.status !== "cancelled" : canEdit);
   const overdue = isOverdueClear(e);
@@ -772,6 +792,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       if (action === "approve") updated = await ExpenseService.approve(e._id, form.note, form.useSignature !== false);
       if (action === "reject") updated = await ExpenseService.reject(e._id, form.reason);
       if (action === "cancel") updated = await ExpenseService.cancel(e._id, form.reason);
+      if (action === "revert") updated = await ExpenseService.revert(e._id, form.reason);
       const useSignature = form.useSignature !== false;
       if (action === "pay") updated = (await ExpenseService.pay(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, dueClearAt: form.dueClearAt, useSignature }, files)).expense;
       if (action === "settle") updated = (await ExpenseService.settle(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, useSignature }, files)).expense;
@@ -783,6 +804,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
         approve: closedNow ? "อนุมัติแล้ว — ใบเคลียร์เรียบร้อย (ไม่มีส่วนต่าง)" : `อนุมัติแล้ว — ส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย`,
         reject: "ตีกลับให้แก้ไขแล้ว",
         cancel: "ยกเลิกแล้ว",
+        revert: "ย้อนขั้นอนุมัติแล้ว — บันทึกเหตุผลไว้ในประวัติของใบ",
         pay: "อนุมัติเบิกจ่ายและบันทึกการจ่ายเงินแล้ว",
         settle: mustReturn ? "ยืนยันรับเงินคืนแล้ว — เคลียร์เรียบร้อย" : "อนุมัติเบิกจ่ายแล้ว — ปิดรายการเรียบร้อย",
       }[action];
@@ -1348,6 +1370,14 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
               </Button>
               <FooterProgress steps={steps} status={e.status} color={meta.color} />
             </Box>
+            {canRevert && (
+              <Tooltip title="ย้อนขั้นอนุมัติ 1 ขั้น (Super Admin)">
+                <Button onClick={() => setAction("revert")} startIcon={<Undo sx={{ fontSize: 17 }} />} variant="outlined"
+                  sx={{ textTransform: "none", fontWeight: 700, color: "#7c3aed", borderColor: "#ddd6fe", borderRadius: 2, "&:hover": { borderColor: "#7c3aed", bgcolor: "#f5f3ff" } }}>
+                  ย้อนขั้น
+                </Button>
+              </Tooltip>
+            )}
             {canCancel && (
               <Tooltip title="ยกเลิกใบนี้">
                 <IconButton onClick={() => setAction("cancel")} aria-label="ยกเลิกใบนี้" sx={{ color: TEXT_SUB, border: `1px solid ${BORDER_MAIN}`, width: 36, height: 36 }}>

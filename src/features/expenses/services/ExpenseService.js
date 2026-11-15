@@ -222,6 +222,12 @@ const ExpenseService = {
     return { expense: res.data.expense, rejected };
   },
 
+  /** ✅ (15 พ.ย. 2569) ย้อนขั้นอนุมัติ 1 ขั้น — เฉพาะ Super Admin · ต้องมีเหตุผล */
+  async revert(id, reason) {
+    const res = await API.post(`/expenses/${id}/revert`, { reason });
+    return res.data.expense;
+  },
+
   async cancel(id, reason = "") {
     const res = await API.post(`/expenses/${id}/cancel`, { reason });
     return res.data.expense;
