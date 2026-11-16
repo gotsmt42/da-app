@@ -50,7 +50,7 @@ import { provinceOptionsFor, THAILAND_PROVINCES } from "@/features/contracts/uti
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS, formatRoundLabel, contractYearLabel } from "@/shared/utils/contractRounds";
-import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
+import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness, renewalMap } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
 import BillingDialog from "@/features/finance/components/BillingDialog";
@@ -1748,25 +1748,7 @@ export default function ContractOverview() {
    *    บริษัท + โครงการ + ประเภทงาน + ระบบ เดียวกัน ที่เริ่มหลังสัญญานี้ → key ของสัญญาเดิม → สัญญาฉบับถัดไป
    *    ใช้แยก "หมดอายุ · รอต่อสัญญา" (ยังต้องตาม) ออกจาก "ต่อสัญญาแล้ว" (เป็นประวัติ)
    */
-  const renewalOf = useMemo(() => {
-    const norm = (v) => String(v || "").trim().toLowerCase();
-    const groups = new Map();
-    contracts.forEach((c) => {
-      if (!c.isRealContract || !c.contractStart) return;
-      const k = [c.company, c.site, c.title, c.system].map(norm).join("|");
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(c);
-    });
-    const m = new Map();
-    groups.forEach((list) => {
-      list.sort((a, b) => moment(a.contractStart).valueOf() - moment(b.contractStart).valueOf());
-      list.forEach((c, i) => {
-        const next = list.slice(i + 1).find((n) => moment(n.contractStart).isAfter(moment(c.contractStart), "day"));
-        if (next) m.set(c.key, next);
-      });
-    });
-    return m;
-  }, [contracts]);
+  const renewalOf = useMemo(() => renewalMap(contracts), [contracts]); // เกณฑ์กลาง — ตรงกับแจ้งเตือนฝั่ง server
 
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)

@@ -30,7 +30,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
-import { groupEventsByContract, isRoundOverdue, contractStatusInfo } from "@/shared/utils/contractOverdue";
+import { groupEventsByContract, isRoundOverdue, contractStatusInfo, renewalMap } from "@/shared/utils/contractOverdue";
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai, thaiDate } from "@/shared/utils/thaiDate";
@@ -164,13 +164,14 @@ export default function CustomerOverview() {
     if (events.length) {
       const contracts = groupEventsByContract(events);
       const daysPastDueMap = buildDaysPastDueMap(events);
+      const renewed = renewalMap(contracts); // ต่อสัญญาแล้ว = ไม่นับเป็นหมดอายุ/ใกล้หมด (ตรงกับหน้าภาพรวมงานและแจ้งเตือน)
       contracts.forEach((c) => {
         const b = bucket(nameOf(c.company, c.site));
         if (!b) return;
         b.totalValue += Number(c.jobValue) || 0;
         if (c.isRealContract) {
           b.contracts.push(c);
-          const st = contractStatusInfo(c);
+          const st = renewed.has(c.key) ? null : contractStatusInfo(c);
           if (st?.state === "expired") b.expired.push(c);
           else if (st?.state === "expiring") b.expiring.push(c);
           if (isRoundOverdue(c)) b.overdueRounds.push(c);

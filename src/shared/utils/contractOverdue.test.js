@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import moment from "moment";
-import { nextVisitOverdueInfo, isRoundOverdue } from "./contractOverdue";
+import { nextVisitOverdueInfo, isRoundOverdue, renewalMap } from "./contractOverdue";
 
 /**
  * เกณฑ์เตือน "รอบเข้างานถัดไป" — คิดเป็นเดือน ไม่ใช่วัน (ดู nextVisitOverdueInfo)
@@ -83,5 +83,27 @@ describe("nextVisitOverdueInfo — เตือนตามเดือนที
       end: last.clone().add(1, "day").toISOString(),
     }];
     expect(nextVisitOverdueInfo(c).lastVisitDate.date()).toBe(15);
+  });
+});
+
+// 🐛 (16 พ.ย. 2569) สัญญาที่ต่อแล้วต้องไม่ถูกนับเป็น "หมดอายุ" — ต้องตรงกับแจ้งเตือนฝั่ง server (renewedGroups)
+describe("renewalMap", () => {
+  const base = { isRealContract: true, company: "A", site: "S1", title: "PM", system: "Fire Alarm" };
+  it("สัญญาเดิมที่มีฉบับใหม่ (เริ่มทีหลัง) = ต่อแล้ว", () => {
+    const old = { ...base, key: "g1", contractStart: "2025-11-01" };
+    const next = { ...base, key: "g2", contractStart: "2026-11-01" };
+    const m = renewalMap([next, old]);
+    expect(m.get("g1")?.key).toBe("g2");
+    expect(m.has("g2")).toBe(false);
+  });
+  it("คนละระบบ/คนละโครงการ ไม่นับว่าต่อ · ตัวพิมพ์/ช่องว่างไม่มีผล", () => {
+    const old = { ...base, key: "g1", contractStart: "2025-11-01" };
+    expect(renewalMap([old, { ...base, key: "g2", system: "CCTV", contractStart: "2026-11-01" }]).size).toBe(0);
+    expect(renewalMap([old, { ...base, key: "g3", site: " s1 ", contractStart: "2026-11-01" }]).get("g1")?.key).toBe("g3");
+  });
+  it("งานที่ไม่ใช่สัญญาจริง / ไม่มีวันเริ่ม ไม่ถูกนับ", () => {
+    const old = { ...base, key: "g1", contractStart: "2025-11-01" };
+    expect(renewalMap([old, { ...base, key: "g2", isRealContract: false, contractStart: "2026-11-01" }]).size).toBe(0);
+    expect(renewalMap([old, { ...base, key: "g3", contractStart: null }]).size).toBe(0);
   });
 });

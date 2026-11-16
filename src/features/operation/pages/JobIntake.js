@@ -33,7 +33,7 @@ import {
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { alpha } from "@mui/material/styles";
-import { PostAddRounded, AddRounded, EditRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close, EventAvailableRounded, FlagRounded, NotesRounded, CalendarMonthRounded, GroupsRounded, PersonOutlineRounded, BuildRounded, CallReceivedRounded, DescriptionRounded, PhoneRounded, HourglassTopRounded, ReportProblemRounded, BlockRounded, RestoreRounded, PersonOffRounded, LocalShippingRounded, ReceiptLongRounded, TaskAltRounded, UploadFileRounded, AttachFileRounded, SearchRounded as Search, ViewAgendaRounded, TableRowsRounded, RequestQuoteRounded, ExpandMoreRounded, VerifiedRounded, SendRounded, NotificationsActiveRounded, EditNoteRounded, CheckCircleRounded, CancelRounded, DoNotDisturbOnRounded, LinkRounded } from "@mui/icons-material";
+import { PostAddRounded, AddRounded, EditRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close, EventAvailableRounded, FlagRounded, NotesRounded, CalendarMonthRounded, GroupsRounded, PersonOutlineRounded, BuildRounded, CallReceivedRounded, DescriptionRounded, PhoneRounded, HourglassTopRounded, ReportProblemRounded, BlockRounded, RestoreRounded, PersonOffRounded, LocalShippingRounded, ReceiptLongRounded, TaskAltRounded, UploadFileRounded, AttachFileRounded, SearchRounded as Search, ViewAgendaRounded, TableRowsRounded, RequestQuoteRounded, ExpandMoreRounded, VerifiedRounded, SendRounded, NotificationsActiveRounded, EditNoteRounded, CheckCircleRounded, CancelRounded, DoNotDisturbOnRounded, LinkRounded, HistoryRounded, FlagCircleRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
 import JobTypeService from "@/shared/services/JobTypeService";
@@ -55,6 +55,7 @@ import { can, rankLabel } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
+import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 
@@ -920,14 +921,82 @@ const FileLinks = ({ files, label = "เอกสารรับงาน" }) =>
 const NOTE_FILE_TYPES = [["quotation", "ใบเสนอราคา", RequestQuoteRounded], ["sitePhoto", "ไฟล์อื่น", AttachFileRounded]];
 // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ทำเป็น Module การจัดการไฟล์ และรูปภาพ ให้ใช้รูปแบบเดียวกันทั้งแอพ" · "อัพรูปแล้วเด้งกระพริบ ให้โหลดเบื้องหลัง")
 //    ใช้ AttachmentList (shared/ui) — แถวไฟล์ชุดเดียวทั้งแอป · อัปโหลดเบื้องหลังมีแถวชั่วคราว + % · เลื่อนดูรูปได้แม้ชื่อซ้ำ · ลบไฟล์ได้
+/**
+ * ✅ (16 พ.ย. 2569 ผู้ใช้: "หน้าบันทึกงานเพิ่มการแสดงประวัติต่างๆ ทำหัวข้อ และ Icon ให้ชัดเจน ดูสวยงามมากขึ้น")
+ *    หัวข้อการ์ดในแผ่นบันทึกงาน — ช่องไอคอนพื้นอ่อน + ชื่อหัวข้อ + ข้อมูลเสริมขวา (ชุดเดียวกันทุกการ์ด)
+ */
+const SecHead = ({ icon: Icon, title, extra, color = ACCENT }) => (
+  <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1 }}>
+    <Box sx={{ width: 30, height: 30, borderRadius: "9px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color }}>
+      <Icon sx={{ fontSize: 17 }} />
+    </Box>
+    <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.92rem", fontWeight: 800, color: INK }}>{title}</Typography>
+    {extra}
+  </Stack>
+);
+const SHEET_CARD = { mt: 1, px: 1.5, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` };
+
+/**
+ * ประวัติของบันทึกงาน — ดึง activityLog ของงานตอนเปิดแผ่น (รายการหน้านี้ไม่ได้โหลดประวัติมาเพื่อความเร็ว)
+ * ไม่มีประวัติในระบบ (งานเก่า) = สร้างจากข้อมูลที่มี: บันทึกเมื่อ/โดย · ทำเสร็จเมื่อ/โดย
+ */
+function NoteHistory({ job }) {
+  const [log, setLog] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    EventService.GetEventById(job._id).then((r) => alive && setLog(r?.event?.activityLog || [])).catch(() => alive && setLog([]));
+    return () => { alive = false; };
+  }, [job._id, job.noteDoneAt, job.updatedAt]);
+  const rows = useMemo(() => {
+    const list = (log || []).map((a) => {
+      const meta = getActivityLogMeta(a.action);
+      return { at: a.timestamp, who: a.userName, title: meta.label, detail: a.detail && a.detail !== meta.label ? a.detail : "", color: meta.color };
+    });
+    const has = (t) => list.some((r) => r.title === t);
+    if (job.intakeAt && !has("รับงานใหม่")) list.push({ at: job.intakeAt, who: job.intakeBy, title: "บันทึกงาน", detail: "", color: ACCENT });
+    if (job.noteDoneAt && !list.some((r) => /ทำเสร็จ/.test(r.title))) list.push({ at: job.noteDoneAt, who: job.noteDoneBy, title: "ยืนยันทำเสร็จ", detail: "", color: GREEN });
+    return list.filter((r) => r.at).sort((a, b) => new Date(b.at) - new Date(a.at));
+  }, [log, job.intakeAt, job.intakeBy, job.noteDoneAt, job.noteDoneBy]);
+  return (
+    <Box sx={SHEET_CARD}>
+      <SecHead icon={HistoryRounded} title="ประวัติ" color="#64748b"
+        extra={rows.length ? <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{rows.length} รายการ</Typography> : null} />
+      {log === null ? (
+        <Stack spacing={0.75}>{[0, 1].map((i) => <Skeleton key={i} variant="rounded" height={34} sx={{ borderRadius: 2 }} />)}</Stack>
+      ) : !rows.length ? (
+        <Typography sx={{ fontSize: "0.8rem", color: "#94a3b8" }}>ยังไม่มีประวัติ</Typography>
+      ) : (
+        <Box sx={{ position: "relative", pl: 2.25 }}>
+          {/* เส้นเวลา */}
+          <Box sx={{ position: "absolute", left: 6, top: 6, bottom: 6, width: 2, borderRadius: 1, bgcolor: "#e2e8f0" }} />
+          <Stack spacing={1.1}>
+            {rows.map((r, i) => (
+              <Box key={i} sx={{ position: "relative" }}>
+                <Box sx={{ position: "absolute", left: -21, top: 4, width: 12, height: 12, borderRadius: "50%", bgcolor: "#fff", border: `3px solid ${i === 0 ? r.color : alpha(r.color, 0.55)}` }} />
+                <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: i === 0 ? INK : "#334155", lineHeight: 1.35 }}>{r.title}</Typography>
+                {r.detail && <Typography sx={{ fontSize: "0.78rem", color: "#475569", lineHeight: 1.45, overflowWrap: "anywhere" }}>{r.detail}</Typography>}
+                <Typography sx={{ fontSize: "0.72rem", color: MUTED, mt: 0.15 }}>
+                  {formatThai(moment(r.at), "D MMM YY · HH:mm")}{r.who ? ` · ${r.who}` : ""}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 function NoteFiles({ job, outcome, readOnly, onChanged }) {
   const items = [
     ...(job.sitePhotoFiles || []).map((f) => ({ ...f, _type: "sitePhoto", tag: f.source === "intake" ? "ตอนบันทึก" : "แนบเพิ่ม" })),
     ...(job.quotationFiles || []).map((f) => ({ ...f, _type: "quotation", tag: "ใบเสนอราคา", tagColor: ACCENT })),
   ];
   return (
-    <Box sx={{ mt: 1, px: 1.5, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-      <AttachmentList title="ไฟล์แนบ" files={items} readOnly={readOnly}
+    <Box sx={SHEET_CARD}>
+      <SecHead icon={AttachFileRounded} title="ไฟล์แนบ" color="#d97706"
+        extra={items.length ? <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{items.length} ไฟล์</Typography> : null} />
+      <AttachmentList files={items} readOnly={readOnly}
         actions={NOTE_FILE_TYPES.map(([key, label, icon]) => ({ key, label: `แนบ${label}`, icon }))}
         upload={(file, type, onProgress) => EventService.Upload(job._id, file, type, { onUploadProgress: (e) => e.total && onProgress(e.loaded / e.total) })}
         onUploaded={async () => { await onChanged?.(); }}
@@ -1668,18 +1737,24 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             })()}
             {/* บันทึกงานในแถวตาราง: แสดงข้อความบันทึกเต็ม + ทำเสร็จเมื่อไร/โดยใคร (หัวการ์ดถูกซ่อน) */}
             {inRow && job.intakeNote && (
-              <Box sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
-                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.25 }}>บันทึกงาน</Typography>
-                <Typography sx={{ fontSize: "0.86rem", color: "#334155", lineHeight: 1.55, whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{job.description || "—"}</Typography>
-                <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.6 }}>
-                  บันทึก {formatThai(moment(job.intakeAt), "D MMM YYYY")}{job.intakeBy ? ` · ${job.intakeBy}` : ""}
-                  {job.noteDoneAt ? ` · ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY HH:mm")}${job.noteDoneBy ? ` โดย ${job.noteDoneBy}` : ""}` : ""}
-                </Typography>
+              <Box sx={{ ...SHEET_CARD, mt: 0 }}>
+                <SecHead icon={NotesRounded} title="รายละเอียดบันทึก" />
+                <Typography sx={{ fontSize: "0.94rem", color: INK, lineHeight: 1.6, whiteSpace: "pre-line", overflowWrap: "anywhere", px: 0.25 }}>{job.description || "—"}</Typography>
+                <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1.1, pt: 1, borderTop: `1px solid ${LINE}` }}>
+                  <Chip><CalendarMonthRounded sx={{ fontSize: 14, color: MUTED }} />บันทึก {formatThai(moment(job.intakeAt), "D MMM YYYY")}</Chip>
+                  {job.intakeBy && <Chip><PersonOutlineRounded sx={{ fontSize: 14, color: MUTED }} />{job.intakeBy}</Chip>}
+                  {job.noteDoneAt && (
+                    <Chip color={GREEN} bg={alpha(GREEN, 0.08)} border={alpha(GREEN, 0.3)}>
+                      <TaskAltRounded sx={{ fontSize: 14 }} />ทำเสร็จ {formatThai(moment(job.noteDoneAt), "D MMM YY HH:mm")}{job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}
+                    </Chip>
+                  )}
+                </Stack>
               </Box>
             )}
             {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดแสดงให้ครบ แนบไฟล์ไปไม่ขึ้น") ไฟล์ของบันทึกงาน — ตอนบันทึก / ตอนทำเสร็จ / ใบเสนอราคา
                 + แนบเพิ่มได้ · ใบเสนอราคา = ติดตามผลต่อที่หน้าติดตามใบเสนอราคา */}
             {inRow && job.intakeNote && <NoteFiles job={job} outcome={outcome} readOnly={readOnly} onChanged={onNoteChanged} />}
+            {inRow && inSheet && job.intakeNote && <NoteHistory job={job} />}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
             {!job.intakeNote && (
               <Box sx={{ mt: 1, px: inSheet ? 1.5 : 1.25, py: inSheet ? 1.1 : 0.9, borderRadius: inSheet ? 3 : 2, bgcolor: inSheet ? "#fff" : SURFACE, border: `1px solid ${LINE}` }}>
@@ -1784,6 +1859,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           ? { mt: 1, px: 1.5, py: 1.25, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3 }
           : { display: { xs: actions || viewOnly || !nx ? "none" : "flex", sm: "flex" }, px: { xs: 1.75, sm: 2.25 }, py: { xs: 0.85, sm: 1.1 }, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
         <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.25, md: 1 } }}>
+          {inSheet && job.intakeNote && <Box sx={{ width: "100%", mb: -0.25 }}><SecHead icon={FlagCircleRounded} title="สถานะ" color={st.color} /></Box>}
           {/* ในหน้าต่างรายละเอียด สถานะอยู่บนกล่องกำหนดการแล้ว — ไม่ซ้ำ */}
           <Box sx={{ display: inSheet && !job.intakeNote ? "none" : inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><StageChip st={st} /></Box>
           {nx && !inRow && showMore && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}

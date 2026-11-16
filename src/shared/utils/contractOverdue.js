@@ -283,6 +283,33 @@ export const contractStatusInfo = (c) => {
 // ⚠️ สัญญาที่ยังไม่กรอกวันสิ้นสุดไม่เข้าเกณฑ์นี้ — ถูกแล้ว เพราะยังไม่รู้ว่าหมดอายุหรือยัง การเดาว่า
 // "ไม่กรอก = หมดอายุ" จะทำให้สัญญาที่ยังใช้งานอยู่โผล่มาผิดกลุ่ม
 export const isExpiredContract = (c) => contractStatusInfo(c)?.state === "expired";
+
+/**
+ * ✅ สัญญาไหน "ต่อแล้ว" — มีสัญญาจริงของ บริษัท + โครงการ + ประเภทงาน + ระบบ เดียวกัน ที่เริ่มหลังสัญญานี้
+ *    คืน Map: key ของสัญญาเดิม → สัญญาฉบับถัดไป
+ * 🔁 (16 พ.ย. 2569 ผู้ใช้: "สัญญาที่กดต่อสัญญาไปแล้ว ไม่มีในแถบหมดอายุ แต่ยังแจ้งเตือนมา")
+ *    ย้ายมาเป็นของกลาง — หน้าภาพรวมงาน · หน้าภาพรวมลูกค้า · แจ้งเตือนฝั่ง server (OverdueReminder.renewedGroups)
+ *    ใช้เกณฑ์เดียวกันทั้งหมด ⚠️ แก้ที่นี่ต้องแก้ฝั่ง server ให้ตรงกันด้วย
+ */
+export const renewalMap = (contracts) => {
+  const norm = (v) => String(v || "").trim().toLowerCase();
+  const groups = new Map();
+  (contracts || []).forEach((c) => {
+    if (!c.isRealContract || !c.contractStart) return;
+    const k = [c.company, c.site, c.title, c.system].map(norm).join("|");
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  });
+  const m = new Map();
+  groups.forEach((list) => {
+    list.sort((a, b) => moment(a.contractStart).valueOf() - moment(b.contractStart).valueOf());
+    list.forEach((c, i) => {
+      const next = list.slice(i + 1).find((n) => moment(n.contractStart).isAfter(moment(c.contractStart), "day"));
+      if (next) m.set(c.key, next);
+    });
+  });
+  return m;
+};
 export const isExpiringContract = (c) => contractStatusInfo(c)?.state === "expiring";
 
 /**
