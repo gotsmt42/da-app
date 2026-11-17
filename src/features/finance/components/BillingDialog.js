@@ -110,7 +110,8 @@ const emptyPayment = () => ({
   amount: "", paidAt: moment().format("YYYY-MM-DD"), method: "", note: "",
   receiptNo: "",
   // ไฟล์สลิป/ใบเสร็จที่เลือกไว้ (ยังไม่อัปโหลด) — อัปพร้อมกับตอนกดบันทึกรับเงินในคำขอเดียว
-  slip: null,
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "เอกสารการรับเงินให้อัปได้หลายไฟล์") เก็บเป็นรายการ
+  slip: [],
 });
 
 /**
@@ -260,8 +261,17 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
    * พอบิลนั้นรับครบแล้วจะบันทึกรายการใหม่ไม่ได้อีก (ติดกฎห้ามรับเกิน) เท่ากับแนบหลักฐานย้อนหลัง
    * ไม่ได้เลย — เป็นอาการที่เห็นเป็น "แนบไฟล์แล้วไม่มีอะไรเกิดขึ้น"
    */
-  const attachSlipToPayment = (paymentId, file) =>
-    run(() => EventService.UpdatePayment(event._id, paymentId, { slip: file }));
+  const attachSlipToPayment = (paymentId, files) =>
+    run(() => EventService.UpdatePayment(event._id, paymentId, { slip: files }));
+  /** ลบหลักฐานทีละไฟล์ของรายการรับเงิน */
+  const removeSlipFromPayment = (paymentId, fileUrl) => {
+    if (!window.confirm("ลบไฟล์หลักฐานนี้?")) return; // กันแตะ ✕ พลาด
+    run(() => EventService.UpdatePayment(event._id, paymentId, { removeFileUrl: fileUrl }));
+  };
+  /** ไฟล์หลักฐานของรายการ — รายการเก่ามีแค่ slipFile* ไฟล์เดียว */
+  const slipFilesOf = (p) => ((p.slipFiles || []).length
+    ? p.slipFiles
+    : p.slipFileUrl ? [{ fileName: p.slipFileName, fileUrl: p.slipFileUrl, fileType: p.slipFileType }] : []);
 
   /**
    * ✅ แนบไฟล์ใบวางบิลได้จากในกล่องนี้เลย (เดิมแนบได้จากหน้า "การดำเนินงาน" ที่เดียว)
@@ -271,16 +281,20 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
    * ⚠️ route นี้คืนมาแค่ข้อมูลไฟล์ ไม่ได้คืน event ทั้งก้อน จึงต้องต่อ array เองแล้วส่งให้ onSaved
    * (ถูกกว่าการยิง GET ซ้ำอีกรอบ และหน้าที่เรียกก็อัปเดตตัวนับเอกสารของตัวเองได้ทันที)
    */
-  const uploadInvoiceFile = async (file) => {
+  const uploadInvoiceFile = async (fileOrList) => {
+    const list = Array.isArray(fileOrList) ? fileOrList : [fileOrList];
     setSaving(true); setError("");
     try {
-      const saved = await EventService.Upload(event._id, file, "invoice");
+      // อัปทีละไฟล์ (route อัปโหลดกลางรับครั้งละไฟล์) แล้วอัปเดตหน้าครั้งเดียว
+      const added = [];
+      for (const file of list) {
+        // eslint-disable-next-line no-await-in-loop -- เรียงลำดับตามที่เลือก
+        const saved = await EventService.Upload(event._id, file, "invoice");
+        added.push({ _id: saved.fileId, fileName: saved.fileName, fileUrl: saved.fileUrl, fileType: saved.fileType });
+      }
       onSaved?.({
         ...event,
-        invoiceFiles: [
-          ...(event.invoiceFiles || []),
-          { _id: saved.fileId, fileName: saved.fileName, fileUrl: saved.fileUrl, fileType: saved.fileType },
-        ],
+        invoiceFiles: [...(event.invoiceFiles || []), ...added],
       });
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "อัปโหลดไฟล์ไม่สำเร็จ");
@@ -851,32 +865,31 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
                     <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
                       {formatThai(moment(p.paidAt), "DD/MM/YYYY")}{p.method ? ` · ${p.method}` : ""}{p.recordedByName ? ` · บันทึกโดย ${p.recordedByName}` : ""}
                     </Typography>
-                    {/* สลิป/ใบเสร็จที่แนบไว้ — เปิดดูด้วยตัวพรีวิวตัวเดียวกับที่ใช้ดูใบวางบิล */}
-                    {p.slipFileUrl && (
-                      <Button
-                        size="small" startIcon={<AttachFile sx={{ fontSize: 14 }} />}
-                        onClick={() => {
-                          setPreviewCaption(p.receiptNo ? `สลิป/ใบเสร็จ เลขที่ ${p.receiptNo}` : "สลิป/ใบเสร็จการรับเงิน");
-                          setPreviewFiles(null);
-                          setPreviewFile({ fileName: p.slipFileName, fileUrl: p.slipFileUrl, fileType: p.slipFileType });
-                        }}
-                        sx={{
-                          mt: 0.3, px: 0.6, py: 0, minHeight: 0, borderRadius: 1,
-                          textTransform: "none", fontWeight: 700, fontSize: "0.7rem", color: "#0284c7",
-                          "&:hover": { bgcolor: alpha("#0ea5e9", 0.1) },
-                        }}
-                      >
-                        ดูสลิป / ใบเสร็จ
-                      </Button>
+                    {/* สลิป/ใบเสร็จที่แนบไว้ (หลายไฟล์) — เปิดดูด้วยตัวพรีวิวตัวเดียวกับที่ใช้ดูใบวางบิล · เลื่อนดูไฟล์อื่นได้ */}
+                    {slipFilesOf(p).length > 0 && (
+                      <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.4 }}>
+                        {slipFilesOf(p).map((sf, k, list) => (
+                          <Chip key={sf.fileUrl} size="small" icon={<AttachFile sx={{ fontSize: 13 }} />}
+                            label={sf.fileName || `ไฟล์ ${k + 1}`}
+                            onClick={() => {
+                              setPreviewCaption(p.receiptNo ? `หลักฐานการรับเงิน · ใบเสร็จ ${p.receiptNo}` : "หลักฐานการรับเงิน");
+                              setPreviewFiles(list.length > 1 ? list : null);
+                              setPreviewFile(sf);
+                            }}
+                            onDelete={saving ? undefined : () => removeSlipFromPayment(p._id, sf.fileUrl)}
+                            sx={{ maxWidth: 190, height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#0ea5e9", 0.1), color: "#0369a1",
+                              "& .MuiChip-icon": { color: "inherit", ml: 0.5 }, "& .MuiChip-deleteIcon": { fontSize: 14 } }} />
+                        ))}
+                      </Stack>
                     )}
                   </Box>
                   {/* ✅ แนบ/เปลี่ยนสลิปของรายการที่บันทึกไปแล้ว — ของจริงใบเสร็จมักออกทีหลังเงินเข้า */}
-                  <Tooltip title={p.slipFileUrl ? "เปลี่ยนสลิป / ใบเสร็จ" : "แนบสลิป / ใบเสร็จ"}>
+                  <Tooltip title={slipFilesOf(p).length ? "แนบหลักฐานเพิ่ม (เลือกได้หลายไฟล์)" : "แนบสลิป / ใบเสร็จ (เลือกได้หลายไฟล์)"}>
                     <span>
                       <IconButton
                         size="small" disabled={saving}
                         onClick={() => { setSlipTargetId(p._id); rowSlipInputRef.current?.click(); }}
-                        sx={{ color: p.slipFileUrl ? "#0284c7" : TEXT_SUB }}
+                        sx={{ color: slipFilesOf(p).length ? "#0284c7" : TEXT_SUB }}
                       >
                         <AttachFile sx={{ fontSize: 15 }} />
                       </IconButton>
@@ -962,23 +975,26 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
             {/* ✅ แนบสลิปโอน/ใบเสร็จ — อัปไปพร้อมกับตอนกดบันทึกรับเงินในคำขอเดียว ไม่ต้องบันทึกก่อน
                 แล้วค่อยกลับมาแนบทีหลัง (ซึ่งเป็นขั้นตอนที่คนลืมทำบ่อยที่สุด) */}
             <Box sx={{ mb: 1.5 }}>
-              {payForm.slip ? (
-                <Stack direction="row" alignItems="center" spacing={1}
-                  sx={{ p: 0.9, borderRadius: 2, bgcolor: alpha("#0ea5e9", 0.07), border: "1px solid", borderColor: alpha("#0ea5e9", 0.25) }}>
-                  <AttachFile sx={{ fontSize: 16, color: "#0284c7" }} />
-                  <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {payForm.slip.name}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: TEXT_SUB, flexShrink: 0 }}>
-                    {(payForm.slip.size / 1024).toFixed(0)} KB
-                  </Typography>
-                  <Tooltip title="เอาไฟล์ออก">
-                    <IconButton size="small" disabled={saving} onClick={() => setPayForm((f) => ({ ...f, slip: null }))}>
-                      <Close sx={{ fontSize: 15 }} />
-                    </IconButton>
-                  </Tooltip>
+              {(payForm.slip || []).length > 0 && (
+                <Stack spacing={0.5} sx={{ mb: 0.75 }}>
+                  {payForm.slip.map((f, k) => (
+                    <Stack key={`${f.name}-${k}`} direction="row" alignItems="center" spacing={1}
+                      sx={{ p: 0.8, borderRadius: 2, bgcolor: alpha("#0ea5e9", 0.07), border: "1px solid", borderColor: alpha("#0ea5e9", 0.25) }}>
+                      <AttachFile sx={{ fontSize: 16, color: "#0284c7" }} />
+                      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {f.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: TEXT_SUB, flexShrink: 0 }}>{(f.size / 1024).toFixed(0)} KB</Typography>
+                      <Tooltip title="เอาไฟล์ออก">
+                        <IconButton size="small" disabled={saving} onClick={() => setPayForm((pf) => ({ ...pf, slip: pf.slip.filter((_, x) => x !== k) }))}>
+                          <Close sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  ))}
                 </Stack>
-              ) : (
+              )}
+              {(payForm.slip || []).length < 10 && (
                 <Button
                   size="small" startIcon={<AttachFile sx={{ fontSize: 16 }} />}
                   disabled={saving}
@@ -989,7 +1005,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
                     px: 1.5, "&:hover": { borderColor: "#10b981", color: "#059669", bgcolor: alpha("#10b981", 0.06) },
                   }}
                 >
-                  แนบสลิป / ใบเสร็จ
+                  {(payForm.slip || []).length ? "แนบไฟล์เพิ่ม" : "แนบสลิป / ใบเสร็จ (ได้หลายไฟล์)"}
                 </Button>
               )}
             </Box>
@@ -1016,25 +1032,26 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
             เสมอไป (อาการที่เจอคือ "กดแนบไฟล์แล้วไม่มีอะไรเกิดขึ้น")
             ⚠️ ต้องล้าง e.target.value ทุกครั้ง ไม่งั้นเลือกไฟล์ "ชื่อเดิม" ซ้ำจะไม่ยิง onChange อีก
             ⚠️ รับ PDF ด้วย ไม่จำกัดแค่รูป — ใบเสร็จที่ออกจากระบบบัญชีมักเป็น PDF */}
-        <input ref={newSlipInputRef} hidden type="file" accept="image/*,application/pdf"
+        <input ref={newSlipInputRef} hidden type="file" multiple accept="image/*,application/pdf"
           onChange={(e) => {
-            const file = e.target.files?.[0];
+            const files = Array.from(e.target.files || []);
             e.target.value = "";
-            if (file) setPayForm((f) => ({ ...f, slip: file }));
+            if (files.length) setPayForm((f) => ({ ...f, slip: [...(f.slip || []), ...files].slice(0, 10) }));
           }} />
-        <input ref={invoiceInputRef} hidden type="file" accept="image/*,application/pdf"
+        {/* ✅ (17 พ.ย. 2569) ใบวางบิล/เอกสารการเงิน เลือกได้หลายไฟล์ */}
+        <input ref={invoiceInputRef} hidden type="file" multiple accept="image/*,application/pdf"
           onChange={(e) => {
-            const file = e.target.files?.[0];
+            const files = Array.from(e.target.files || []);
             e.target.value = "";
-            if (file) uploadInvoiceFile(file);
+            if (files.length) uploadInvoiceFile(files);
           }} />
-        <input ref={rowSlipInputRef} hidden type="file" accept="image/*,application/pdf"
+        <input ref={rowSlipInputRef} hidden type="file" multiple accept="image/*,application/pdf"
           onChange={(e) => {
-            const file = e.target.files?.[0];
+            const files = Array.from(e.target.files || []);
             e.target.value = "";
             const target = slipTargetId;
             setSlipTargetId(null);
-            if (file && target) attachSlipToPayment(target, file);
+            if (files.length && target) attachSlipToPayment(target, files);
           }} />
       </DialogContent>
 

@@ -15,15 +15,20 @@ import { prepareUploadFile } from "@/shared/utils/fileUpload";
  * จึงใช้ได้กับ route ที่มีและไม่มี multer เหมือนกัน) · มีไฟล์ = multipart ตามเดิม
  * ⚠️ ต้องระบุ Content-Type เองตอนส่ง FormData เพราะ axiosInstance ตั้ง application/json ไว้เป็นค่าเริ่มต้น
  */
+// ✅ (17 พ.ย. 2569) file เป็น array ได้ — แนบหลายไฟล์ในคำขอเดียว (ชื่อฟิลด์เดียวกันซ้ำ = multer upload.array)
 const withOptionalFile = async (fields, file, fileField) => {
-  if (!file) return [fields, undefined];
-  const prepared = await prepareUploadFile(file);
-  if (!prepared.ok) throw new Error(prepared.message);
+  const list = (Array.isArray(file) ? file : [file]).filter(Boolean);
+  if (!list.length) return [fields, undefined];
   const formData = new FormData();
   Object.entries(fields).forEach(([k, v]) => {
     if (v !== undefined && v !== null) formData.append(k, v);
   });
-  formData.append(fileField, prepared.file);
+  for (const f of list) {
+    // eslint-disable-next-line no-await-in-loop -- ย่อ/เตรียมทีละไฟล์
+    const prepared = await prepareUploadFile(f);
+    if (!prepared.ok) throw new Error(prepared.message);
+    formData.append(fileField, prepared.file);
+  }
   return [formData, { headers: { "Content-Type": "multipart/form-data" } }];
 };
 
