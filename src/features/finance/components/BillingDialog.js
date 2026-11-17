@@ -315,10 +315,16 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
    * ⚠️ เติมเฉพาะช่องที่ AI อ่านได้จริงเท่านั้น ช่องที่อ่านไม่ได้ต้องคงค่าเดิมไว้ ไม่ใช่ล้างเป็นศูนย์/ว่าง
    * ทับของที่คนพิมพ์ไว้แล้ว (เคสที่เจอบ่อย: อ่านยอดได้แต่เลขที่บิลเบลอ)
    */
+  /**
+   * 🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้ AI อ่านยอดได้ กรณีที่บิลมีหลายบิล แต่บันทึกเป็นยอดรวม")
+   *    ส่งไฟล์เดียว = อ่านใบนั้น · ส่ง "all" = อ่านทุกรูปที่แนบ → เลขที่รวมทุกใบ · ยอดก่อน VAT รวม · วันที่ล่าสุด
+   */
   const scanInvoice = async (file) => {
-    setScanning(file._id); setError(""); setScanResult(null);
+    const all = file === "all";
+    setScanning(all ? "all" : file._id); setError(""); setScanResult(null);
     try {
-      const { result } = await EventService.ScanInvoice(event._id, file._id);
+      const ids = all ? imageFiles.map((f) => f._id) : file._id;
+      const { result } = await EventService.ScanInvoice(event._id, ids);
       setScanResult(result);
       if (result?.found) {
         setForm((f) => ({
@@ -345,6 +351,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
 
   // ⚠️ ช่างอัปโหลดผ่านหน้าการดำเนินงานด้วย type="invoice" → เก็บลง invoiceFiles (ดู models/Events.js)
   const attachments = event.invoiceFiles || [];
+  const imageFiles = attachments.filter((f) => isImageFile(f)); // อ่านรวมยอดได้เฉพาะรูป
   // โชว์เฉพาะตอนยังไม่เคยวางบิล — ใบที่บันทึกไปแล้วยอดมาจากของจริง ไม่ใช่ค่าที่ระบบแบ่งให้
   const hint = event.billing?.invoicedAt ? "" : amountHint(event);
 
@@ -523,11 +530,19 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
                   </Stack>
                 )}
               </Box>
+              {/* ✅ มีรูปบิลหลายใบ = ปุ่มหลักอ่านทุกใบแล้วรวมยอด · ปุ่มรองอ่านเฉพาะใบที่เปิดอยู่ */}
+              {scanEnabled && imageFiles.length > 1 && !event.billing?.invoicedAt && (
+                <Button fullWidth variant="contained" disableElevation startIcon={scanning === "all" ? <CircularProgress size={15} sx={{ color: "#fff" }} /> : <AutoAwesome />}
+                  disabled={Boolean(scanning) || saving} onClick={() => scanInvoice("all")}
+                  sx={{ mt: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9" } }}>
+                  {scanning === "all" ? `AI กำลังอ่าน ${imageFiles.length} ใบ…` : `ให้ AI อ่านทุกใบ (${imageFiles.length} ใบ) แล้วรวมยอด`}
+                </Button>
+              )}
               {scanEnabled && mainIsImage && !event.billing?.invoicedAt && (
                 <Button fullWidth variant="outlined" startIcon={scanning === mainFile._id ? <CircularProgress size={15} /> : <AutoAwesome />}
                   disabled={Boolean(scanning) || saving} onClick={() => scanInvoice(mainFile)}
                   sx={{ mt: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#7c3aed", borderColor: alpha("#7c3aed", 0.4), "&:hover": { bgcolor: alpha("#7c3aed", 0.06), borderColor: "#7c3aed" } }}>
-                  {scanning === mainFile._id ? "AI กำลังอ่านใบวางบิล…" : "ให้ AI อ่านเลขที่และยอดจากใบนี้"}
+                  {scanning === mainFile._id ? "AI กำลังอ่านใบวางบิล…" : imageFiles.length > 1 ? "อ่านเฉพาะใบที่เปิดอยู่" : "ให้ AI อ่านเลขที่และยอดจากใบนี้"}
                 </Button>
               )}
             </Box>
@@ -662,6 +677,24 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle, zInde
                   ความมั่นใจ: {{ high: "สูง", medium: "ปานกลาง", low: "ต่ำ" }[scanResult.confidence] || scanResult.confidence}
                   {scanResult.note ? ` · ${scanResult.note}` : ""}
                 </Typography>
+                {/* อ่านหลายใบ: แสดงรายใบ + ยอดรวม ให้ตรวจเทียบกับรูปทีละใบ */}
+                {(scanResult.invoices || []).length > 1 && (
+                  <Box sx={{ mt: 1, borderRadius: 1.5, border: `1px solid ${alpha("#0f172a", 0.12)}`, bgcolor: alpha("#fff", 0.7), overflow: "hidden" }}>
+                    {scanResult.invoices.map((x, i) => (
+                      <Stack key={i} direction="row" alignItems="center" gap={1} sx={{ px: 1, py: 0.6, borderTop: i ? `1px solid ${alpha("#0f172a", 0.08)}` : 0 }}>
+                        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700 }} noWrap>
+                          {x.invoiceNo || "ไม่พบเลขที่"}
+                          <Box component="span" sx={{ fontWeight: 500, color: TEXT_SUB }}>{x.files?.length ? ` · รูปที่ ${x.files.join(", ")}` : ""}</Box>
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, whiteSpace: "nowrap" }}>฿{Number(x.amountBeforeVat || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</Typography>
+                      </Stack>
+                    ))}
+                    <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1, py: 0.7, borderTop: `1px solid ${alpha("#0f172a", 0.12)}`, bgcolor: alpha("#7c3aed", 0.06) }}>
+                      <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800 }}>รวม {scanResult.invoices.length} ใบ (ก่อน VAT)</Typography>
+                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 900, color: "#6d28d9", whiteSpace: "nowrap" }}>฿{Number(scanResult.amountBeforeVat || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</Typography>
+                    </Stack>
+                  </Box>
+                )}
               </>
             )}
           </Alert>
