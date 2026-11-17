@@ -68,7 +68,8 @@ export default function CustomerJobsSection({ jobs = [], showValue = false, empl
           <Stack spacing={1}>
             {years.map(([year, list], idx) => {
               const open = openYears[year] ?? idx === 0;
-              const value = list.reduce((s, j) => s + (j.value || 0), 0);
+              // มูลค่าครั้งนี้ของงาน (1 ค่าต่องาน) รวมทั้งปี · ยอดที่ช่างแต่ละคนลงไม่นำมารวม
+              const value = list.reduce((t, j) => t + (j.value || 0), 0);
               return (
                 <Box key={year} sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden" }}>
                   <ButtonBase onClick={() => setOpenYears((p) => ({ ...p, [year]: !open }))}
@@ -76,7 +77,7 @@ export default function CustomerJobsSection({ jobs = [], showValue = false, empl
                     <ChevronRightRounded sx={{ fontSize: 18, color: MUTED, transition: "transform .15s", transform: open ? "rotate(90deg)" : "none" }} />
                     <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "0.84rem", color: INK }}>ปี {year}</Typography>
                     <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
-                      {list.length} งาน · เสร็จ {list.filter((j) => j.group === "closed").length}{showValue && value ? ` · ${baht(value)}` : ""}
+                      {list.length} งาน · เสร็จ {list.filter((j) => j.group === "closed").length}{showValue && value ? ` · มูลค่าครั้งนี้ ${baht(value)}` : ""}
                     </Typography>
                   </ButtonBase>
                   <Collapse in={open} unmountOnExit>
@@ -104,10 +105,14 @@ export default function CustomerJobsSection({ jobs = [], showValue = false, empl
                               <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: g?.color || FAINT }} />
                               <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: "#334155", whiteSpace: "nowrap" }}>{g?.label || "—"}</Typography>
                             </Stack>
+                            {/* 🔁 (17 พ.ย. 2569) มูลค่าครั้งนี้ของงาน (1 ค่า) + มูลค่างานรวมเทียบ */}
                             {showValue && (
                               <Typography sx={{ fontSize: "0.72rem", color: j.value === null ? FAINT : INK, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                                 {j.value === null ? "ยังไม่ใส่มูลค่า" : baht(j.value)}
                               </Typography>
+                            )}
+                            {showValue && j.jobTotal !== null && j.jobTotal !== undefined && (
+                              <Typography noWrap sx={{ fontSize: "0.66rem", color: FAINT }}>จากมูลค่างานรวม {baht(j.jobTotal)}</Typography>
                             )}
                           </Box>
                           <ChevronRightRounded sx={{ fontSize: 18, color: "#cbd5e1" }} />

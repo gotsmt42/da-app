@@ -101,7 +101,7 @@ import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import WorkValueField from "@/shared/ui/WorkValueField";
-import { vatLabel, personValueOf, workersOfRows, jobWorkValueHit, jobWorkValueNet } from "@/shared/utils/workValue";
+import { personValueOf, workersOfRows, jobTotalNet, jobWorkValueHit, jobWorkValueNet, vatLabel } from "@/shared/utils/workValue";
 import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
@@ -1618,35 +1618,36 @@ const EventRowCard = ({
                       </InfoLine>
                     );
                   })()}
-                  {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ (ไม่บังคับ)
-                      แอดมิน/manager แก้ได้แม้งานปิดแล้ว (เติมงานเก่าย้อนหลัง) · ช่างแก้ได้จนกว่างานปิด */}
-                  {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "มูลค่างาน ต้องแสดงมูลค่างานครั้งนี้ และมูลค่างานรวม แยกให้สมบูรณ์ ให้สอดคล้อง")
-                      มูลค่าครั้งนี้ (workValue · แก้ได้ที่นี่) · มูลค่างานรวม (jobValue · ยอดทั้งงาน/สัญญา — แก้ที่ฟอร์มงาน/ภาพรวมงาน) */}
-                  {event.department !== "sales" && (
-                    <InfoLine label="มูลค่างานรวม" center>
-                      <JobValueEdit event={event} canEdit={can(currentUser, "editContracts")
-                        || (currentUser?.userId && String(event.responsiblePersonId || "") === String(currentUser.userId))
-                        || (currentUser?.fname && event.responsiblePerson === currentUser.fname)} />
-                    </InfoLine>
-                  )}
-                  {event.department !== "sales" && (
-                    <InfoLine label="มูลค่าครั้งนี้" center>
-                      <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
-                        disabled={!onStatusUpdate || (!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น")}
-                        onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
-                    </InfoLine>
-                  )}
-                  {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "คนที่ 1 ลง 5000 คนที่ 2 ลง 3000 แล้วไม่รวมมูลค่ากัน ให้แยกตามคน")
-                      มูลค่ารายคน — แต่ละคนในทีมลงของตัวเอง · ผู้อนุมัติ/ผู้รับผิดชอบลงแทนได้ · ไม่รวมเข้ามูลค่าครั้งนี้ของงาน */}
-                  {event.department !== "sales" && workersOfRows([event]).length > 0 && (() => {
+                  {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "มันจะดูงงไหม ที่มีมูลค่างานครั้งนี้ กับ ผลงานรายคน" → ทำข้อ 3: จัดเป็นกลุ่มเดียว)
+                      รวมเป็นกลุ่ม "มูลค่า" กลุ่มเดียว 3 บรรทัด บอกหน้าที่ของแต่ละช่องชัดๆ:
+                      • มูลค่างานรวม — ทั้งงาน/สัญญา · ผู้รับผิดชอบ/แอดมิน
+                      • มูลค่าครั้งนี้ — 1 ค่าต่องาน · ใช้สรุปงาน/วางบิล · ผู้รับผิดชอบ/แอดมิน
+                      • ผลงานรายคน — ช่างแต่ละคนลงเอง (แอดมินลงแทนได้) · ใช้ประเมินช่าง ไม่รวมกัน */}
+                  {event.department !== "sales" && (() => {
                     const responsible = (currentUser?.userId && String(event.responsiblePersonId || "") === String(currentUser.userId))
                       || (currentUser?.fname && event.responsiblePerson === currentUser.fname);
-                    const approver = isAdminOrManager || can(currentUser, "editFinance");
+                    const canVisit = Boolean(onStatusUpdate) && (isAdminOrManager || (responsible && event.status !== "ดำเนินการเสร็จสิ้น"));
+                    const hasWorkers = workersOfRows([event]).length > 0;
                     return (
-                      <InfoLine label="มูลค่ารายคน">
-                        <WorkerValuesPanel variant="inline" event={event} me={currentUser} canManage={approver || responsible}
-                          disabled={!approver && event.status === "ดำเนินการเสร็จสิ้น"} onPatched={onPatched} />
-                      </InfoLine>
+                      <Box sx={{ mt: 0.75, mb: 0.5, px: 1.25, py: 1, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fafbfc" }}>
+                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, mb: 0.25 }}>มูลค่า</Typography>
+                        <InfoLine label="มูลค่างานรวม" center>
+                          <JobValueEdit event={event} canEdit={can(currentUser, "editContracts") || responsible} />
+                        </InfoLine>
+                        <InfoLine label="มูลค่าครั้งนี้" center>
+                          <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
+                            disabled={!canVisit} onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
+                        </InfoLine>
+                        {hasWorkers && (
+                          <InfoLine label="ผลงานรายคน">
+                            <WorkerValuesPanel variant="inline" event={event} me={currentUser} canManage={isAdminOrManager}
+                              disabled={!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น"} onPatched={onPatched} />
+                          </InfoLine>
+                        )}
+                        <Typography sx={{ mt: 0.5, pt: 0.75, borderTop: `1px dashed ${LINE}`, fontSize: "0.7rem", color: MUTED, lineHeight: 1.5 }}>
+                          มูลค่างานรวม = ทั้งงาน/สัญญา · มูลค่าครั้งนี้ = ของงานครั้งนี้ ใช้สรุปงาน/วางบิล · ผลงานรายคน = ช่างแต่ละคนลงเอง ใช้ประเมินช่าง ไม่รวมกัน
+                        </Typography>
+                      </Box>
                     );
                   })()}
                   {canAssignTeam && (
@@ -1919,10 +1920,10 @@ const EventRowCard = ({
                     {event.closeRequestedAt && ` · ${formatThai(moment(event.closeRequestedAt), "D MMM YY HH:mm")} น.`}
                   </Typography>
                 </Box>
-                {/* ✅ (2 พ.ย. 2569) มูลค่างานครั้งนี้ที่ช่างใส่ตอนขอปิด — แอดมินเห็นก่อนอนุมัติ */}
+                {/* ✅ (2 พ.ย. 2569) มูลค่าครั้งนี้ของงาน — แอดมินเห็นก่อนอนุมัติ */}
                 {event.workValue != null && event.workValue !== "" && (
                   <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-                    <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#0e7490" }}>มูลค่างานครั้งนี้</Typography>
+                    <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#0e7490" }}>มูลค่าครั้งนี้</Typography>
                     <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#155e75", lineHeight: 1.2 }}>{baht(event.workValue)}</Typography>
                     <Typography sx={{ fontSize: "0.66rem", color: "#64748b" }}>{vatLabel(event.workValueVatIncluded)}</Typography>
                   </Box>
@@ -2188,9 +2189,9 @@ const StatusStrip = ({ items, value, onChange }) => (
 );
 
 /** วันแรกของงานที่ใส่มูลค่าไว้ (ทุกวันในกลุ่มเก็บค่าเดียวกัน) */
-const workValueHit = jobWorkValueHit;
+
 /** 🔁 (10 พ.ย. 2569) มูลค่างานครั้งนี้ "ก่อน VAT" (ใช้รวมยอด — ไม่บวกยอดรวม VAT ปนกับยอด Net) · null = ยังไม่ใส่ */
-const workValueOf = jobWorkValueNet;
+
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 
 /** กรองผู้เข้างาน: "all" | "noteam" (ยังไม่มีทีม) | ชื่อคน (หัวหน้าทีมหรือลูกทีม) */
@@ -2445,7 +2446,7 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
           <TableCell>ผู้ติดต่อ</TableCell>
           <TableCell>เอกสารอ้างอิง</TableCell>
           <TableCell>เอกสารที่แนบ</TableCell>
-          {showValue && <TableCell align="right">มูลค่างาน</TableCell>}
+          {showValue && <TableCell align="right">มูลค่าครั้งนี้</TableCell>}
           <TableCell>สถานะ</TableCell>
           <TableCell sx={{ width: 32 }} />
         </TableRow>
@@ -2515,12 +2516,14 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
               {/* เอกสารที่แนบ — ตรรกะเดียวกับการ์ดงาน (x/4 · ครบ/ต้องมี/ไม่มี) · ใบเสนอราคากดติดตามได้ทันที */}
               <TableCell sx={{ minWidth: 200 }}><JobDocsCell event={a} /></TableCell>
               {showValue && (() => {
-                const hit = workValueHit(job.sessions);
+                // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · มูลค่างานรวมแสดงเทียบ") แก้มูลค่าครั้งนี้ได้ (ทุกวันของงานนี้)
+                const hit = jobWorkValueHit(job.sessions);
+                const total = jobTotalNet(job.sessions);
                 return (
-                  // ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้แก้ไข และใส่มูลค่างานในนี้ได้ด้วย") กดดินสอ → พิมพ์ → บันทึก (ทุกวันของงานนี้)
-                  <TableCell align="right" sx={{ minWidth: 120, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                  <TableCell align="right" sx={{ minWidth: 130, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                     <WorkValueField compact value={hit ? hit.workValue : null} vatIncluded={hit?.workValueVatIncluded} event={job.sessions[0]}
                       disabled={!onSaveValue} onSave={(v, meta) => onSaveValue?.(job, v, meta)} />
+                    {total !== null && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>จากมูลค่างานรวม {baht(total)}</Typography>}
                   </TableCell>
                 );
               })()}
@@ -3261,9 +3264,10 @@ const Operation = () => {
   //    ยอดหลัก = มูลค่าครั้งนี้ของงาน (ตรงกับตัวเลขในแถวด้านล่าง) · เลือกคน = รวมทุกงานที่คนนั้นอยู่ในทีม (ทุกประเภทงาน)
   //    + บอกแยกว่าคนนั้น "บันทึกมูลค่างานที่ทำเอง" แล้วเท่าไร (ยอดรายคน — ใช้ในผลงานรายบุคคล)
   const valueSummary = useMemo(() => {
+    // 🔁 (17 พ.ย. 2569) ยอดหลัก = มูลค่าครั้งนี้ของงาน (1 ค่าต่องาน) · เลือกคน = ผลงานที่คนนั้นลงเอง (ไม่รวมของคนอื่น)
     let total = 0; let withValue = 0; let missing = 0; let own = 0; let ownCount = 0;
     allJobGroups.forEach((g) => {
-      const wv = workValueOf(g);
+      const wv = jobWorkValueNet(g);
       if (wv === null) missing += 1; else { total += wv; withValue += 1; }
       if (valueMember) {
         const pv = personValueOf(g, valueMember);
@@ -4039,19 +4043,23 @@ const Operation = () => {
             <Box sx={{ mb: 1.5, px: { xs: 1.75, sm: 2 }, py: { xs: 1.1, sm: 1.25 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: { xs: "nowrap", sm: "wrap" } }}>
               <Box sx={{ minWidth: 0, flex: { xs: 1, sm: "0 1 auto" } }}>
                 <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>
-                  {valueMember ? `มูลค่างานที่ ${valueMember} เข้าร่วม (ก่อน VAT)` : "มูลค่างานรวม (ก่อน VAT)"}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
+                  {valueMember ? `ผลงานของ ${valueMember} (ยอดที่ลงเอง · ก่อน VAT)` : "มูลค่าครั้งนี้ของงาน (ก่อน VAT)"}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
                 </Typography>
-                <Typography noWrap sx={{ fontSize: { xs: "1.25rem", sm: "1.35rem" }, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{baht(valueSummary.total)}</Typography>
+                <Typography noWrap sx={{ fontSize: { xs: "1.25rem", sm: "1.35rem" }, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{baht(valueMember ? valueSummary.own : valueSummary.total)}</Typography>
               </Box>
               <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-end", sm: "center" }, gap: { xs: 0.25, sm: 2 }, flexWrap: "wrap", flexShrink: 0, fontSize: { xs: "0.76rem", sm: "0.8rem" }, color: "#334155", textAlign: "right" }}>
-                {valueMember && (
-                  <Box component="span" title="มูลค่างานที่คนนี้บันทึกเองว่าทำได้ (ยอดรายคน) — ใช้ในหน้าผลงานรายบุคคล">
-                    บันทึกเอง <b>{baht(valueSummary.own)}</b> ({valueSummary.ownCount} งาน)
-                  </Box>
+                {valueMember ? (
+                  <>
+                    <span><b>{valueSummary.ownCount}</b> งานที่ลงแล้ว</span>
+                    {valueSummary.jobs - valueSummary.ownCount > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.jobs - valueSummary.ownCount}</b> ยังไม่ลง</span>}
+                  </>
+                ) : (
+                  <>
+                    <span><b>{valueSummary.withValue}</b> ใส่มูลค่าแล้ว</span>
+                    {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> ยังไม่ใส่</span>}
+                  </>
                 )}
-                <span><b>{valueSummary.withValue}</b> ใส่มูลค่าแล้ว</span>
-                {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> ยังไม่ใส่</span>}
-                {valueSummary.withValue > 0 && <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เฉลี่ย <b>{baht(valueSummary.total / valueSummary.withValue)}</b> / งาน</Box>}
+                {valueMember && valueSummary.ownCount > 0 && <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เฉลี่ย <b>{baht(valueSummary.own / valueSummary.ownCount)}</b> / งาน</Box>}
               </Box>
             </Box>
           )}
@@ -4074,7 +4082,7 @@ const Operation = () => {
               showValue={isAdminOrManager}
               onSaveValue={async (job, v, meta = {}) => {
                 if (!(await handleStatusUpdate(job.sessions[0]._id, { workValue: v, ...meta }))) return;
-                setSnackbar({ open: true, msg: v === null ? "ล้างมูลค่างานแล้ว" : `บันทึกมูลค่างาน ${baht(v)} แล้ว`, severity: "success" });
+                setSnackbar({ open: true, msg: v === null ? "ล้างมูลค่าครั้งนี้แล้ว" : `บันทึกมูลค่าครั้งนี้ ${baht(v)} แล้ว`, severity: "success" });
               }}
               employee={employee}
               canAssign={can(currentUser, "editContracts")}

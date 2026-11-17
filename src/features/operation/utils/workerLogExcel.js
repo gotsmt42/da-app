@@ -189,9 +189,9 @@ export async function exportWorkerLog(entries, summary, meta) {
   const gradeColor = (d) => (v) => (typeof v !== "number" ? C.muted : v * 100 >= d.good ? C.ok : v * 100 >= d.warn ? C.warn : "FFDC2626");
   const def = Object.fromEntries(KPI_DEFS.map((d) => [d.key, d]));
   const t = summary.totals;
-  const thb = (n) => Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // ✅ ทุกชีตบอกยอดรวมตามตัวกรองไว้บรรทัดรอง — เปิดชีตไหนก็เห็นทันทีว่าตัวเลขชุดนี้คือเงื่อนไขอะไร รวมเท่าไร
-  const sub = [meta.periodLabel, meta.filterLabel, `มูลค่างานรวม ${thb(t.total)} บาท · ${t.visits} ครั้ง${t.missing ? ` (ยังไม่ใส่มูลค่า ${t.missing})` : ""}`].filter(Boolean).join("  ·  ");
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ไม่มียอดเงินรวมหลายคนในหัวชีต/แถวรวม
+  const sub = [meta.periodLabel, meta.filterLabel, `${t.people} คน · เข้างาน ${t.visits} ครั้ง${t.missing ? ` (ยังไม่ลงมูลค่า ${t.missing})` : ""}`].filter(Boolean).join("  ·  ");
   const warnIf = (v) => (v ? C.warn : C.muted);
 
   // 0) รายละเอียดรายคน — ชีตแรก: แยกเป็นช่วงของแต่ละคน ไล่ดูได้ทันทีว่าเข้างานไหน ที่ไหน เมื่อไร มูลค่าเท่าไร
@@ -200,8 +200,8 @@ export async function exportWorkerLog(entries, summary, meta) {
   // 1) KPI รายคน — ✅ (17 พ.ย. 2569 ผู้ใช้: "สรุปรายงาน ยอดของแต่ละคนแยกกันให้ชัดเจน · เช็ค KPI ช่างแต่ละคน")
   const kt = kpi.team;
   const kpiRow = (p, i) => ({
-    no: i === null ? "" : i + 1, name: p.name, visits: p.visits, days: p.days, total: p.total, jobValueSum: p.jobsWithValue ? p.jobValueSum : "–",
-    share: p.share === null ? "–" : pctOf(p.share), avg: p.avgPerVisit ?? "–", perDay: p.perDay ?? "–",
+    no: i === null ? "" : i + 1, name: p.name, visits: p.visits, days: p.days, total: p.total,
+    avg: p.avgPerVisit ?? "–", perDay: p.perDay ?? "–",
     ...Object.fromEntries(RATE_KPIS.map((d) => [d.key, pctOf(p[d.key])])),
     missing: p.issues.missingValue.length || "", status: p.reliable ? "ใช้ประเมินได้" : p.past ? "ข้อมูลยังไม่ครบ" : "ยังไม่มีงานที่ผ่านไป",
   });
@@ -216,8 +216,6 @@ ${note}
       { key: "visits", header: "เข้างาน (ครั้ง)", width: 11, align: "center" },
       { key: "days", header: "วันทำงาน", width: 10, align: "center" },
       { key: "total", header: "มูลค่างานที่ทำ (บาท)", width: 18, align: "right", fmt: MONEY, bold: true },
-      { key: "share", header: "สัดส่วนในทีม", width: 11, align: "center", fmt: PCT },
-      { key: "jobValueSum", header: "มูลค่างานที่เข้าร่วม (เต็ม · อ้างอิง)", width: 18, align: "right", fmt: MONEY },
       { key: "avg", header: "เฉลี่ยต่อครั้ง (บาท)", width: 16, align: "right", fmt: MONEY },
       { key: "perDay", header: "มูลค่าต่อวันทำงาน (บาท)", width: 18, align: "right", fmt: MONEY, bold: true },
       // ✅ (17 พ.ย. 2569) ความครบของข้อมูลทุกข้อ — ชุดเดียวกับหน้าจอ (RATE_KPIS)
@@ -226,7 +224,7 @@ ${note}
       { key: "status", header: "สถานะข้อมูล", width: 18, align: "center", color: (v) => (v === "ใช้ประเมินได้" ? C.ok : C.warn) },
     ],
     rows: kpi.people.map((p, i) => kpiRow(p, i)),
-    total: { ...kpiRow({ ...kt, name: `รวม ${kpi.people.length} คน` }, null), share: "" },
+    total: { ...kpiRow({ ...kt, name: `${kpi.people.length} คน (จำนวนเท่านั้น)` }, null), total: "", avg: "", perDay: "" },
   });
 
   // 1b) รายการที่ต้องแก้ก่อนสรุป KPI — ไล่แก้ทีละรายการได้
@@ -267,11 +265,7 @@ ${note}`,
       months.forEach((m) => { row[m] = cells.get(m)?.total || ""; });
       return row;
     }),
-    total: (() => {
-      const row = { name: "รวมทุกคน", sum: t.total };
-      months.forEach((m) => { row[m] = summary.byMonth.find((x) => x.key === m)?.total || 0; });
-      return row;
-    })(),
+    // ไม่มีแถว "รวมทุกคน" — ยอดของแต่ละคนไม่นำมารวมกัน
   });
 
   // 2b) รายปี — เฉพาะเมื่อคร่อมหลายปี
@@ -283,10 +277,9 @@ ${note}`,
         { key: "period", header: "ปี (พ.ศ.)", width: 14, bold: true, align: "center" },
         { key: "visits", header: "เข้างาน (ครั้ง)", width: 14, align: "center" },
         { key: "people", header: "ผู้ปฏิบัติงาน (คน)", width: 16, align: "center" },
-        { key: "total", header: "มูลค่างานรวม (บาท)", width: 20, align: "right", fmt: MONEY, bold: true },
       ],
-      rows: summary.byYear.map((y) => ({ period: String(Number(y.key) + 543), visits: y.visits, people: y.people, total: y.total })),
-      total: { period: "รวม", visits: t.visits, people: t.people, total: t.total },
+      rows: summary.byYear.map((y) => ({ period: String(Number(y.key) + 543), visits: y.visits, people: y.people })),
+      total: { period: "รวม", visits: t.visits, people: t.people },
     });
   }
 
@@ -310,7 +303,7 @@ ${note}`,
       job: [r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : ""].filter(Boolean).join(" · "),
       role: r.lead ? "หัวหน้าทีม" : "ทีม", status: r.status, value: r.value === null ? "ยังไม่ใส่" : r.value,
     })),
-    total: { name: `รวม ${log.length} รายการ`, date: "", site: "", company: "", job: "", role: "", status: "", value: t.total },
+    total: { name: `รวม ${log.length} รายการ`, date: "", site: "", company: "", job: "", role: "", status: "", value: "" },
   });
 
   // 4) วิธีอ่าน KPI — ขั้นตอนเช็ค + ความหมาย/เกณฑ์ (ข้อความเดียวกับหน้าจอ)

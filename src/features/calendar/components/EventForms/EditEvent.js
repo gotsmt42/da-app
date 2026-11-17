@@ -13,7 +13,7 @@ import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
-import { WORK_VALUE_CSS, workValueInitial, workValueCardHtml, bindWorkValueCard } from "./workValueCard";
+import { WORK_VALUE_CSS, workValueInitial, workValueCardHtml, bindWorkValueCard, workerValuesSummaryHtml } from "./workValueCard";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import { createElement, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
@@ -1749,6 +1749,10 @@ export const getEditEvent = async ({
   const isRawResponsiblePerson =
     (eventResponsiblePersonId && eventResponsiblePersonId === userData?.userId) ||
     (eventResponsiblePerson && eventResponsiblePerson === userData?.fname);
+  // ✅ (17 พ.ย. 2569 ผู้ใช้: "มูลค่างานรวมถ้ามี เช่นงาน PM ที่ต้องเข้าหลายรอบ ให้ผู้รับผิดชอบ แอดมินระบุ" ·
+  //    "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า") มูลค่างานรวม (งานทั่วไป) + มูลค่าครั้งนี้ของงาน — ผู้รับผิดชอบหรือแอดมิน
+  //    งานสัญญา: มูลค่าทั้งสัญญาแก้ที่หน้าภาพรวมงาน/การ์ดงาน (บันทึกทั้งสัญญาทีเดียว)
+  const canEditJobValueSingle = isAdminOrManagerUser || Boolean(isRawResponsiblePerson);
   // ✅ "การดำเนินงาน" (check-in/check-out/ปิดงาน/ติดตามใบเสนอราคา ฯลฯ) เป็นสิทธิ์ของ "ผู้รับผิดชอบ"
   // โดยเฉพาะแล้ว ไม่ใช่ "ทีมที่เข้างาน" อีกต่อไป (หัวหน้าทีมเข้างานไม่มีสิทธิ์จัดการส่วนนี้) — เจ้าของ
   // (คนสร้างงาน)/ผู้รับผิดชอบ (แบบ fallback ด้านบน)/admin/manager กดดูได้
@@ -2308,10 +2312,12 @@ export const getEditEvent = async ({
     <section class="ee-card ee-key-card">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">💰</span>
-        <div class="ee-card-titles"><h4>มูลค่างานครั้งนี้</h4><p>${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "ยอดของการเข้างานครั้งนี้เท่านั้น · เลือกก่อน/รวม VAT · เว้นว่างได้"}</p></div>
+        <div class="ee-card-titles"><h4>มูลค่าครั้งนี้</h4><p>1 ค่าต่องาน · แอดมิน/ผู้รับผิดชอบระบุ · ${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "เลือกก่อน/รวม VAT · เว้นว่างได้"}</p></div>
       </div>
       <div class="ee-card-body">
-        ${workValueCardHtml(wvInit, { disabled: isViewOnly })}
+        ${workValueCardHtml(wvInit, { disabled: isViewOnly || !canEditJobValueSingle })}
+        <div style="margin-top:12px;font-weight:800;font-size:.86rem;color:#0f172a">ผลงานรายคน <span style="font-weight:500;color:#64748b;font-size:.76rem">· ช่างแต่ละคนลงเอง ไม่รวมกัน</span></div>
+        ${workerValuesSummaryHtml(ev.extendedProps || {})}
       </div>
     </section>`}
 
@@ -2643,9 +2649,9 @@ export const getEditEvent = async ({
         <div class="ee-money-input">
           <span class="ee-money-symbol">฿</span>
           <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
-                 placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${isAdminOrManagerUser ? "" : "disabled"}>
+                 placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${canEditJobValueSingle ? "" : "disabled"}>
         </div>
-        <span class="ee-hint">ราคาทั้งงานที่ตกลงกับลูกค้า (ไม่ใช่ราคาต่อครั้ง) · เว้นว่างได้</span>
+        <span class="ee-hint">ราคาทั้งงานที่ตกลงกับลูกค้า (ไม่ใช่ราคาต่อครั้ง) · ผู้รับผิดชอบ/แอดมินระบุ · เว้นว่างได้</span>
       </div>
       ` : ""}
     </div>
@@ -3059,7 +3065,8 @@ export const getEditEvent = async ({
           }
           if (btn && !btn.dataset.busy) btn.textContent = keys.length ? `💾 บันทึก (${keys.length})` : "💾 บันทึก";
         };
-        wvCtl = bindWorkValueCard(popupEl, {
+        // 🔁 (17 พ.ย. 2569) การ์ดมูลค่าครั้งนี้เป็นแบบอ่านอย่างเดียว (รายคน) — ผูกเฉพาะเมื่อยังมีช่องกรอกแบบเดิม
+        if (popupEl.querySelector("#editWorkValue")) wvCtl = bindWorkValueCard(popupEl, {
           init: wvInit, eventId, EventService,
           // งานสัญญาที่มีมูลค่าสัญญาแล้ว แบ่งตามรอบได้เลย ไม่ต้องใช้ AI
           allowAi: !eventContractGroupId,
@@ -4083,7 +4090,7 @@ export const getEditEvent = async ({
         // ถ้าส่งจากสองทางพร้อมกันจะเขียนทับกันเอง จึงต้องส่งทางใดทางหนึ่งเท่านั้น
         // ⚠️ ส่งเฉพาะตอนแอดมิน/manager (ช่องนี้ disabled สำหรับช่าง getVal จะได้ค่าว่างเสมอ ถ้าส่งไป
         // ด้วยจะกลายเป็นล้างมูลค่าเดิมทิ้งทุกครั้งที่ช่างกดบันทึกงาน)
-        ...(!eventContractGroupId && isAdminOrManagerUser
+        ...(!eventContractGroupId && canEditJobValueSingle
           ? { jobValue: getVal("editJobValueSingle") ? Number(getVal("editJobValueSingle")) : null }
           : {}),
         team: getVal("editTeam"),

@@ -123,6 +123,8 @@ const emptyPayment = () => ({
 const defaultAmount = (event) => {
   // ✅ (4 พ.ย. 2569 ผู้ใช้: "ทำให้สวยงาม และสมบูรณ์ ใช้ง่าย") มูลค่างานครั้งนี้ (ใส่ไว้ตอนลงงาน/ขอปิดงาน) = ยอดของครั้งนี้ตรงที่สุด → ใช้ก่อน
   // 🔁 (10 พ.ย. 2569) ช่องนี้คือ "ยอดก่อน VAT" — มูลค่าที่ใส่แบบรวม VAT ต้องถอด VAT ออกก่อน
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · ยอดที่ช่างลงเป็นผลงานรายคน") ใช้มูลค่าครั้งนี้ของงาน
+  //    (ไม่ใช้ยอดรายคน) ไม่มี = มูลค่างานรวม ÷ จำนวนครั้ง → ยอดใบเสนอราคา
   if (event.workValue !== null && event.workValue !== undefined && event.workValue !== "" && Number(event.workValue) > 0) return workValueNet(event);
   const split = perRoundAmount(event.jobValue, event.visitCount, event.time);
   if (split !== null) return split;
@@ -133,8 +135,8 @@ const defaultAmount = (event) => {
 const amountHint = (event) => {
   if (event.workValue !== null && event.workValue !== undefined && event.workValue !== "" && Number(event.workValue) > 0) {
     return event.workValueVatIncluded
-      ? `จากมูลค่างานครั้งนี้ ${baht(event.workValue)} (รวม VAT) → ก่อน VAT ${baht(workValueNet(event))}`
-      : `จากมูลค่างานครั้งนี้ ${baht(event.workValue)} (ก่อน VAT)`;
+      ? `จากมูลค่าครั้งนี้ของงาน ${baht(event.workValue)} (รวม VAT) → ก่อน VAT ${baht(workValueNet(event))}`
+      : `จากมูลค่าครั้งนี้ของงาน ${baht(event.workValue)} (ก่อน VAT)`;
   }
   const rounds = Number(event.visitCount);
   const total = Number(event.jobValue);

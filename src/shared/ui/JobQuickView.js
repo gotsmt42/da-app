@@ -24,6 +24,7 @@ import { INK, MUTED, LINE } from "@/shared/ui/PageKit";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { thaiDate } from "@/shared/utils/thaiDate";
+import { workersOfRows, personValueOf, jobTotalNet } from "@/shared/utils/workValue";
 import moment from "moment";
 
 const STATUS_COLOR = { "กำลังรอยืนยัน": "#d97706", ยืนยันแล้ว: "#2563eb", กำลังดำเนินการ: "#7c3aed", ดำเนินการเสร็จสิ้น: "#059669" };
@@ -128,10 +129,36 @@ export default function JobQuickView({ eventId, onClose, employees = [], showVal
 
           {/* มูลค่างาน */}
           {showValue && (
-            <Section title="มูลค่างานครั้งนี้">
-              {hasValue
-                ? <Typography sx={{ fontSize: "1.4rem", fontWeight: 900, color: INK, fontVariantNumeric: "tabular-nums" }}>{baht(ev.workValue)}</Typography>
-                : <Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: "#d97706" }}>ยังไม่ใส่มูลค่างาน</Typography>}
+            // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · มูลค่างานรวมแสดงเทียบ · ยอดที่ช่างลงเป็นผลงานรายคน ไม่รวมกัน")
+            <Section title="มูลค่าครั้งนี้">
+              {(() => {
+                const workers = workersOfRows([ev]);
+                const rows = workers.map((n) => ({ n, v: personValueOf([ev], n) }));
+                const total = jobTotalNet([ev]);
+                return (
+                  <Box>
+                    {/* มูลค่าครั้งนี้ของงาน (1 ค่า) + มูลค่างานรวมเทียบ */}
+                    {hasValue
+                      ? <Typography sx={{ fontSize: "1.4rem", fontWeight: 900, color: INK, fontVariantNumeric: "tabular-nums" }}>{baht(ev.workValue)}</Typography>
+                      : <Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: "#d97706" }}>ยังไม่ใส่มูลค่าครั้งนี้</Typography>}
+                    {total !== null && (
+                      <Typography sx={{ fontSize: "0.78rem", color: MUTED }}>มูลค่างานรวม{ev.contractGroupId ? " (ทั้งสัญญา)" : ""} {baht(total)}</Typography>
+                    )}
+                    {/* ผลงานรายคน — ช่างลงเอง ไม่รวมกัน */}
+                    {workers.length > 0 && (
+                      <Box sx={{ mt: 1.25, pt: 1, borderTop: `1px dashed ${LINE}` }}>
+                        <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: MUTED, mb: 0.25 }}>ผลงานรายคน (ช่างลงเอง · ไม่รวมกัน)</Typography>
+                        {rows.map(({ n, v }) => (
+                          <Stack key={n} direction="row" alignItems="center" sx={{ py: 0.4 }}>
+                            <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 700, color: INK }}>{n}</Typography>
+                            <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: v ? INK : "#94a3b8", fontVariantNumeric: "tabular-nums" }}>{v ? baht(v.net) : "ยังไม่ลง"}</Typography>
+                          </Stack>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })()}
             </Section>
           )}
 

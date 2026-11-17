@@ -153,13 +153,13 @@ function PeopleCard({ people, team, avatarOf, personal, loading, period }) {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" alignItems="baseline" gap={1}>
                     <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 800, color: INK }}>{p.name}</Typography>
-                    <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: INK, ...NUM }}>{baht(p.total)}</Typography>
+                    {p.valued
+                      ? <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: INK, ...NUM }}>{baht(p.total)}</Typography>
+                      : <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: FAINT }}>ยังไม่ลง</Typography>}
                   </Stack>
-                  <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.4 }}>
-                    <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: "#eef2f7", overflow: "hidden" }}>
-                      <Box sx={{ width: `${Math.round((p.share || 0) * 100)}%`, height: "100%", bgcolor: alpha(ACCENT, 0.55), transition: "width .4s ease" }} />
-                    </Box>
-                    <Typography sx={{ fontSize: "0.7rem", color: MUTED, width: 70, textAlign: "right" }}>{p.visits} ครั้ง</Typography>
+                  {/* 🔁 (17 พ.ย. 2569) ไม่มีแถบสัดส่วนของทีม — ยอดของแต่ละคนเป็นผลงานของคนนั้น ไม่นำมารวมกัน */}
+                  <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.3 }}>
+                    <Typography sx={{ flex: 1, fontSize: "0.7rem", color: MUTED }}>{p.visits} ครั้ง · {p.days} วัน · ลงแล้ว {p.valued}/{p.visits}</Typography>
                     {p.past > 0 && (p.issueCount
                       ? <Typography component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, color: WARN, whiteSpace: "nowrap" }}>ต้องแก้ {p.issueCount}</Typography>
                       : <Typography component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, color: OK, whiteSpace: "nowrap" }}>✓ ครบ</Typography>)}
@@ -169,12 +169,9 @@ function PeopleCard({ people, team, avatarOf, personal, loading, period }) {
               </ButtonBase>
             ))}
           </Box>
-          <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.1, bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}` }}>
-            <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK }}>
-              รวม {people.length} คน{people.length > top.length ? ` (แสดง ${top.length})` : ""}
-            </Typography>
-            <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: INK, ...NUM }}>{baht(team.total)}</Typography>
-          </Stack>
+          <Typography sx={{ px: 2, py: 1, fontSize: "0.74rem", color: MUTED, bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}` }}>
+            {people.length} คน{people.length > top.length ? ` (แสดง ${top.length} อันดับแรก)` : ""} · ยอดของแต่ละคน = มูลค่าครั้งนี้ที่คนนั้นลงเอง ไม่รวมกัน
+          </Typography>
           {team.issueCount > 0 && (
             <Typography sx={{ px: 2, py: 0.75, fontSize: "0.72rem", color: WARN, borderTop: `1px solid ${LINE}` }}>
               ข้อมูลยังไม่ครบ {team.issueCount} รายการ — ยอดบางคนอาจต่ำกว่าจริง
@@ -213,7 +210,7 @@ function TrendCard({ trend, showValue, loading }) {
       <Stack direction="row" gap={2} sx={{ px: 2, pb: 1.5 }}>
         <Stack direction="row" alignItems="center" gap={0.75}><Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(ACCENT, 0.16) }} /><Typography sx={{ fontSize: "0.72rem", color: MUTED }}>งานทั้งหมด</Typography></Stack>
         <Stack direction="row" alignItems="center" gap={0.75}><Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(ACCENT, 0.75) }} /><Typography sx={{ fontSize: "0.72rem", color: MUTED }}>เสร็จสิ้นแล้ว</Typography></Stack>
-        {showValue && <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>ตัวเลขใต้เดือน = มูลค่างานของงาน (ก่อน VAT)</Typography>}
+        {showValue && <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>ตัวเลขใต้เดือน = มูลค่าครั้งนี้ของงาน (ก่อน VAT)</Typography>}
       </Stack>
     </Box>
   );
@@ -273,8 +270,8 @@ export default function DesktopOverview({ events, users = [], loading, teamView,
         <KpiTile loading={loading} to="/jobs/report" label="เสร็จสิ้นแล้ว" value={`${t.closeRate}%`}
           sub={`${t.closed} จาก ${t.total} งาน`} subColor={t.total && t.closeRate >= 80 ? OK : undefined} />
         {showValue ? (
-          <KpiTile loading={loading} to="/jobs/report" label="มูลค่างานของงาน" value={baht(t.value)}
-            sub={`ก่อน VAT · ${t.missing ? `ยังไม่ใส่ ${t.missing} งาน` : "ใส่ครบทุกงาน"}`} subColor={t.missing ? WARN : undefined} />
+          <KpiTile loading={loading} to="/jobs/report" label="มูลค่าครั้งนี้ของงาน" value={baht(t.value)}
+            sub={`ก่อน VAT${t.jobTotal ? ` · มูลค่างานรวม ${baht(t.jobTotal)}` : ""}${t.missing ? ` · ยังไม่ใส่ ${t.missing} งาน` : ""}`} subColor={t.missing ? WARN : undefined} />
         ) : (
           <KpiTile loading={loading} to="/jobs/workers" label="มูลค่างานที่ฉันทำ" value={baht(myTotal)}
             sub={data.team.issueCount ? `ข้อมูลยังไม่ครบ ${data.team.issueCount} รายการ` : "ข้อมูลครบ"} subColor={data.team.issueCount ? WARN : OK} />

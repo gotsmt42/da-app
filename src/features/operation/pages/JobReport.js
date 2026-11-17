@@ -75,10 +75,16 @@ function JobRow({ j, avatarOf, onClick, showValue }) {
         <Box component="span" sx={{ display: "inline-block", fontSize: "0.76rem", fontWeight: 800, color: g.color, bgcolor: alpha(g.color, 0.1), borderRadius: "6px", px: 1, py: 0.3 }}>
           {g.label}{j.overdueDays ? ` ${j.overdueDays} วัน` : ""}
         </Box>
+        {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · งานไหนมีมูลค่ารวมก็ให้แสดงเทียบ") */}
         {showValue && (
-          <Typography sx={{ mt: 0.5, fontSize: "0.9rem", fontWeight: 800, color: j.value === null ? "#cbd5e1" : INK, fontVariantNumeric: "tabular-nums" }}>
-            {j.value === null ? "—" : baht(j.value)}
-          </Typography>
+          <Box sx={{ mt: 0.5 }}>
+            <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: j.value === null ? "#cbd5e1" : INK, fontVariantNumeric: "tabular-nums" }}>
+              {j.value === null ? "ยังไม่ใส่" : baht(j.value)}
+            </Typography>
+            {j.jobTotal !== null && (
+              <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>จากมูลค่างานรวม {baht(j.jobTotal)}</Typography>
+            )}
+          </Box>
         )}
       </Box>
     </ButtonBase>
@@ -181,7 +187,7 @@ export default function JobReport() {
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader icon={<AssessmentRounded />} title="สรุปผลการดำเนินงาน"
-        subtitle="จำนวนงาน สถานะ งานค้าง และมูลค่างานของงาน — ใช้กติกาเดียวกับหน้าการดำเนินงาน"
+        subtitle="จำนวนงาน สถานะ งานค้าง · มูลค่าครั้งนี้ของแต่ละงาน เทียบมูลค่างานรวม — ใช้กติกาเดียวกับหน้าการดำเนินงาน"
         actions={exportBtn} />
       {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "2 แท็บนี้ข้อมูลเหมือนกันไหม") หน้านี้นับอะไร + เทียบกับผลงานรายบุคคล */}
       <ReportScopeBar scope="jobs" />
@@ -214,12 +220,12 @@ export default function JobReport() {
       <TotalHero
         label="งานทั้งหมดตามตัวกรอง"
         value={`${t.total} งาน`}
-        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่างานของงาน ${baht(t.value)}` : ""}`}
+        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่าครั้งนี้ ${baht(t.value)}${t.jobTotal ? ` · มูลค่างานรวม ${baht(t.jobTotal)}` : ""}` : ""}`}
         stats={summary.statusRows.map((g) => (
           <Stat key={g.key} label={g.label} value={`${g.count} งาน`} tone={g.count ? g.color : undefined}
             active={listGroup === g.key} onClick={() => setListGroup(listGroup === g.key ? "all" : g.key)} />
         ))}
-        note={<>1 งานอยู่สถานะเดียว ผลรวมทุกสถานะ = {t.total} งาน · ค้างงาน = เลยวันเข้างานเกิน 1 สัปดาห์{t.severe ? <> (เกิน 2 สัปดาห์ <b style={{ color: "#dc2626" }}>{t.severe}</b> งาน)</> : ""} · กดสถานะเพื่อดูรายการ{showValue && t.missing ? ` · ยังไม่ใส่มูลค่า ${t.missing} งาน` : ""}</>}
+        note={<>1 งานอยู่สถานะเดียว ผลรวมทุกสถานะ = {t.total} งาน · ค้างงาน = เลยวันเข้างานเกิน 1 สัปดาห์{t.severe ? <> (เกิน 2 สัปดาห์ <b style={{ color: "#dc2626" }}>{t.severe}</b> งาน)</> : ""} · กดสถานะเพื่อดูรายการ{showValue && t.missing ? ` · ยังไม่ใส่มูลค่าครั้งนี้ ${t.missing} งาน` : ""}</>}
       />
 
       {jobs.length === 0 ? (

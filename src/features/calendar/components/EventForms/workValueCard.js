@@ -10,7 +10,7 @@
  *    🔁 (10 พ.ย. 2569) งานสัญญา: ไม่มีตัวเลือก VAT · ไม่มีปุ่ม AI — ใช้การระบุ VAT ของมูลค่าสัญญา (หน้าภาพรวมงาน)
  *    สูตร/ค่าแนะนำอยู่ที่ shared/utils/workValue.js ที่เดียว (ใช้ร่วมกับหน้างานช่าง · หน้าการดำเนินงาน · วางบิล)
  */
-import { suggestWorkValue, vatParts, hasWorkValue, contractVatInfo } from "@/shared/utils/workValue";
+import { suggestWorkValue, vatParts, hasWorkValue, contractVatInfo, workersOfRows, personValueOf } from "@/shared/utils/workValue";
 import { baht } from "@/shared/utils/billing";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -76,6 +76,30 @@ export function workValueInitial(p = {}) {
     vat: contract ? contract.vatIncluded : saved ? savedVat : suggest && suggest.vatIncluded !== null ? suggest.vatIncluded : savedVat,
     source: saved ? (p.workValueSource || "") : suggest ? suggest.source : "",
   };
+}
+
+/**
+ * 🔁 (17 พ.ย. 2569 ผู้ใช้: "มูลค่าครั้งนี้คือให้ช่างทุกคนลง · มูลค่ารวมของงานแยกต่างหากโดยผู้รับผิดชอบงานจัดการ")
+ *    ฟอร์มแก้ไขงานไม่ให้แก้ "มูลค่าครั้งนี้" ตรงแล้ว (ช่องเดียว = ช่างแต่ละคนลงที่การ์ดงาน) — แสดงรายคน (อ่านอย่างเดียว · ไม่รวมกัน)
+ *    มูลค่างานรวม (ทั้งงาน/สัญญา) ยังแก้ได้ที่ช่อง "มูลค่างาน" ของฟอร์มตามเดิม
+ * @param p extendedProps ของงาน (team · teamMembers · workerValues · workValue)
+ */
+export function workerValuesSummaryHtml(p = {}) {
+  const rows = [p];
+  const workers = workersOfRows(rows);
+  if (!workers.length) {
+    return `<div class="ee-wv-break" style="display:block">${hasWorkValue(p.workValue) ? `ยอดเดิม ${esc(baht(p.workValue))} · ` : ""}ยังไม่มีทีมเข้างาน — เลือกหัวหน้าทีม/ลูกทีมก่อน แล้วให้ช่างลงมูลค่าครั้งนี้ของตัวเอง</div>`;
+  }
+  const lines = workers.map((n, i) => {
+    const v = personValueOf(rows, n);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-top:${i ? "1px solid #e2e8f0" : "0"}">
+      <span style="flex:1;min-width:0;font-weight:700;color:#1e293b">${esc(n)}${i === 0 ? ' <span style="font-size:.72rem;font-weight:600;color:#64748b">หัวหน้าทีม</span>' : ""}${v?.legacy ? ' <span style="font-size:.7rem;color:#94a3b8">ยอดเดิม</span>' : ""}</span>
+      <span style="font-weight:800;${v ? "color:#0f172a" : "color:#d97706"}">${v ? `${esc(baht(v.amount))} <span style="font-size:.72rem;font-weight:500;color:#64748b">${v.vatIncluded ? "รวม VAT" : "ก่อน VAT"}</span>` : "ยังไม่ลง"}</span>
+    </div>`;
+  }).join("");
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ไม่มีบรรทัดรวมทั้งทีม
+  return `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:4px 12px;background:#fff">${lines}</div>
+    <div class="ee-wv-break" style="display:block;margin-top:6px">ยอดของแต่ละคน = ผลงานของคนนั้น (ไม่รวมกัน · ไม่ใช่มูลค่าครั้งนี้ของงาน) · ช่างลงของตัวเองที่การ์ดงาน · แอดมินลงแทนได้</div>`;
 }
 
 export function workValueCardHtml(init, { disabled = false } = {}) {

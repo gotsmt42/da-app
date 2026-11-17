@@ -121,7 +121,8 @@ export async function exportContractsToExcel({
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
     { key: "jobValue", header: "มูลค่างานรวม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     // ✅ (4 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานด้วยให้แก้ไขให้สอดคล้อง และข้อมูลครบถ้วน สมบูรณ์") ผลรวม "มูลค่างานครั้งนี้" ที่ใส่ไว้ (นับครั้งละ 1 ค่า)
-    { key: "workValueSum", header: "มูลค่างานที่ใส่รายครั้ง ก่อน VAT (฿)", width: 17, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    // 🔁 (17 พ.ย. 2569) มูลค่าครั้งนี้ของงาน (1 ค่าต่อครั้ง · แอดมิน/ผู้รับผิดชอบลง) รวมทุกครั้งของสัญญา — ไม่ใช่ยอดที่ช่างลงรายคน
+    { key: "workValueSum", header: "มูลค่าครั้งนี้รวมทุกครั้ง ก่อน VAT (฿)", width: 17, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     // ✅ ค่าคอมที่จ่ายให้ฝั่งลูกค้า + สัดส่วนเทียบมูลค่างาน — ใส่ % เป็นคอลัมน์แยกให้เรียง/กรองได้
     // (บนจอโชว์เป็นบรรทัดเล็กใต้ตัวเลข ซึ่งดีเวลาไล่ดูทีละแถว แต่ในไฟล์ต้องเป็นคอลัมน์ถึงจะใช้งานต่อได้)
     { key: "commission", header: "ค่าคอม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
@@ -338,7 +339,7 @@ export async function exportContractsToExcel({
           const k = String(v.jobGroupId || `t${Number(v.time) || 1}`);
           if (!byRound.has(k)) byRound.set(k, workValueNet(v) || 0);
         });
-        return byRound.size ? [...byRound.values()].reduce((a, b) => a + b, 0) : "";
+        return byRound.size ? [...byRound.values()].reduce((x, y) => x + y, 0) : "";
       })(),
       remark: c.remark || "",
       contactName: c.contactName || "",

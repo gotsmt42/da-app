@@ -4,7 +4,8 @@
  * ✅ (17 พ.ย. 2569 ผู้ใช้: "ผู้ปฏิบัติงาน 1 ใส่มูลค่าเข้างานโครงการนั้นครั้งนั้น 5000 คนที่ 2 ลง 3000
  *    แล้วไม่รวมมูลค่ากัน ให้แยกตามคน และเช็คการเชื่อมโยงข้อมูลกันให้สมบูรณ์ไม่ผิดพลาด")
  *    เดิมทุกคนบันทึกลงช่องเดียว (workValue) → คนหลังทับคนแรก · รายงานรายช่างให้ทุกคนได้ยอดเดียวกัน
- *    ตอนนี้แต่ละคนมีรายการของตัวเอง (PUT /events/:id/worker-value) · ไม่รวมเป็นมูลค่างานของงาน (ผู้ใช้เลือก)
+ *    ตอนนี้แต่ละคนมีรายการของตัวเอง (PUT /events/:id/worker-value)
+ *    🔁 (17 พ.ย. 2569 ผู้ใช้: "มูลค่าครั้งนี้คือให้ช่างทุกคนลง · มูลค่ารวมของงานแยกต่างหากโดยผู้รับผิดชอบงานจัดการ") ช่องเดียวรายคน · 🔁 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน ให้แยกเป็นผลงานของแต่ละคน" — ไม่มีผลรวมทั้งทีม · ยอดของงาน = jobValue (มูลค่างานรวม)
  *
  * variant
  *   "mine"   — ช่าง: ช่องเดียว "มูลค่างานของฉันครั้งนี้"
@@ -58,10 +59,10 @@ export default function WorkerValuesPanel({ event, sessions, me, canManage = fal
     const v = personValueOf(rows, myName);
     return (
       <Box>
-        <WorkValueField label="มูลค่างานของฉันครั้งนี้" value={v ? v.amount : null} vatIncluded={v?.vatIncluded} event={event}
+        <WorkValueField label="ผลงานของฉันครั้งนี้ (มูลค่างานที่ทำ)" value={v ? v.amount : null} vatIncluded={v?.vatIncluded} event={event}
           noSuggest disabled={disabled} emptyText="ยังไม่ใส่ (ไม่บังคับ)" onSave={(amount, meta) => save(myName, amount, meta)} />
         <Typography sx={{ mt: 0.5, px: 0.5, fontSize: "0.72rem", color: "#94a3b8", lineHeight: 1.45 }}>
-          ลงเฉพาะยอดของคุณ · คนอื่นในทีมลงของตัวเอง ไม่ทับกันและไม่รวมกัน
+          ลงเฉพาะมูลค่างานที่คุณทำ = ผลงานของคุณ · คนอื่นในทีมลงของตัวเอง ไม่รวมกัน · คนละช่องกับมูลค่าครั้งนี้ของงาน
         </Typography>
       </Box>
     );
@@ -93,20 +94,21 @@ export default function WorkerValuesPanel({ event, sessions, me, canManage = fal
     </Stack>
   );
 
-  if (variant === "inline") return list;
+  // 🔁 (17 พ.ย. 2569) ไม่มีบรรทัดรวมทั้งทีม — ยอดของแต่ละคนเป็นผลงานของคนนั้น ไม่นำมารวมกัน
+  if (variant === "inline") return <Box sx={{ width: "100%" }}>{list}</Box>;
 
   return (
     <Box sx={{ borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", overflow: "hidden" }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 0.9, bgcolor: "#f8fafc", borderBottom: `1px solid ${LINE}` }}>
         <GroupsRounded sx={{ fontSize: 18, color: "#2563eb" }} />
-        <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: "#1e293b" }}>มูลค่างานรายคน</Typography>
+        <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: "#1e293b" }}>ผลงานรายคน (ช่างลงเอง)</Typography>
         <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: filled < workers.length ? "#b45309" : "#15803d" }}>
           ลงแล้ว {filled}/{workers.length} คน
         </Typography>
       </Stack>
       {list}
       <Typography sx={{ px: 1.25, py: 0.75, borderTop: `1px solid ${LINE}`, fontSize: "0.72rem", color: "#94a3b8", lineHeight: 1.45 }}>
-        แต่ละคนลงยอดของตัวเอง · ไม่นำไปรวมเป็นมูลค่างานของงาน · ใช้ในรายงานรายช่าง
+        ช่างแต่ละคนลงมูลค่างานที่ตัวเองทำ = ผลงานของคนนั้น (ไม่รวมกัน) · มูลค่าครั้งนี้ของงาน และมูลค่างานรวม ผู้รับผิดชอบ/แอดมินระบุแยก
       </Typography>
     </Box>
   );

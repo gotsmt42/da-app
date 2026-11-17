@@ -30,8 +30,8 @@ import { INK, INK_2, MUTED, LINE, SURFACE, ACCENT, SUCCESS } from "@/shared/ui/P
 import InfoLine from "@/shared/ui/InfoLine";
 import JobInfoPanel from "@/shared/ui/JobInfoPanel";
 import TelLink from "@/shared/components/TelLink";
-import WorkValueField from "@/shared/ui/WorkValueField";
 import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
+import WorkValueField from "@/shared/ui/WorkValueField";
 import { myWorkerName, personValueOf } from "@/shared/utils/workValue";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES, can } from "@/shared/utils/roles";
@@ -340,9 +340,13 @@ const TechnicianJobCard = ({
    */
   const me = { userId: userData?.userId || payload?.userId || "", fname: userData?.fname || payload?.fname || "" };
   const myWorker = myWorkerName([event], me);
-  const valueManager = can(userData || payload, "approveJobs") || can(userData || payload, "editFinance")
-    || (me.userId && String(event.responsiblePersonId || "") === String(me.userId))
-    || (me.fname && event.responsiblePerson === me.fname);
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "มูลค่างานครั้งนี้ให้ช่างทุกคนระบุลงงานของตัวเองที่มีรายชื่อปฏิบัติงาน หรือแอดมินระบุ")
+  //    ลงแทนคนอื่นได้เฉพาะแอดมิน (approveJobs) — ผู้รับผิดชอบที่ไม่ได้อยู่ในทีมไม่ลงแทน (จัดการ "มูลค่างานรวม" แทน)
+  const valueManager = can(userData || payload, "approveJobs");
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า") มูลค่าครั้งนี้ของงาน — แอดมินหรือผู้รับผิดชอบงานลง
+  const isResponsibleUser = Boolean((me.userId && String(event.responsiblePersonId || "") === String(me.userId))
+    || (me.fname && event.responsiblePerson === me.fname));
+  const canEditVisitValue = valueManager || isResponsibleUser;
 
   // ── push activityLog ─────────────────────────────────────────────
   const pushLog = useCallback(async (action, detail = "") => {
@@ -394,11 +398,11 @@ const TechnicianJobCard = ({
      *    ยังไม่เคยใส่ = ถามครั้งเดียวตอนขอปิด (ข้ามได้) · ใส่ไว้แล้ว = ไม่ถามซ้ำ (แก้ได้ที่ช่อง "มูลค่างานครั้งนี้")
      */
     let workValue = null;
-    // 🔁 (17 พ.ย. 2569) คนในทีม = ถามยอดของตัวเอง (แยกรายคน) · คนอื่น (เช่น ผู้รับผิดชอบที่ไม่ได้เข้างาน) = มูลค่างานของงานแบบเดิม
+    // 🔁 (17 พ.ย. 2569) คนในทีม = ถามผลงานของตัวเอง · ผู้รับผิดชอบ/แอดมินที่ไม่ได้อยู่ในทีม = ถามมูลค่าครั้งนี้ของงาน (1 ค่า)
     const askMine = Boolean(myWorker);
     const needAsk = askMine
       ? !personValueOf([event], myWorker)
-      : (event.workValue === null || event.workValue === undefined || event.workValue === "");
+      : canEditVisitValue && (event.workValue === null || event.workValue === undefined || event.workValue === "");
     if (needAsk) {
       const wvAsk = await Swal.fire({
         title: askMine ? "มูลค่างานของคุณครั้งนี้" : "มูลค่างานครั้งนี้",
@@ -510,10 +514,10 @@ const TechnicianJobCard = ({
     setRequestingClose(false);
   };
 
-  // ── Save Work Value (ทั้งกลุ่มวันของงานเดียวกัน) ─────────────────────
+  // ── Save มูลค่าครั้งนี้ของงาน (1 ค่า · ทุกวันของงานเดียวกัน) — แอดมิน/ผู้รับผิดชอบ ─────────
   const handleSaveWorkValue = async (v, meta = {}) => {
     await (onStatusUpdate || onInputUpdate)(event._id, { workValue: v, ...meta });
-    await pushLog("value_saved", v === null ? "ล้างมูลค่างาน" : `มูลค่างานครั้งนี้ ${Number(v).toLocaleString("th-TH")} บาท (${meta.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})`);
+    await pushLog("value_saved", v === null ? "ล้างมูลค่าครั้งนี้" : `มูลค่าครั้งนี้ของงาน ${Number(v).toLocaleString("th-TH")} บาท (${meta.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})`);
   };
 
   // ── Save Work Note ───────────────────────────────────────────────
@@ -555,10 +559,12 @@ const TechnicianJobCard = ({
       {myWorker && (
         <WorkerValuesPanel variant="mine" event={event} me={me} disabled={isLocked} onPatched={onPatched} />
       )}
-      {(!myWorker || valueManager) && event.department !== "sales" && (
-        <WorkValueField label={valueManager ? "มูลค่างานของงาน (สรุปงาน/วางบิล)" : "มูลค่างานครั้งนี้"}
-          value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} disabled={isLocked} onSave={handleSaveWorkValue} />
+      {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า") มูลค่าครั้งนี้ของงาน — แอดมิน/ผู้รับผิดชอบ (ช่างดูอย่างเดียว) */}
+      {event.department !== "sales" && (canEditVisitValue || event.workValue != null) && (
+        <WorkValueField label="มูลค่าครั้งนี้ของงาน" value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
+          disabled={!canEditVisitValue || (isLocked && !valueManager)} onSave={handleSaveWorkValue} />
       )}
+      {/* ผลงานรายคน — แอดมินดู/ลงแทนได้ทุกคน (ไม่รวมกัน) */}
       {valueManager && event.department !== "sales" && (
         <WorkerValuesPanel variant="list" event={event} me={me} canManage disabled={isLocked && !can(userData || payload, "approveJobs")} onPatched={onPatched} />
       )}

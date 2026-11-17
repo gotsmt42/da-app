@@ -89,6 +89,7 @@ import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 import { resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
+import { personValuesOf } from "@/shared/utils/workValue";
 
 // ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
 //    แดงเหลือไว้เฉพาะเรื่องที่อันตราย/เร่งด่วนจริง (ลบ · เลยกำหนด · หมดอายุ) — DANGER
@@ -124,7 +125,9 @@ const TEXT_SUB = "#64748b";         // slate-500 — ตัวหนังสื
  */
 const VisitExtra = ({ visit, showValue, size = "0.62rem" }) => {
   const others = [...new Set((visit.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== visit.team))];
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า") แสดงมูลค่าครั้งนี้ของงาน · ผลงานรายคน (ช่างลงเอง) อยู่ในคำอธิบายเมื่อชี้
   const hasValue = showValue && visit.workValue !== null && visit.workValue !== undefined && visit.workValue !== "";
+  const people = showValue ? personValuesOf([visit]).filter((pp) => pp.value) : [];
   if (!others.length && !hasValue) return null;
   return (
     <>
@@ -135,7 +138,8 @@ const VisitExtra = ({ visit, showValue, size = "0.62rem" }) => {
         </Typography>
       )}
       {hasValue && (
-        <Typography variant="caption" title={`มูลค่างานครั้งนี้ (${visit.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})`}
+        <Typography variant="caption"
+          title={`มูลค่าครั้งนี้ของงาน (${visit.workValueVatIncluded ? "รวม VAT" : "ก่อน VAT"})${people.length ? ` · ผลงานรายคน: ${people.map((pp) => `${pp.name} ฿${pp.value.net.toLocaleString("th-TH")}`).join(" · ")}` : ""}`}
           sx={{ display: "block", fontSize: size, lineHeight: 1.3, fontWeight: 800, color: "#059669", whiteSpace: "nowrap" }}>
           ฿{Number(visit.workValue).toLocaleString("th-TH", { maximumFractionDigits: 2 })}{visit.workValueVatIncluded ? " (รวม VAT)" : ""}
         </Typography>

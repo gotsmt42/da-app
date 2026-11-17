@@ -69,7 +69,8 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   //    อย่างน้อย 4 ช่อง · งานไหนมีคนมากกว่านั้นเพิ่มช่องให้พอทุกคน
   const workersOf = (a) => [...new Set([a.team, ...((a.teamMembers || []).map((m) => m?.name))].filter(Boolean))];
   // มูลค่างานครั้งนี้ของงาน — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่
-  // 🔁 (10 พ.ย. 2569) ยอดก่อน VAT เสมอ · ที่เดียวกับทุกหน้า (shared/utils/workValue.js)
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · ยอดที่ช่างลงเป็นผลงานรายคน ไม่รวมกัน")
+  //    คอลัมน์มูลค่า = มูลค่าครั้งนี้ของงาน (ก่อน VAT) · ผลงานรายคนอยู่ต่อท้ายชื่อผู้ปฏิบัติงานแต่ละช่อง
   const workValueOf = jobWorkValueNet;
   const workerSlots = Math.max(4, ...jobs.map((job) => workersOf(job.sessions[0] || {}).length));
   const workerCols = Array.from({ length: workerSlots }, (_, i) => (
@@ -102,7 +103,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     { key: "checkOut", header: "เวลาเสร็จงานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "workNote", header: "รายละเอียดงานที่ทำ", width: 36, group: "การปฏิบัติงาน", wrap: true },
     { key: "closeState", header: "สถานะการปิดงาน", width: 18, group: "การปฏิบัติงาน", align: "center" },
-    ...(showValue ? [{ key: "workValue", header: "มูลค่างานครั้งนี้ ก่อน VAT (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
+    ...(showValue ? [{ key: "workValue", header: "มูลค่าครั้งนี้ของงาน ก่อน VAT (บาท)", width: 18, group: "การปฏิบัติงาน", align: "right" }] : []),
     { key: "docReport", header: "Service Report", width: 14, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docQuotation", header: "ใบเสนอราคา", width: 13, group: "เอกสารแนบ (ไฟล์)", align: "center" },
     { key: "docInvoice", header: "เอกสารการเงิน (ไฟล์)", width: 16, group: "เอกสารแนบ (ไฟล์)", align: "center" },
@@ -309,11 +310,8 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
 function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
   const ws = wb.addWorksheet("มูลค่างานรายช่าง", { pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
   const per = new Map();
-  let grand = 0; let valued = 0; let missing = 0;
   jobs.forEach(({ sessions }) => {
     const a = sessions[0] || {};
-    const wv = workValueOf(sessions);
-    if (wv === null) missing += 1; else { grand += wv; valued += 1; }
     workersOf(a).forEach((name, i) => {
       const r = per.get(name) || { name, jobs: 0, lead: 0, valued: 0, missing: 0, total: 0 };
       r.jobs += 1;
@@ -343,7 +341,7 @@ function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
   ws.getCell(2, 1).value = `${meta.groupLabel}  ·  ${meta.filterSummary}  ·  ส่งออก ${meta.exportedAt}`;
   ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
   ws.mergeCells(3, 1, 3, cols.length);
-  ws.getCell(3, 1).value = `มูลค่างานรวมทั้งหมด (นับงานละครั้ง) ${grand.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท จาก ${valued} งาน${missing ? ` · ยังไม่ใส่มูลค่า ${missing} งาน` : ""}  ·  หมายเหตุ: มูลค่ารายช่าง = มูลค่างานที่แต่ละคนทำ (ก่อน VAT) แยกกัน ไม่รวมกับมูลค่างานของงาน`;
+  ws.getCell(3, 1).value = "มูลค่ารายช่าง = มูลค่าครั้งนี้ที่ช่างแต่ละคนลงเอง (ก่อน VAT) — เป็นผลงานของแต่ละคน ไม่นำมารวมกัน";
   ws.getCell(3, 1).font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.titleText } };
   const HEAD = 5;
   const hr = ws.getRow(HEAD);

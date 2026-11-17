@@ -31,7 +31,6 @@ const OK = "#15803d";
 const WARN = "#b45309";
 const FAINT = "#94a3b8";
 const SHOW_FIRST_ROWS = 15;
-const sharePct = (v) => (v === null || v === undefined ? "–" : `${Math.round(v * 100)}%`);
 const NUM = { fontVariantNumeric: "tabular-nums" };
 // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ขยายให้เต็ม · ทำให้สมูทดูดีกว่านี้") เปลี่ยนคน/มุมมอง = ค่อยๆ ปรากฏ · แถว hover นุ่ม
 const FADE_IN = { "@keyframes kpiIn": { from: { opacity: 0, transform: "translateY(6px)" }, to: { opacity: 1, transform: "none" } }, animation: "kpiIn .28s ease-out" };
@@ -65,9 +64,10 @@ const ShareBar = ({ share }) => (
 //    • ยังไม่ลงมูลค่าเลย = "ยังไม่ลง" (ไม่ใช่ ฿0 ที่ดูเหมือนทำงานได้ศูนย์บาท) · เพิ่มคอลัมน์ "ลงมูลค่าแล้ว x/y"
 //    • ความครบของข้อมูล บอกว่าขาดอะไรกี่รายการ (ไม่ลงมูลค่า / ไม่กดเข้างาน / ไม่ขอปิด) · คำอธิบายทุกคอลัมน์ใต้ตาราง
 //    ≥1180 = ครบทุกคอลัมน์ · 760–1179 = ตัดสัดส่วน/ลงมูลค่าแล้ว · <760 = รายการย่อ
-const COLS = "40px minmax(160px, 1fr) 124px 132px 116px 70px 78px 108px 100px 186px 20px";
+// 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ตัดสัดส่วนในทีม/ยอดรวมทุกคนออก — แสดงรายคนอย่างเดียว
+const COLS = "40px minmax(170px, 1fr) 132px 78px 86px 120px 112px 196px 20px";
 const COLS_MID = "34px minmax(150px, 1fr) 118px 66px 74px 108px 180px 18px";
-const W_FULL = 1300;
+const W_FULL = 1060;
 const W_MID = 760;
 
 /** ขาดอะไรบ้าง — ข้อความสั้นใต้ป้ายสถานะ */
@@ -99,16 +99,6 @@ const ValueText = ({ p, size = "1rem" }) => (p.valued
   ? <Typography sx={{ fontSize: size, fontWeight: 900, color: INK, ...NUM }}>{baht(p.total)}</Typography>
   : <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: FAINT }}>ยังไม่ลง</Typography>);
 
-/** มูลค่างานที่เข้าร่วม — มูลค่าครั้งนี้ของงาน (เต็มจำนวน) รวมทุกงานที่อยู่ในทีม · อ้างอิง ไม่ใช่ยอดรายคน */
-const JobValueText = ({ p, strong }) => (p.jobsWithValue
-  ? (
-    <Box sx={{ textAlign: "right" }}>
-      <Typography sx={{ fontSize: "0.86rem", fontWeight: strong ? 900 : 700, color: "#334155", ...NUM }}>{baht(p.jobValueSum)}</Typography>
-      <Typography sx={{ fontSize: "0.66rem", color: FAINT }}>{p.jobsWithValue} งานที่มีมูลค่า</Typography>
-    </Box>
-  )
-  : <Typography sx={{ fontSize: "0.78rem", color: FAINT }}>—</Typography>);
-
 /** สถานะข้อมูล + ขาดอะไร */
 const DataCell = ({ p, align = "center" }) => (
   <Box sx={{ textAlign: align, minWidth: 0 }}>
@@ -117,7 +107,7 @@ const DataCell = ({ p, align = "center" }) => (
   </Box>
 );
 
-const TABLE_LEGEND = "มูลค่างานที่ทำ = ยอดที่คนนั้นบันทึกเอง (ใช้ประเมินรายคน) · งานที่เข้าร่วม = มูลค่าครั้งนี้ของงานที่อยู่ในทีม รวมเต็มจำนวน (อ้างอิง — คนในทีมเดียวกันนับงานเดียวกันซ้ำได้) · เข้างาน = จำนวนงานที่อยู่ในทีม (งานหลายวันนับ 1) · วันทำงาน = รวมวันที่อยู่ในทีม · ต่อวัน = มูลค่าที่ลง ÷ วันของงานที่ลงแล้ว · ความครบของข้อมูล = งานที่ผ่านไปแล้วแต่ยังขาด: ลงมูลค่า · กดเข้างาน · ขอปิดงาน · Service Report · เอกสารงาน PM · สรุปงานที่ทำ";
+const TABLE_LEGEND = "มูลค่างานที่ทำ = ผลรวม \"มูลค่าครั้งนี้\" ที่คนนั้นลงเองทุกงาน · เข้างาน = จำนวนงานที่อยู่ในทีม (งานหลายวันนับ 1) · วันทำงาน = รวมวันที่อยู่ในทีม · ต่อวัน = มูลค่าที่ลง ÷ วันของงานที่ลงแล้ว · ความครบของข้อมูล = งานที่ผ่านไปแล้วแต่ยังขาด: ลงมูลค่า · กดเข้างาน · ขอปิดงาน · Service Report · เอกสารงาน PM · สรุปงานที่ทำ";
 
 function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
   const [boxRef, width] = useElementWidth();
@@ -126,7 +116,6 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
   const mobile = w < W_MID;
   const mid = !mobile && w < W_FULL;
   const cols = mid ? COLS_MID : COLS;
-  const anyValue = team.valued > 0;
 
   if (mobile) {
     return (
@@ -141,10 +130,8 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
                   <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.95rem", fontWeight: 800, color: INK }}>{p.name}</Typography>
                   <ValueText p={p} />
                 </Stack>
-                {anyValue && <Box sx={{ my: 0.6 }}><ShareBar share={p.share} /></Box>}
-                <Typography sx={{ fontSize: "0.74rem", color: "#475569", mt: anyValue ? 0 : 0.4 }}>
-                  เข้างาน {p.visits} ครั้ง · {p.days} วัน · บันทึกมูลค่าแล้ว {p.valued}/{p.visits}{anyValue && p.share !== null ? ` · ${sharePct(p.share)} ของทีม` : ""}
-                  {p.jobsWithValue > 0 && <><br />งานที่เข้าร่วมมีมูลค่า {baht(p.jobValueSum)} ({p.jobsWithValue} งาน)</>}
+                <Typography sx={{ fontSize: "0.74rem", color: "#475569", mt: 0.4 }}>
+                  เข้างาน {p.visits} ครั้ง · {p.days} วัน · บันทึกมูลค่าแล้ว {p.valued}/{p.visits}{p.perDay !== null ? ` · ต่อวัน ${formatKpi("perDay", p.perDay)}` : ""}
                 </Typography>
                 <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.5, flexWrap: "wrap" }}>
                   <DataStatus p={p} />
@@ -154,8 +141,7 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
             </ButtonBase>
           ))}
           <Stack direction="row" alignItems="center" sx={{ px: 1.5, py: 1.25, bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}` }}>
-            <Typography sx={{ flex: 1, fontSize: "0.9rem", fontWeight: 900, color: INK }}>รวม {total} คน · {team.visits} ครั้ง</Typography>
-            <ValueText p={team} size="1.05rem" />
+            <Typography sx={{ flex: 1, fontSize: "0.86rem", fontWeight: 800, color: INK }}>{total} คน · เข้างานรวม {team.visits} ครั้ง</Typography>
           </Stack>
         </Box>
         <Typography sx={{ mt: 0.75, px: 0.5, fontSize: "0.7rem", color: FAINT, lineHeight: 1.5 }}>{TABLE_LEGEND}</Typography>
@@ -174,8 +160,6 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
           <Head align="center">#</Head>
           <Head sub="กดแถวเพื่อดูรายละเอียด">ผู้ปฏิบัติงาน</Head>
           <SortHead label="มูลค่างานที่ทำ" sub="ก่อน VAT" k="total" sortBy={sortBy} onSort={onSort} />
-          {!mid && <Head sub="% ของยอดรวมทีม">สัดส่วนในทีม</Head>}
-          {!mid && <Head align="right" sub="มูลค่าครั้งนี้ของงาน (เต็ม)">งานที่เข้าร่วม</Head>}
           <Head align="center" sub="งาน">เข้างาน</Head>
           <Head align="center" sub="วัน">วันทำงาน</Head>
           <SortHead label="ต่อวัน" sub="มูลค่า ÷ วัน" k="perDay" sortBy={sortBy} onSort={onSort} />
@@ -198,17 +182,6 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
               </Box>
             </Box>
             <Box sx={right}><ValueText p={p} /></Box>
-            {!mid && (
-              <Box sx={{ ...cell, gap: 1 }}>
-                {anyValue ? (
-                  <>
-                    <Box sx={{ flex: 1 }}><ShareBar share={p.share} /></Box>
-                    <Typography sx={{ width: 36, textAlign: "right", fontSize: "0.8rem", fontWeight: 700, color: MUTED, ...NUM }}>{sharePct(p.share)}</Typography>
-                  </>
-                ) : <Typography sx={{ fontSize: "0.76rem", color: FAINT }}>ยังไม่มียอด</Typography>}
-              </Box>
-            )}
-            {!mid && <Box sx={right}><JobValueText p={p} /></Box>}
             <Box sx={center}>{num(p.visits)}</Box>
             <Box sx={center}>{num(p.days)}</Box>
             <Box sx={right}><Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: p.perDay === null ? FAINT : INK, ...NUM }}>{p.perDay === null ? "—" : formatKpi("perDay", p.perDay)}</Typography></Box>
@@ -219,13 +192,12 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
         ))}
         <Box sx={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}` }}>
           <Box />
-          <Box sx={cell}><Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: INK }}>รวม {total} คน{rows.length < total ? ` (แสดง ${rows.length})` : ""}</Typography></Box>
-          <Box sx={right}><ValueText p={team} size="1.05rem" /></Box>
-          {!mid && <Box sx={cell}><Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: anyValue ? MUTED : FAINT }}>{anyValue ? "100%" : "—"}</Typography></Box>}
-          {!mid && <Box sx={right}><JobValueText p={team} strong /></Box>}
+          {/* แถวสรุป — เฉพาะจำนวน (ไม่มียอดเงินรวมทุกคน ตามกติกา "ไม่นำมารวมกัน") */}
+          <Box sx={cell}><Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>{total} คน{rows.length < total ? ` (แสดง ${rows.length})` : ""}</Typography></Box>
+          <Box sx={right}><Typography sx={{ fontSize: "0.72rem", color: FAINT }}>รายคน ไม่รวมกัน</Typography></Box>
           <Box sx={center}>{num(team.visits, true)}</Box>
           <Box sx={center}>{num(team.days, true)}</Box>
-          <Box sx={right}><Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: team.perDay === null ? FAINT : INK, ...NUM }}>{team.perDay === null ? "—" : formatKpi("perDay", team.perDay)}</Typography></Box>
+          <Box />
           {!mid && <Box sx={center}>{num(`${team.valued} / ${team.visits}`, true)}</Box>}
           <Box sx={center}><DataCell p={team} /></Box>
           <Box />
@@ -328,7 +300,6 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
   const [showAll, setShowAll] = useState(false);
   const list = filter === "issues" ? issueRows : sorted;
   const shown = showAll ? list : list.slice(0, 8);
-  const vs = p.vsTeamPerDay;
   // 🔁 (17 พ.ย. 2569 ผู้ใช้: "จัดให้ดูง่าย ลงตัว สวยงามกว่านี้") จัดตามความกว้างจริงของกล่อง
   //    กว้าง = คอลัมน์ซ้ายแคบ (ความครบของข้อมูล) · ขวากว้าง (งานที่เข้า) · แถบสถิติ 4 ช่องเส้นคั่น
   const [boxRef, boxW] = useElementWidth();
@@ -350,13 +321,8 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
           <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>มูลค่างานที่ทำ (ก่อน VAT)</Typography>
           <Typography sx={{ fontSize: { xs: "1.4rem", sm: "1.7rem" }, fontWeight: 900, color: INK, lineHeight: 1.15, ...NUM }}>{baht(p.total)}</Typography>
           <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>
-            บันทึกมูลค่าแล้ว {p.valued}/{p.visits} ครั้ง{teamSize > 1 && p.share !== null ? ` · ${sharePct(p.share)} ของทีม` : ""}
+            บันทึกมูลค่าแล้ว {p.valued}/{p.visits} ครั้ง
           </Typography>
-          {p.jobsWithValue > 0 && (
-            <Typography title="มูลค่าครั้งนี้ของงานที่คนนี้อยู่ในทีม รวมเต็มจำนวน — อ้างอิง ไม่ใช่ยอดรายคน" sx={{ fontSize: "0.72rem", color: MUTED }}>
-              งานที่เข้าร่วมมีมูลค่า <b style={{ color: INK }}>{baht(p.jobValueSum)}</b> ({p.jobsWithValue} งาน)
-            </Typography>
-          )}
         </Box>
       </Stack>
 
@@ -368,7 +334,7 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
         <BigStat label="เฉลี่ยต่อครั้ง" value={formatKpi("avgPerVisit", p.avgPerVisit)} empty={p.avgPerVisit === null ? "ยังไม่มียอด" : null}
           sub={p.valued ? `คิดจาก ${p.valued} ครั้งที่ลงแล้ว` : "ลงมูลค่าแล้วจึงคำนวณได้"} />
         <BigStat label="มูลค่าต่อวันทำงาน" value={formatKpi("perDay", p.perDay)} empty={p.perDay === null ? "ยังไม่มียอด" : null}
-          sub={teamSize > 1 && vs !== null ? `${vs >= 0 ? "สูงกว่า" : "ต่ำกว่า"}ค่าเฉลี่ยทีม ${Math.abs(Math.round(vs * 100))}%` : p.valuedDays ? `คิดจาก ${p.valuedDays} วันที่ลงแล้ว` : undefined} />
+          sub={p.valuedDays ? `คิดจาก ${p.valuedDays} วันที่ลงแล้ว` : undefined} />
       </Box>
 
       <Box sx={{ display: "grid", gap: wide ? 3 : 2, px: { xs: 1.5, sm: 2 }, py: 2, gridTemplateColumns: wide ? "minmax(300px, 380px) minmax(0, 1fr)" : "1fr" }}>

@@ -116,6 +116,8 @@ export default function WorkerReport() {
 
   const periodRows = periodBy === "year" ? summary.byYear.slice().reverse() : summary.byMonth.slice().reverse();
   const periodMax = Math.max(1, ...periodRows.map((p) => p.total));
+  const visitMax = Math.max(1, ...periodRows.map((p) => p.visits));
+  const single = effPerson !== "all" || t.people <= 1; // คนเดียว = แสดงยอดเงินของคนนั้นได้
 
   const doExport = async () => {
     setExporting(true);
@@ -177,21 +179,21 @@ export default function WorkerReport() {
 
       {/* ── ลำดับความสำคัญของหน้า ──
           🔁 (17 พ.ย. 2569 ผู้ใช้: "จัดวางให้มองง่าย อันไหนควรเด่น อันไหนควรมาก่อน ให้มืออาชีพ")
-          1) ยอดรวมทุกคน (ตัวเลขเดียวที่ใหญ่สุด — แสดงเมื่อดูหลายคน · ดูคนเดียว = แผงของคนนั้นเป็นตัวหลักแทน ไม่ซ้ำ)
+          1) ภาพรวมการเข้างาน (จำนวน — แสดงเมื่อดูหลายคน · ดูคนเดียว = แผงของคนนั้นเป็นตัวหลักแทน ไม่ซ้ำ)
+          🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ไม่มียอดเงินรวมทุกคน — ยอดเงินดูรายคนเท่านั้น
           2) ยอดแยกรายคน (ตาราง/แผงรายละเอียด)  3) แนวโน้มรายเดือน  4) วิธีเช็ค KPI (อ้างอิง ท้ายหน้า) */}
       {entries.length > 0 && t.people > 1 && (
         <TotalHero
-          label="มูลค่างานที่ทุกคนทำ (ก่อน VAT)"
-          value={baht(t.total)}
+          label="ภาพรวมการเข้างาน"
+          value={`${t.people} คน`}
           sub={periodLabel}
           stats={[
-            <Stat key="p" label="ผู้ปฏิบัติงาน" value={`${t.people} คน`} />,
             <Stat key="j" label="จำนวนงาน" value={`${t.jobs} งาน`} />,
             <Stat key="v" label="เข้างาน (คน × งาน)" value={`${t.visits} ครั้ง`} />,
             <Stat key="d" label="วันทำงานรวม" value={`${t.days} วัน`} />,
-            <Stat key="a" label="เฉลี่ยต่อครั้ง" value={t.valued ? baht(t.avg) : "–"} />,
+            <Stat key="m" label="บันทึกมูลค่าแล้ว" value={`${t.valued} / ${t.visits}`} tone={t.missing ? "#b45309" : undefined} />,
           ]}
-          note={<>ผลรวมมูลค่างานที่แต่ละคนทำ · คนละค่ากับมูลค่างานของงาน ({baht(t.jobValueTotal)}) ที่หน้าสรุปผลการดำเนินงาน</>}
+          note={<>"มูลค่าครั้งนี้" ที่ช่างแต่ละคนลง = ผลงานของคนนั้น ไม่นำมารวมกัน — ดูยอดของแต่ละคนในตารางด้านล่าง</>}
         />
       )}
 
@@ -211,15 +213,17 @@ export default function WorkerReport() {
 
           {/* ── รายเดือน / รายปี ── */}
           <ReportSection title={periodBy === "year" ? "แนวโน้มรายปี" : "แนวโน้มรายเดือน"}
-            hint={`${effPerson !== "all" ? `${effPerson} · ` : ""}มูลค่างานที่ทำ และจำนวนครั้งที่เข้างาน`}
+            hint={effPerson !== "all" ? `${effPerson} · มูลค่างานที่ทำ และจำนวนครั้งที่เข้างาน` : "จำนวนครั้งที่เข้างาน และจำนวนคน (ยอดเงินดูรายคน)"}
             right={<Segmented value={periodBy} onChange={setPeriodBy} options={[["month", "รายเดือน"], ["year", "รายปี"]]} />}>
             <Box sx={R_CARD}>
+              {/* ดูคนเดียว = มูลค่าของคนนั้นรายเดือน · ดูทุกคน = จำนวนครั้ง (ไม่รวมยอดเงินของหลายคน) */}
               {periodRows.map((p) => (
                 <BarRow key={p.key} label={periodBy === "year" ? `ปี ${Number(p.key) + 543}` : monthLabel(p.key)}
-                  pct={(p.total / periodMax) * 100} value={baht(p.total)}
-                  sub={`${p.visits} ครั้ง · ${p.people} คน${p.missing ? ` · ยังไม่ใส่ ${p.missing}` : ""}`} />
+                  pct={(single ? p.total / periodMax : p.visits / visitMax) * 100}
+                  value={single ? baht(p.total) : `${p.visits} ครั้ง`}
+                  sub={single ? `${p.visits} ครั้ง${p.missing ? ` · ยังไม่ลง ${p.missing}` : ""}` : `${p.people} คน${p.missing ? ` · ยังไม่ลงมูลค่า ${p.missing}` : ""}`} />
               ))}
-              <TotalRow label="รวม" value={baht(t.total)} valueSub={`${t.visits} ครั้ง`} />
+              <TotalRow label="รวม" value={single ? baht(t.total) : `${t.visits} ครั้ง`} valueSub={single ? `${t.visits} ครั้ง` : `${t.people} คน`} />
             </Box>
           </ReportSection>
 

@@ -112,11 +112,14 @@ export function suggestWorkValue(ev) {
  * ✅ (17 พ.ย. 2569 ผู้ใช้: "ผู้ปฏิบัติงาน 1 ใส่มูลค่าเข้างานโครงการนั้นครั้งนั้น 5000 คนที่ 2 ลง 3000
  *    แล้วไม่รวมมูลค่ากัน ให้แยกตามคน และเช็คการเชื่อมโยงข้อมูลให้สมบูรณ์")
  *    มูลค่างานรายคน (workerValues) — แต่ละคนลงยอดของตัวเอง ไม่ทับกัน ไม่บวกรวมกัน
- *    • ผู้ใช้เลือก: ยอดรายคนใช้ในรายงานรายช่างเท่านั้น · มูลค่างานของงาน (workValue) แยกเป็นอีกค่า
+ *    • 🔁 (17 พ.ย. 2569 ผู้ใช้: "มูลค่าครั้งนี้คือให้ช่างทุกคนลง · มูลค่ารวมของงานแยกต่างหากโดยผู้รับผิดชอบงานจัดการ") ช่องเดียวรายคน · 🔁 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน ให้แยกเป็นผลงานของแต่ละคน" — ไม่มีผลรวมทั้งทีม · ยอดของงาน = jobValue (มูลค่างานรวม)
  *    • งานเข้าหลายวันเก็บชุดเดียวกันทุกวัน — rows = ทุกวันของงาน (หรือวันเดียวก็ได้)
  *    • ข้อมูลเดิม (ก่อนมีรายคน): งานที่ยังไม่มีรายการรายคนเลย + ยอดเดิมลงโดยคนในทีม = นับให้คนที่ลง
  *      (เดิมทุกคนได้ยอดเต็ม — ยอดรายคนจึงพองเกินจริง)
  * ───────────────────────────────────────────────────────────────────────────── */
+
+/** วันแยกช่อง "มูลค่าครั้งนี้ของงาน" กับ "ผลงานรายคน" — ยอดของงานที่ลงก่อนวันนี้โดยช่างในทีม = ผลงานเดิมของช่างคนนั้น */
+export const LEGACY_CUTOFF = "2026-11-18";
 
 /** ชื่อเต็ม "ชื่อ นามสกุล" ตรงกับชื่อในทีม (ชื่อคำแรก) ไหม */
 export const sameWorkerName = (full, name) => Boolean(full && name)
@@ -151,8 +154,15 @@ export function personValueOf(rows, name) {
     return { amount: Number(w.amount), vatIncluded: vat, net: vatParts(w.amount, vat).net, at: w.at, by: w.by, legacy: false };
   }
   if (map.size) return null;
-  const hit = (rows || []).find((r) => hasWorkValue(r?.workValue));
-  if (!hit || !sameWorkerName(hit.workValueBy, name)) return null;
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · ยอดที่ช่างลงเป็นผลงานรายคน")
+  //    มูลค่าครั้งนี้ของงาน (workValue) ไม่ใช่ผลงานรายคน — ยกเว้นข้อมูลเดิมก่อนแยกช่อง (ก่อน LEGACY_CUTOFF)
+  //    ที่ "ช่างในทีมลงเอง" (สมัยที่ช่างลงมูลค่าครั้งนี้ตอนขอปิดงาน) = นับเป็นผลงานของช่างคนนั้น
+  //    แอดมิน/ผู้รับผิดชอบลง หรือหลังวันแยกช่อง = ไม่นับให้ใคร · กติกาเดียวกับ server (PUT /events/:id/worker-value)
+  const hit = (rows || []).find((r) => hasWorkValue(r?.workValue) && r.workValueSource !== "workers"
+    && (!r.workValueAt || String(r.workValueAt) < LEGACY_CUTOFF));
+  if (!hit) return null;
+  const owner = workersOfRows(rows).find((n) => sameWorkerName(hit.workValueBy, n));
+  if (!owner || owner !== name) return null;
   const vat = Boolean(hit.workValueVatIncluded);
   return { amount: Number(hit.workValue), vatIncluded: vat, net: vatParts(hit.workValue, vat).net, at: hit.workValueAt, by: hit.workValueBy, legacy: true };
 }
@@ -165,3 +175,22 @@ export function myWorkerName(rows, me) {
   if (byId?.name) return byId.name;
   return workersOfRows(rows).find((n) => n === me.fname) || "";
 }
+
+/**
+ * ✅ (17 พ.ย. 2569 ผู้ใช้: "ยอดมูลค่าที่ลงจะไม่นำมารวมยอดกัน ให้แยกเป็นผลงานของแต่ละคน" ·
+ *    หน้าสรุปงาน "แยกรายคน + มูลค่างานรวม")
+ *    มูลค่าครั้งนี้ของงาน = รายการรายคน (ไม่มีผลรวม) · มูลค่าของงาน = มูลค่างานรวม (jobValue) ที่ผู้รับผิดชอบ/แอดมินระบุ
+ */
+/** รายคนของงาน: [{ name, lead, value }] — value = personValueOf (null = ยังไม่ลง) */
+export const personValuesOf = (rows) => workersOfRows(rows).map((name, i) => ({ name, lead: i === 0, value: personValueOf(rows, name) }));
+
+/** มูลค่างานรวม (ก่อน VAT) — งานสัญญาใช้ธง VAT ของสัญญา · null = ยังไม่ระบุ */
+export function jobTotalNet(rows) {
+  const hit = (rows || []).find((r) => Number(r?.jobValue) > 0);
+  if (!hit) return null;
+  return vatParts(Number(hit.jobValue), hit.jobValueVatIncluded === true).net;
+}
+
+/** คีย์นับ "มูลค่างานรวม" ครั้งเดียว — งานสัญญาหลายรอบใช้ค่าเดียวกันทั้งสัญญา (นับสัญญาละครั้ง ไม่คูณตามรอบ) */
+export const jobTotalKey = (row, fallbackKey) => (row?.contractGroupId ? `c:${row.contractGroupId}` : fallbackKey);
+

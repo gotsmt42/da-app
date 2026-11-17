@@ -1,4 +1,4 @@
-import { jobWorkValueNet } from "@/shared/utils/workValue";
+import { jobWorkValueNet, jobTotalNet, jobTotalKey } from "@/shared/utils/workValue";
 import { jobDayStart as dayStart, jobDayEnd as dayEnd } from "@/shared/utils/jobDays";
 import { getOverdueGroupKey, isFlaggedDays, isSevereDays } from "@/shared/utils/overdueJobs";
 
@@ -31,7 +31,13 @@ export const STATUS_GROUPS = [
 ];
 export const GROUP_BY_KEY = Object.fromEntries(STATUS_GROUPS.map((g) => [g.key, g]));
 
-const valueOf = jobWorkValueNet; // 🔁 (10 พ.ย. 2569) ก่อน VAT เสมอ · ที่เดียวกับทุกหน้า (shared/utils/workValue.js)
+/**
+ * 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · มูลค่างานรวมให้แสดงเทียบ · ยอดที่ช่างลงเป็นผลงานรายคน ไม่นำมารวม")
+ *    value = มูลค่าครั้งนี้ของงาน (workValue · ก่อน VAT · แอดมิน/ผู้รับผิดชอบลง) — 1 ค่าต่องาน
+ *    total = มูลค่างานรวม (jobValue · ก่อน VAT) แสดงเทียบ — งานสัญญาหลายรอบนับสัญญาละครั้ง (totalKey)
+ *    ยอดที่ช่างแต่ละคนลง (workerValues) ไม่อยู่ในไฟล์นี้ — ดูผลงานรายบุคคล
+ */
+const valueOf = jobWorkValueNet;
 const workersOf = (rows) => [...new Set(rows.flatMap((r) => [r.team, ...((r.teamMembers || []).map((m) => m?.name))]).filter(Boolean))];
 
 /** แปลงแถวดิบ → รายการงาน (1 รายการ = 1 งาน) พร้อมกลุ่มสถานะ */
@@ -67,6 +73,8 @@ export function buildJobs(events = [], daysPastDueMap = new Map()) {
       overdueDays: flagged ? overdueDays : null,
       severe: flagged && isSevereDays(overdueDays),
       value: valueOf(rows),
+      jobTotal: jobTotalNet(rows),
+      totalKey: jobTotalKey(latest, key),
       jobNo: latest.jobNo || "",
       company: (latest.company || "").trim(),
       site: (latest.site || "").trim(),
@@ -94,13 +102,19 @@ export function filterJobs(jobs, { from, to, responsible = "all", system = "all"
   });
 }
 
-const emptyRow = (key) => ({ key, total: 0, closed: 0, open: 0, overdue: 0, value: 0, valued: 0, ...Object.fromEntries(STATUS_GROUPS.map((g) => [`g_${g.key}`, 0])) });
+const emptyRow = (key) => ({ key, total: 0, closed: 0, open: 0, overdue: 0, value: 0, valued: 0, jobTotal: 0, totalKeys: new Set(), ...Object.fromEntries(STATUS_GROUPS.map((g) => [`g_${g.key}`, 0])) });
 const addJob = (row, j) => {
   row.total += 1;
   row[`g_${j.group}`] += 1;
   if (j.group === "closed") row.closed += 1; else row.open += 1;
   if (j.group === "overdue") row.overdue += 1;
+  // มูลค่าครั้งนี้ของงาน — 1 ค่าต่องาน
   if (j.value !== null) { row.value += j.value; row.valued += 1; }
+  // มูลค่างานรวม (เทียบ) — งานสัญญาหลายรอบนับครั้งเดียวต่อสัญญา ไม่บวกซ้ำทุกรอบ
+  if (j.jobTotal !== null && j.jobTotal !== undefined) {
+    const k = j.totalKey || j.key;
+    if (!row.totalKeys.has(k)) { row.totalKeys.add(k); row.jobTotal += j.jobTotal; }
+  }
 };
 const finish = (r) => ({ ...r, closeRate: r.total ? Math.round((r.closed / r.total) * 100) : 0 });
 const groupBy = (jobs, keyOf) => {

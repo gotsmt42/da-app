@@ -94,4 +94,13 @@ describe("มูลค่างานรายคน", () => {
     expect(myWorkerName(rows, { fname: "A" })).toBe("A");
     expect(myWorkerName(rows, { fname: "Z" })).toBe("");
   });
+  it("ยอดเดิม (ก่อนแยกช่อง): ช่างในทีมลงเอง = ผลงานของคนนั้น · แอดมินลง / หลังแยกช่อง = ไม่นับให้ใคร", () => {
+    const base = { team: "A", teamMembers: [{ name: "B" }], workValue: 5000, workValueAt: "2026-11-10T03:00:00Z" };
+    expect(personValueOf([{ ...base, workValueBy: "B Lastname" }], "B")).toMatchObject({ amount: 5000, legacy: true });
+    expect(personValueOf([{ ...base, workValueBy: "B Lastname" }], "A")).toBeNull();
+    expect(personValueOf([{ ...base, workValueBy: "แอดมิน X" }], "A")).toBeNull();
+    expect(personValueOf([{ ...base, workValueBy: "B Lastname", workValueAt: "2026-11-20T03:00:00Z" }], "B")).toBeNull();
+    // ผลรวมที่ระบบคำนวณจากรายคน (workers) ไม่ย้อนนับเป็นยอดเดิม
+    expect(personValueOf([{ ...base, workValueSource: "workers" }], "A")).toBeNull();
+  });
 });

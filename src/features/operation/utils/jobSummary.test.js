@@ -32,4 +32,15 @@ describe("jobSummary — กติกาเดียวกับหน้าก�
   it("กรองช่วงตามวันเริ่มงาน", () => {
     expect(filterJobs(jobs, { from: d(25), to: d(0) })).toHaveLength(3);
   });
+
+  // ✅ (17 พ.ย. 2569) มูลค่าครั้งนี้ของงาน (1 ค่าต่องาน) · มูลค่างานรวมเทียบ (สัญญานับครั้งเดียว) · ยอดที่ช่างลงไม่ถูกรวม
+  it("มูลค่าครั้งนี้ของงาน + มูลค่างานรวมเทียบ · ยอดรายคนไม่ถูกรวม", () => {
+    const evs = [
+      ev({ _id: "c1", contractGroupId: "K", time: "1", start: d(20), end: d(20), jobValue: 40000, workValue: 10000, team: "A", workerValues: [{ name: "A", amount: 5000 }] }),
+      ev({ _id: "c2", contractGroupId: "K", time: "2", start: d(10), end: d(10), jobValue: 40000, workValue: 10000, team: "B", teamMembers: [{ name: "C" }], workerValues: [{ name: "B", amount: 3000 }, { name: "C", amount: 2000 }] }),
+    ];
+    const sm = summarizeJobs(buildJobs(evs, new Map()));
+    expect(sm.totals.value).toBe(20000);     // มูลค่าครั้งนี้ของงาน 2 ครั้ง
+    expect(sm.totals.jobTotal).toBe(40000);  // มูลค่างานรวม นับสัญญาละครั้ง
+  });
 });
