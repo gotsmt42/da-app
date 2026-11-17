@@ -101,7 +101,8 @@ import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import WorkValueField from "@/shared/ui/WorkValueField";
-import { workValueNet, vatLabel } from "@/shared/utils/workValue";
+import { vatLabel, personValueOf, workersOfRows, jobWorkValueHit, jobWorkValueNet } from "@/shared/utils/workValue";
+import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
@@ -249,6 +250,7 @@ const ACTION_META = {
   time_corrected: { label: "แก้เวลาเข้างาน", icon: <History sx={{ fontSize: 13 }} />, color: "#d97706" },
   note_saved:     { label: "บันทึกรายละเอียดงานที่ทำ",     icon: <Edit sx={{ fontSize: 13 }} />,        color: "#3b82f6" },
   value_saved:    { label: "บันทึกมูลค่างาน",   icon: <Edit sx={{ fontSize: 13 }} />,        color: "#059669" },
+  worker_value_saved: { label: "บันทึกมูลค่างานรายคน", icon: <Edit sx={{ fontSize: 13 }} />, color: "#059669" },
   report_saved:   { label: "บันทึก Report",     icon: <NoteAdd sx={{ fontSize: 13 }} />,     color: "#10b981" },
   file_uploaded:  { label: "อัปโหลดไฟล์",       icon: <CloudUpload sx={{ fontSize: 13 }} />, color: "#f59e0b" },
   status_changed: { label: "เปลี่ยนสถานะ",      icon: <Circle sx={{ fontSize: 7 }} />,       color: "#6b7280" },
@@ -1634,6 +1636,19 @@ const EventRowCard = ({
                         onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
                     </InfoLine>
                   )}
+                  {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "คนที่ 1 ลง 5000 คนที่ 2 ลง 3000 แล้วไม่รวมมูลค่ากัน ให้แยกตามคน")
+                      มูลค่ารายคน — แต่ละคนในทีมลงของตัวเอง · ผู้อนุมัติ/ผู้รับผิดชอบลงแทนได้ · ไม่รวมเข้ามูลค่าครั้งนี้ของงาน */}
+                  {event.department !== "sales" && workersOfRows([event]).length > 0 && (() => {
+                    const responsible = (currentUser?.userId && String(event.responsiblePersonId || "") === String(currentUser.userId))
+                      || (currentUser?.fname && event.responsiblePerson === currentUser.fname);
+                    const approver = isAdminOrManager || can(currentUser, "editFinance");
+                    return (
+                      <InfoLine label="มูลค่ารายคน">
+                        <WorkerValuesPanel variant="inline" event={event} me={currentUser} canManage={approver || responsible}
+                          disabled={!approver && event.status === "ดำเนินการเสร็จสิ้น"} onPatched={onPatched} />
+                      </InfoLine>
+                    );
+                  })()}
                   {canAssignTeam && (
                     <AssignResponsibleMenu title="เลือกหัวหน้าทีมเข้างาน"
                       anchorEl={teamAnchor} onClose={() => setTeamAnchor(null)}
@@ -2173,9 +2188,9 @@ const StatusStrip = ({ items, value, onChange }) => (
 );
 
 /** วันแรกของงานที่ใส่มูลค่าไว้ (ทุกวันในกลุ่มเก็บค่าเดียวกัน) */
-const workValueHit = (sessions) => (sessions || []).find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "") || null;
+const workValueHit = jobWorkValueHit;
 /** 🔁 (10 พ.ย. 2569) มูลค่างานครั้งนี้ "ก่อน VAT" (ใช้รวมยอด — ไม่บวกยอดรวม VAT ปนกับยอด Net) · null = ยังไม่ใส่ */
-const workValueOf = (sessions) => workValueNet(workValueHit(sessions));
+const workValueOf = jobWorkValueNet;
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 
 /** กรองผู้เข้างาน: "all" | "noteam" (ยังไม่มีทีม) | ชื่อคน (หัวหน้าทีมหรือลูกทีม) */
@@ -3239,14 +3254,24 @@ const Operation = () => {
     return c;
   }, [jobGroups, splitClosed, sectionOfGroup]);
   // ✅ ยอดมูลค่างานรวมตามตัวกรองปัจจุบัน — นับงานละครั้ง (allJobGroups รวมงานที่ปิดแล้วด้วย)
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้แยกตามคน") เลือกผู้ปฏิบัติงานคนเดียว = รวมเฉพาะมูลค่างานที่คนนั้นทำ (มูลค่ารายคน)
+  //    ไม่เลือก = มูลค่างานของงาน (นับงานละครั้ง) เหมือนเดิม
+  const valueMember = filterMember !== "all" && filterMember !== "noteam" ? filterMember : "";
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ทำไมไม่มีขึ้น · ได้นับยอดรวมทั้งหมดของคนนั้นไหม ไม่ว่าจะเป็นงานอะไร ที่มีมูลค่าครั้งนี้")
+  //    ยอดหลัก = มูลค่าครั้งนี้ของงาน (ตรงกับตัวเลขในแถวด้านล่าง) · เลือกคน = รวมทุกงานที่คนนั้นอยู่ในทีม (ทุกประเภทงาน)
+  //    + บอกแยกว่าคนนั้น "บันทึกมูลค่างานที่ทำเอง" แล้วเท่าไร (ยอดรายคน — ใช้ในผลงานรายบุคคล)
   const valueSummary = useMemo(() => {
-    let total = 0; let withValue = 0; let missing = 0;
+    let total = 0; let withValue = 0; let missing = 0; let own = 0; let ownCount = 0;
     allJobGroups.forEach((g) => {
       const wv = workValueOf(g);
       if (wv === null) missing += 1; else { total += wv; withValue += 1; }
+      if (valueMember) {
+        const pv = personValueOf(g, valueMember);
+        if (pv) { own += pv.net; ownCount += 1; }
+      }
     });
-    return { total, withValue, missing, jobs: allJobGroups.length };
-  }, [allJobGroups]);
+    return { total, withValue, missing, own, ownCount, jobs: allJobGroups.length };
+  }, [allJobGroups, valueMember]);
   const hiddenClosedCount = splitClosed ? allJobGroups.length - jobGroups.length : 0;
 
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
@@ -4014,11 +4039,16 @@ const Operation = () => {
             <Box sx={{ mb: 1.5, px: { xs: 1.75, sm: 2 }, py: { xs: 1.1, sm: 1.25 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: { xs: 1, sm: 2.5 }, flexWrap: { xs: "nowrap", sm: "wrap" } }}>
               <Box sx={{ minWidth: 0, flex: { xs: 1, sm: "0 1 auto" } }}>
                 <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>
-                  มูลค่างานรวม (ก่อน VAT){filterMember !== "all" && filterMember !== "noteam" ? ` · ${filterMember}` : ""}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
+                  {valueMember ? `มูลค่างานที่ ${valueMember} เข้าร่วม (ก่อน VAT)` : "มูลค่างานรวม (ก่อน VAT)"}{showAll ? " · ทุกเดือน" : selectedDate ? ` · ${moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY")}` : ""}
                 </Typography>
                 <Typography noWrap sx={{ fontSize: { xs: "1.25rem", sm: "1.35rem" }, fontWeight: 900, color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{baht(valueSummary.total)}</Typography>
               </Box>
               <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-end", sm: "center" }, gap: { xs: 0.25, sm: 2 }, flexWrap: "wrap", flexShrink: 0, fontSize: { xs: "0.76rem", sm: "0.8rem" }, color: "#334155", textAlign: "right" }}>
+                {valueMember && (
+                  <Box component="span" title="มูลค่างานที่คนนี้บันทึกเองว่าทำได้ (ยอดรายคน) — ใช้ในหน้าผลงานรายบุคคล">
+                    บันทึกเอง <b>{baht(valueSummary.own)}</b> ({valueSummary.ownCount} งาน)
+                  </Box>
+                )}
                 <span><b>{valueSummary.withValue}</b> ใส่มูลค่าแล้ว</span>
                 {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> ยังไม่ใส่</span>}
                 {valueSummary.withValue > 0 && <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เฉลี่ย <b>{baht(valueSummary.total / valueSummary.withValue)}</b> / งาน</Box>}

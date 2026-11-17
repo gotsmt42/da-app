@@ -32,6 +32,7 @@ import { ReportSection, Segmented, RankRow, TotalRow, Stat, TotalHero, FilterCar
 import { periodRange, periodText, monthLabel } from "../utils/reportPeriod";
 import { buildJobs, filterJobs, summarizeJobs, GROUP_BY_KEY } from "../utils/jobSummary";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
+import ReportScopeBar from "../components/ReportScopeBar";
 
 const GROUP_DIMS = [
   ["site", "โครงการ", "bySite"],
@@ -180,8 +181,10 @@ export default function JobReport() {
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader icon={<AssessmentRounded />} title="สรุปผลการดำเนินงาน"
-        subtitle="จำนวนงาน สถานะ งานค้าง และมูลค่างาน — ใช้กติกาเดียวกับหน้าการดำเนินงาน"
+        subtitle="จำนวนงาน สถานะ งานค้าง และมูลค่างานของงาน — ใช้กติกาเดียวกับหน้าการดำเนินงาน"
         actions={exportBtn} />
+      {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "2 แท็บนี้ข้อมูลเหมือนกันไหม") หน้านี้นับอะไร + เทียบกับผลงานรายบุคคล */}
+      <ReportScopeBar scope="jobs" />
 
       {/* ── ตัวกรอง ── */}
       <FilterCard footer={`${periodLabel} · ${filterLabel} · นับตามวันเริ่มงาน · งานที่เข้าหลายวันนับเป็น 1 งาน`}>
@@ -211,7 +214,7 @@ export default function JobReport() {
       <TotalHero
         label="งานทั้งหมดตามตัวกรอง"
         value={`${t.total} งาน`}
-        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่างานรวม ${baht(t.value)}` : ""}`}
+        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่างานของงาน ${baht(t.value)}` : ""}`}
         stats={summary.statusRows.map((g) => (
           <Stat key={g.key} label={g.label} value={`${g.count} งาน`} tone={g.count ? g.color : undefined}
             active={listGroup === g.key} onClick={() => setListGroup(listGroup === g.key ? "all" : g.key)} />

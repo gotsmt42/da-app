@@ -31,8 +31,10 @@ import InfoLine from "@/shared/ui/InfoLine";
 import JobInfoPanel from "@/shared/ui/JobInfoPanel";
 import TelLink from "@/shared/components/TelLink";
 import WorkValueField from "@/shared/ui/WorkValueField";
+import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
+import { myWorkerName, personValueOf } from "@/shared/utils/workValue";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { ROLES } from "@/shared/utils/roles";
+import { ROLES, can } from "@/shared/utils/roles";
 import EventService from "@/shared/services/EventService";
 import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
@@ -332,6 +334,16 @@ const TechnicianJobCard = ({
   const payload  = JSON.parse(localStorage.getItem("payload") || "{}");
   const userName = payload?.name || payload?.username || "ช่าง";
 
+  /**
+   * ✅ (17 พ.ย. 2569 ผู้ใช้: "ผู้ปฏิบัติงาน 1 ใส่มูลค่า 5000 คนที่ 2 ลง 3000 แล้วไม่รวมมูลค่ากัน ให้แยกตามคน")
+   *    คนในทีมเข้างาน = ลง "มูลค่างานของฉัน" (แยกรายคน) · ผู้รับผิดชอบ/ผู้อนุมัติ = มูลค่างานของงาน + รายคนทุกคน
+   */
+  const me = { userId: userData?.userId || payload?.userId || "", fname: userData?.fname || payload?.fname || "" };
+  const myWorker = myWorkerName([event], me);
+  const valueManager = can(userData || payload, "approveJobs") || can(userData || payload, "editFinance")
+    || (me.userId && String(event.responsiblePersonId || "") === String(me.userId))
+    || (me.fname && event.responsiblePerson === me.fname);
+
   // ── push activityLog ─────────────────────────────────────────────
   const pushLog = useCallback(async (action, detail = "") => {
     const newLog = {
@@ -382,12 +394,19 @@ const TechnicianJobCard = ({
      *    ยังไม่เคยใส่ = ถามครั้งเดียวตอนขอปิด (ข้ามได้) · ใส่ไว้แล้ว = ไม่ถามซ้ำ (แก้ได้ที่ช่อง "มูลค่างานครั้งนี้")
      */
     let workValue = null;
-    if (event.workValue === null || event.workValue === undefined || event.workValue === "") {
+    // 🔁 (17 พ.ย. 2569) คนในทีม = ถามยอดของตัวเอง (แยกรายคน) · คนอื่น (เช่น ผู้รับผิดชอบที่ไม่ได้เข้างาน) = มูลค่างานของงานแบบเดิม
+    const askMine = Boolean(myWorker);
+    const needAsk = askMine
+      ? !personValueOf([event], myWorker)
+      : (event.workValue === null || event.workValue === undefined || event.workValue === "");
+    if (needAsk) {
       const wvAsk = await Swal.fire({
-        title: "มูลค่างานครั้งนี้",
+        title: askMine ? "มูลค่างานของคุณครั้งนี้" : "มูลค่างานครั้งนี้",
         // 🔁 (6 พ.ย. 2569 ผู้ใช้: "แก้ไขหน้ามือถือ ให้ดูง่าย สะดวก สวยงามกว่านี้") ช่องตัวเลขใหญ่กลางกล่อง ใส่คอมม่าให้เอง
         //    ปุ่มเรียงแนวตั้งเต็มความกว้าง (เดิม 3 ปุ่มในแถวเดียว ข้อความ "ไม่มีมูลค่างาน" ตกบรรทัด)
-        html: '<div style="font-size:.86rem;color:#64748b;line-height:1.55">ใส่ยอดเป็นบาท · ไม่บังคับ<br/>แก้ภายหลังได้ที่ช่อง “มูลค่างานครั้งนี้”</div>',
+        html: askMine
+          ? '<div style="font-size:.86rem;color:#64748b;line-height:1.55">ใส่เฉพาะยอดของคุณ (บาท) · ไม่บังคับ<br/>คนอื่นในทีมลงของตัวเอง ไม่รวมกัน · แก้ภายหลังได้ที่ “มูลค่างานของฉัน”</div>'
+          : '<div style="font-size:.86rem;color:#64748b;line-height:1.55">ใส่ยอดเป็นบาท · ไม่บังคับ<br/>แก้ภายหลังได้ที่ช่อง “มูลค่างานครั้งนี้”</div>',
         input: "text",
         inputPlaceholder: "฿ 0",
         inputAttributes: { inputmode: "decimal", autocomplete: "off", "aria-label": "มูลค่างาน (บาท)" },
@@ -473,11 +492,20 @@ const TechnicianJobCard = ({
       // ✅ เก็บ userId จริงของคนกดขอปิดงานไว้ด้วย เพื่อให้แจ้งเตือน push ตอนอนุมัติ/ไม่อนุมัติ
       // ส่งถึงคนที่กดขอจริงๆ ได้ (resPerson ของงานอาจไม่ตรงกับคนกดขอ เช่น งานมอบหมายผ่านชื่อทีมแบบเก่า)
       closeRequestedByUserId: payload?.userId || "",
-      ...(workValue !== null ? { workValue } : {}),
+      ...(workValue !== null && !askMine ? { workValue } : {}),
       ...(overrideReason ? { closeOverrideReason: overrideReason } : {}),
     });
-    const wvNow = workValue !== null ? workValue : event.workValue;
-    const wvText = wvNow !== null && wvNow !== undefined && wvNow !== "" ? ` · มูลค่างาน ${Number(wvNow).toLocaleString("th-TH")} บาท` : "";
+    if (workValue !== null && askMine) {
+      // มูลค่ารายคน — บันทึกเฉพาะของคนนี้ (ไม่แตะยอดของคนอื่น/ของงาน)
+      try {
+        const res = await EventService.SetWorkerValue(event._id, { amount: workValue, vatIncluded: event.contractGroupId ? event.jobValueVatIncluded === true : false });
+        onPatched?.((res?.eventIds || [event._id]).map((id) => ({ _id: id, workerValues: res?.workerValues || [] })));
+      } catch (err) {
+        Swal.fire({ icon: "warning", title: "ขอปิดงานแล้ว แต่บันทึกมูลค่างานไม่สำเร็จ", text: err?.response?.data?.message || "ใส่ใหม่ได้ที่ช่อง “มูลค่างานของฉัน”" });
+      }
+    }
+    const wvNow = workValue !== null ? workValue : askMine ? personValueOf([event], myWorker)?.amount : event.workValue;
+    const wvText = wvNow !== null && wvNow !== undefined && wvNow !== "" ? ` · มูลค่างาน${askMine ? `ของ ${myWorker}` : ""} ${Number(wvNow).toLocaleString("th-TH")} บาท` : "";
     await pushLog("close_requested", overrideReason ? `ขอปิดงาน${wvText} (เอกสารไม่ผ่านการตรวจ — ขอแอดมินพิจารณา: ${overrideReason})` : `ขอปิดงาน${wvText} · รอแอดมินอนุมัติ`);
     setRequestingClose(false);
   };
@@ -522,8 +550,18 @@ const TechnicianJobCard = ({
   // แบบกางลงในหน้า (Collapse บนมือถือ) และแบบ Dialog ทับขึ้นมา (จอกว้าง) ไม่ต้องเขียนซ้ำสองที่
   const expandedContent = (
     <Stack spacing={2}>
-      {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ ไม่บังคับ */}
-      <WorkValueField value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} disabled={isLocked} onSave={handleSaveWorkValue} />
+      {/* ✅ (2 พ.ย. 2569 ผู้ใช้: "ให้ใส่แยกได้ด้วยสิ") มูลค่างานครั้งนี้ — ใส่/แก้ได้ทุกเมื่อ ไม่บังคับ
+          🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้แยกตามคน") คนในทีม = ยอดของตัวเอง · ผู้รับผิดชอบ/ผู้อนุมัติ = ยอดของงาน + รายคน */}
+      {myWorker && (
+        <WorkerValuesPanel variant="mine" event={event} me={me} disabled={isLocked} onPatched={onPatched} />
+      )}
+      {(!myWorker || valueManager) && event.department !== "sales" && (
+        <WorkValueField label={valueManager ? "มูลค่างานของงาน (สรุปงาน/วางบิล)" : "มูลค่างานครั้งนี้"}
+          value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} disabled={isLocked} onSave={handleSaveWorkValue} />
+      )}
+      {valueManager && event.department !== "sales" && (
+        <WorkerValuesPanel variant="list" event={event} me={me} canManage disabled={isLocked && !can(userData || payload, "approveJobs")} onPatched={onPatched} />
+      )}
 
       {/* สรุปงาน */}
       <Box>
@@ -577,6 +615,7 @@ const TechnicianJobCard = ({
                   <Typography variant="caption" fontWeight={600} color="text.secondary">
                     {log.action === "note_saved"             ? "บันทึกรายละเอียดงานที่ทำ"
                     : log.action === "value_saved"            ? "บันทึกมูลค่างาน"
+                    : log.action === "worker_value_saved"     ? "บันทึกมูลค่างานรายคน"
                     : log.action === "file_uploaded"          ? "อัปโหลดไฟล์"
                     : log.action === "file_deleted"           ? "ลบไฟล์"
                     : log.action === "document_checked"       ? "ทำเครื่องหมายเอกสาร"

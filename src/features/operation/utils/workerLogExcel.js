@@ -1,13 +1,15 @@
 /**
  * workerLogExcel.js — ส่งออก "รายงานรายช่าง" เป็น Excel (.xlsx)
  *
- * ชีต: รายละเอียดรายคน · สรุปรายคน · รายเดือน (รายคน×เดือน) · [รายปี ถ้าคร่อมหลายปี] · บันทึกเข้างาน
+ * ชีต: รายละเอียดรายคน · KPI รายคน · รายเดือน (รายคน×เดือน) · [รายปี ถ้าคร่อมหลายปี] · บันทึกเข้างาน · วิธีอ่าน KPI
  * ⚠️ exceljs ใหญ่ — หน้ารายงาน import ไฟล์นี้แบบ dynamic ตอนกดส่งออกเท่านั้น
- * ⚠️ ทุกคนในทีมได้มูลค่างานเต็มจำนวน — ผลรวมรายคนมากกว่ามูลค่างานจริงได้ (บอกไว้ในหัวทุกชีต)
+ * 🔁 (17 พ.ย. 2569) มูลค่ารายคน = มูลค่างานที่แต่ละคนทำ (ก่อน VAT) แยกกัน ไม่รวมกัน (บอกไว้ในหัวทุกชีต)
+ *    KPI/เกณฑ์/คำอธิบาย มาจาก utils/workerKpi.js (ที่เดียวกับหน้าจอ)
  */
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
+import { buildPersonKpis, KPI_DEFS, KPI_GUIDE, ISSUE_DEFS, RATE_KPIS } from "./workerKpi";
 
 const C = {
   headerBg: "FF1E293B", headerText: "FFFFFFFF", titleText: "FF0F172A", subtitleText: "FF64748B",
@@ -97,7 +99,7 @@ function addPersonDetailSheet(wb, entries, summary, sub, note) {
     { key: "role", header: "บทบาท", width: 11, align: "center" },
     { key: "checkIn", header: "กดเข้างานจริง", width: 18, align: "center", wrap: true },
     { key: "status", header: "สถานะงาน", width: 17, align: "center" },
-    { key: "value", header: "มูลค่าครั้งนี้ (บาท)", width: 17, align: "right", fmt: MONEY, bold: true },
+    { key: "value", header: "มูลค่ารายคน (บาท · ก่อน VAT)", width: 17, align: "right", fmt: MONEY, bold: true },
   ];
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const last = cols.length;
@@ -180,7 +182,12 @@ export async function exportWorkerLog(entries, summary, meta) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "TidTam";
   wb.created = new Date();
-  const note = "ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน";
+  const note = "มูลค่ารายคน = มูลค่างานที่แต่ละคนทำ (ก่อน VAT) แยกกัน ไม่รวมกัน · อัตรา % คิดจากงานที่ผ่านไปแล้วเท่านั้น";
+  const kpi = buildPersonKpis(entries);
+  const pctOf = (v) => (v === null || v === undefined ? "–" : Math.round(v * 1000) / 1000);
+  const PCT = "0%";
+  const gradeColor = (d) => (v) => (typeof v !== "number" ? C.muted : v * 100 >= d.good ? C.ok : v * 100 >= d.warn ? C.warn : "FFDC2626");
+  const def = Object.fromEntries(KPI_DEFS.map((d) => [d.key, d]));
   const t = summary.totals;
   const thb = (n) => Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // ✅ ทุกชีตบอกยอดรวมตามตัวกรองไว้บรรทัดรอง — เปิดชีตไหนก็เห็นทันทีว่าตัวเลขชุดนี้คือเงื่อนไขอะไร รวมเท่าไร
@@ -190,22 +197,59 @@ export async function exportWorkerLog(entries, summary, meta) {
   // 0) รายละเอียดรายคน — ชีตแรก: แยกเป็นช่วงของแต่ละคน ไล่ดูได้ทันทีว่าเข้างานไหน ที่ไหน เมื่อไร มูลค่าเท่าไร
   addPersonDetailSheet(wb, entries, summary, sub, note);
 
-  // 1) สรุปรายคน — ใครเข้างานกี่ครั้ง ได้มูลค่าเท่าไร
-  addTable(wb, "สรุปรายคน", {
-    title: "สรุปรายคน",
+  // 1) KPI รายคน — ✅ (17 พ.ย. 2569 ผู้ใช้: "สรุปรายงาน ยอดของแต่ละคนแยกกันให้ชัดเจน · เช็ค KPI ช่างแต่ละคน")
+  const kt = kpi.team;
+  const kpiRow = (p, i) => ({
+    no: i === null ? "" : i + 1, name: p.name, visits: p.visits, days: p.days, total: p.total, jobValueSum: p.jobsWithValue ? p.jobValueSum : "–",
+    share: p.share === null ? "–" : pctOf(p.share), avg: p.avgPerVisit ?? "–", perDay: p.perDay ?? "–",
+    ...Object.fromEntries(RATE_KPIS.map((d) => [d.key, pctOf(p[d.key])])),
+    missing: p.issues.missingValue.length || "", status: p.reliable ? "ใช้ประเมินได้" : p.past ? "ข้อมูลยังไม่ครบ" : "ยังไม่มีงานที่ผ่านไป",
+  });
+  addTable(wb, "KPI รายคน", {
+    title: "สรุปยอดและ KPI รายคน",
     sub: `${sub}
-${note}`,
+${note}
+เกณฑ์: ${KPI_DEFS.filter((d) => d.good !== undefined).map((d) => `${d.label} ≥${d.good}%`).join(" · ")} — ดูชีต "วิธีอ่าน KPI"`,
     cols: [
       { key: "no", header: "ลำดับ", width: 7, align: "center" },
-      { key: "name", header: "ผู้ปฏิบัติงาน", width: 26, bold: true },
-      { key: "visits", header: "เข้างาน (ครั้ง)", width: 14, align: "center" },
-      { key: "checked", header: "กดเข้างานจริง (ครั้ง)", width: 17, align: "center" },
-      { key: "total", header: "มูลค่างานรวม (บาท)", width: 20, align: "right", fmt: MONEY, bold: true },
-      { key: "missing", header: "ยังไม่ใส่มูลค่า (ครั้ง)", width: 16, align: "center", color: warnIf },
+      { key: "name", header: "ผู้ปฏิบัติงาน", width: 22, bold: true },
+      { key: "visits", header: "เข้างาน (ครั้ง)", width: 11, align: "center" },
+      { key: "days", header: "วันทำงาน", width: 10, align: "center" },
+      { key: "total", header: "มูลค่างานที่ทำ (บาท)", width: 18, align: "right", fmt: MONEY, bold: true },
+      { key: "share", header: "สัดส่วนในทีม", width: 11, align: "center", fmt: PCT },
+      { key: "jobValueSum", header: "มูลค่างานที่เข้าร่วม (เต็ม · อ้างอิง)", width: 18, align: "right", fmt: MONEY },
+      { key: "avg", header: "เฉลี่ยต่อครั้ง (บาท)", width: 16, align: "right", fmt: MONEY },
+      { key: "perDay", header: "มูลค่าต่อวันทำงาน (บาท)", width: 18, align: "right", fmt: MONEY, bold: true },
+      // ✅ (17 พ.ย. 2569) ความครบของข้อมูลทุกข้อ — ชุดเดียวกับหน้าจอ (RATE_KPIS)
+      ...RATE_KPIS.map((d) => ({ key: d.key, header: d.label, width: 13, align: "center", fmt: PCT, color: gradeColor(def[d.key]) })),
+      { key: "missing", header: "ยังไม่ลงมูลค่า (ครั้ง)", width: 15, align: "center", color: warnIf },
+      { key: "status", header: "สถานะข้อมูล", width: 18, align: "center", color: (v) => (v === "ใช้ประเมินได้" ? C.ok : C.warn) },
     ],
-    rows: summary.byPerson.map((p, i) => ({ no: i + 1, name: p.key, visits: p.visits, checked: `${p.checked}/${p.visits}`, total: p.total, missing: p.missing || "" })),
-    total: { no: "", name: `รวม ${summary.byPerson.length} คน`, visits: t.visits, checked: `${t.checked}/${t.visits}`, total: t.total, missing: t.missing || "" },
+    rows: kpi.people.map((p, i) => kpiRow(p, i)),
+    total: { ...kpiRow({ ...kt, name: `รวม ${kpi.people.length} คน` }, null), share: "" },
   });
+
+  // 1b) รายการที่ต้องแก้ก่อนสรุป KPI — ไล่แก้ทีละรายการได้
+  const fixRows = kpi.people.flatMap((p) => p.issueList.flatMap((x) => x.entries.map((r) => ({
+    name: p.name, issue: ISSUE_DEFS[x.key].label, date: toDate(r.date), site: r.site || r.company || "-",
+    job: [r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : ""].filter(Boolean).join(" · "), jobNo: r.jobNo || "", fix: ISSUE_DEFS[x.key].hint,
+  }))));
+  if (fixRows.length) {
+    addTable(wb, "ต้องแก้ก่อนสรุป KPI", {
+      title: "รายการที่ต้องแก้ก่อนสรุป KPI", sub: `${sub}
+${fixRows.length} รายการ · แก้แล้วส่งออกใหม่ ตัวเลข KPI จะถูกต้อง`,
+      cols: [
+        { key: "name", header: "ผู้ปฏิบัติงาน", width: 20, bold: true },
+        { key: "issue", header: "ปัญหา", width: 24, color: () => C.warn },
+        { key: "date", header: "วันที่เข้างาน", width: 13, align: "center", fmt: "dd/mm/yyyy" },
+        { key: "site", header: "โครงการ (สถานที่)", width: 30, wrap: true },
+        { key: "job", header: "งาน", width: 24, wrap: true },
+        { key: "jobNo", header: "เลขที่งาน", width: 15 },
+        { key: "fix", header: "วิธีแก้", width: 36, wrap: true },
+      ],
+      rows: fixRows,
+    });
+  }
 
   // 2) รายเดือน — แถว = คน · คอลัมน์ = เดือน (มูลค่า) · แถวล่างสุด = ยอดรวมของแต่ละเดือน
   const months = summary.months;
@@ -259,7 +303,7 @@ ${note}`,
       { key: "job", header: "งานที่เข้าไปทำ", width: 24, wrap: true },
       { key: "role", header: "บทบาท", width: 11, align: "center" },
       { key: "status", header: "สถานะ", width: 17, align: "center", color: (v) => (v === "ดำเนินการเสร็จสิ้น" ? C.ok : C.titleText) },
-      { key: "value", header: "มูลค่าครั้งนี้ (บาท)", width: 18, align: "right", fmt: MONEY, bold: true, color: (v) => (typeof v === "number" ? C.titleText : C.warn) },
+      { key: "value", header: "มูลค่ารายคน (บาท · ก่อน VAT)", width: 18, align: "right", fmt: MONEY, bold: true, color: (v) => (typeof v === "number" ? C.titleText : C.warn) },
     ],
     rows: log.map((r) => ({
       name: r.name, date: toDate(r.date), site: r.site || "-", company: r.company || "-",
@@ -267,6 +311,20 @@ ${note}`,
       role: r.lead ? "หัวหน้าทีม" : "ทีม", status: r.status, value: r.value === null ? "ยังไม่ใส่" : r.value,
     })),
     total: { name: `รวม ${log.length} รายการ`, date: "", site: "", company: "", job: "", role: "", status: "", value: t.total },
+  });
+
+  // 4) วิธีอ่าน KPI — ขั้นตอนเช็ค + ความหมาย/เกณฑ์ (ข้อความเดียวกับหน้าจอ)
+  addTable(wb, "วิธีอ่าน KPI", {
+    title: "วิธีเช็ค KPI ช่างให้แม่นยำ ไม่ผิดพลาด", sub: note,
+    cols: [
+      { key: "no", header: "ขั้นที่ / ตัวชี้วัด", width: 24, bold: true },
+      { key: "text", header: "รายละเอียด", width: 90, wrap: true },
+      { key: "target", header: "เกณฑ์", width: 22, align: "center" },
+    ],
+    rows: [
+      ...KPI_GUIDE.map((g, i) => ({ no: `${i + 1}. ${g.title}`, text: g.text, target: "" })),
+      ...KPI_DEFS.map((d) => ({ no: d.label, text: d.desc, target: d.good !== undefined ? `≥${d.good}% ผ่าน · ${d.warn}–${d.good - 1}% ควรตรวจ` : "ข้อมูลประกอบ" })),
+    ],
   });
 
   const buf = await wb.xlsx.writeBuffer();

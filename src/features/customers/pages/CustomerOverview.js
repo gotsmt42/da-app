@@ -31,8 +31,9 @@ import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import { groupEventsByContract, isRoundOverdue, contractStatusInfo, renewalMap } from "@/shared/utils/contractOverdue";
-import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { buildAllJobs, jobsByCustomer } from "../utils/customerJobs";
+import CustomerJobsSection from "../components/CustomerJobsSection";
 import { formatThai, thaiDate } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { can } from "@/shared/utils/roles";
@@ -146,7 +147,7 @@ export default function CustomerOverview() {
         map.set(key, {
           key, name: label, sites: new Set(), records: [],
           contracts: [], expired: [], expiring: [], overdueRounds: [],
-          totalValue: 0, quotationPending: [], overdueJobKeys: new Set(), jobKeys: new Set(),
+          totalValue: 0, quotationPending: [], jobs: [], renewedKeys: new Set(),
           docs: [], lastActivity: null,
         });
       }
@@ -163,7 +164,6 @@ export default function CustomerOverview() {
 
     if (events.length) {
       const contracts = groupEventsByContract(events);
-      const daysPastDueMap = buildDaysPastDueMap(events);
       const renewed = renewalMap(contracts); // ต่อสัญญาแล้ว = ไม่นับเป็นหมดอายุ/ใกล้หมด (ตรงกับหน้าภาพรวมงานและแจ้งเตือน)
       contracts.forEach((c) => {
         const b = bucket(nameOf(c.company, c.site));
@@ -171,6 +171,7 @@ export default function CustomerOverview() {
         b.totalValue += Number(c.jobValue) || 0;
         if (c.isRealContract) {
           b.contracts.push(c);
+          if (renewed.has(c.key)) b.renewedKeys.add(c.key);
           const st = renewed.has(c.key) ? null : contractStatusInfo(c);
           if (st?.state === "expired") b.expired.push(c);
           else if (st?.state === "expiring") b.expiring.push(c);
@@ -181,12 +182,15 @@ export default function CustomerOverview() {
         const b = bucket(nameOf(e.company, e.site));
         if (!b) return;
         if (norm(e.site)) b.sites.add(norm(e.site));
-        b.jobKeys.add(getOverdueGroupKey(e));
         if (e.quotationStatus === "sent") b.quotationPending.push(e);
-        const days = daysPastDueMap.get(e._id);
-        if (isFlaggedDays(days) && e.status !== "ดำเนินการเสร็จสิ้น") b.overdueJobKeys.add(getOverdueGroupKey(e));
         const stamp = e.updatedAt || e.end || e.start || e.date;
         if (stamp && moment(stamp).isValid() && (!b.lastActivity || moment(stamp).isAfter(b.lastActivity))) b.lastActivity = moment(stamp);
+      });
+      // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ข้อมูลสอดคล้อง") งาน/ค้างงาน นับกติกาเดียวกับหน้าการดำเนินงาน (utils/customerJobs)
+      //    1 งาน = 1 กลุ่มงาน · ไม่นับนัดฝ่ายขาย · ค้างงาน = กลุ่ม "ค้างงาน" (ขอปิดแล้ว = รอตรวจ ไม่ใช่ค้าง)
+      jobsByCustomer(buildAllJobs(events)).forEach((list, key) => {
+        const b = map.get(key) || bucket(list[0].company || list[0].site);
+        if (b) b.jobs = list;
       });
     }
 
@@ -201,10 +205,10 @@ export default function CustomerOverview() {
         ...b,
         contact,
         siteList: [...b.sites],
-        jobCount: b.jobKeys.size,
-        overdueJobCount: b.overdueJobKeys.size,
+        jobCount: b.jobs.length,
+        overdueJobCount: b.jobs.filter((j) => j.group === "overdue").length,
         // ✅ "คะแนนต้องดูก่อน" ถ่วงตามความเสียหายถ้าปล่อยไว้: สัญญาหมดอายุ > ใกล้หมด > งานค้าง > รอบยังไม่วางแผน > ใบเสนอราคาค้าง
-        attention: b.expired.length * 100 + b.expiring.length * 40 + b.overdueJobKeys.size * 20 + b.overdueRounds.length * 10 + b.quotationPending.length * 5,
+        attention: b.expired.length * 100 + b.expiring.length * 40 + b.jobs.filter((j) => j.group === "overdue").length * 20 + b.overdueRounds.length * 10 + b.quotationPending.length * 5,
       };
     });
   }, [events, registry, docs]);
@@ -409,7 +413,7 @@ export default function CustomerOverview() {
       )}
 
       {/* ── กล่องรายละเอียดลูกค้า ── */}
-      <Dialog open={Boolean(selected)} onClose={() => setSelectedKey("")} fullWidth maxWidth="sm" fullScreen={fullScreen} PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
+      <Dialog open={Boolean(selected)} onClose={() => setSelectedKey("")} fullWidth maxWidth="md" fullScreen={fullScreen} PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
         {selected && (
           <>
             <Box sx={{ px: 2.5, py: 2, bgcolor: "#fff", borderBottom: `1px solid ${LINE}` }}>
@@ -464,6 +468,33 @@ export default function CustomerOverview() {
                     </Stack>
                   </Section>
                 )}
+
+                {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "ให้ดูมีอะไรให้ชัดเจน ละเอียดกว่านี้") สัญญา + งานทั้งหมดของลูกค้า */}
+                {selected.contracts.length > 0 && (
+                  <Section title={`สัญญา (${selected.contracts.length})`}>
+                    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5 }}>
+                      {selected.contracts.slice().sort((a, b) => String(b.contractStart || "").localeCompare(String(a.contractStart || ""))).map((c, i) => {
+                        const st = selected.renewedKeys.has(c.key) ? { label: "ต่อสัญญาแล้ว", color: "#64748b" } : contractStatusInfo(c);
+                        return (
+                          <Stack key={c.key} direction="row" alignItems="center" spacing={1.25} sx={{ px: 1.5, py: 1, borderTop: i ? `1px solid ${LINE}` : 0 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK }}>{[c.contractNo || "ไม่ระบุเลขสัญญา", c.title, c.system].filter(Boolean).join(" · ")}</Typography>
+                              <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>
+                                {[c.site, c.contractStart || c.contractEnd ? `${c.contractStart ? thaiDate(c.contractStart) : "?"} – ${c.contractEnd ? thaiDate(c.contractEnd) : "?"}` : "", c.visitCount ? `${c.visitCount} ครั้ง` : ""].filter(Boolean).join(" · ")}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                              {st && <DotLabel color={st.color}>{st.label}</DotLabel>}
+                              {Number(c.jobValue) > 0 && <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: INK, mt: 0.25 }}>{baht(c.jobValue)}</Typography>}
+                            </Box>
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                  </Section>
+                )}
+
+                <CustomerJobsSection jobs={selected.jobs} showValue={can(userData, "approveJobs") || can(userData, "viewAllJobs")} />
 
                 <Section title="สิ่งที่ต้องติดตาม">
                   <Stack spacing={0.75}>

@@ -1,5 +1,5 @@
-import moment from "moment";
-import { workValueNet } from "@/shared/utils/workValue";
+import { jobWorkValueNet } from "@/shared/utils/workValue";
+import { jobDayStart as dayStart, jobDayEnd as dayEnd } from "@/shared/utils/jobDays";
 import { getOverdueGroupKey, isFlaggedDays, isSevereDays } from "@/shared/utils/overdueJobs";
 
 /**
@@ -31,17 +31,7 @@ export const STATUS_GROUPS = [
 ];
 export const GROUP_BY_KEY = Object.fromEntries(STATUS_GROUPS.map((g) => [g.key, g]));
 
-const dayStart = (e) => moment(e.start || e.date).startOf("day");
-const dayEnd = (e) => {
-  if (!e.end) return dayStart(e);
-  const end = moment(e.end);
-  return (e.allDay ? end.subtract(1, "days") : end).startOf("day");
-};
-
-const valueOf = (rows) => {
-  const hit = rows.find((r) => r.workValue !== null && r.workValue !== undefined && r.workValue !== "");
-  return hit ? workValueNet(hit) : null; // 🔁 (10 พ.ย. 2569) ก่อน VAT เสมอ
-};
+const valueOf = jobWorkValueNet; // 🔁 (10 พ.ย. 2569) ก่อน VAT เสมอ · ที่เดียวกับทุกหน้า (shared/utils/workValue.js)
 const workersOf = (rows) => [...new Set(rows.flatMap((r) => [r.team, ...((r.teamMembers || []).map((m) => m?.name))]).filter(Boolean))];
 
 /** แปลงแถวดิบ → รายการงาน (1 รายการ = 1 งาน) พร้อมกลุ่มสถานะ */

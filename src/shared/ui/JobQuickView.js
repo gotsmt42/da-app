@@ -51,7 +51,8 @@ const dateText = (e) => {
   return (end.isSame(s, "day") ? thaiDate(s) : `${thaiDate(s)} – ${thaiDate(end)}`) + time;
 };
 
-export default function JobQuickView({ eventId, onClose, employees = [], showValue = false }) {
+// zIndex — เปิดทับกล่อง Dialog อื่น (เช่น กล่องรายละเอียดลูกค้า) ต้องส่ง 1400 ไม่งั้นแผ่นมือถือ (Drawer 1200) อยู่ใต้ Dialog (1300)
+export default function JobQuickView({ eventId, onClose, employees = [], showValue = false, zIndex }) {
   const navigate = useNavigate();
   const [ev, setEv] = useState(null);
   const [err, setErr] = useState("");
@@ -72,7 +73,7 @@ export default function JobQuickView({ eventId, onClose, employees = [], showVal
   const hasValue = ev && ev.workValue !== null && ev.workValue !== undefined && ev.workValue !== "";
 
   return (
-    <MobileSheet open={Boolean(eventId)} onClose={onClose} maxWidth="lg"
+    <MobileSheet open={Boolean(eventId)} onClose={onClose} maxWidth="lg" zIndex={zIndex}
       title={ev ? [ev.title, ev.system].filter(Boolean).join(" · ") || "รายละเอียดงาน" : "รายละเอียดงาน"}
       subtitle={ev ? [ev.site || ev.company, ev.jobNo].filter(Boolean).join(" · ") : ""}
       actions={ev ? (

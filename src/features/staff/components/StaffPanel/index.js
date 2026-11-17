@@ -19,7 +19,7 @@ import API from "@/shared/api/axiosInstance";
 import Swal from "@/shared/ui/swal";
 
 import {
-  TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar, IconButton, Tooltip, Skeleton,
+  TextField, Button, Snackbar, Alert, Box, Stack, Typography, IconButton, Tooltip, Skeleton,
   useMediaQuery, Table, TableBody, TableCell, TableHead, TableRow, TableSortLabel, Pagination,
   MenuItem, Dialog, DialogContent, DialogActions,
 } from "@mui/material";
@@ -30,7 +30,7 @@ import {
   ALL_ROLES, ROLES, isRole, canAssignRole, canManageUserOfRole, TECHNICIAN_ROLES, rankLabel,
   systemRoleOf, SYSTEM_ROLES, SYSTEM_ROLE_LABEL, titleOf,
 } from "@/shared/utils/roles";
-import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import UserAvatar from "@/shared/ui/UserAvatar";
 import SelectField from "@/shared/ui/SelectField";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
@@ -171,7 +171,8 @@ const Person = ({ row, size = 34 }) => {
   const name = fullNameOf(row) || row.username || "-";
   return (
     <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
-      <Avatar sx={{ width: size, height: size, fontSize: size * 0.4, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
+      {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "ควรเอารูป user จริงมาแสดง") */}
+      <UserAvatar name={name} src={row.imageUrl} size={size} />
       <Box sx={{ minWidth: 0 }}>
         <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK, lineHeight: 1.3 }}>{name}</Typography>
         <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.3 }}>@{row.username || "-"}</Typography>

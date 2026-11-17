@@ -14,12 +14,13 @@ import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, IconButton, Skeleton, Avatar, Tooltip, useMediaQuery,
+  Box, Stack, Typography, IconButton, Skeleton, Tooltip, useMediaQuery,
   Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
 import { RefreshRounded as Refresh, GroupsRounded as Groups, ChevronRightRounded as ChevronRight } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
-import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import UserAvatar from "@/shared/ui/UserAvatar";
+import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, resolveResponsibleUser } from "@/shared/utils/overdueJobs";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, INK, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW,
   TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
@@ -29,10 +30,9 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
-import { can, isRole, ROLES } from "@/shared/utils/roles";
+import { can, isRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 
 const WARNING_DAYS_AFTER_END = 7;   // เกณฑ์เดียวกับหน้า Operation/งานของฉัน — เลยกำหนด 1 สัปดาห์ = ค้างงาน
-const SEVERE_DAYS_AFTER_END = 14;
 
 // ✅ ลายเซ็นเดียวกับที่ใช้จัดกลุ่มงานหลายวันไม่ติดกันทั้งฝั่ง Operation/Dashboard/backend reminder
 const getGroupKey = (ev) => {
@@ -114,7 +114,11 @@ export default function TeamWorkload() {
   }, [events]);
 
   const statsByTech = useMemo(() => {
-    const technicians = users.filter((u) => isRole(u, ROLES.TECHNICIAN));
+    // 🔁 (17 พ.ย. 2569 ผู้ใช้: "หน้านี้ซ้ำไหม · ไม่ให้สับสน") ให้ตรงกับหน้าแรก "งานค้างของช่าง":
+    //    ช่าง = ช่างเทคนิค + หัวหน้าช่างเทคนิค (TECHNICIAN_ROLES — เดิมนับแค่ช่างเทคนิค หัวหน้าช่างหายจากหน้านี้)
+    //    เจ้าของงาน = resolveResponsibleUser ตัวกลาง · ค้างงาน = buildDaysPastDueMap (ไม่นับงานที่ยังไม่ยืนยัน — เหมือนหน้าการดำเนินงาน)
+    const technicians = users.filter((u) => isRole(u, ...TECHNICIAN_ROLES));
+    const pastDue = buildDaysPastDueMap(events);
     const userById = new Map(users.map((u) => [u._id, u]));
     const userByFname = new Map(users.map((u) => [u.fname, u]));
 
@@ -124,14 +128,7 @@ export default function TeamWorkload() {
     // ผลคือหน้านี้นับงานเข้าให้ "ทีมที่เข้างาน" แทนที่จะเป็นผู้รับผิดชอบ ตัวเลขจึงไม่ตรงกับหน้าอื่น
     // ✅ ใช้ลำดับเดียวกับ resolveResponsibleUser ฝั่ง backend (services/OverdueReminder.js) เป๊ะๆ:
     // responsiblePersonId → responsiblePerson → resPerson → team → คนที่สร้างงานเอง
-    const resolveTech = (sessions) => {
-      for (const e of sessions) if (e.responsiblePersonId && userById.has(e.responsiblePersonId)) return userById.get(e.responsiblePersonId);
-      for (const e of sessions) if (e.responsiblePerson && userByFname.has(e.responsiblePerson)) return userByFname.get(e.responsiblePerson);
-      for (const e of sessions) if (e.resPerson && userById.has(e.resPerson)) return userById.get(e.resPerson);
-      for (const e of sessions) if (e.team && userByFname.has(e.team)) return userByFname.get(e.team);
-      for (const e of sessions) if (e.userId && userById.has(e.userId)) return userById.get(e.userId);
-      return null;
-    };
+    const resolveTech = (sessions) => resolveResponsibleUser(sessions, userById, userByFname);
 
     const map = new Map(technicians.map((t) => [t._id, {
       tech: t, active: 0, pending: 0, overdue: 0, severeOverdue: 0, completedThisMonth: 0,
@@ -145,7 +142,7 @@ export default function TeamWorkload() {
 
     jobGroups.forEach((sessions) => {
       const tech = resolveTech(sessions);
-      if (!tech || !isRole(tech, ROLES.TECHNICIAN)) return;
+      if (!tech || !isRole(tech, ...TECHNICIAN_ROLES)) return;
       const entry = map.get(tech._id);
       if (!entry) return;
 
@@ -193,10 +190,9 @@ export default function TeamWorkload() {
         const start = moment(e.start);
         if (!earliestStart || start.isBefore(earliestStart)) earliestStart = start;
       });
-      const daysPastDue = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
-      // ✅ ใช้ > แทน >= — วันที่ครบพอดี 7/14 วันยังไม่ถือว่า "เกิน" (เทียบเกณฑ์เดียวกับ isFlaggedDays/
-      // isSevereDays ใน shared/utils/overdueJobs.js)
-      const isOverdue = daysPastDue > WARNING_DAYS_AFTER_END;
+      // 🔁 (17 พ.ย. 2569) ค้างงานจาก buildDaysPastDueMap ตัวเดียวกับหน้าการดำเนินงาน/หน้าแรก (งานที่ยังไม่ยืนยันไม่นับเป็นค้าง)
+      const daysPastDue = sessions.reduce((m, e) => Math.max(m, pastDue.get(e._id)?.days ?? -Infinity), -Infinity);
+      const isOverdue = sessions.some((e) => isFlaggedDays(pastDue.get(e._id)?.days));
 
       // 🐛 BUG ที่แก้ (ตัวเลขรวมกันแล้วเกินจำนวนงานจริง): เดิมนับ entry.active++ ก่อนเสมอ แล้วค่อยไปเช็ค
       // ค้างงานแยกอีกที — งานที่ค้างเกินกำหนดจึงถูกนับทั้งใน "กำลังทำ" และ "ค้างงาน" พร้อมกัน (เห็นได้
@@ -205,7 +201,7 @@ export default function TeamWorkload() {
       // จึงให้ครองงานนั้นไว้
       if (isOverdue) {
         entry.overdue += 1;
-        if (daysPastDue > SEVERE_DAYS_AFTER_END) entry.severeOverdue += 1;
+        if (isSevereDays(daysPastDue)) entry.severeOverdue += 1;
         // ✅ เก็บ "ค้างนานสุดกี่วัน" ไว้ด้วย — บอกความรุนแรงได้ตรงกว่าจำนวนงานเฉยๆ
         if (daysPastDue > entry.maxOverdueDays) entry.maxOverdueDays = daysPastDue;
       } else if (sessions.some((e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status))) {
@@ -229,7 +225,7 @@ export default function TeamWorkload() {
     });
 
     return [...map.values()];
-  }, [users, jobGroups]);
+  }, [users, jobGroups, events]);
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -343,7 +339,7 @@ export default function TeamWorkload() {
                 <TableRow key={s.tech._id} hover onClick={() => openTech(s.tech)} sx={{ cursor: "pointer", ...TABLE_ROW_SX }}>
                   <TableCell sx={{ maxWidth: 240 }}>
                     <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
-                      <Avatar sx={{ width: 32, height: 32, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(nameOf(s.tech)) }}>{personInitial(nameOf(s.tech))}</Avatar>
+                      <UserAvatar name={nameOf(s.tech)} src={s.tech.imageUrl} size={32} />
                       <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK }}>{nameOf(s.tech)}</Typography>
                     </Stack>
                   </TableCell>
@@ -381,7 +377,7 @@ export default function TeamWorkload() {
             <Box key={s.tech._id} role="button" onClick={() => openTech(s.tech)}
               sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, cursor: "pointer", boxShadow: CARD_SHADOW, "&:active": { bgcolor: SURFACE } }}>
               <Stack direction="row" spacing={1.1} alignItems="center">
-                <Avatar sx={{ width: 34, height: 34, fontSize: "0.9rem", fontWeight: 800, bgcolor: personColor(nameOf(s.tech)) }}>{personInitial(nameOf(s.tech))}</Avatar>
+                <UserAvatar name={nameOf(s.tech)} src={s.tech.imageUrl} size={34} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK }}>{nameOf(s.tech)}</Typography>
                   {s.overdue > 0

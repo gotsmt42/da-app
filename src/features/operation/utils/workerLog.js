@@ -1,5 +1,25 @@
-import moment from "moment";
 import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
+import { personValueOf, jobWorkValueNet } from "@/shared/utils/workValue";
+import { JOB_DOC_TYPES, isDocRequired, isDocComplete } from "@/shared/utils/jobDocTypes";
+import { jobDayStart as dayStart, jobDayEnd as dayEnd, jobDayCount } from "@/shared/utils/jobDays";
+
+/**
+ * ✅ (17 พ.ย. 2569 ผู้ใช้: "ความครบของข้อมูลควรมีมากกว่านี้ ให้สมบูรณ์") ความครบของ "งาน" (ทั้งทีม)
+ *    Service Report · เอกสารครบตามประเภทงาน (กติกาเดียวกับเช็คลิสต์เอกสารในหน้าการดำเนินงาน) · สรุปงานที่ทำ
+ *    คืน null = ข้อมูลชุดนี้ไม่มีฟิลด์ (server เก่ายังไม่ส่งมา) → ไม่นับ ไม่กล่าวหาว่าขาด
+ */
+export function jobCompleteness(rows) {
+  const known = rows.some((r) => r.reportFiles !== undefined || r.documentSentReport !== undefined);
+  const knownSummary = rows.some((r) => r.description !== undefined || r.workNote !== undefined);
+  const latest = rows[rows.length - 1] || {};
+  // เอกสารอื่นที่งานนี้ต้องมีนอกจาก Service Report (งาน PM = เอกสารการเงิน + ใบส่งมอบงาน) — ไม่ต้องมี = ไม่นับ
+  const others = JOB_DOC_TYPES.filter((t) => t.key !== "report" && isDocRequired(latest, t.key));
+  return {
+    hasReport: known ? rows.some((r) => isDocComplete(r, "report")) : null,
+    docsOk: known && others.length ? others.every((t) => rows.some((r) => isDocComplete(r, t.key))) : null,
+    hasSummary: knownSummary ? rows.some((r) => String(r.description || r.workNote || "").trim().length > 0) : null,
+  };
+}
 
 /**
  * workerLog.js — รายงานรายช่าง (บันทึกการเข้างานแยกรายบุคคล)
@@ -10,30 +30,21 @@ import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
  * หน่วยนับ: 1 แถว = 1 คน × 1 งาน ("ครั้ง")
  *  • งานที่เข้าหลายวัน/หลายช่วง (jobGroupId เดียวกัน) = 1 งาน — คนเดียวไปหลายช่วงก็นับ 1 ครั้ง (นับวันแยกให้)
  *  • ผู้ปฏิบัติงาน = หัวหน้าทีม (team) + ลูกทีม (teamMembers) ของ "แต่ละช่วง" — แต่ละช่วงคนไม่ตรงกันได้
- *  • มูลค่าครั้งนี้ (workValue) — ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน (ผู้ใช้เลือก 2 พ.ย. 2569)
- *    ผลรวมรายคนจึงมากกว่ามูลค่างานจริงได้ — ยอด "มูลค่างานจริง" นับงานละครั้งแยกไว้ (jobValueTotal)
+ *  • 🔁 (17 พ.ย. 2569 ผู้ใช้: "คนที่ 1 ลง 5000 คนที่ 2 ลง 3000 แล้วไม่รวมมูลค่ากัน ให้แยกตามคน")
+ *    มูลค่าของแถว (value) = มูลค่างานที่คนนั้นทำ (workerValues · ก่อน VAT) — เดิมทุกคนได้ workValue ของงานเต็มจำนวน
+ *    ข้อมูลเดิมที่ยังไม่มีรายคน: ยอดเดิมนับให้ "คนที่ลง" (workValueBy) เท่านั้น · คนอื่น = ยังไม่ใส่
+ *    มูลค่างานของงาน (workValue · ก่อน VAT) แยกไว้ใน jobValue / jobValueTotal (นับงานละครั้ง — ไม่ใช่ผลรวมรายคน)
  *  • นับเข้าเดือน/ปีตาม "วันแรกที่คนนั้นเข้างานนั้น"
  *  • ไม่นับนัดฝ่ายขาย และงานที่ยังไม่ลงวัน
  */
 
 export const DONE_STATUS = "ดำเนินการเสร็จสิ้น";
 
-const dayStart = (e) => moment(e.start || e.date).startOf("day");
-const dayEnd = (e) => {
-  if (!e.end) return dayStart(e);
-  const end = moment(e.end);
-  // allDay เก็บ end แบบ exclusive (เที่ยงคืนของวันถัดไป) — ถอยกลับหนึ่งวัน
-  return (e.allDay ? end.subtract(1, "days") : end).startOf("day");
-};
-
 /** ผู้ปฏิบัติงานของแถวหนึ่ง — คนที่ 1 = หัวหน้าทีม (ตัดชื่อซ้ำ) */
 export const workersOfRow = (e) => [...new Set([e.team, ...((e.teamMembers || []).map((m) => m?.name))].filter(Boolean))];
 
-/** มูลค่างานครั้งนี้ของงาน — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่ */
-export const workValueOfRows = (rows) => {
-  const hit = rows.find((r) => r.workValue !== null && r.workValue !== undefined && r.workValue !== "");
-  return hit ? Number(hit.workValue) : null;
-};
+/** มูลค่างานของงาน (ก่อน VAT) — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่ */
+export const workValueOfRows = jobWorkValueNet;
 
 /** ชื่อใน attendance เป็น "ชื่อ นามสกุล" — เทียบกับชื่อในทีม (ชื่อเล่น/ชื่อจริงคำแรก) */
 const sameName = (full, name) => full === name || String(full || "").split(" ")[0] === name;
@@ -62,7 +73,8 @@ export function buildWorkerEntries(events = [], attendance = []) {
   jobs.forEach((rows, jobKey) => {
     rows.sort((a, b) => dayStart(a) - dayStart(b));
     const latest = rows.reduce((p, r) => (dayEnd(r).isAfter(dayEnd(p)) ? r : p), rows[0]);
-    const value = workValueOfRows(rows);
+    const jobValue = workValueOfRows(rows);
+    const complete = jobCompleteness(rows);
     const teamAll = new Set();
     const per = new Map();
     rows.forEach((r) => workersOfRow(r).forEach((name, i) => {
@@ -77,9 +89,9 @@ export function buildWorkerEntries(events = [], attendance = []) {
       let last = dayEnd(x.sessions[0]);
       let days = 0;
       x.sessions.forEach((r) => {
-        const s = dayStart(r); const e = dayEnd(r);
+        const e = dayEnd(r);
         if (e.isAfter(last)) last = e;
-        days += Math.max(1, e.diff(s, "days") + 1);
+        days += jobDayCount(r);
       });
       const ids = new Set(x.sessions.map((r) => String(r._id)));
       const member = x.sessions.flatMap((r) => r.teamMembers || []).find((m) => m?.name === name);
@@ -97,9 +109,16 @@ export function buildWorkerEntries(events = [], attendance = []) {
         endDate: last.format("YYYY-MM-DD"),
         sessions: x.sessions.length,
         days,
-        value,
+        ...(() => {
+          const pv = personValueOf(rows, name);
+          return { value: pv ? pv.net : null, valueLegacy: Boolean(pv?.legacy) };
+        })(),
+        jobValue,
         status: latest.status || "",
         done: latest.status === DONE_STATUS,
+        // ✅ (17 พ.ย. 2569) ขอปิดงานแล้ว รอแอดมินตรวจ — กติกาเดียวกับกลุ่ม "รอตรวจปิดงาน" ของหน้าการดำเนินงาน
+        closeRequested: rows.some((r) => r.closeRequested && r.status !== DONE_STATUS),
+        ...complete,
         company: latest.company || "",
         site: latest.site || "",
         title: latest.title || "",
@@ -176,7 +195,7 @@ export function summarizeEntries(entries = []) {
     const cell = pivot.get(r.name).get(m) || { visits: 0, total: 0 };
     cell.visits += 1; cell.total += r.value || 0;
     pivot.get(r.name).set(m, cell);
-    if (r.value !== null) jobValues.set(r.jobKey, r.value);
+    if (r.jobValue !== null && r.jobValue !== undefined) jobValues.set(r.jobKey, r.jobValue);
   });
 
   const totals = finish(all);

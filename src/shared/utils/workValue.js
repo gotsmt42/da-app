@@ -26,6 +26,14 @@ export function vatParts(amount, vatIncluded) {
 /** ยอดก่อน VAT ของงาน (ใช้รวมยอด/วางบิล) · ไม่มีค่า = null */
 export const workValueNet = (ev) => (hasWorkValue(ev?.workValue) ? vatParts(ev.workValue, Boolean(ev.workValueVatIncluded)).net : null);
 
+/**
+ * ✅ (17 พ.ย. 2569) มูลค่างานของ "งาน" (ทุกวันของงานเก็บค่าเดียวกัน — ใช้แถวแรกที่ใส่ไว้)
+ *    ที่เดียวทั้งแอป: หน้าการดำเนินงาน · สรุปผลงาน · รายงานรายช่าง · Excel (เดิมเขียนซ้ำ 4 ที่)
+ */
+export const jobWorkValueHit = (rows) => (rows || []).find((r) => hasWorkValue(r?.workValue)) || null;
+/** มูลค่างานของงาน ก่อน VAT · null = ยังไม่ใส่ */
+export const jobWorkValueNet = (rows) => workValueNet(jobWorkValueHit(rows));
+
 export const vatLabel = (vatIncluded) => (vatIncluded ? "รวม VAT" : "ก่อน VAT");
 
 /**
@@ -98,4 +106,62 @@ export function suggestWorkValue(ev) {
     }
   }
   return null;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * ✅ (17 พ.ย. 2569 ผู้ใช้: "ผู้ปฏิบัติงาน 1 ใส่มูลค่าเข้างานโครงการนั้นครั้งนั้น 5000 คนที่ 2 ลง 3000
+ *    แล้วไม่รวมมูลค่ากัน ให้แยกตามคน และเช็คการเชื่อมโยงข้อมูลให้สมบูรณ์")
+ *    มูลค่างานรายคน (workerValues) — แต่ละคนลงยอดของตัวเอง ไม่ทับกัน ไม่บวกรวมกัน
+ *    • ผู้ใช้เลือก: ยอดรายคนใช้ในรายงานรายช่างเท่านั้น · มูลค่างานของงาน (workValue) แยกเป็นอีกค่า
+ *    • งานเข้าหลายวันเก็บชุดเดียวกันทุกวัน — rows = ทุกวันของงาน (หรือวันเดียวก็ได้)
+ *    • ข้อมูลเดิม (ก่อนมีรายคน): งานที่ยังไม่มีรายการรายคนเลย + ยอดเดิมลงโดยคนในทีม = นับให้คนที่ลง
+ *      (เดิมทุกคนได้ยอดเต็ม — ยอดรายคนจึงพองเกินจริง)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/** ชื่อเต็ม "ชื่อ นามสกุล" ตรงกับชื่อในทีม (ชื่อคำแรก) ไหม */
+export const sameWorkerName = (full, name) => Boolean(full && name)
+  && (full === name || String(full).trim().split(/\s+/)[0] === name);
+
+/** ผู้ปฏิบัติงานของงาน (หัวหน้าทีม + ลูกทีม ทุกวัน ตัดชื่อซ้ำ) — คนแรก = หัวหน้าทีม */
+export const workersOfRows = (rows) => [...new Set((rows || [])
+  .flatMap((r) => [r?.team, ...((r?.teamMembers || []).map((m) => m?.name))])
+  .filter(Boolean))];
+
+/** Map ชื่อ → รายการมูลค่ารายคน (ถ้าแต่ละวันไม่ตรงกัน ใช้ค่าที่บันทึกล่าสุด) */
+export function workerValueMap(rows) {
+  const map = new Map();
+  (rows || []).forEach((r) => (r?.workerValues || []).forEach((w) => {
+    if (!w?.name || !hasWorkValue(w.amount)) return;
+    const prev = map.get(w.name);
+    if (!prev || new Date(w.at || 0) > new Date(prev.at || 0)) map.set(w.name, w);
+  }));
+  return map;
+}
+
+/**
+ * มูลค่างานของคนนี้ในงานนี้ · null = คนนี้ยังไม่ลง
+ * @returns {{amount:number, vatIncluded:boolean, net:number, at?:string, by?:string, legacy:boolean}|null}
+ */
+export function personValueOf(rows, name) {
+  if (!name) return null;
+  const map = workerValueMap(rows);
+  const w = map.get(name);
+  if (w) {
+    const vat = Boolean(w.vatIncluded);
+    return { amount: Number(w.amount), vatIncluded: vat, net: vatParts(w.amount, vat).net, at: w.at, by: w.by, legacy: false };
+  }
+  if (map.size) return null;
+  const hit = (rows || []).find((r) => hasWorkValue(r?.workValue));
+  if (!hit || !sameWorkerName(hit.workValueBy, name)) return null;
+  const vat = Boolean(hit.workValueVatIncluded);
+  return { amount: Number(hit.workValue), vatIncluded: vat, net: vatParts(hit.workValue, vat).net, at: hit.workValueAt, by: hit.workValueBy, legacy: true };
+}
+
+/** ชื่อของผู้ใช้คนนี้ในทีมงาน (เทียบ userId ของลูกทีมก่อน แล้วชื่อ) · ไม่อยู่ในทีม = "" */
+export function myWorkerName(rows, me) {
+  if (!me) return "";
+  const uid = me.userId ? String(me.userId) : "";
+  const byId = uid && (rows || []).flatMap((r) => r?.teamMembers || []).find((m) => m?.userId && String(m.userId) === uid);
+  if (byId?.name) return byId.name;
+  return workersOfRows(rows).find((n) => n === me.fname) || "";
 }

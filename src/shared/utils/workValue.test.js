@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vatParts, workValueNet, suggestWorkValue, vatNote, contractVatInfo } from "./workValue";
+import { vatParts, workValueNet, suggestWorkValue, vatNote, contractVatInfo, personValueOf, workersOfRows, myWorkerName } from "./workValue";
 
 describe("vatParts", () => {
   it("ยอดก่อน VAT → บวก 7%", () => {
@@ -71,5 +71,27 @@ describe("contractVatInfo (งานสัญญา = VAT ตามมูลค�
     expect(unset.text).toMatch(/ยังไม่ระบุ/);
     expect(unset.vatText).toMatch(/ยังไม่ระบุ VAT/);
     expect(contractVatInfo({ contractGroupId: "C" }).text).toMatch(/ยังไม่มีมูลค่าสัญญา/);
+  });
+});
+
+// ✅ (17 พ.ย. 2569) มูลค่างานรายคน — แยกตามคน ไม่ทับ ไม่รวม
+describe("มูลค่างานรายคน", () => {
+  const rows = [{
+    team: "A", teamMembers: [{ name: "B", userId: "u-b" }, { name: "C" }], workValue: 9000,
+    workerValues: [{ name: "A", amount: 5000, at: "2026-11-01" }, { name: "B", amount: 3210, vatIncluded: true, at: "2026-11-02" }],
+  }];
+  it("แต่ละคนได้ยอดของตัวเอง · รวม VAT แปลงเป็นก่อน VAT", () => {
+    expect(personValueOf(rows, "A")).toMatchObject({ amount: 5000, net: 5000, legacy: false });
+    expect(personValueOf(rows, "B")).toMatchObject({ amount: 3210, net: 3000, vatIncluded: true });
+    expect(personValueOf(rows, "C")).toBeNull();
+  });
+  it("มีรายคนแล้ว = ไม่ย้อนใช้ยอดเดิมของงาน", () => {
+    expect(personValueOf([{ ...rows[0], workValueBy: "C Lastname" }], "C")).toBeNull();
+  });
+  it("ทีมงาน + ชื่อของผู้ใช้ในทีม (userId ก่อนชื่อ)", () => {
+    expect(workersOfRows(rows)).toEqual(["A", "B", "C"]);
+    expect(myWorkerName(rows, { userId: "u-b", fname: "X" })).toBe("B");
+    expect(myWorkerName(rows, { fname: "A" })).toBe("A");
+    expect(myWorkerName(rows, { fname: "Z" })).toBe("");
   });
 });

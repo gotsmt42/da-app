@@ -264,6 +264,15 @@ const EventService = {
   },
 
   /** ให้ AI อ่านยอดจากรูปใบวางบิล — คืนค่ามาเติมในฟอร์มเท่านั้น ไม่ได้บันทึกอะไร */
+  /**
+   * ✅ (17 พ.ย. 2569) มูลค่างานรายคน — แต่ละคนลงยอดของตัวเอง (ไม่ทับกัน ไม่รวมกัน)
+   *    name ว่าง = ของตัวเอง · amount null = ล้าง · คืน { workerValues, eventIds } (ทุกวันของงาน)
+   */
+  async SetWorkerValue(id, { name, amount, vatIncluded } = {}) {
+    const res = await API.put(`/events/${id}/worker-value`, { name: name || undefined, amount, vatIncluded: Boolean(vatIncluded) });
+    return res.data;
+  },
+
   async ScanInvoice(id, fileId) {
     // ✅ (17 พ.ย. 2569) ส่ง array = อ่านหลายใบแล้วรวมยอด (server รวมยอดเอง ไม่ให้ AI บวกเลข)
     const res = await API.post(`/events/${id}/billing/scan`, Array.isArray(fileId) ? { fileIds: fileId } : { fileId });

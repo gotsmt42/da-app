@@ -25,7 +25,7 @@ import {
   isSevereDays,
   countFlaggedJobs,
   countDistinctJobs,
-  resolveAssignedTechnician,
+  resolveResponsibleUser,
   resolveOperationGroup,
   getOverdueGroupKey,
 } from "@/shared/utils/overdueJobs";
@@ -41,9 +41,11 @@ import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, AL
 import HomeMenu from "../components/HomeMenu";
 import TodayCheckInCard from "@/features/attendance/components/TodayCheckInCard";
 import MobileHome from "../components/MobileHome";
-import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
+import DesktopOverview from "../components/DesktopOverview";
+import UserAvatar from "@/shared/ui/UserAvatar";
+import { buildAllJobs, rankProjects } from "@/features/customers/utils/customerJobs";
+import { Box, Typography, Stack, ButtonBase } from "@mui/material";
 import { ExpandMoreRounded as ExpandMore, TodayRounded as Today, EventRounded, EngineeringRounded, RequestQuoteRounded, EventRepeatRounded, EditCalendarRounded, ApartmentRounded, GroupsRounded, ScheduleRounded, NotificationsActiveRounded, ErrorOutlineRounded as ErrorOutline } from "@mui/icons-material";
-import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
 import { Widget, Row, Empty, Loading, Pager, Pill, DateTile, IconTile } from "../components/DashWidgets";
 import { alpha } from "@mui/material/styles";
@@ -115,6 +117,9 @@ const Dashboard = () => {
   const canViewQuotations = can(userData, "viewFinance");
   // จอมือถือ (< 600px) ใช้หน้าแรกแบบแอป (MobileHome)
   const isPhone = useMediaQuery("(max-width:599.95px)");
+  // ✅ (17 พ.ย. 2569 ผู้ใช้: "หน้านี้ควรเป็น Dashboard แสดงผลงานจริง · เฉพาะจอคอม/จอใหญ่ · มือถือเป็นเมนูแบบเดิม")
+  //    ≥1024px = ภาพรวมผลงาน (DesktopOverview) แทนกริดเมนู (จอใหญ่มีเมนูข้าง/แถบบนอยู่แล้ว) · เล็กกว่า = เมนูเดิม
+  const isLargeScreen = useMediaQuery("(min-width:1024px)");
 
 
   /**
@@ -321,7 +326,7 @@ const Dashboard = () => {
       ]),
     );
     bySignature.forEach(({ sessions, days }) => {
-      const tech = resolveAssignedTechnician(sessions, userById, userByFname);
+      const tech = resolveResponsibleUser(sessions, userById, userByFname); // ✅ ลำดับเดียวกับหน้าภาระงานทีมช่าง/backend
       if (!tech || !isRole(tech, ...TECHNICIAN_ROLES)) return;
       const entry = counts.get(tech._id);
       if (!entry) return;
@@ -469,33 +474,9 @@ const Dashboard = () => {
   // ✅ events มาจาก getEventOp() ที่ scope ตาม role อยู่แล้ว — แอดมิน/manager เห็นทุกโครงการจริง
   // ส่วนช่างจะเห็นแค่โครงการที่ตัวเองเคยได้รับมอบหมาย จึงโชว์ section นี้เฉพาะแอดมิน/manager
   // ที่ข้อมูลมีความหมายเป็น "ภาพรวมทั้งบริษัท" จริงๆ
-  const topProjects = (() => {
-    const counts = {};
-    events.forEach((e) => {
-      if (!e.company && !e.site) return;
-      // ✅ เก็บ company/site แยกไว้ (ไม่ใช่แค่รวมเป็นข้อความเดียว) เพื่อส่งเป็น query param
-      // ไปกรองหน้า /customer ให้ตรงตัวเป๊ะๆ ตอนกดแถวโครงการ
-      // ⚠️ คั่นด้วย \u0000 (อักขระที่เป็นไปไม่ได้ในชื่อบริษัท/โครงการ) กันคีย์ชนกันเวลาชื่อมีอักขระพิเศษ
-      // ⚠️ ต้องเขียนเป็น escape ห้ามฝัง NUL ดิบลงไฟล์ — จะทำให้ grep มองไฟล์นี้เป็น binary แล้วข้ามทั้งไฟล์
-      const key = `${e.company || ""}\u0000${e.site || ""}`;
-      if (!counts[key])
-        counts[key] = {
-          company: e.company || "",
-          site: e.site || "",
-          count: 0,
-        };
-      counts[key].count += 1;
-    });
-    return Object.values(counts)
-      .sort((a, b) => b.count - a.count)
-      .map((p) => ({
-        ...p,
-        name:
-          p.company && p.site
-            ? `${p.company} · ${p.site}`
-            : p.company || p.site,
-      }));
-  })();
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ความสอดคล้องข้อมูลหน้าต่างๆ") นับเป็น "งาน" กติกาเดียวกับหน้าการดำเนินงาน/ภาพรวมลูกค้า/ทะเบียนลูกค้า
+  //    (features/customers/utils/customerJobs) — เดิมนับทุกแถว: งานเข้า 3 วัน = 3 งาน และรวมนัดฝ่ายขาย ทำให้เลขไม่ตรงกับหน้าอื่น
+  const topProjects = useMemo(() => rankProjects(buildAllJobs(events)), [events]);
   const maxProjectCount = topProjects[0]?.count || 1;
 
   // 📄 แบ่งหน้ารายการโครงการ — แสดงหน้าละ 5 รายการ (รีเซ็ตกลับหน้า 1 เมื่อดึงข้อมูลใหม่)
@@ -585,7 +566,7 @@ const Dashboard = () => {
             <Box key={tech._id} sx={{ borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
               <Row onClick={() => setExpandedOverdueTechIds((prev) => { const next = new Set(prev); if (next.has(tech._id)) next.delete(tech._id); else next.add(tech._id); return next; })}
                 chevron={false}
-                leading={<Avatar sx={{ width: 30, height: 30, fontSize: "0.8rem", fontWeight: 800, bgcolor: personColor(name) }}>{personInitial(name)}</Avatar>}
+                leading={<UserAvatar name={name} src={tech.imageUrl} size={30} />}
                 title={name} sub={`${count} งานค้าง${severeCount > 0 ? ` · ${severeCount} เกิน 2 สัปดาห์` : ""}`}
                 trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}><Pill color={severeCount > 0 ? DANGER : "#d97706"}>{count} งาน</Pill><ExpandMore sx={{ fontSize: 18, color: FAINT, transition: "transform .15s", transform: isExpanded ? "rotate(180deg)" : "none" }} /></Box>}
                 danger={severeCount > 0} />
@@ -691,7 +672,7 @@ const Dashboard = () => {
             ) : (
             <>
             <Box sx={{ display: "flex", alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" }, gap: 1.5, mb: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
-              <Avatar sx={{ width: 42, height: 42, fontWeight: 800, bgcolor: personColor(userData?.fname || "ผู้ใช้") }}>{personInitial(userData?.fname || "ผู้ใช้")}</Avatar>
+              <UserAvatar name={userData?.fname || "ผู้ใช้"} src={userData?.imageUrl} size={42} />
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{getGreeting()} · {formatThai(moment().locale("th"), "D MMMM YYYY")}</Typography>
                 <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
@@ -757,12 +738,18 @@ const Dashboard = () => {
           ✅ ทุกหน้ารวมเป็นกริดเดียว หน้าตาเดียวกัน ตามสิทธิ์ของผู้ใช้ (เงื่อนไขเดียวกับเมนูข้าง)
           ✅ ตัวเลขใบเสนอราคาที่ต้องติดตามยังเห็นอยู่ เป็นป้ายแดงบนช่อง "ใบเสนอราคา" แทนแบนเนอร์ ─── */}
             {/* 🔁 (27 ต.ค. 2569) หัว "เมนูหลัก" ย้ายเข้าไปอยู่ใน HomeMenu เอง (ต้องดำเนินการ · เมนูทั้งหมด) */}
+            {isLargeScreen ? (
+              <DesktopOverview events={events} users={users} loading={loading}
+                teamView={isAdminOrManager} myName={userData?.fname || ""}
+                showValue={can(userData, "approveJobs") || can(userData, "viewAllJobs")} />
+            ) : (
             <HomeMenu
               userData={userData}
               badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
               hideMyJobs={showMyJobsHero}
               hideSalesJobs={isSale}
             />
+            )}
             </>
             )}
 
@@ -799,7 +786,7 @@ const Dashboard = () => {
             {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
           เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
             {isAdminOrManager && (
-              <Widget title="โครงการที่มีงานมากที่สุด" icon={ApartmentRounded} count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
+              <Widget title="โครงการที่มีงานมากที่สุด" icon={ApartmentRounded} count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับเป็นงาน (เข้าหลายวันนับ 1 · ไม่รวมนัดฝ่ายขาย) — ตรงกับภาพรวมลูกค้า"
                 footer={<Pager page={projectPage} pages={totalProjectPages} onChange={setProjectPage} />}>
                 {loading ? <Loading rows={5} /> : topProjects.length === 0 ? <Empty text="ยังไม่มีข้อมูลงานของโครงการ" /> : pagedProjects.map((p, i) => {
                   const rank = (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
@@ -811,7 +798,8 @@ const Dashboard = () => {
                       sub={<Box component="span" sx={{ display: "block", height: 4, mt: 0.75, borderRadius: 2, bgcolor: SURFACE, overflow: "hidden" }}>
                         <Box component="span" sx={{ display: "block", height: "100%", width: `${Math.max((p.count / maxProjectCount) * 100, 4)}%`, bgcolor: alpha(ACCENT, rank <= 3 ? 0.75 : 0.35), borderRadius: 2 }} />
                       </Box>}
-                      trailing={<Pill color={INK_2}>{p.count} งาน</Pill>} />
+                      trailing={<Pill color={INK_2}>{p.count} งาน</Pill>}
+                      trailingSub={`เสร็จ ${p.closed}${p.overdue ? ` · ค้าง ${p.overdue}` : ""}`} />
                   );
                 })}
               </Widget>

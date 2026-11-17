@@ -12,23 +12,26 @@
 import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { useMemo, useState, useEffect } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
 import Swal from "@/shared/ui/swal";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
-import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
+import { buildAllJobs, jobsByProject, projectKey, duplicateProjectKeys } from "../../utils/customerJobs";
+import CustomerJobsSection from "../CustomerJobsSection";
+import { useAuth } from "@/features/auth/AuthContext";
+import { can } from "@/shared/utils/roles";
 import {
   TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar, IconButton, Tooltip, Skeleton, useMediaQuery,
-  Pagination, Dialog, DialogContent, DialogActions, Table, TableHead, TableBody, TableRow, TableCell, Collapse,
+  Pagination, Dialog, DialogContent, DialogActions, Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
-import { ApartmentRounded as Apartment, AddRounded as Add, EditRounded as Edit, DeleteOutlineRounded as DeleteOutline, CloseRounded as Close, DownloadRounded as Download, ContentCopyRounded as ContentCopy, ChevronRightRounded as ChevronRight, PhoneRounded as Phone, EmailRounded as Email, PersonRounded as Person, PlaceRounded as Place, ReceiptRounded as Receipt, FilterAltRounded as FilterAlt, WorkHistoryRounded as WorkHistory } from "@mui/icons-material";
+import { ApartmentRounded as Apartment, AddRounded as Add, EditRounded as Edit, DeleteOutlineRounded as DeleteOutline, CloseRounded as Close, DownloadRounded as Download, ContentCopyRounded as ContentCopy, PhoneRounded as Phone, EmailRounded as Email, PersonRounded as Person, PlaceRounded as Place, ReceiptRounded as Receipt, FilterAltRounded as FilterAlt } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import SelectField from "@/shared/ui/SelectField";
 import {
-  PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
+  PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
   CARD_SHADOW, TABLE_HEAD_SX, TABLE_ROW_SX, PRIMARY_BTN_SX, ICON_BTN_SX,
   PAGE_SX,
 } from "@/shared/ui/PageKit";
@@ -37,8 +40,6 @@ const EMPTY_FORM = { cCompany: "", cSite: "", cEmail: "", cName: "", address: ""
 const PAGE_SIZE = 15;
 
 // ✅ สีจุดสถานะงาน — ความหมายเดียวกับหน้าการดำเนินงาน (ใช้เป็นจุดเล็กเท่านั้น)
-const STATUS_COLORS = { "กำลังรอยืนยัน": "#d97706", "ยืนยันแล้ว": "#2563eb", "กำลังดำเนินการ": "#7c3aed", "ดำเนินการเสร็จสิ้น": "#16a34a" };
-const statusColor = (status) => STATUS_COLORS[status] || FAINT;
 
 // ✅ บังคับแค่ "โครงการ" ช่องเดียว — บริษัท/อีเมล/เบอร์/ที่อยู่ กรอกทีหลังได้
 const FIELDS = [
@@ -53,7 +54,6 @@ const FIELDS = [
 const FIELD_SX = { "& .MuiOutlinedInput-root": { borderRadius: 2 } };
 const titleOfRow = (r) => r.cSite || r.cCompany || "ไม่ระบุชื่อ";
 /** งานของโครงการนี้ — Event ไม่มี customerId จึงเทียบ company+site ตรงตัว (เหมือนตอนลงงานใน AddEvent) */
-const eventsOf = (events, r) => (events || []).filter((e) => (e.company || "") === (r.cCompany || "") && (e.site || "") === (r.cSite || ""));
 
 const CustomerFormDialog = ({ open, mode, data, errors, onChange, onClose, onSubmit, fullScreen }) => {
   const group = (key, title) => (
@@ -94,20 +94,12 @@ const CustomerFormDialog = ({ open, mode, data, errors, onChange, onClose, onSub
   );
 };
 
-/** กล่องรายละเอียดลูกค้า: ข้อมูลติดต่อครบ + ประวัติงานรายปี (กดงานไปหน้าการดำเนินงาน) */
-const CustomerDetailDialog = ({ row, events, onClose, onEdit, onDelete, fullScreen }) => {
-  const navigate = useNavigate();
-  const [openYears, setOpenYears] = useState({});
-  const jobs = useMemo(() => (row ? eventsOf(events, row) : []), [events, row]);
-  const years = useMemo(() => {
-    const byYear = {};
-    jobs.forEach((e) => {
-      const y = formatThai(moment(e.start || e.date), "YYYY");
-      (byYear[y] = byYear[y] || []).push(e);
-    });
-    return Object.entries(byYear).sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([year, list]) => ({ year, list: list.sort((a, b) => new Date(b.start || b.date) - new Date(a.start || a.date)) }));
-  }, [jobs]);
+/**
+ * กล่องรายละเอียดลูกค้า: ข้อมูลติดต่อครบ + งานในระบบ (สรุปสถานะ + รายปี — กดงานเปิดรายละเอียดทับ)
+ * 🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้ดูมีอะไรให้ชัดเจน ละเอียดกว่านี้ · ข้อมูลสอดคล้อง") งานมาจาก utils/customerJobs
+ *    (1 งาน = 1 กลุ่มงาน · ไม่นับนัดฝ่ายขาย — ตัวเลขตรงกับภาพรวมลูกค้า/หน้าแรก/หน้าการดำเนินงาน)
+ */
+const CustomerDetailDialog = ({ row, jobs = [], duplicate = 0, showValue, onClose, onEdit, onDelete, fullScreen }) => {
   if (!row) return null;
   const name = titleOfRow(row);
   const info = [
@@ -118,13 +110,13 @@ const CustomerDetailDialog = ({ row, events, onClose, onEdit, onDelete, fullScre
     [Receipt, row.tax && `เลขผู้เสียภาษี ${row.tax}`],
   ].filter(([, v]) => v);
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={fullScreen} PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
+    <Dialog open onClose={onClose} fullWidth maxWidth="md" fullScreen={fullScreen} PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
       <Box sx={{ px: 2.5, py: 2, bgcolor: "#fff", borderBottom: `1px solid ${LINE}` }}>
         <Stack direction="row" spacing={1.25} alignItems="center">
           <Avatar variant="rounded" sx={{ width: 40, height: 40, borderRadius: 2, fontWeight: 800, bgcolor: personColor(name) }}>{personInitial(name)}</Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography noWrap sx={{ fontWeight: 900, fontSize: "1.02rem", color: INK }}>{name}</Typography>
-            <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{row.cCompany && row.cSite ? row.cCompany : "ทะเบียนลูกค้า"} · งาน {jobs.length} รายการ</Typography>
+            <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{row.cCompany && row.cSite ? row.cCompany : "ทะเบียนลูกค้า"} · งานในระบบ {jobs.length} งาน</Typography>
           </Box>
           <IconButton aria-label="ปิด" onClick={onClose}><Close /></IconButton>
         </Stack>
@@ -144,47 +136,13 @@ const CustomerDetailDialog = ({ row, events, onClose, onEdit, onDelete, fullScre
             </Box>
           </Box>
 
-          <Box>
-            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.75 }}>
-              <WorkHistory sx={{ fontSize: 17, color: MUTED }} />
-              <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: INK }}>ประวัติงานรายปี</Typography>
-            </Stack>
-            {!years.length ? (
-              <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีงานของโครงการนี้ในระบบ</Typography>
-            ) : (
-              <Stack spacing={1}>
-                {years.map(({ year, list }, idx) => {
-                  const open = openYears[year] ?? idx === 0;
-                  return (
-                    <Box key={year} sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden" }}>
-                      <Stack direction="row" alignItems="center" spacing={1} onClick={() => setOpenYears((p) => ({ ...p, [year]: !open }))}
-                        sx={{ px: 1.5, py: 1, cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
-                        <ChevronRight sx={{ fontSize: 18, color: MUTED, transition: "transform .15s", transform: open ? "rotate(90deg)" : "none" }} />
-                        <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "0.84rem", color: INK }}>ปี {year}</Typography>
-                        <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>{list.length} งาน</Typography>
-                      </Stack>
-                      <Collapse in={open} unmountOnExit>
-                        {list.map((job) => (
-                          <Stack key={job._id} direction="row" spacing={1.1} alignItems="center"
-                            onClick={() => { const g = resolveOperationGroup(job); navigate(`/operation/${job._id}${g ? `?group=${g}` : ""}`); }}
-                            sx={{ px: 1.5, py: 1, borderTop: `1px solid ${LINE}`, cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK }}>{[job.title || "ไม่ระบุประเภท", job.system].filter(Boolean).join(" · ")}</Typography>
-                              <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>
-                                {formatThai(moment(job.start || job.date), "D MMM YYYY")}{job.team ? ` · ทีม ${job.team}` : ""}{job.docNo ? ` · #${job.docNo}` : ""}
-                              </Typography>
-                            </Box>
-                            <DotLabel color={statusColor(job.status)}>{job.status || "ไม่ระบุ"}</DotLabel>
-                            <ChevronRight sx={{ fontSize: 18, color: "#cbd5e1" }} />
-                          </Stack>
-                        ))}
-                      </Collapse>
-                    </Box>
-                  );
-                })}
-              </Stack>
-            )}
-          </Box>
+          {duplicate > 1 && (
+            <Box sx={{ px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#b45309" }}>มีชื่อนี้ในทะเบียน {duplicate} รายการ</Typography>
+              <Typography sx={{ fontSize: "0.76rem", color: "#92400e" }}>งานของโครงการนี้แสดงเหมือนกันทุกรายการ — เก็บรายการที่ข้อมูลครบไว้ แล้วลบรายการที่ซ้ำ</Typography>
+            </Box>
+          )}
+          <CustomerJobsSection jobs={jobs} showValue={showValue} />
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 1.5, bgcolor: "#fff", borderTop: `1px solid ${LINE}` }}>
@@ -211,13 +169,16 @@ const CopyBtn = ({ text, label, onCopy }) => (
   </Tooltip>
 );
 
-const Who = ({ row, size = 34 }) => {
+const Who = ({ row, size = 34, duplicate = false }) => {
   const name = titleOfRow(row);
   return (
     <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
       <Avatar variant="rounded" sx={{ width: size, height: size, borderRadius: 2, fontSize: size * 0.4, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
       <Box sx={{ minWidth: 0 }}>
-        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK, lineHeight: 1.3 }}>{name}</Typography>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK, lineHeight: 1.3 }}>
+          {name}
+          {duplicate && <Box component="span" title="มีชื่อนี้ในทะเบียนมากกว่า 1 รายการ" sx={{ ml: 0.75, px: 0.6, py: 0.1, borderRadius: "5px", fontSize: "0.66rem", fontWeight: 800, color: "#b45309", bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>ชื่อซ้ำ</Box>}
+        </Typography>
         <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.3 }}>{row.cCompany && row.cSite ? row.cCompany : row.tax ? `ภาษี ${row.tax}` : "ไม่ระบุบริษัท"}</Typography>
       </Box>
     </Stack>
@@ -401,8 +362,9 @@ const Customer = () => {
   const filteredCustomers = useMemo(() => {
     // ✅ กรองตรงตัวเป๊ะๆ ตามโครงการที่กดมาจาก Dashboard — ทับตัวค้นหาข้อความปกติไว้ก่อน
     if (projectFilter) {
+      // ⚠️ เทียบแบบตัดช่องว่าง/ไม่สนตัวพิมพ์ — ชื่อจากงานกับทะเบียนพิมพ์ต่างกันเล็กน้อยได้
       return customers.filter((customer) =>
-        customer.cCompany === projectFilter.company && customer.cSite === projectFilter.site
+        projectKey(customer.cCompany, customer.cSite) === projectKey(projectFilter.company, projectFilter.site)
       );
     }
     const lowerSearch = searchTerm.trim().toLowerCase();
@@ -411,12 +373,15 @@ const Customer = () => {
   }, [customers, searchTerm, projectFilter]);
 
   // จำนวนงานต่อโครงการ (นับครั้งเดียว ใช้ทั้งตาราง/การ์ด/เรียงลำดับ)
-  const jobCounts = useMemo(() => {
-    const m = new Map();
-    events.forEach((e) => { const k = `${e.company || ""}|${e.site || ""}`; m.set(k, (m.get(k) || 0) + 1); });
-    return m;
-  }, [events]);
-  const jobCountOf = (r) => jobCounts.get(`${r.cCompany || ""}|${r.cSite || ""}`) || 0;
+  // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ข้อมูลสอดคล้อง") นับเป็น "งาน" กติกาเดียวกับหน้าการดำเนินงาน — เดิมนับทุกแถว (เข้า 3 วัน = 3 · รวมนัดฝ่ายขาย)
+  const jobCounts = useMemo(() => jobsByProject(buildAllJobs(events)), [events]);
+  const jobsOfRow = (r) => jobCounts.get(projectKey(r.cCompany, r.cSite)) || [];
+  const jobCountOf = (r) => jobsOfRow(r).length;
+  // ชื่อซ้ำในทะเบียน (บริษัท + โครงการเดียวกัน) — ติดป้ายให้เห็นแล้วลบรายการซ้ำ
+  const dupKeys = useMemo(() => duplicateProjectKeys(customers), [customers]);
+  const dupCount = (r) => customers.filter((c) => projectKey(c.cCompany, c.cSite) === projectKey(r.cCompany, r.cSite)).length;
+  const { userData } = useAuth();
+  const showValue = can(userData, "approveJobs") || can(userData, "viewAllJobs");
 
   const sortedCustomers = useMemo(() => {
     const by = (f) => (a, b) => String(a[f] || "~").localeCompare(String(b[f] || "~"), "th");
@@ -438,7 +403,8 @@ const Customer = () => {
     ).length;
     const companies = new Set(customers.map((c) => String(c.cCompany || "").trim().toLowerCase()).filter(Boolean)).size;
     const withJobs = customers.filter((c) => jobCountOf(c) > 0).length;
-    const jobs = customers.reduce((n, c) => n + jobCountOf(c), 0);
+    // งานรวม — นับโครงการละครั้ง (ทะเบียนชื่อซ้ำไม่นับงานซ้ำ)
+    const jobs = [...new Set(customers.map((c) => projectKey(c.cCompany, c.cSite)))].reduce((n, k) => n + (jobCounts.get(k) || []).length, 0);
     const noContact = customers.filter((c) => !c.tel && !c.cEmail).length;
     return { total, thisMonth, companies, withJobs, jobs, noContact };
   }, [customers, jobCounts]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -490,7 +456,7 @@ const Customer = () => {
           ) : (
             <KpiRow columns={4}>
               <Kpi label="โครงการทั้งหมด" value={`${stats.total} รายการ`} sub={`${stats.companies} บริษัท`} />
-              <Kpi label="มีงานในระบบ" value={`${stats.withJobs} รายการ`} sub={`งานรวม ${stats.jobs} รายการ`} />
+              <Kpi label="มีงานในระบบ" value={`${stats.withJobs} รายการ`} sub={`งานรวม ${stats.jobs} งาน${dupKeys.size ? ` · ชื่อซ้ำ ${dupKeys.size} ชื่อ` : ""}`} />
               <Kpi label="ไม่มีข้อมูลติดต่อ" value={`${stats.noContact} รายการ`} sub="ไม่มีทั้งเบอร์และอีเมล" />
               <Kpi label="เพิ่มเดือนนี้" value={`${stats.thisMonth} รายการ`} sub={formatThai(moment(), "MMMM YYYY")} />
             </KpiRow>
@@ -520,7 +486,7 @@ const Customer = () => {
               <Box key={row._id} role="button" onClick={() => setDetailId(row._id)}
                 sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, cursor: "pointer", boxShadow: CARD_SHADOW, "&:active": { bgcolor: SURFACE } }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Box sx={{ flex: 1, minWidth: 0 }}><Who row={row} /></Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}><Who row={row} duplicate={dupKeys.has(projectKey(row.cCompany, row.cSite))} /></Box>
                   <RowActions row={row} onEdit={handleEditOpen} onDelete={handleDeleteRow} />
                 </Stack>
                 <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${LINE}`, display: "grid", gap: 0.6 }}>
@@ -538,7 +504,7 @@ const Customer = () => {
                     </Typography>
                   )}
                   {!row.cName && !row.tel && !row.cEmail && <Typography sx={{ fontSize: "0.8rem", color: FAINT }}>ยังไม่มีข้อมูลติดต่อ</Typography>}
-                  <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>งานในระบบ {jobCountOf(row)} รายการ</Typography>
+                  <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>งานในระบบ {jobCountOf(row)} งาน</Typography>
                 </Box>
               </Box>
             ))}
@@ -559,7 +525,7 @@ const Customer = () => {
               <TableBody>
                 {pageRows.map((row) => (
                   <TableRow key={row._id} hover onClick={() => setDetailId(row._id)} sx={{ cursor: "pointer", ...TABLE_ROW_SX }}>
-                    <TableCell sx={{ maxWidth: 300 }}><Who row={row} /></TableCell>
+                    <TableCell sx={{ maxWidth: 300 }}><Who row={row} duplicate={dupKeys.has(projectKey(row.cCompany, row.cSite))} /></TableCell>
                     <TableCell sx={{ maxWidth: 180 }}><Typography noWrap sx={{ fontSize: "0.84rem", color: row.cName ? INK : FAINT }}>{row.cName || "—"}</Typography></TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {row.tel ? (
@@ -602,7 +568,7 @@ const Customer = () => {
       </Box>
 
       {detailRow && (
-        <CustomerDetailDialog row={detailRow} events={events} fullScreen={isSmallScreen} onClose={() => setDetailId("")}
+        <CustomerDetailDialog row={detailRow} jobs={jobsOfRow(detailRow)} duplicate={dupCount(detailRow)} showValue={showValue} fullScreen={isSmallScreen} onClose={() => setDetailId("")}
           onEdit={(r) => { setDetailId(""); handleEditOpen(r); }} onDelete={(id) => { setDetailId(""); handleDeleteRow(id); }} />
       )}
       <CustomerFormDialog open={modalOpenInsert} mode="add" data={newCustomerData} errors={formErrors} onChange={handleChange}

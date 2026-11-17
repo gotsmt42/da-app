@@ -46,6 +46,10 @@ export const ACTIVITY_LOG_META = {
   job_confirmed:        { label: "ยืนยันนัดแล้ว",            emoji: "✅", color: "#16a34a" },
   responsible_assigned: { label: "มอบหมายผู้รับผิดชอบ",       emoji: "👤", color: "#8b5cf6" },
   follow_up:            { label: "แจ้งงานไม่เสร็จ",          emoji: "⚠️", color: "#d97706" },
+
+  // มูลค่างาน — ของงาน (value_saved) · รายคน (worker_value_saved ✅ 17 พ.ย. 2569 แยกตามคน)
+  value_saved:          { label: "บันทึกมูลค่างาน",          emoji: "💰", color: "#059669" },
+  worker_value_saved:   { label: "บันทึกมูลค่างานรายคน",     emoji: "💰", color: "#059669" },
 };
 
 export const getActivityLogMeta = (action) =>

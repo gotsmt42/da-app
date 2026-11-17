@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { workValueNet } from "@/shared/utils/workValue";
+import { jobWorkValueNet, personValueOf } from "@/shared/utils/workValue";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -69,11 +69,8 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   //    อย่างน้อย 4 ช่อง · งานไหนมีคนมากกว่านั้นเพิ่มช่องให้พอทุกคน
   const workersOf = (a) => [...new Set([a.team, ...((a.teamMembers || []).map((m) => m?.name))].filter(Boolean))];
   // มูลค่างานครั้งนี้ของงาน — ทุกวันในกลุ่มเก็บค่าเดียวกัน ใช้ค่าแรกที่มี · null = ยังไม่ใส่
-  const workValueOf = (sessions) => {
-    // 🔁 (10 พ.ย. 2569) ยอดก่อน VAT เสมอ (ใส่แบบรวม VAT ไว้ = ถอด VAT ออก) — รวมยอดได้ถูกต้อง
-    const hit = sessions.find((e) => e?.workValue !== null && e?.workValue !== undefined && e?.workValue !== "");
-    return hit ? workValueNet(hit) : null;
-  };
+  // 🔁 (10 พ.ย. 2569) ยอดก่อน VAT เสมอ · ที่เดียวกับทุกหน้า (shared/utils/workValue.js)
+  const workValueOf = jobWorkValueNet;
   const workerSlots = Math.max(4, ...jobs.map((job) => workersOf(job.sessions[0] || {}).length));
   const workerCols = Array.from({ length: workerSlots }, (_, i) => (
     { key: `worker${i + 1}`, header: i === 0 ? "ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" : `ผู้ปฏิบัติงาน ${i + 1}`, width: i === 0 ? 24 : 18, group: "ผู้ปฏิบัติงาน", worker: true }
@@ -201,7 +198,11 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       source: { sales: "ฝ่ายขาย", service: "ฝ่ายบริการ", project: "ฝ่ายโครงการ", customer: "ลูกค้าแจ้งตรง", calendar: "ลงตารางตรง", dispatch: "คำขอลงงาน" }[a.intakeSource] || "",
       dispatchNo: a.dispatchNo || "",
       parts: sessions.length,
-      ...Object.fromEntries(workersOf(a).map((n, i) => [`worker${i + 1}`, n])),
+      // ✅ (17 พ.ย. 2569) แสดงมูลค่ารายคนต่อท้ายชื่อ (เฉพาะไฟล์ที่มีสิทธิ์เห็นมูลค่า) — มูลค่างานที่คนนั้นทำ ก่อน VAT
+      ...Object.fromEntries(workersOf(a).map((n, i) => {
+        const pv = showValue ? personValueOf(sessions, n) : null;
+        return [`worker${i + 1}`, pv ? `${n} (฿${pv.net.toLocaleString("th-TH", { maximumFractionDigits: 2 })})` : n];
+      })),
       ack: (a.acks || []).map((k) => `${k.name || ""}${k.at ? ` ${moment(k.at).format("DD/MM/YY HH:mm")}` : ""}`).filter((x) => x.trim()).join(", "),
       overdue: isOverdue ? overdueDays : "",
       approval: approvalState,
@@ -317,7 +318,9 @@ function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
       const r = per.get(name) || { name, jobs: 0, lead: 0, valued: 0, missing: 0, total: 0 };
       r.jobs += 1;
       if (i === 0) r.lead += 1;
-      if (wv === null) r.missing += 1; else { r.valued += 1; r.total += wv; }
+      // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้แยกตามคน") มูลค่างานที่คนนั้นทำ — เดิมทุกคนได้มูลค่างานของงานเต็มจำนวน
+      const pv = personValueOf(sessions, name);
+      if (!pv) r.missing += 1; else { r.valued += 1; r.total += pv.net; }
       per.set(name, r);
     });
   });
@@ -340,7 +343,7 @@ function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
   ws.getCell(2, 1).value = `${meta.groupLabel}  ·  ${meta.filterSummary}  ·  ส่งออก ${meta.exportedAt}`;
   ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
   ws.mergeCells(3, 1, 3, cols.length);
-  ws.getCell(3, 1).value = `มูลค่างานรวมทั้งหมด (นับงานละครั้ง) ${grand.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท จาก ${valued} งาน${missing ? ` · ยังไม่ใส่มูลค่า ${missing} งาน` : ""}  ·  หมายเหตุ: ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน`;
+  ws.getCell(3, 1).value = `มูลค่างานรวมทั้งหมด (นับงานละครั้ง) ${grand.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท จาก ${valued} งาน${missing ? ` · ยังไม่ใส่มูลค่า ${missing} งาน` : ""}  ·  หมายเหตุ: มูลค่ารายช่าง = มูลค่างานที่แต่ละคนทำ (ก่อน VAT) แยกกัน ไม่รวมกับมูลค่างานของงาน`;
   ws.getCell(3, 1).font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.titleText } };
   const HEAD = 5;
   const hr = ws.getRow(HEAD);

@@ -5,98 +5,53 @@
  *    มูลค่าต่อครั้ง แยกคน ค้นหาได้ง่าย export ชัดเจน รวมยอดต่อเดือน ปี หรือเลือกดูได้สมบูรณ์")
  * 🎨 หน้าตาแบบหน้าแรก (Agoda) — หัวข้อใหญ่บนพื้นหน้า · การ์ดขาวมุมโค้ง · รายการจัดอันดับ · ตัวสลับแคปซูล (components/ReportKit)
  *
- * บนลงล่าง: ตัวกรอง → ยอดรวมตามตัวกรอง → อันดับผู้ปฏิบัติงาน → รายเดือน/รายปี → บันทึกเข้างาน (กด = เด้งรายละเอียดงาน)
+ * บนลงล่าง: ตัวกรอง → ยอดรวมตามตัวกรอง → สรุปยอดและ KPI รายคน (+ วิธีเช็ค KPI) → รายเดือน/รายปี → บันทึกเข้างาน (กด = เด้งรายละเอียดงาน)
  * ⚠️ อ่านจาก /events/event-op (slim) ตัวเดียวกับหน้าการดำเนินงาน — ช่างที่ไม่มีสิทธิ์ดูทุกงาน = เห็นเฉพาะของตัวเอง
  * ⚠️ หน่วยนับ/มูลค่า: ดูหัวไฟล์ utils/workerLog.js
  */
 import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { Box, Button, ButtonBase, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { useSearchParams } from "react-router-dom";
+import { Box, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import { EngineeringRounded, SearchRounded } from "@mui/icons-material";
 
 import SectionTabs from "@/shared/ui/SectionTabs";
 import SelectField from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
-import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import AttendanceService from "@/shared/services/AttendanceService";
 import JobQuickView from "@/shared/ui/JobQuickView";
-import { thaiDate, THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
-import { PAGE_SX, PageHeader, INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
+import { PAGE_SX, PageHeader, INK, MUTED, LINE } from "@/shared/ui/PageKit";
 import PeriodFilter from "../components/PeriodFilter";
-import { ReportSection, Segmented, RankRow, TotalRow, Stat, TotalHero, FilterCard, BarRow, PersonAvatar, R_CARD, baht } from "../components/ReportKit";
+import { ReportSection, Segmented, TotalRow, Stat, TotalHero, FilterCard, BarRow, PersonAvatar, R_CARD, baht } from "../components/ReportKit";
+import WorkerKpiPanel, { KpiGuide } from "../components/WorkerKpiPanel";
 import { periodRange, periodText, monthLabel } from "../utils/reportPeriod";
-import { buildWorkerEntries, filterEntries, summarizeEntries, DONE_STATUS } from "../utils/workerLog";
+import { buildWorkerEntries, filterEntries, summarizeEntries } from "../utils/workerLog";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
+import ReportScopeBar from "../components/ReportScopeBar";
 
-const STATUS_COLOR = { "กำลังรอยืนยัน": "#d97706", ยืนยันแล้ว: "#2563eb", กำลังดำเนินการ: "#7c3aed", [DONE_STATUS]: "#059669" };
-const WARN = "#d97706";
-
-/** แถวบันทึกเข้างาน — ช่องวันที่ · โครงการ/งาน · ผู้ปฏิบัติงาน · มูลค่า/สถานะ */
-function LogRow({ r, avatar, onClick, showWorker }) {
-  const tone = STATUS_COLOR[r.status] || MUTED;
-  const d = moment(r.date);
-  return (
-    <ButtonBase onClick={onClick} component="div"
-      sx={{ display: "flex", alignItems: "center", gap: { xs: 1.25, sm: 2 }, width: "100%", px: { xs: 1.5, sm: 2 }, py: 1.5, textAlign: "left", fontFamily: "inherit",
-        borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, bgcolor: "#fff", "&:hover": { bgcolor: alpha(ACCENT, 0.035) } }}>
-      <Box sx={{ width: 54, flexShrink: 0, textAlign: "center", borderRadius: "12px", border: `1px solid ${LINE}`, overflow: "hidden" }}>
-        <Box sx={{ bgcolor: "#f1f5f9", fontSize: "0.68rem", fontWeight: 800, color: MUTED, py: 0.25 }}>{THAI_MONTHS_SHORT[d.month()]} {String(d.year() + 543).slice(-2)}</Box>
-        <Box sx={{ fontSize: "1.25rem", fontWeight: 900, color: INK, lineHeight: 1.35 }}>{d.date()}</Box>
-        {r.days > 1 && <Box sx={{ fontSize: "0.64rem", color: MUTED, pb: 0.25 }}>{r.days} วัน</Box>}
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography noWrap sx={{ fontSize: "0.98rem", fontWeight: 800, color: INK }}>{r.site || r.company || "-"}</Typography>
-        <Typography noWrap sx={{ fontSize: "0.82rem", color: MUTED }}>
-          {[r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : "", r.jobNo].filter(Boolean).join(" · ")}
-        </Typography>
-        {showWorker && (
-          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.6 }}>
-            <PersonAvatar name={r.name} avatar={avatar} size={22} />
-            <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK }}>{r.name}</Typography>
-            <Box component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, color: r.lead ? "#1d4ed8" : MUTED, bgcolor: r.lead ? "#dbeafe" : "#f1f5f9", borderRadius: "6px", px: 0.75, py: 0.1, flexShrink: 0 }}>
-              {r.lead ? "หัวหน้าทีม" : "ทีม"}
-            </Box>
-          </Stack>
-        )}
-      </Box>
-      <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-        {r.value === null
-          ? <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, color: WARN }}>ยังไม่ใส่มูลค่า</Typography>
-          : <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: INK, fontVariantNumeric: "tabular-nums" }}>{baht(r.value)}</Typography>}
-        <Stack direction="row" spacing={0.5} justifyContent="flex-end" sx={{ mt: 0.5 }}>
-          {/* ✅ กดเข้างานจริงของคนนี้ (เวลาแรก) — ไม่มี = ยังไม่กด */}
-          <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, borderRadius: "6px", px: 0.9, py: 0.2,
-            color: r.checkIns?.length ? "#15803d" : "#b45309", bgcolor: r.checkIns?.length ? "#f0fdf4" : "#fffbeb" }}>
-            {r.checkIns?.length ? `✓ เข้างาน ${moment(r.checkIns[0]).format("HH:mm")}${r.checkIns.length > 1 ? ` (${r.checkIns.length} วัน)` : ""}` : "ยังไม่กดเข้างาน"}
-          </Box>
-          <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, bgcolor: alpha(tone, 0.1), borderRadius: "6px", px: 0.9, py: 0.2 }}>{r.status || "—"}</Box>
-        </Stack>
-      </Box>
-    </ButtonBase>
-  );
-}
 
 export default function WorkerReport() {
   const { can } = usePermissions();
   const { userData } = useAuth();
   const viewAll = can("viewAllJobs") || can("approveJobs");
   const myName = userData?.fname || "";
+  // ✅ (17 พ.ย. 2569) ?person=ชื่อ — เปิดมาที่ผลงานของคนนั้น (กดจากการ์ด "ผลงานรายคน" หน้าแรก) · ?period=lastMonth|year ช่วงเดียวกับหน้าแรก
+  const [searchParams] = useSearchParams();
 
   const [events, setEvents] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [error, setError] = useState("");
   const [employees, setEmployees] = useState([]);
   const [period, setPeriod] = useState({
-    preset: "month", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
+    preset: ["month", "lastMonth", "year"].includes(searchParams.get("period")) ? searchParams.get("period") : "month", month: moment().format("YYYY-MM"), year: moment().format("YYYY"),
     from: moment().startOf("month").format("YYYY-MM-DD"), to: moment().format("YYYY-MM-DD"),
   });
   const [quickId, setQuickId] = useState(null);
-  const [person, setPerson] = useState("all");
+  const [person, setPerson] = useState(() => searchParams.get("person") || "all");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
   const [valueMode, setValueMode] = useState("all");
@@ -156,14 +111,11 @@ export default function WorkerReport() {
     effPerson !== "all" ? `ผู้ปฏิบัติงาน: ${effPerson}` : "ทุกคน",
     q.trim() ? `ค้นหา: ${q.trim()}` : "",
     status === "done" ? "เฉพาะงานที่เสร็จสิ้น" : status === "open" ? "เฉพาะงานที่ยังไม่ปิด" : "",
-    valueMode === "has" ? "เฉพาะที่ใส่มูลค่าแล้ว" : valueMode === "missing" ? "เฉพาะที่ยังไม่ใส่มูลค่า" : "",
+    valueMode === "has" ? "เฉพาะที่บันทึกมูลค่างานที่ทำแล้ว" : valueMode === "missing" ? "เฉพาะที่ยังไม่บันทึกมูลค่างานที่ทำ" : "",
   ].filter(Boolean).join(" · ");
 
-  const personPg = usePaged(summary.byPerson, 10);
-  const logPg = usePaged(entries, 20);
   const periodRows = periodBy === "year" ? summary.byYear.slice().reverse() : summary.byMonth.slice().reverse();
   const periodMax = Math.max(1, ...periodRows.map((p) => p.total));
-  const showWorker = effPerson === "all";
 
   const doExport = async () => {
     setExporting(true);
@@ -188,8 +140,10 @@ export default function WorkerReport() {
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="operation" />
       <PageHeader icon={<EngineeringRounded />} title="ผลงานรายบุคคล"
-        subtitle="ใครเข้างานที่ไหน เมื่อไร มูลค่าต่อครั้ง — แยกรายคน รวมยอดรายเดือน/รายปี"
+        subtitle="มูลค่างานที่แต่ละคนทำ แยกรายคน · KPI ช่าง · รายเดือน/รายปี"
         actions={exportBtn} />
+      {/* ✅ (17 พ.ย. 2569 ผู้ใช้: "2 แท็บนี้ข้อมูลเหมือนกันไหม") หน้านี้นับอะไร + เทียบกับสรุปผลการดำเนินงาน */}
+      <ReportScopeBar scope="workers" />
 
       {/* ── ตัวกรอง ── */}
       <FilterCard footer={`${periodLabel} · ${filterLabel} · นับตามวันแรกที่เข้างาน`}>
@@ -211,34 +165,35 @@ export default function WorkerReport() {
           <option value="done">เสร็จสิ้นแล้ว</option>
           <option value="open">ยังไม่ปิด</option>
         </SelectField>
-        <SelectField label="มูลค่างาน" value={valueMode} onChange={(e) => setValueMode(e.target.value)} sx={{ minWidth: 140 }}>
+        {/* 🔁 (17 พ.ย. 2569) กรองตาม "มูลค่างานที่ทำ" ที่แต่ละคนบันทึกเอง (ยอดรายคน) — ไม่ใช่มูลค่าครั้งนี้ของงาน */}
+        <SelectField label="มูลค่างานที่ทำ (รายคน)" value={valueMode} onChange={(e) => setValueMode(e.target.value)} sx={{ minWidth: 170 }}>
           <option value="all">ทั้งหมด</option>
-          <option value="has">ใส่มูลค่าแล้ว</option>
-          <option value="missing">ยังไม่ใส่มูลค่า</option>
+          <option value="has">บันทึกแล้ว</option>
+          <option value="missing">ยังไม่บันทึก</option>
         </SelectField>
       </FilterCard>
 
       {error && <Typography sx={{ color: "#dc2626", fontSize: "0.85rem", mb: 1 }}>{error}</Typography>}
 
-      {/* ── ยอดรวมตามตัวกรอง ── */}
-      <TotalHero
-        label={effPerson !== "all" ? `มูลค่างานรวมของ ${effPerson}` : "มูลค่างานรวมตามตัวกรอง"}
-        value={baht(t.total)}
-        sub={`${periodLabel} · ${filterLabel}`}
-        stats={[
-          <Stat key="v" label="เข้างาน" value={`${t.visits} ครั้ง`} />,
-          <Stat key="j" label="จำนวนงาน" value={`${t.jobs} งาน`} />,
-          <Stat key="d" label="วันทำงานรวม" value={`${t.days} วัน`} />,
-          <Stat key="p" label="ผู้ปฏิบัติงาน" value={`${t.people} คน`} />,
-          <Stat key="c" label="กดเข้างานจริง" value={`${t.checked}/${t.visits} ครั้ง`} tone={t.checked < t.visits ? "#b45309" : "#15803d"} />,
-          <Stat key="a" label="เฉลี่ยต่อครั้ง" value={t.valued ? baht(t.avg) : "–"} />,
-          <Stat key="m" label="ยังไม่ใส่มูลค่า" value={`${t.missing} ครั้ง`} tone={t.missing ? WARN : undefined}
-            active={valueMode === "missing"} onClick={t.missing || valueMode === "missing" ? () => setValueMode(valueMode === "missing" ? "all" : "missing") : undefined} />,
-        ]}
-        note={effPerson === "all" && t.people > 1
-          ? <>ยอดนี้นับให้ทุกคนในทีมเต็มจำนวน · มูลค่างานจริง (นับงานละครั้ง) <b style={{ color: INK }}>{baht(t.jobValueTotal)}</b> จาก {t.jobs} งาน</>
-          : null}
-      />
+      {/* ── ลำดับความสำคัญของหน้า ──
+          🔁 (17 พ.ย. 2569 ผู้ใช้: "จัดวางให้มองง่าย อันไหนควรเด่น อันไหนควรมาก่อน ให้มืออาชีพ")
+          1) ยอดรวมทุกคน (ตัวเลขเดียวที่ใหญ่สุด — แสดงเมื่อดูหลายคน · ดูคนเดียว = แผงของคนนั้นเป็นตัวหลักแทน ไม่ซ้ำ)
+          2) ยอดแยกรายคน (ตาราง/แผงรายละเอียด)  3) แนวโน้มรายเดือน  4) วิธีเช็ค KPI (อ้างอิง ท้ายหน้า) */}
+      {entries.length > 0 && t.people > 1 && (
+        <TotalHero
+          label="มูลค่างานที่ทุกคนทำ (ก่อน VAT)"
+          value={baht(t.total)}
+          sub={periodLabel}
+          stats={[
+            <Stat key="p" label="ผู้ปฏิบัติงาน" value={`${t.people} คน`} />,
+            <Stat key="j" label="จำนวนงาน" value={`${t.jobs} งาน`} />,
+            <Stat key="v" label="เข้างาน (คน × งาน)" value={`${t.visits} ครั้ง`} />,
+            <Stat key="d" label="วันทำงานรวม" value={`${t.days} วัน`} />,
+            <Stat key="a" label="เฉลี่ยต่อครั้ง" value={t.valued ? baht(t.avg) : "–"} />,
+          ]}
+          note={<>ผลรวมมูลค่างานที่แต่ละคนทำ · คนละค่ากับมูลค่างานของงาน ({baht(t.jobValueTotal)}) ที่หน้าสรุปผลการดำเนินงาน</>}
+        />
+      )}
 
       {entries.length === 0 ? (
         <Box sx={{ ...R_CARD, textAlign: "center", py: 6 }}>
@@ -247,30 +202,16 @@ export default function WorkerReport() {
         </Box>
       ) : (
         <>
-          {/* ── อันดับผู้ปฏิบัติงาน ── */}
-          {viewAll && (
-            <ReportSection title="อันดับผู้ปฏิบัติงาน" hint="เรียงตามมูลค่างานรวม · กดชื่อเพื่อดูเฉพาะคนนั้น"
-              right={person !== "all" ? <Button size="small" onClick={() => setPerson("all")} sx={{ textTransform: "none", fontWeight: 800 }}>ดูทุกคน</Button> : null}>
-              <Box sx={R_CARD}>
-                {personPg.rows.map((p, i) => (
-                  <RankRow key={p.key} rank={(personPg.page - 1) * personPg.size + i + 1}
-                    leading={<PersonAvatar name={p.key} avatar={avatarOf(p.key)} />}
-                    title={p.key}
-                    sub={`เข้างาน ${p.visits} ครั้ง · กดเข้างานจริง ${p.checked}/${p.visits} · หัวหน้าทีม ${p.lead} · ล่าสุด ${thaiDate(p.last)}`}
-                    value={baht(p.total)}
-                    valueSub={p.missing ? <span style={{ color: WARN, fontWeight: 700 }}>ยังไม่ใส่มูลค่า {p.missing} ครั้ง</span> : p.valued ? `เฉลี่ย ${baht(p.avg)} / ครั้ง` : ""}
-                    active={person === p.key}
-                    onClick={() => setPerson(person === p.key ? "all" : p.key)} />
-                ))}
-                <TotalRow label={`รวม ${summary.byPerson.length} คน · ${t.visits} ครั้ง`} value={baht(t.total)} valueSub={t.missing ? `ยังไม่ใส่มูลค่า ${t.missing} ครั้ง` : ""} />
-              </Box>
-              <PageBar {...personPg} unit="คน" />
-            </ReportSection>
-          )}
+          {/* ── สรุปยอดและ KPI รายคน ──
+              🔁 (17 พ.ย. 2569 ผู้ใช้: "ทำสรุปรายงาน ยอดของแต่ละคนแยกกันให้ชัดเจน และมีวิธีแนะนำว่าจะเช็ค KPI ยังไง")
+              แทน "อันดับผู้ปฏิบัติงาน" เดิม — การ์ดต่อคน (มูลค่างานที่ทำ · ต่อวัน · อัตรา % เทียบเกณฑ์ · รายการที่ต้องแก้)
+              ตัวเลข/เกณฑ์อยู่ที่ utils/workerKpi.js ที่เดียว (ใช้ร่วมกับ Excel) */}
+          <WorkerKpiPanel entries={entries} avatarOf={avatarOf} activePerson={person}
+            onPickPerson={viewAll ? setPerson : undefined} onOpenJob={setQuickId} />
 
           {/* ── รายเดือน / รายปี ── */}
-          <ReportSection title={periodBy === "year" ? "สรุปรายปี" : "สรุปรายเดือน"}
-            hint={`${effPerson !== "all" ? `${effPerson} · ` : ""}มูลค่างานรวม และจำนวนครั้งที่เข้างาน`}
+          <ReportSection title={periodBy === "year" ? "แนวโน้มรายปี" : "แนวโน้มรายเดือน"}
+            hint={`${effPerson !== "all" ? `${effPerson} · ` : ""}มูลค่างานที่ทำ และจำนวนครั้งที่เข้างาน`}
             right={<Segmented value={periodBy} onChange={setPeriodBy} options={[["month", "รายเดือน"], ["year", "รายปี"]]} />}>
             <Box sx={R_CARD}>
               {periodRows.map((p) => (
@@ -282,16 +223,11 @@ export default function WorkerReport() {
             </Box>
           </ReportSection>
 
-          {/* ── บันทึกเข้างาน ── */}
-          <ReportSection title="บันทึกเข้างาน" hint={`${entries.length} รายการ · 1 รายการ = 1 คน × 1 งาน · กดเพื่อดูรายละเอียดงาน`}>
-            <Box sx={R_CARD}>
-              {logPg.rows.map((r) => (
-                <LogRow key={r.id} r={r} avatar={avatarOf(r.name)} showWorker={showWorker} onClick={() => setQuickId(r.eventId)} />
-              ))}
-              <TotalRow label={`รวมทั้งหมด ${entries.length} รายการ (ทุกหน้า)`} value={baht(t.total)} />
-            </Box>
-            <PageBar {...logPg} unit="รายการ" />
-          </ReportSection>
+          {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "ตรงนี้ควรตัดออกไหม มีหน้าบันทึกงานอยู่แล้ว") ตัดรายการเข้างานทั้งหมดออก —
+              ซ้ำกับแท็บ "ประวัติเข้างาน" และแผงรายละเอียดรายคน (กดชื่อ = เห็นงานที่เข้าทุกงานของคนนั้น) · Excel ยังมีชีตบันทึกเข้างานครบ */}
+
+          {/* อ้างอิง — ท้ายหน้า พับไว้ */}
+          <KpiGuide />
         </>
       )}
       <JobQuickView eventId={quickId} onClose={() => setQuickId(null)} employees={employees} showValue />

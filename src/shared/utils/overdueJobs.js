@@ -97,6 +97,23 @@ export const countDistinctJobs = (allEvents, predicate) => {
 // ✅ หาเจ้าของงานจริงด้วยลำดับความสำคัญเดียวกับที่ backend ใช้ตัดสินว่า "งานนี้ของช่างคนไหน"
 // (resPerson ตรงๆ → ชื่อทีมตรงกับ fname → คนที่สร้าง event เอง) รับ Map ที่สร้างไว้ล่วงหน้าเพื่อ
 // ไม่ต้อง build ซ้ำทุกครั้งที่เรียก
+/**
+ * ✅ (17 พ.ย. 2569 ผู้ใช้: "ภาระงานทีมช่าง/หน้าแรก ข้อมูลไม่ตรงกัน") ผู้รับผิดชอบงาน — ที่เดียวทั้งแอป
+ *    ลำดับเดียวกับ resolveResponsibleUser ฝั่ง backend (services/OverdueReminder.js):
+ *    responsiblePersonId → responsiblePerson → resPerson → team (หัวหน้าทีม) → คนสร้างงาน
+ *    เดิมหน้าแรก "งานค้างของช่าง" ใช้ resolveAssignedTechnician (ข้ามผู้รับผิดชอบ) ส่วนหน้าภาระงานทีมช่างใช้ลำดับนี้
+ *    → ช่างคนเดียวกันเลขค้างไม่ตรงกัน · ตอนนี้ทั้งสองหน้าใช้ฟังก์ชันนี้
+ */
+export const resolveResponsibleUser = (sessions, userById, userByFname) => {
+  const byId = (v) => (v ? userById.get(String(v)) : null);
+  for (const e of sessions) { const u = byId(e.responsiblePersonId); if (u) return u; }
+  for (const e of sessions) if (e.responsiblePerson && userByFname.has(e.responsiblePerson)) return userByFname.get(e.responsiblePerson);
+  for (const e of sessions) { const u = byId(e.resPerson); if (u) return u; }
+  for (const e of sessions) if (e.team && userByFname.has(e.team)) return userByFname.get(e.team);
+  for (const e of sessions) { const u = byId(e.userId); if (u) return u; }
+  return null;
+};
+
 export const resolveAssignedTechnician = (sessions, userById, userByFname) => {
   for (const e of sessions) if (e.resPerson && userById.has(e.resPerson.toString())) return userById.get(e.resPerson.toString());
   for (const e of sessions) if (e.team && userByFname.has(e.team)) return userByFname.get(e.team);

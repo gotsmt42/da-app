@@ -27,8 +27,10 @@ const fmt2 = (n) => Number(n).toLocaleString("th-TH", { minimumFractionDigits: 2
  * @param value        มูลค่าที่บันทึกไว้
  * @param vatIncluded  ค่าที่บันทึกไว้รวม VAT แล้วหรือไม่
  * @param event        ข้อมูลงาน (ใช้หาค่าแนะนำอัตโนมัติ) — ไม่ส่ง = ไม่แนะนำ
+ * @param label        หัวข้อ (แบบเต็ม) · ค่าเริ่ม "มูลค่างานครั้งนี้"
+ * @param noSuggest    ไม่เติมค่าแนะนำ — ✅ (17 พ.ย. 2569) มูลค่ารายคน: ค่าแนะนำคือยอดทั้งงาน ไม่ใช่ของคนนั้น
  */
-export default function WorkValueField({ value, vatIncluded = false, event, onSave, disabled = false, compact = false }) {
+export default function WorkValueField({ value, vatIncluded = false, event, onSave, disabled = false, compact = false, label = "มูลค่างานครั้งนี้", noSuggest = false, emptyText }) {
   const has = hasWorkValue(value);
   const ct = contractVatInfo(event);
   const [editing, setEditing] = useState(false);
@@ -42,7 +44,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
   const parts = parsed > 0 ? vatParts(parsed, vat) : null;
 
   const start = () => {
-    const sg = has ? null : suggestWorkValue(event);
+    const sg = has || noSuggest ? null : suggestWorkValue(event);
     setText(has ? fmt(value) : sg ? fmt(sg.amount) : "");
     setVat(ct ? ct.vatIncluded : has ? Boolean(vatIncluded) : sg && sg.vatIncluded !== null ? sg.vatIncluded : Boolean(vatIncluded));
     setSource(has ? "" : sg ? sg.source : "manual");
@@ -55,6 +57,8 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
     try {
       await onSave?.(parsed, { workValueVatIncluded: ct ? ct.vatIncluded : vat, workValueSource: parsed === null ? "" : (source || "manual") });
       setEditing(false);
+    } catch {
+      // ผู้เรียกแจ้งข้อผิดพลาดเอง — ค้างช่องไว้ให้ลองใหม่ได้
     } finally { setSaving(false); }
   };
 
@@ -136,7 +140,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
       sx={{ px: 1.5, py: 1.1, borderRadius: 2, border: "1px solid", borderColor: has ? "#dbeafe" : "#fde68a", bgcolor: has ? "#f8fbff" : "#fffbeb" }}>
       <Payments sx={{ fontSize: 20, color: has ? "#2563eb" : "#d97706" }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: "#64748b" }}>มูลค่างานครั้งนี้</Typography>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: "#64748b" }}>{label}</Typography>
         {has ? (
           <>
             <Typography sx={{ fontSize: "1rem", fontWeight: 700, color: "#1e293b", lineHeight: 1.3 }}>
@@ -148,7 +152,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
               </Typography>
             )}
           </>
-        ) : <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#b45309" }}>ยังไม่ใส่ (ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้)</Typography>}
+        ) : <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#b45309" }}>{emptyText || "ยังไม่ใส่ (ไม่บังคับ — งานที่ไม่มีมูลค่าเว้นว่างได้)"}</Typography>}
       </Box>
       {!disabled && (
         <Button size="small" variant={has ? "text" : "contained"} disableElevation onClick={start} startIcon={<Edit sx={{ fontSize: 15 }} />}
