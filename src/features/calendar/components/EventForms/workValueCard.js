@@ -33,7 +33,9 @@ export const WORK_VALUE_CSS = `
   .ee-vat-seg input:disabled + span { cursor: default; }
   .ee-wv-break { margin-top: 6px; font-size: 12px; color: #64748b; min-height: 16px; font-variant-numeric: tabular-nums; }
   .ee-wv-break b { color: #334155; font-weight: 600; }
-  .ee-wv-auto { margin-top: 8px; display: flex; gap: 6px; align-items: flex-start; padding: 7px 10px; border-radius: 9px; background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af; font-size: 12px; line-height: 1.45; }
+  .ee-wv-auto { margin-top: 8px; display: flex; gap: 6px; align-items: center; padding: 7px 10px; border-radius: 9px; background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af; font-size: 12px; line-height: 1.45; }
+  .ee-wv-use { flex-shrink: 0; border: 1px solid #93c5fd; background: #fff; color: #1d4ed8; font: inherit; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
+  .ee-wv-use:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
   .ee-wv-ai { margin-top: 10px; }
   .ee-wv-ai-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #c7d2fe; background: #fff; color: #4338ca; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .ee-wv-ai-btn:hover { background: #eef2ff; }
@@ -67,14 +69,20 @@ export function workValueInitial(p = {}) {
   const savedVat = Boolean(p.workValueVatIncluded);
   const suggest = saved ? null : suggestWorkValue(p);
   const contract = contractVatInfo(p);
+  /**
+   * 🔁 (18 พ.ย. 2569 ผู้ใช้: "ทำไมยอดเยอะขนาดนี้" → "ทำเลยอันไหนที่ทำให้มีประสิทธิภาพและเช็คข้อมูลได้ง่าย")
+   *    เดิมเติมค่าแนะนำลงช่องให้เลย แล้วถูกบันทึกไปด้วยทุกครั้งที่กดบันทึกฟอร์ม (แม้แก้เรื่องอื่น) —
+   *    งานทั่วไปค่าแนะนำ = มูลค่างานรวมทั้งงาน → มูลค่าครั้งนี้กลายเป็นยอดทั้งโครงการโดยไม่ตั้งใจ
+   *    ตอนนี้: ช่องว่างไว้ · แสดงค่าแนะนำพร้อมปุ่ม "ใช้ค่านี้" ต้องกดเองถึงจะใส่ (ไม่กด = ไม่บันทึก)
+   */
   return {
     saved, savedVat, contract,
     savedValue: saved ? Number(p.workValue) : null,
     suggest,
-    amount: saved ? Number(p.workValue) : suggest ? suggest.amount : null,
+    amount: saved ? Number(p.workValue) : null,
     // งานสัญญา = VAT ตามมูลค่าสัญญาเสมอ (ทั้งค่าที่บันทึกแล้วและค่าใหม่)
-    vat: contract ? contract.vatIncluded : saved ? savedVat : suggest && suggest.vatIncluded !== null ? suggest.vatIncluded : savedVat,
-    source: saved ? (p.workValueSource || "") : suggest ? suggest.source : "",
+    vat: contract ? contract.vatIncluded : savedVat,
+    source: saved ? (p.workValueSource || "") : "",
   };
 }
 
@@ -124,7 +132,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
     <div id="ee-wv-break" class="ee-wv-break" aria-live="polite"></div>
     <div id="ee-wv-contract" class="ee-wv-ct" data-no-draft>
       <div class="ee-wv-ct-main">
-        <div class="ee-wv-ct-top"><span class="ee-wv-ct-tag">งานสัญญา</span>${init.suggest && !disabled ? `<span id="ee-wv-auto" class="ee-wv-ct-auto">✦ เติมให้อัตโนมัติ — กดบันทึกเพื่อยืนยัน</span>` : ""}</div>
+        <div class="ee-wv-ct-top"><span class="ee-wv-ct-tag">งานสัญญา</span>${init.suggest && !disabled && !init.saved ? `<button type="button" id="ee-wv-use" class="ee-wv-use" data-no-draft>ใช้ ${esc(baht(init.suggest.amount))}</button>` : ""}</div>
         <div class="ee-wv-ct-line">${esc(line)}</div>
         ${ct.hasValue ? `<div class="ee-wv-ct-vat${ct.set ? "" : " warn"}">${esc(ct.set ? `VAT ตามสัญญา · ${ct.vatText}` : ct.vatText)}</div>` : ""}
       </div>
@@ -143,7 +151,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
     </div>
     ${vatHtml}
     <div id="ee-wv-break" class="ee-wv-break" aria-live="polite"></div>
-    ${init.suggest && !disabled ? `<div id="ee-wv-auto" class="ee-wv-auto" data-no-draft><span aria-hidden="true">✦</span><span>ใส่ให้อัตโนมัติจาก${esc(init.suggest.hint)} — ตรวจแล้วกด “บันทึก” ด้านล่าง${init.suggest.vatIncluded === null && !ct ? " · เลือกให้ตรงว่าเป็นยอดก่อนหรือรวม VAT" : ""}</span></div>` : ""}
+    ${init.suggest && !disabled && !init.saved ? `<div id="ee-wv-auto" class="ee-wv-auto" data-no-draft><span aria-hidden="true">✦</span><span style="flex:1">ค่าแนะนำ <b>${esc(baht(init.suggest.amount))}</b> จาก${esc(init.suggest.hint)}${init.suggest.source === "job" ? " — ใช้เมื่องานนี้เข้าครั้งเดียว (ยอดทั้งงาน)" : ""}${init.suggest.vatIncluded === null && !ct ? " · เลือกให้ตรงว่าเป็นยอดก่อนหรือรวม VAT" : ""}</span><button type="button" id="ee-wv-use" class="ee-wv-use">ใช้ค่านี้</button></div>` : ""}
     <div id="ee-wv-ai" class="ee-wv-ai" data-no-draft></div>`;
 }
 
@@ -195,6 +203,16 @@ export function bindWorkValueCard(root, { init, eventId, EventService, allowAi =
     root.querySelector("#ee-wv-auto")?.remove();
     render();
   };
+
+  // ✅ (18 พ.ย. 2569) "ใช้ค่านี้" — ใส่ค่าแนะนำเมื่อคนกดเองเท่านั้น
+  const useBtn = root.querySelector("#ee-wv-use");
+  if (useBtn && init.suggest) {
+    useBtn.addEventListener("click", () => {
+      const sg = init.suggest;
+      setValue(sg.amount, init.contract ? init.contract.vatIncluded : sg.vatIncluded !== null ? sg.vatIncluded : vatOn(), sg.source);
+      useBtn.remove();
+    });
+  }
 
   // ── AI อ่านยอดจากไฟล์ (เปิดใช้เฉพาะเมื่อเซิร์ฟเวอร์มีคีย์) ──
   const host = root.querySelector("#ee-wv-ai");

@@ -194,3 +194,16 @@ export function jobTotalNet(rows) {
 /** คีย์นับ "มูลค่างานรวม" ครั้งเดียว — งานสัญญาหลายรอบใช้ค่าเดียวกันทั้งสัญญา (นับสัญญาละครั้ง ไม่คูณตามรอบ) */
 export const jobTotalKey = (row, fallbackKey) => (row?.contractGroupId ? `c:${row.contractGroupId}` : fallbackKey);
 
+/**
+ * ✅ (18 พ.ย. 2569 ผู้ใช้: "งานที่เข้าไม่ต่อเนื่องหลายช่วง ไม่เอามูลค่างานมารวมกันนะ")
+ *    คีย์นับ "มูลค่าครั้งนี้" ครั้งเดียวต่อการเข้างาน 1 ครั้ง (ไม่บวกซ้ำทุกช่วงวัน)
+ *    • มี jobGroupId = ทุกช่วงของงานเดียวกัน → คีย์เดียว
+ *    • งานเก่าที่ไม่มี jobGroupId และแต่ละช่วงทีมไม่ตรงกัน (การ์ดแยกกัน) แต่เป็นงานเดียวกัน (บริษัท/โครงการ/ประเภท/ระบบ/ครั้งที่ เดียวกัน)
+ *      และใส่ยอดเท่ากันทุกช่วง → นับครั้งเดียว
+ */
+export function visitValueKey(row, net) {
+  if (row?.jobGroupId) return `gid:${row.jobGroupId}`;
+  const sig = ["company", "site", "title", "system", "time"].map((k) => String(row?.[k] || "").trim().toLowerCase()).join("|");
+  return `sig:${sig}|${Math.round(Number(net || 0) * 100)}`;
+}
+

@@ -101,7 +101,7 @@ import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import WorkValueField from "@/shared/ui/WorkValueField";
-import { personValueOf, workersOfRows, jobTotalNet, jobWorkValueHit, jobWorkValueNet, vatLabel } from "@/shared/utils/workValue";
+import { personValueOf, workersOfRows, jobTotalNet, jobWorkValueHit, jobWorkValueNet, vatLabel, visitValueKey } from "@/shared/utils/workValue";
 import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
@@ -1635,7 +1635,7 @@ const EventRowCard = ({
                           <JobValueEdit event={event} canEdit={can(currentUser, "editContracts") || responsible} />
                         </InfoLine>
                         <InfoLine label="มูลค่าครั้งนี้" center>
-                          <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event}
+                          <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} source={event.workValueSource}
                             disabled={!canVisit} onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
                         </InfoLine>
                         {hasWorkers && (
@@ -2521,7 +2521,7 @@ const OperationTable = React.memo(({ jobGroups, daysPastDueMap, onOpenJob, emplo
                 const total = jobTotalNet(job.sessions);
                 return (
                   <TableCell align="right" sx={{ minWidth: 130, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
-                    <WorkValueField compact value={hit ? hit.workValue : null} vatIncluded={hit?.workValueVatIncluded} event={job.sessions[0]}
+                    <WorkValueField compact value={hit ? hit.workValue : null} vatIncluded={hit?.workValueVatIncluded} event={job.sessions[0]} source={hit?.workValueSource}
                       disabled={!onSaveValue} onSave={(v, meta) => onSaveValue?.(job, v, meta)} />
                     {total !== null && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>จากมูลค่างานรวม {baht(total)}</Typography>}
                   </TableCell>
@@ -3266,16 +3266,34 @@ const Operation = () => {
   const valueSummary = useMemo(() => {
     // 🔁 (17 พ.ย. 2569) ยอดหลัก = มูลค่าครั้งนี้ของงาน (1 ค่าต่องาน) · เลือกคน = ผลงานที่คนนั้นลงเอง (ไม่รวมของคนอื่น)
     let total = 0; let withValue = 0; let missing = 0; let own = 0; let ownCount = 0;
+    // ✅ (18 พ.ย. 2569 ผู้ใช้: "ทำไมยอดเยอะขนาดนี้ แสดงผลอะไรกันแน่") เก็บรายการงานที่มีมูลค่าครั้งนี้ + ที่มาของยอด — กดดูได้
+    const items = [];
+    const counted = new Set(); // 🔁 (18 พ.ย. 2569) งานหลายช่วงวัน = นับมูลค่าครั้งนี้ครั้งเดียว (visitValueKey)
     allJobGroups.forEach((g) => {
       const wv = jobWorkValueNet(g);
-      if (wv === null) missing += 1; else { total += wv; withValue += 1; }
+      if (wv === null) missing += 1;
+      else {
+        const hit = jobWorkValueHit(g) || g[0];
+        const vk = visitValueKey(hit, wv);
+        if (counted.has(vk)) return; // ช่วงอื่นของงานเดียวกัน (การ์ดแยก) — ไม่บวกซ้ำ
+        counted.add(vk);
+        total += wv; withValue += 1;
+        items.push({
+          sessions: g.length,
+          id: hit._id, value: wv, source: hit.workValueSource || "", by: hit.workValueBy || "", at: hit.workValueAt || null,
+          total: jobTotalNet(g), site: hit.site || hit.company || "-", title: [hit.title, hit.system, hit.time ? `ครั้งที่ ${hit.time}` : ""].filter(Boolean).join(" · "),
+          start: g.map((e) => e.start || e.date).filter(Boolean).sort()[0] || null,
+        });
+      }
       if (valueMember) {
         const pv = personValueOf(g, valueMember);
         if (pv) { own += pv.net; ownCount += 1; }
       }
     });
-    return { total, withValue, missing, own, ownCount, jobs: allJobGroups.length };
+    items.sort((a, b) => b.value - a.value);
+    return { total, withValue, missing, own, ownCount, jobs: allJobGroups.length, items };
   }, [allJobGroups, valueMember]);
+  const [valueSheetOpen, setValueSheetOpen] = useState(false);
   const hiddenClosedCount = splitClosed ? allJobGroups.length - jobGroups.length : 0;
 
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
@@ -4057,12 +4075,51 @@ const Operation = () => {
                   <>
                     <span><b>{valueSummary.withValue}</b> ใส่มูลค่าแล้ว</span>
                     {valueSummary.missing > 0 && <span style={{ color: "#d97706" }}><b>{valueSummary.missing}</b> ยังไม่ใส่</span>}
+                    {valueSummary.withValue > 0 && (
+                      <ButtonBase onClick={() => setValueSheetOpen(true)} sx={{ fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 800, color: ACCENT, px: 0.5, borderRadius: 1 }}>
+                        ดูที่มาของยอด ›
+                      </ButtonBase>
+                    )}
                   </>
                 )}
                 {valueMember && valueSummary.ownCount > 0 && <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เฉลี่ย <b>{baht(valueSummary.own / valueSummary.ownCount)}</b> / งาน</Box>}
               </Box>
             </Box>
           )}
+
+          {/* ✅ (18 พ.ย. 2569 ผู้ใช้: "ทำไมยอดเยอะขนาดนี้ แสดงผลอะไรกันแน่") ที่มาของยอดมูลค่าครั้งนี้ — งานไหน เท่าไร มาจากไหน
+              ช่วยตรวจงานที่ยอดถูกเติมอัตโนมัติจากมูลค่างานรวมทั้งงาน (ยอดใหญ่ผิดปกติ) */}
+          <MobileSheet open={valueSheetOpen} onClose={() => setValueSheetOpen(false)} maxWidth="md"
+            title="ที่มาของยอดมูลค่าครั้งนี้" subtitle={`${valueSummary.withValue} งานที่ใส่มูลค่าแล้ว · รวม ${baht(valueSummary.total)} (ก่อน VAT) · เรียงจากมากไปน้อย`}>
+            <Box sx={{ p: { xs: 1.25, sm: 2 } }}>
+              <Typography sx={{ mb: 1, fontSize: "0.78rem", color: MUTED, lineHeight: 1.55 }}>
+                ยอดด้านบน = ผลรวม "มูลค่าครั้งนี้ของงาน" ของงานที่ใส่แล้วตามตัวกรอง (นับงานละครั้ง) — ไม่ใช่มูลค่างานรวม และไม่ใช่ยอดที่ช่างลงรายคน
+                · ถ้ายอดใดเท่ากับมูลค่างานรวมทั้งงาน (ป้ายส้ม) แปลว่าถูกเติมจากมูลค่างานรวม — ตรวจและแก้ให้เป็นยอดของครั้งนี้
+              </Typography>
+              <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden" }}>
+                {valueSummary.items.map((it, i) => {
+                  const SRC = { contract: "มูลค่าสัญญา ÷ จำนวนครั้ง (เติมอัตโนมัติ)", job: "มูลค่างานรวม (เติมอัตโนมัติ)", quotation: "ยอดใบเสนอราคาที่ได้งาน (เติมอัตโนมัติ)", ai: "AI อ่านจากไฟล์", manual: "ลงเอง", workers: "ระบบรวมจากรายคน (ข้อมูลทดสอบเดิม)" };
+                  const sameAsTotal = it.total !== null && Math.abs(it.total - it.value) < 1 && it.source !== "manual";
+                  return (
+                    <ButtonBase key={it.id} component="div" onClick={() => { setValueSheetOpen(false); openJobById(it.id); }}
+                      sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, width: "100%", px: 1.5, py: 1.1, textAlign: "left", fontFamily: "inherit", borderTop: i ? `1px solid ${LINE}` : 0, "&:hover": { bgcolor: "#f8fafc" } }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>{it.site}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>{[it.title, it.start ? moment(it.start).add(543, "year").format("D/M/YY") : "", it.sessions > 1 ? `${it.sessions} ช่วงวัน (นับครั้งเดียว)` : ""].filter(Boolean).join(" · ")}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.72rem", color: sameAsTotal ? "#b45309" : MUTED, fontWeight: sameAsTotal ? 800 : 400 }}>
+                          ที่มา: {SRC[it.source] || "ไม่ทราบที่มา (ลงก่อนมีการเก็บที่มา)"}{it.by ? ` · โดย ${it.by}` : ""}{sameAsTotal ? " · เท่ากับมูลค่างานรวมทั้งงาน" : ""}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                        <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: INK, fontVariantNumeric: "tabular-nums" }}>{baht(it.value)}</Typography>
+                        {it.total !== null && <Typography sx={{ fontSize: "0.68rem", color: MUTED }}>มูลค่างานรวม {baht(it.total)}</Typography>}
+                      </Box>
+                    </ButtonBase>
+                  );
+                })}
+              </Box>
+            </Box>
+          </MobileSheet>
 
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)

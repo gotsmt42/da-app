@@ -43,4 +43,20 @@ describe("jobSummary — กติกาเดียวกับหน้าก�
     expect(sm.totals.value).toBe(20000);     // มูลค่าครั้งนี้ของงาน 2 ครั้ง
     expect(sm.totals.jobTotal).toBe(40000);  // มูลค่างานรวม นับสัญญาละครั้ง
   });
+
+  // ✅ (18 พ.ย. 2569 ผู้ใช้: "งานที่เข้าไม่ต่อเนื่องหลายช่วง ไม่เอามูลค่างานมารวมกัน")
+  it("งานหลายช่วงวัน: มูลค่าครั้งนี้นับครั้งเดียว (ทั้งมี jobGroupId และงานเก่าที่ทีมแต่ละช่วงไม่ตรงกัน)", () => {
+    const evs = [
+      // มี jobGroupId · 3 ช่วง เก็บยอดเดียวกันทุกช่วง
+      ev({ _id: "g1", jobGroupId: "G", site: "BKK", start: d(30), end: d(30), workValue: 50000 }),
+      ev({ _id: "g2", jobGroupId: "G", site: "BKK", start: d(20), end: d(20), workValue: 50000 }),
+      ev({ _id: "g3", jobGroupId: "G", site: "BKK", start: d(10), end: d(10), workValue: 50000 }),
+      // งานเก่าไม่มี jobGroupId · 2 ช่วงคนละทีม (การ์ดแยก) · ยอดเท่ากัน = งานเดียวกัน
+      ev({ _id: "o1", site: "HQ", time: "1", team: "A", start: d(25), end: d(25), workValue: 8000 }),
+      ev({ _id: "o2", site: "HQ", time: "1", team: "B", start: d(24), end: d(24), workValue: 8000 }),
+    ];
+    const sm = summarizeJobs(buildJobs(evs, new Map()));
+    expect(sm.totals.value).toBe(58000);
+  });
 });
+

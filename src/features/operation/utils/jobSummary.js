@@ -1,4 +1,4 @@
-import { jobWorkValueNet, jobTotalNet, jobTotalKey } from "@/shared/utils/workValue";
+import { jobWorkValueNet, jobTotalNet, jobTotalKey, visitValueKey, jobWorkValueHit } from "@/shared/utils/workValue";
 import { jobDayStart as dayStart, jobDayEnd as dayEnd } from "@/shared/utils/jobDays";
 import { getOverdueGroupKey, isFlaggedDays, isSevereDays } from "@/shared/utils/overdueJobs";
 
@@ -73,6 +73,8 @@ export function buildJobs(events = [], daysPastDueMap = new Map()) {
       overdueDays: flagged ? overdueDays : null,
       severe: flagged && isSevereDays(overdueDays),
       value: valueOf(rows),
+      // 🔁 (18 พ.ย. 2569 ผู้ใช้: "งานที่เข้าไม่ต่อเนื่องหลายช่วง ไม่เอามูลค่างานมารวมกัน") คีย์นับครั้งเดียวต่อการเข้างาน
+      valueKey: valueOf(rows) === null ? null : visitValueKey(jobWorkValueHit(rows) || latest, valueOf(rows)),
       jobTotal: jobTotalNet(rows),
       totalKey: jobTotalKey(latest, key),
       jobNo: latest.jobNo || "",
@@ -102,14 +104,18 @@ export function filterJobs(jobs, { from, to, responsible = "all", system = "all"
   });
 }
 
-const emptyRow = (key) => ({ key, total: 0, closed: 0, open: 0, overdue: 0, value: 0, valued: 0, jobTotal: 0, totalKeys: new Set(), ...Object.fromEntries(STATUS_GROUPS.map((g) => [`g_${g.key}`, 0])) });
+const emptyRow = (key) => ({ key, total: 0, closed: 0, open: 0, overdue: 0, value: 0, valued: 0, valueKeys: new Set(), jobTotal: 0, totalKeys: new Set(), ...Object.fromEntries(STATUS_GROUPS.map((g) => [`g_${g.key}`, 0])) });
 const addJob = (row, j) => {
   row.total += 1;
   row[`g_${j.group}`] += 1;
   if (j.group === "closed") row.closed += 1; else row.open += 1;
   if (j.group === "overdue") row.overdue += 1;
-  // มูลค่าครั้งนี้ของงาน — 1 ค่าต่องาน
-  if (j.value !== null) { row.value += j.value; row.valued += 1; }
+  // มูลค่าครั้งนี้ของงาน — 1 ค่าต่อการเข้างาน (งานหลายช่วงวันนับครั้งเดียว ไม่บวกทุกช่วง)
+  if (j.value !== null) {
+    row.valued += 1;
+    const vk = j.valueKey || j.key;
+    if (!row.valueKeys.has(vk)) { row.valueKeys.add(vk); row.value += j.value; }
+  }
   // มูลค่างานรวม (เทียบ) — งานสัญญาหลายรอบนับครั้งเดียวต่อสัญญา ไม่บวกซ้ำทุกรอบ
   if (j.jobTotal !== null && j.jobTotal !== undefined) {
     const k = j.totalKey || j.key;

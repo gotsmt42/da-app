@@ -12,11 +12,14 @@ const mount = (props, opts) => {
 
 describe("การ์ดมูลค่างานครั้งนี้", () => {
   afterEach(() => { document.body.innerHTML = ""; });
-  it("งานสัญญาที่ยังไม่ใส่ → เติมมูลค่าสัญญา ÷ ครั้ง ให้เลย และบันทึกพร้อมแหล่งที่มา", () => {
+  // 🔁 (18 พ.ย. 2569) ไม่เติมเอง — ต้องกด "ใช้ค่านี้" (กันยอดแนะนำถูกบันทึกไปตอนกดบันทึกฟอร์มเรื่องอื่น)
+  it("งานสัญญาที่ยังไม่ใส่ → ช่องว่าง · ไม่กดใช้ = ไม่ส่ง · กด 'ใช้' = มูลค่าสัญญา ÷ ครั้ง พร้อมแหล่งที่มา", () => {
     const { root, ctl, inp } = mount({ contractGroupId: "C1", jobValue: 41600, visitCount: 4, time: "3" });
-    expect(inp.value).toBe("10,400");
+    expect(inp.value).toBe("");
+    expect(ctl.read()).toEqual({});
     expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/÷ 4 ครั้ง/);
-    expect(root.querySelector("#ee-wv-auto")).not.toBeNull();
+    root.querySelector("#ee-wv-use").click();
+    expect(inp.value).toBe("10,400");
     expect(ctl.read()).toEqual({ workValue: 10400, workValueVatIncluded: false, workValueSource: "contract" });
   });
 
@@ -25,6 +28,7 @@ describe("การ์ดมูลค่างานครั้งนี้", (
     expect(root.querySelector('input[name="editWorkValueVat"]')).toBeNull();
     expect(root.querySelector("#ee-wv-contract").textContent).toMatch(/รวม VAT 7%/);
     expect(root.querySelector("[data-open-contract]").hidden).toBe(true); // ไม่ส่งตัวเปิดลิงก์ = ซ่อนปุ่ม
+    root.querySelector("#ee-wv-use").click();
     expect(root.querySelector("#ee-wv-break").textContent).toMatch(/ก่อน VAT/);
     expect(ctl.read()).toEqual({ workValue: 10700, workValueVatIncluded: true, workValueSource: "contract" });
   });
@@ -71,6 +75,8 @@ describe("การ์ดมูลค่างานครั้งนี้", (
 
   it("ใบเสนอราคาที่ได้งานแบบรวม VAT → เลือก 'รวม VAT' ให้อัตโนมัติ", () => {
     const { root, ctl } = mount({ quotationStatus: "approved", quotationAmount: 21400, quotationVatIncluded: true });
+    expect(ctl.read()).toEqual({});
+    root.querySelector("#ee-wv-use").click();
     expect(root.querySelector('input[name="editWorkValueVat"][value="1"]').checked).toBe(true);
     expect(ctl.read()).toMatchObject({ workValue: 21400, workValueVatIncluded: true, workValueSource: "quotation" });
   });
@@ -80,4 +86,12 @@ describe("การ์ดมูลค่างานครั้งนี้", (
     expect(inp.value).toBe("");
     expect(ctl.read()).toEqual({});
   });
+
+  it("งานทั่วไปที่มีมูลค่างานรวม → แนะนำพร้อมคำเตือน 'ใช้เมื่องานนี้เข้าครั้งเดียว' · ไม่ใส่ให้เอง", () => {
+    const { root, ctl, inp } = mount({ jobValue: 5000000 });
+    expect(inp.value).toBe("");
+    expect(root.querySelector("#ee-wv-auto").textContent).toMatch(/เข้าครั้งเดียว/);
+    expect(ctl.read()).toEqual({});
+  });
 });
+
