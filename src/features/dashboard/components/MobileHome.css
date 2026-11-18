@@ -381,19 +381,21 @@
 .mh-quick .mh-icon-wrap .mh-badge { top: -4px; right: -6px; }
 
 /* 🔁 (4 พ.ย. 2569 ผู้ใช้: "ปุ่มงานของฉันทำให้ชัดเจน สังเกตง่าย" → "สีเข้มไป ไม่มืออาชีพ")
-   การ์ดพื้นขาวอมแดงอ่อน ขอบแดงอ่อน · ไอคอนขาวในวงกลมแดงทึบ (จุดเด่นเดียว) · ชื่อตัวใหญ่สีเข้ม · ปุ่ม "เปิด" แดงทึบด้านขวา */
+   🔁 (18 พ.ย. 2569 ผู้ใช้: "สีสันของเมนูงานของฉันยังดูแปลกๆ ไม่เข้าธีม") โทนแดงอมชมพู → น้ำเงินของระบบ
+   การ์ดฟ้าอ่อนจางไปขาว ขอบฟ้าอ่อน (ชุดเดียวกับกล่องเด่นในหน้าสรุปมูลค่า) · ไอคอนน้ำเงินบนพื้นฟ้าอ่อน
+   ปุ่ม "เปิด" น้ำเงินทึบ = จุดเด่นเดียวของการ์ด · แดงเหลือเฉพาะตัวเลข "ค้าง" (เตือนจริง) */
 .mh .mh-myjobs:not(.mh-myjobs--plain) {
   margin-top: 0;
-  padding: 12px 12px 12px 12px;
+  padding: 12px;
   gap: 12px;
-  border: 1px solid #fbcaca;
+  border: 1px solid #bfdbfe;
   border-radius: 16px;
-  background: #fff5f5;
-  box-shadow: 0 6px 16px -12px rgba(220, 38, 38, 0.45);
+  background: linear-gradient(135deg, #eff6ff 0%, #ffffff 78%);
+  box-shadow: 0 6px 16px -12px rgba(37, 99, 235, 0.45);
   color: var(--mh-ink);
 }
-.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-art { width: 46px; height: 46px; background: #dc2626; }
-.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-icon { font-size: 24px; filter: none; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-art { width: 46px; height: 46px; border-radius: 14px; background: #dbeafe; }
+.mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-icon { font-size: 25px; filter: none; }
 .mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-title { font-size: 1.08rem; font-weight: 800; color: #0f172a; }
 .mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-sum { font-size: 0.82rem; color: #475569; margin-top: 2px; }
 .mh .mh-myjobs:not(.mh-myjobs--plain) .mh-myjobs-sum b { font-weight: 700; }
@@ -401,10 +403,13 @@
 .mh .mh-myjobs-flag { font-weight: 800; }
 .mh .mh-myjobs-cta {
   margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px;
-  padding: 6px 6px 6px 12px; border-radius: 999px; background: #dc2626; color: #fff;
-  font-size: 0.82rem; font-weight: 800;
+  padding: 6px 6px 6px 12px; border-radius: 999px; background: #2563eb; color: #fff;
+  font-size: 0.82rem; font-weight: 800; box-shadow: 0 4px 10px -6px rgba(37, 99, 235, 0.7);
 }
 .mh .mh-myjobs-cta .mh-myjobs-go { margin-left: 0; font-size: 19px; color: #fff; }
 
-/* ✅ (11 พ.ย. 2569) การ์ดบันทึกเข้างานวันนี้ — ใต้การ์ดงานของฉัน ระยะขอบเดียวกัน */
-.mh-today { margin: 12px 16px 0; }
+/* ✅ (11 พ.ย. 2569) การ์ดบันทึกเข้างานวันนี้ — ใต้การ์ดงานของฉัน ระยะขอบเดียวกัน
+   🔧 (18 พ.ย. 2569) เดิม margin ซ้าย-ขวา 16px ซ้อนกับ padding ของหน้า → การ์ดแคบกว่าตัวอื่น · ให้กว้างเท่าการ์ดงานของฉัน/ต้องดำเนินการ
+   มุมโค้ง 14px เท่าการ์ด "ต้องดำเนินการ" · ระยะบน-ล่างใช้ gap 16px ของหน้า (เดิมบวก margin 12px อีก → ห่างเกิน) */
+.mh-today { margin: 0; }
+.mh .mh-today > div { border-radius: 14px; }

@@ -683,12 +683,13 @@ const Dashboard = () => {
               {showMyJobsHero && (
                 <ButtonBase component={Link} to="/technician/jobs" title={loading ? "" : myJobsSummary}
                   sx={{
-                    // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ตรวจสอบสีและธีมหน้าจอคอมให้เหมือนกับมือถือ") โทนแดงแบรนด์ชุดเดียวกับหน้าแรกมือถือ
+                    // 🔁 (4 พ.ย. 2569 ผู้ใช้: "ตรวจสอบสีและธีมหน้าจอคอมให้เหมือนกับมือถือ") ชุดเดียวกับหน้าแรกมือถือ
+                    // 🔁 (18 พ.ย. 2569 ผู้ใช้: "สีสันของเมนูงานของฉันยังดูแปลกๆ ไม่เข้าธีม") แดงอมชมพู → น้ำเงินของระบบ
                     width: { xs: "100%", sm: "auto" }, minWidth: { sm: 300 }, gap: 1.25, px: 1.5, py: 1.1, borderRadius: "16px", justifyContent: "flex-start",
-                    bgcolor: "#fff5f5", border: "1px solid #fbcaca", textDecoration: "none", fontFamily: "inherit", boxShadow: "0 6px 16px -12px rgba(220,38,38,.45)",
-                    transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#dc2626", boxShadow: "0 8px 20px -12px rgba(220,38,38,.6)" },
+                    background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 78%)", border: "1px solid #bfdbfe", textDecoration: "none", fontFamily: "inherit", boxShadow: "0 6px 16px -12px rgba(37,99,235,.45)",
+                    transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#2563eb", boxShadow: "0 8px 20px -12px rgba(37,99,235,.6)" },
                   }}>
-                  <Box sx={{ width: 42, height: 42, borderRadius: "50%", bgcolor: "#dc2626", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <Box sx={{ width: 42, height: 42, borderRadius: "13px", bgcolor: "#dbeafe", color: "#2563eb", display: "grid", placeItems: "center", flexShrink: 0 }}>
                     <FaUserCheck size={17} />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0, textAlign: "left" }}>
@@ -704,7 +705,7 @@ const Dashboard = () => {
                     </Typography>
                   </Box>
                   <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0, pl: 1.5, pr: 1, py: 0.6, borderRadius: 99,
-                    bgcolor: "#dc2626", color: "#fff", fontWeight: 800, fontSize: "0.84rem" }}>
+                    bgcolor: "#2563eb", color: "#fff", fontWeight: 800, fontSize: "0.84rem", boxShadow: "0 4px 10px -6px rgba(37,99,235,.7)" }}>
                     เปิด<FaChevronRight size={11} />
                   </Box>
                 </ButtonBase>
