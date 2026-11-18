@@ -3666,6 +3666,7 @@ const Operation = () => {
             filterMember !== "all" ? `ผู้ปฏิบัติงาน: ${filterMember === "noteam" ? "ยังไม่มีทีม" : filterMember}` : "",
           ].filter(Boolean).join("  ·  "),
           exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
+          member: filterMember !== "all" && filterMember !== "noteam" ? filterMember : "",
         },
         daysPastDueMap,
         isFlaggedDays,
@@ -4067,7 +4068,7 @@ const Operation = () => {
             <WorkValueSummaryCard s={valueSummary} member={valueMember} onOpenDetail={setValueSheet}
               periodText={valuePeriodText} />
           )}
-          <WorkValueSourceSheet s={valueSummary} filter={valueSheet} onFilter={setValueSheet} onClose={() => setValueSheet(null)}
+          <WorkValueSourceSheet s={valueSummary} employees={employee} filter={valueSheet} onFilter={setValueSheet} onClose={() => setValueSheet(null)}
             periodText={valuePeriodText}
             onOpenJob={(jid) => { setValueSheet(null); openJobById(jid); }} />
 

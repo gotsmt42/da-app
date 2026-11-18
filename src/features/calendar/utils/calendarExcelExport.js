@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
+import { excelDate } from "@/shared/utils/excelDate";
 
 /**
  * calendarExcelExport.js — ส่งออกตารางงานช่าง / ตารางนัดหมายฝ่ายขาย เป็นไฟล์ Excel (.xlsx)
@@ -57,15 +58,8 @@ const border = {
   right: { style: "thin", color: { argb: GREY.border } },
 };
 const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
-/**
- * 🐛 วันที่ใน Excel ไม่มีโซนเวลา — ExcelJS เขียน Date เป็น UTC ตรงๆ เที่ยงคืนเวลาไทย (UTC+7) จึงกลายเป็น 17:00
- *    ของ "วันก่อนหน้า" ในไฟล์ (นัด 4 ส.ค. ขึ้นเป็น 3 ส.ค.) → สร้าง Date แบบ UTC ที่ตัวเลข วัน/เวลา ตรงกับเวลาไทย
- */
-const toDate = (v) => {
-  if (!v) return "";
-  const m = moment(v);
-  return m.isValid() ? new Date(Date.UTC(m.year(), m.month(), m.date(), m.hours(), m.minutes())) : "";
-};
+/** 🐛 วันที่ใน Excel ไม่มีโซนเวลา — ใช้ excelDate (shared) กันวันเลื่อนเป็นวันก่อนหน้า */
+const toDate = excelDate;
 
 /** ช่วงวันที่จริงของงาน — end ของงานทั้งวันเก็บแบบ exclusive (+1 วัน) ต้องลบคืน · งานที่มีเวลาไม่ต้อง */
 const rangeOf = (ev) => {

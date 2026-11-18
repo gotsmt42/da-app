@@ -4,6 +4,8 @@ import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { addServiceReportSheets } from "@/features/documents/utils/serviceReportExcel";
+import { addWorkerValueSheets } from "./workerValueExcel";
+import { excelDate } from "@/shared/utils/excelDate";
 import { jobInfoOf, issueStats } from "@/features/documents/utils/serviceReportData";
 
 const srUnreadable = (sr) => (sr?.data?.fileChecks || []).some((x) => x.status === "unreadable" || x.status === "partial");
@@ -56,7 +58,7 @@ const thinBorder = {
  * @param roundLabel (event) => "1/4 - 2569-70" — ครั้งที่แบบเดียวกับหน้าจอ
  * @param srOf       (sessions) => สรุป Service Report ของงาน { status, data } | null — มี = เพิ่มชีตสรุป/ปัญหาที่พบ
  */
-/** @param showValue แสดงมูลค่างานครั้งนี้ + ชีต "มูลค่างานรายช่าง" (แอดมิน/manager) */
+/** @param showValue แสดงมูลค่าครั้งนี้ของงาน + ชีต "ผลงานรายช่าง" สรุป/แยกงาน (แอดมิน/manager) · meta.member = กรองผู้ปฏิบัติงานอยู่ */
 export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel, srOf, showValue = false }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
@@ -215,13 +217,14 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       docNo: a.docNo || "",
       // ✅ ข้อความช่วงวันที่แบบอ่านง่าย (รวมทุกช่วงของงานหลายวันไม่ติดกัน) เหมือนที่เห็นบนการ์ด
       dateRange: sessions.map((e) => formatEventDateRange(e)).join("\n"),
-      startDate: minStart.toDate(),
-      endDate: maxEnd.toDate(),
+      // 🐛 (18 พ.ย. 2569) excelDate — กันวันที่/เวลาเลื่อน 7 ชม. (ExcelJS เขียนเป็น UTC)
+      startDate: excelDate(minStart),
+      endDate: excelDate(maxEnd),
       dayCount,
       timeRange: a.startTime || a.endTime ? `${a.startTime || "-"}-${a.endTime || "-"}` : "ทั้งวัน",
       responsible: a.responsiblePerson || "",
-      checkIn: a.checkedInAt ? new Date(a.checkedInAt) : "",
-      checkOut: a.checkedOutAt ? new Date(a.checkedOutAt) : "",
+      checkIn: excelDate(a.checkedInAt),
+      checkOut: excelDate(a.checkedOutAt),
       workNote: [...new Set(sessions.flatMap((x) => [x.description, x.workNote]).map((v) => String(v || "").trim()).filter(Boolean))].join("\n"),
       closeState,
       ...(showValue ? { workValue: workValueOf(sessions) ?? "ยังไม่ใส่" } : {}),
@@ -288,8 +291,9 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
   }
 
   // ✅ (2 พ.ย. 2569 ผู้ใช้: "ค้นหาว่าช่างคนนั้นๆ มีมูลค่างานรวมทั้งหมดเท่าไร ... และ export")
-  //    ชีต "มูลค่างานรายช่าง" — ทุกคนในทีมได้มูลค่างานนั้นเต็มจำนวน (ผลรวมรายคนจึงมากกว่ามูลค่างานจริงได้)
-  if (showValue && jobs.length) addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta);
+  // 🔁 (18 พ.ย. 2569 ผู้ใช้: "สรุปยอดรวมของช่างแต่ละคนว่ามูลค่าครั้งนี้ที่ลง แจกแจงแยกแต่ละงานให้ชัดเจน")
+  //    2 ชีต: ผลงานรายช่าง (สรุป) + (แยกงาน) — ดู utils/workerValueExcel · กรองผู้ปฏิบัติงานอยู่ = เฉพาะคนนั้น
+  if (showValue && jobs.length) addWorkerValueSheets(wb, jobs, meta, { only: meta.member || "", roundLabel });
 
   // ✅ ชีตสรุป Service Report — เฉพาะงานที่มีสรุปแล้ว เรียงตามลำดับเดียวกับชีตหลัก
   const srJobs = srOf ? jobs.map((job) => ({ sessions: job.sessions, summary: srOf(job.sessions) })).filter((x) => x.summary?.data && !srUnreadable(x.summary)) : [];
@@ -305,70 +309,6 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
     meta.fileName
   );
-}
-
-function addWorkerValueSheet(wb, jobs, workersOf, workValueOf, meta) {
-  const ws = wb.addWorksheet("มูลค่างานรายช่าง", { pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-  const per = new Map();
-  jobs.forEach(({ sessions }) => {
-    const a = sessions[0] || {};
-    workersOf(a).forEach((name, i) => {
-      const r = per.get(name) || { name, jobs: 0, lead: 0, valued: 0, missing: 0, total: 0 };
-      r.jobs += 1;
-      if (i === 0) r.lead += 1;
-      // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ให้แยกตามคน") มูลค่างานที่คนนั้นทำ — เดิมทุกคนได้มูลค่างานของงานเต็มจำนวน
-      const pv = personValueOf(sessions, name);
-      if (!pv) r.missing += 1; else { r.valued += 1; r.total += pv.net; }
-      per.set(name, r);
-    });
-  });
-  const rows = [...per.values()].sort((x, y) => y.total - x.total || y.jobs - x.jobs || x.name.localeCompare(y.name, "th"));
-  const cols = [
-    { key: "no", header: "ลำดับ", width: 7, align: "center" },
-    { key: "name", header: "ผู้ปฏิบัติงาน", width: 26 },
-    { key: "jobs", header: "จำนวนงาน", width: 11, align: "center" },
-    { key: "lead", header: "เป็นหัวหน้าทีม", width: 13, align: "center" },
-    { key: "valued", header: "ใส่มูลค่าแล้ว", width: 13, align: "center" },
-    { key: "missing", header: "ยังไม่ใส่มูลค่า", width: 14, align: "center" },
-    { key: "total", header: "มูลค่างานรวม (บาท)", width: 20, align: "right" },
-    { key: "avg", header: "เฉลี่ย / งาน (บาท)", width: 18, align: "right" },
-  ];
-  ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
-  ws.mergeCells(1, 1, 1, cols.length);
-  ws.getCell(1, 1).value = "มูลค่างานรายช่าง";
-  ws.getCell(1, 1).font = { name: "Tahoma", size: 16, bold: true, color: { argb: C.titleText } };
-  ws.mergeCells(2, 1, 2, cols.length);
-  ws.getCell(2, 1).value = `${meta.groupLabel}  ·  ${meta.filterSummary}  ·  ส่งออก ${meta.exportedAt}`;
-  ws.getCell(2, 1).font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
-  ws.mergeCells(3, 1, 3, cols.length);
-  ws.getCell(3, 1).value = "มูลค่ารายช่าง = มูลค่าครั้งนี้ที่ช่างแต่ละคนลงเอง (ก่อน VAT) — เป็นผลงานของแต่ละคน ไม่นำมารวมกัน";
-  ws.getCell(3, 1).font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.titleText } };
-  const HEAD = 5;
-  const hr = ws.getRow(HEAD);
-  cols.forEach((c, i) => {
-    const cell = hr.getCell(i + 1);
-    cell.value = c.header;
-    cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = thinBorder;
-  });
-  hr.height = 26;
-  rows.forEach((r, idx) => {
-    const row = ws.addRow({ no: idx + 1, name: r.name, jobs: r.jobs, lead: r.lead, valued: r.valued, missing: r.missing || "", total: r.total, avg: r.valued ? r.total / r.valued : "" });
-    row.height = 22;
-    cols.forEach((c, i) => {
-      const cell = row.getCell(i + 1);
-      cell.font = { name: "Tahoma", size: 10, bold: c.key === "total" || c.key === "name" };
-      cell.border = thinBorder;
-      cell.alignment = { vertical: "middle", horizontal: c.align || "left" };
-      if (idx % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
-      if (c.key === "total" || c.key === "avg") cell.numFmt = "#,##0.00";
-      if (c.key === "missing" && r.missing) cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.warn } };
-    });
-  });
-  ws.views = [{ state: "frozen", ySplit: HEAD }];
-  if (rows.length) ws.autoFilter = { from: { row: HEAD, column: 1 }, to: { row: HEAD + rows.length, column: cols.length } };
 }
 
 export const buildOperationFileName = (groupLabel) =>
