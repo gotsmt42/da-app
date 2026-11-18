@@ -256,7 +256,8 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, defaultOpen =
         </Box>
         <ChevronRight sx={{ fontSize: 22, color: FAINT, flexShrink: 0, mt: 0.2 }} />
       </ButtonBase>
-      <AttendanceDetailDialog row={open ? row : null} onClose={() => setOpen(false)} me={me} isApprover={isApprover} onPreview={onPreview} onChanged={onChanged} />
+      {/* showJob = หน้าประวัติเข้างาน · ไม่มี = อยู่ในงานนั้นเอง (การ์ดงาน/รายละเอียดงาน) */}
+      <AttendanceDetailDialog row={open ? row : null} onClose={() => setOpen(false)} me={me} isApprover={isApprover} onPreview={onPreview} onChanged={onChanged} inJob={!showJob} />
 
       {quick && (
         <Suspense fallback={null}>
@@ -356,7 +357,7 @@ const Section = ({ title, icon, children, right }) => (
   </Box>
 );
 
-function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
+function AttendanceDetail({ row, me, isApprover, onPreview, onChanged, onClose, inJob = false }) {
   const [fixOpen, setFixOpen] = useState(false);
   const { busy, decide } = useDecide(row, onChanged, false);
   const mine = String(row.userId) === String(me);
@@ -371,8 +372,12 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
   const galleryList = photos.map((p) => ({ ...p, _id: p.fileId }));
   // 🐛 (18 พ.ย. 2569 ผู้ใช้: "กดดูบันทึกเข้างานแล้วไม่มีอะไรเกิดขึ้น") ในฟอร์มแก้ไขงาน (SweetAlert · createRoot แยก) ไม่มี Router
   //    <Link> พังทั้งก้อน → กล่องเข้างานหายทั้งกล่อง · นอก Router = ไม่แสดงปุ่ม "เปิดงาน" (อยู่ในหน้างานนั้นแล้ว)
+  // 🐛 (18 พ.ย. 2569 ผู้ใช้: "ปัญหากดเปิดงานไม่ได้ของหน้าบันทึกเข้างาน") เปิดจากในงานนั้นเอง (การ์ดงาน/รายละเอียดงาน)
+  //    ลิงก์ไปงานเดิม = หน้าไม่เปลี่ยน กล่องนี้ยังทับอยู่ → ดูเหมือนกดไม่ได้
+  //    → ในงาน: ปุ่ม "กลับไปที่งาน" (ปิดกล่องนี้) · หน้าประวัติเข้างาน: "เปิดงาน" แล้วปิดกล่องนี้ไปพร้อมกัน
   const inRouter = useInRouterContext();
-  const canOpenJob = Boolean(row.eventId) && inRouter;
+  const canOpenJob = Boolean(row.eventId) && inRouter && !inJob;
+  const canBackToJob = inJob && Boolean(onClose);
   const openFile = (p) => {
     const i = photos.findIndex((x) => x.fileId === p.fileId);
     if (onPreview) onPreview(p.fileUrl, p.fileName, galleryList, i);
@@ -493,7 +498,7 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
         </Stack>
       </Box>
 
-      {(mine || isApprover) || canOpenJob ? (
+      {(mine || isApprover) || canOpenJob || canBackToJob ? (
         <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.5 }}>
           {(mine || isApprover) && (
             <Button variant="outlined" startIcon={<EditCalendarRounded />} onClick={() => setFixOpen(true)}
@@ -502,9 +507,15 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
             </Button>
           )}
           {canOpenJob && (
-            <Button component={Link} to={`/operation/${row.eventId}`} variant="contained" disableElevation endIcon={<ChevronRight />}
+            <Button component={Link} to={`/operation/${row.eventId}`} onClick={() => onClose?.()} variant="contained" disableElevation endIcon={<ChevronRight />}
               sx={{ ...SMALL_BTN, minHeight: 40, px: 2.25, fontSize: "0.86rem", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
               เปิดงาน
+            </Button>
+          )}
+          {canBackToJob && (
+            <Button onClick={onClose} variant="contained" disableElevation
+              sx={{ ...SMALL_BTN, minHeight: 40, px: 2.25, fontSize: "0.86rem", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
+              กลับไปที่งาน
             </Button>
           )}
         </Stack>
@@ -517,7 +528,7 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
 }
 
 /** กล่องรายละเอียดการเข้างาน — เปิดจากตาราง หรือจากลิงก์แจ้งเตือน (/attendance?open=<id>) */
-export function AttendanceDetailDialog({ row, onClose, me, isApprover, onPreview, onChanged }) {
+export function AttendanceDetailDialog({ row, onClose, me, isApprover, onPreview, onChanged, inJob = false }) {
   const fullScreen = useMediaQuery("(max-width:600px)");
   return (
     <Dialog open={Boolean(row)} onClose={onClose} fullWidth maxWidth="md" fullScreen={fullScreen}
@@ -527,7 +538,7 @@ export function AttendanceDetailDialog({ row, onClose, me, isApprover, onPreview
         <IconButton onClick={onClose} aria-label="ปิด"><Close /></IconButton>
       </Stack>
       <Box sx={{ p: { xs: 1.25, md: 2 }, overflowY: "auto" }}>
-        {row && <AttendanceDetail key={row._id} row={row} me={me} isApprover={isApprover} onPreview={onPreview} onChanged={onChanged} />}
+        {row && <AttendanceDetail key={row._id} row={row} me={me} isApprover={isApprover} onPreview={onPreview} onChanged={onChanged} onClose={onClose} inJob={inJob} />}
       </Box>
     </Dialog>
   );

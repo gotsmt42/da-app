@@ -191,11 +191,14 @@ const EventService = {
       const formData = new FormData();
       formData.append("file", prepared.file);
       formData.append("type", type);
+      // ✅ (18 พ.ย. 2569) ข้อมูลประกอบไฟล์ (เช่น เอกสารนัดเซล: docType · note) — ส่ง config.fields
+      Object.entries(config.fields || {}).forEach(([k, v]) => { if (v !== undefined && v !== null) formData.append(k, v); });
+      const { fields: _fields, ...axiosConfig } = config;
 
       const response = await API.put(`/events/upload/${id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 120000, // ✅ อัปไฟล์บนเน็ตมือถืออาจเกิน 20 วิ (ค่าเริ่มต้นของ API)
-        ...config, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
+        ...axiosConfig, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
       });
 
       return response.data;
@@ -373,6 +376,11 @@ const EventService = {
   /** ขั้นตอนนัดหมายฝ่ายขาย — { status?, visitResult? } (server ตรวจรูปหน้างาน/ผลการเข้าพบ) */
   async SalesStatus(id, body) {
     return (await API.put(`/events/${id}/sales-status`, body)).data;
+  },
+
+  /** ✅ (18 พ.ย. 2569) แก้รายละเอียด/ชนิดเอกสารนัดเซล — { note?, docType? } → { file } (แก้ได้หลังปิดงาน) */
+  async UpdateSalesDoc(id, fileId, body) {
+    return (await API.put(`/events/${id}/sales-doc/${fileId}`, body)).data;
   },
 
   async DeleteFile(id, type, fileId) {

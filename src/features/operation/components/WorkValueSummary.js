@@ -17,14 +17,26 @@ import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ChevronRightRounded, ErrorRounded, CheckCircleRounded, RadioButtonUncheckedRounded, PersonOutlineRounded, InsightsRounded } from "@mui/icons-material";
+import {
+  ChevronRightRounded, PersonOutlineRounded, PaymentsRounded, ReportProblemRounded, HourglassEmptyRounded, InsightsRounded,
+  TaskAltRounded, GroupsRounded, AccountTreeRounded, InfoRounded,
+} from "@mui/icons-material";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import UserAvatar from "@/shared/ui/UserAvatar";
-import { INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
 
-const WARN = "#b45309";
-const GRAY = "#64748b";
-const FAINT = "#94a3b8";
+// 🔁 (18 พ.ย. 2569 ผู้ใช้: "สีสันมันดูรก เข้มเกินไป ตาลาย" → "เอาให้มองง่ายๆ สวยงาม สบายตา ชวนดู สีสันยังมีแต่มืออาชีพ
+//    ให้เข้าธีมระบบ · ดูยากเกินไปในมือถือ")
+//    ธีมระบบ: น้ำเงินหลัก (ACCENT) + พื้นฟ้าอ่อน · ตัวเลขสีเข้ม · สีบอกสถานะอยู่ในไอคอนกลม/ป้ายพื้นอ่อน (ไม่ใช้ตัวอักษรสีเข้มทั้งก้อน)
+//    น้ำเงิน = นับแล้ว/ลงแล้ว · ส้มอ่อน = ต้องตรวจ/ยังไม่ลง · เขียวอมฟ้า = เฉลี่ย · เทา = ยังไม่ใส่
+//    มือถือ: ตัวอักษรใหญ่ขึ้น ช่องไฟมากขึ้น · ยอดหลักเป็นกล่องเด่นเต็มแถว
+const WARN = "#d97706";
+const WARN_TEXT = "#b45309";
+const WARN_SOFT = "#fffbeb";
+const WARN_LINE = "#fde68a";
+const TEAL = "#0d9488";
+const SLATE = "#64748b";
+const TRACK = "#e8edf4";
 const NUM = { fontVariantNumeric: "tabular-nums" };
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 
@@ -53,33 +65,45 @@ function findEmployee(employees, name) {
     || null;
 }
 
-/** รูปผู้ลง · ไม่ทราบผู้ลง = ไอคอนคนสีเทา */
-function ByAvatar({ name, src, size = 22 }) {
+/** รูปผู้ลง · ตัวย่อบนพื้นฟ้าอ่อน (ธีมระบบ) · ไม่ทราบผู้ลง = ไอคอนคนสีเทา */
+function ByAvatar({ name, src, size = 24 }) {
   if (!name) {
     return (
       <Box sx={{ width: size, height: size, borderRadius: "50%", bgcolor: "#f1f5f9", display: "grid", placeItems: "center", flexShrink: 0 }}>
-        <PersonOutlineRounded sx={{ fontSize: size * 0.68, color: FAINT }} />
+        <PersonOutlineRounded sx={{ fontSize: size * 0.66, color: FAINT }} />
       </Box>
     );
   }
-  return <UserAvatar name={name} src={src || ""} size={size} sx={{ boxShadow: "0 0 0 1.5px #fff" }} />;
+  return <UserAvatar name={name} src={src || ""} size={size} sx={{ bgcolor: ACCENT_SOFT, color: ACCENT, fontWeight: 800 }} />;
 }
 const sourceKey = (src) => (SOURCE_LABEL[src] !== undefined ? src : "");
 
-/** ช่องตัวเลข 1 ช่อง */
-function Tile({ icon: Icon, tone, label, value, sub, onClick }) {
+/** ไอคอนในกรอบมนพื้นอ่อน — สีบอกความหมายของช่อง */
+function IconBadge({ icon: Icon, tone, size = 30 }) {
+  return (
+    <Box sx={{ width: size, height: size, borderRadius: "9px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.12), color: tone }}>
+      <Icon sx={{ fontSize: size * 0.6 }} />
+    </Box>
+  );
+}
+
+/** ช่องตัวเลข · hero = ยอดหลัก (พื้นฟ้าอ่อน ตัวเลขใหญ่) */
+function Tile({ icon, tone = SLATE, label, value, sub, onClick, hero = false, dim = false }) {
   return (
     <ButtonBase onClick={onClick} disabled={!onClick} component="div"
-      sx={{ display: "block", height: "100%", textAlign: "left", fontFamily: "inherit", px: 1.5, py: 1.15, borderRadius: 2.5, minWidth: 0,
-        bgcolor: alpha(tone, 0.045), border: `1px solid ${alpha(tone, 0.16)}`, transition: "border-color .15s ease, background-color .15s ease",
-        "&:hover": onClick ? { borderColor: alpha(tone, 0.45), bgcolor: alpha(tone, 0.07) } : {} }}>
-      <Stack direction="row" alignItems="center" gap={0.6}>
-        <Icon sx={{ fontSize: 15, color: tone }} />
-        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 800, color: tone }}>{label}</Typography>
-        {onClick && <ChevronRightRounded sx={{ fontSize: 16, color: alpha(tone, 0.6) }} />}
+      sx={{ display: "block", height: "100%", textAlign: "left", fontFamily: "inherit", p: { xs: 1.4, sm: 1.6 }, borderRadius: "14px", minWidth: 0,
+        bgcolor: hero ? ACCENT_SOFT : "#fff", border: `1px solid ${hero ? ACCENT_LINE : LINE}`,
+        backgroundImage: hero ? `linear-gradient(135deg, ${alpha(ACCENT, 0.09)} 0%, ${alpha(ACCENT, 0.02)} 70%)` : "none",
+        transition: "border-color .15s ease, box-shadow .15s ease, transform .15s ease",
+        "&:hover": onClick ? { borderColor: hero ? ACCENT : "#cbd5e1", boxShadow: "0 4px 14px rgba(15,23,42,.06)" } : {} }}>
+      <Stack direction="row" alignItems="center" gap={1}>
+        <IconBadge icon={icon} tone={tone} size={hero ? 32 : 28} />
+        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 700, color: hero ? ACCENT : INK_2, lineHeight: 1.3 }}>{label}</Typography>
+        {onClick && <ChevronRightRounded sx={{ fontSize: 18, color: hero ? ACCENT : "#cbd5e1" }} />}
       </Stack>
-      <Typography noWrap sx={{ mt: 0.25, fontSize: { xs: "1.12rem", sm: "1.28rem" }, fontWeight: 900, color: INK, lineHeight: 1.25, ...NUM }}>{value}</Typography>
-      <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>{sub}</Typography>
+      <Typography noWrap sx={{ mt: 1, fontSize: hero ? { xs: "1.6rem", sm: "1.75rem" } : { xs: "1.18rem", sm: "1.3rem" }, fontWeight: 800,
+        color: dim ? SLATE : INK, lineHeight: 1.15, letterSpacing: "-0.01em", ...NUM }}>{value}</Typography>
+      <Typography sx={{ mt: 0.4, fontSize: "0.76rem", color: MUTED, lineHeight: 1.4 }}>{sub}</Typography>
     </ButtonBase>
   );
 }
@@ -89,48 +113,66 @@ function CoverageBar({ parts, done, n, label }) {
   if (!n) return null;
   const shown = parts.filter(([c]) => c);
   return (
-    <Stack direction="row" alignItems="center" gap={1.25} sx={{ mt: 1.1, px: 0.25 }}>
-      <Box sx={{ flex: 1, display: "flex", gap: "2px", height: 6, borderRadius: 3, overflow: "hidden", bgcolor: shown.length ? "transparent" : "#e2e8f0" }}>
-        {shown.map(([c, color]) => <Box key={color} sx={{ flex: c, bgcolor: color }} />)}
+    <Box sx={{ mt: 1.4, px: 0.25 }}>
+      <Stack direction="row" alignItems="baseline" sx={{ mb: 0.6 }}>
+        <Typography sx={{ flex: 1, fontSize: "0.76rem", color: MUTED }}>{label}</Typography>
+        <Typography sx={{ fontSize: "0.78rem", color: INK_2, fontWeight: 700, ...NUM }}>
+          {done}/{n} งาน <Box component="span" sx={{ color: ACCENT }}>{Math.round((done / n) * 100)}%</Box>
+        </Typography>
+      </Stack>
+      <Box sx={{ display: "flex", gap: "3px", height: 6, borderRadius: 3, overflow: "hidden", bgcolor: shown.length ? "transparent" : TRACK }}>
+        {shown.map(([c, color]) => <Box key={color} sx={{ flex: c, bgcolor: color, borderRadius: 3 }} />)}
       </Box>
-      <Typography sx={{ flexShrink: 0, fontSize: "0.72rem", color: MUTED, ...NUM }}>
-        {label} <b style={{ color: INK }}>{done}/{n}</b> งาน ({Math.round((done / n) * 100)}%)
-      </Typography>
-    </Stack>
+    </Box>
   );
 }
 
-/** หัวกล่อง: ชื่อ + รายละเอียด (มือถือขึ้นบรรทัดใหม่) + ปุ่มขวา */
-function CardHead({ title, sub, action }) {
+/** หัวกล่อง: ไอคอน + ชื่อ + รายละเอียด + ปุ่มขวา */
+function CardHead({ icon, title, sub, action }) {
   return (
-    <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, px: 0.25 }}>
-      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "baseline" }, columnGap: 0.75 }}>
-        <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>{title}</Typography>
-        <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>{sub}</Typography>
+    <Stack direction="row" alignItems="center" gap={1.1} sx={{ mb: 1.4 }}>
+      <IconBadge icon={icon} tone={ACCENT} size={34} />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography noWrap sx={{ fontSize: "0.98rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>{title}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{sub}</Typography>
       </Box>
       {action}
     </Stack>
   );
 }
 
-/** ตารางช่อง: ช่องแรกเต็มแถวบนมือถือ · จอกว้าง 3 ช่องเรียงกัน */
+/** ตารางช่อง: ช่องแรก (ยอดหลัก) เต็มแถวบนมือถือ · จอกว้าง 3 ช่องเรียงกัน */
 function TileGrid({ first, children }) {
   return (
-    <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "1.4fr 1fr 1fr" } }}>
+    <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "1.5fr 1fr 1fr" } }}>
       <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, minWidth: 0 }}>{first}</Box>
       {children}
     </Box>
   );
 }
 
-const CARD_SX = { mb: 1.5, p: { xs: 1.25, sm: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` };
+/** ปุ่ม "แจกแจงที่มา" มุมขวาของหัวกล่อง */
+function DetailButton({ onClick }) {
+  return (
+    <ButtonBase onClick={onClick}
+      sx={{ flexShrink: 0, pl: 1.25, pr: 0.75, py: 0.6, borderRadius: 99, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 800,
+        color: ACCENT, bgcolor: ACCENT_SOFT, border: `1px solid ${ACCENT_LINE}`, "&:hover": { bgcolor: alpha(ACCENT, 0.12) } }}>
+      แจกแจงที่มา<ChevronRightRounded sx={{ fontSize: 18 }} />
+    </ButtonBase>
+  );
+}
+
+const CARD_SX = { mb: 1.5, p: { xs: 1.5, sm: 1.75 }, borderRadius: "16px", bgcolor: "#fff", border: `1px solid ${LINE}`, boxShadow: "0 1px 2px rgba(15,23,42,.04)" };
+const BAR_BLUE = ACCENT;
+const BAR_WARN = "#f59e0b";
+const BAR_EMPTY = TRACK;
 
 /**
  * กล่องสรุปมูลค่า (แอดมิน/ผู้จัดการ)
  * @param s            valueSummary { total, withValue, wholeTotal, wholeCount, missing, own, ownCount, jobs, items }
  * @param periodText   ช่วงที่กำลังดู เช่น "ทุกเดือน" / "11/2569"
  * @param member       ชื่อผู้ปฏิบัติงานที่กรองอยู่ ("" = ทุกคน)
- * @param onOpenDetail (filter) => void — "all" | "whole" | "counted"
+ * @param onOpenDetail (filter) => void — "all" | "whole" | "counted" · เลือกคน: "p-all" | "p-done" | "p-missing"
  */
 export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
   const period = periodText ? ` · ${periodText}` : "";
@@ -138,50 +180,244 @@ export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
   //    → ใช้โครงเดียวกับกล่องรวม: หัวกล่อง + ช่องตัวเลข + แถบความครบ
   if (member) {
     const notYet = Math.max(0, s.jobs - s.ownCount);
+    // ✅ (18 พ.ย. 2569 ผู้ใช้: "ให้กดดูที่มาได้แบบดูทั้งหมดทุกคนด้วย") กดดูได้เหมือนกล่องรวม
     return (
       <Box sx={CARD_SX}>
-        <CardHead title={`ผลงานของ ${member}`} sub={`ยอดที่ลงเอง · ก่อน VAT${period} · ${s.jobs} งาน`} />
+        <CardHead icon={GroupsRounded} title={`ผลงานของ ${member}`} sub={`ยอดที่ลงเอง · ก่อน VAT${period} · ${s.jobs} งาน`}
+          action={<DetailButton onClick={() => onOpenDetail(s.ownCount ? "p-done" : "p-all")} />} />
         <TileGrid first={
-          <Tile icon={CheckCircleRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
-            sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} />
+          <Tile hero icon={PaymentsRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
+            sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} onClick={s.ownCount ? () => onOpenDetail("p-done") : undefined} />
         }>
-          <Tile icon={InsightsRounded} tone={GRAY} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
-          <Tile icon={RadioButtonUncheckedRounded} tone={notYet ? WARN : GRAY} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน" />
+          <Tile icon={InsightsRounded} tone={TEAL} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
+          <Tile icon={HourglassEmptyRounded} tone={WARN} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน"
+            onClick={notYet ? () => onOpenDetail("p-missing") : undefined} />
         </TileGrid>
-        <CoverageBar parts={[[s.ownCount, ACCENT], [notYet, "#cbd5e1"]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว" />
+        <CoverageBar parts={[[s.ownCount, BAR_BLUE], [notYet, BAR_EMPTY]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว" />
       </Box>
     );
   }
   const jobs = s.withValue + s.wholeCount + s.missing;
   return (
     <Box sx={CARD_SX}>
-      <CardHead title="มูลค่าครั้งนี้ของงาน" sub={`ก่อน VAT${period} · ${jobs} งาน`} action={s.items.length > 0 && (
-        <ButtonBase onClick={() => onOpenDetail("all")} sx={{ flexShrink: 0, px: 1, py: 0.5, borderRadius: 1.5, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800, color: ACCENT, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
-          แจกแจงที่มา<ChevronRightRounded sx={{ fontSize: 17 }} />
-        </ButtonBase>
-      )} />
+      <CardHead icon={PaymentsRounded} title="มูลค่าครั้งนี้ของงาน" sub={`ก่อน VAT${period} · ${jobs} งาน`}
+        action={s.items.length > 0 && <DetailButton onClick={() => onOpenDetail("all")} />} />
       <TileGrid first={
-        <Tile icon={CheckCircleRounded} tone={ACCENT} label="มูลค่าครั้งนี้ · นับแล้ว" value={baht(s.total)}
+        <Tile hero icon={TaskAltRounded} tone={ACCENT} label="นับแล้ว" value={baht(s.total)}
           sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
           onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
       }>
-        <Tile icon={ErrorRounded} tone={WARN} label="ใส่เท่ามูลค่างานรวม" value={s.wholeCount ? baht(s.wholeTotal) : "—"}
-          sub={s.wholeCount ? `${s.wholeCount} งาน · ไม่นับ ต้องตรวจ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
-        <Tile icon={RadioButtonUncheckedRounded} tone={GRAY} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
+        <Tile icon={ReportProblemRounded} tone={WARN} label="ต้องตรวจ" value={s.wholeCount ? baht(s.wholeTotal) : "—"} dim
+          sub={s.wholeCount ? `${s.wholeCount} งาน · ใส่เท่ามูลค่างานรวม ไม่นับ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
+        <Tile icon={HourglassEmptyRounded} tone={SLATE} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
       </TileGrid>
-      <CoverageBar parts={[[s.withValue, ACCENT], [s.wholeCount, WARN], [s.missing, "#cbd5e1"]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว" />
+      <CoverageBar parts={[[s.withValue, BAR_BLUE], [s.wholeCount, BAR_WARN], [s.missing, BAR_EMPTY]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว" />
     </Box>
   );
 }
 
+/** ปุ่มสลับมุมมองในแผ่นแจกแจง (เลือกคนอยู่): ผลงานรายคน ↔ มูลค่าครั้งนี้ของงาน */
+function ViewSwitch({ value, onChange, member }) {
+  const opts = [["person", `ผลงานของ ${member}`], ["job", "มูลค่าครั้งนี้ของงาน"]];
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5, p: 0.5, mb: 1.5, borderRadius: "12px", bgcolor: "#eef2f7" }}>
+      {opts.map(([k, label]) => {
+        const on = value === k;
+        return (
+          <ButtonBase key={k} onClick={() => onChange(k)}
+            sx={{ minWidth: 0, px: 1, py: 0.95, borderRadius: "9px", fontFamily: "inherit", color: on ? ACCENT : MUTED, bgcolor: on ? "#fff" : "transparent",
+              boxShadow: on ? "0 1px 3px rgba(15,23,42,.10)" : "none", transition: "all .15s ease" }}>
+            <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 800 }}>{label}</Typography>
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** ปุ่มกรองแบบเม็ดยา · เลือกอยู่ = น้ำเงินเต็ม (ธีมระบบ) · items = [[key, label, count, warn?]] (warn = โทนส้มอ่อน) */
+function FilterChips({ items, value, onChange }) {
+  return (
+    <Stack direction="row" gap={0.75} sx={{ mb: 1.25, flexWrap: "wrap" }}>
+      {items.map(([k, label, count, warn]) => {
+        const on = value === k;
+        const off = !count && !k.endsWith("all");
+        const fill = warn ? WARN : ACCENT;
+        return (
+          <ButtonBase key={k} onClick={() => onChange(k)} disabled={off}
+            sx={{ gap: 0.75, pl: 1.4, pr: 0.6, py: 0.55, borderRadius: 99, fontFamily: "inherit", fontSize: "0.84rem", fontWeight: 700,
+              color: on ? "#fff" : warn ? WARN_TEXT : INK_2, bgcolor: on ? fill : warn ? WARN_SOFT : "#fff",
+              border: `1px solid ${on ? fill : warn ? WARN_LINE : LINE}`, opacity: off ? 0.45 : 1, transition: "all .15s ease" }}>
+            {label}
+            <Box component="span" sx={{ minWidth: 22, px: 0.6, py: 0.05, borderRadius: 99, fontSize: "0.74rem", fontWeight: 800, textAlign: "center",
+              bgcolor: on ? "rgba(255,255,255,.22)" : warn ? alpha(WARN, 0.12) : "#f1f5f9", color: on ? "#fff" : warn ? WARN_TEXT : MUTED, ...NUM }}>{count}</Box>
+          </ButtonBase>
+        );
+      })}
+    </Stack>
+  );
+}
+
+/** แถวงาน 1 แถวในแผ่นแจกแจง (กดเปิดงาน) */
+function JobRow({ first, onClick, children }) {
+  return (
+    <ButtonBase component="div" onClick={onClick}
+      sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%", pl: 1.5, pr: 1, py: 1.4, textAlign: "left", fontFamily: "inherit",
+        borderTop: first ? 0 : `1px solid ${LINE}`,
+        transition: "background-color .15s ease", "&:hover": { bgcolor: "#f8fafc" } }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+      <ChevronRightRounded sx={{ fontSize: 20, color: "#cbd5e1", flexShrink: 0 }} />
+    </ButtonBase>
+  );
+}
+
+/** ป้ายสั้นพื้นอ่อน · tone: blue | warn | slate */
+function Pill({ tone = "slate", children }) {
+  const c = tone === "blue" ? [ACCENT, ACCENT_SOFT] : tone === "warn" ? [WARN_TEXT, WARN_SOFT] : [SLATE, "#f1f5f9"];
+  return (
+    <Box component="span" sx={{ flexShrink: 0, px: 0.9, py: 0.2, borderRadius: 99, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
+      color: c[0], bgcolor: c[1], border: tone === "warn" ? `1px solid ${WARN_LINE}` : "1px solid transparent" }}>
+      {children}
+    </Box>
+  );
+}
+
+/** กล่องแจกแจงสัดส่วน (ใครเป็นคนลง / ยอดมาจากไหน) */
+function BreakdownBox({ icon, title, sub, children }) {
+  return (
+    <Box sx={{ mb: 1.5, p: { xs: 1.4, sm: 1.6 }, borderRadius: "14px", bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25 }}>
+        <IconBadge icon={icon} tone={ACCENT} size={28} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>{title}</Typography>
+          <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>{sub}</Typography>
+        </Box>
+      </Stack>
+      <Stack spacing={1.25}>{children}</Stack>
+    </Box>
+  );
+}
+
+/** แถวสัดส่วน: ชื่อ · จำนวนงาน · ยอด · % + แถบ */
+function ShareRow({ lead, label, count, total, pct, color = BAR_BLUE }) {
+  return (
+    <Box>
+      <Stack direction="row" alignItems="center" gap={0.9}>
+        {lead}
+        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.84rem", color: INK_2, fontWeight: 600 }}>{label}</Typography>
+        <Typography sx={{ fontSize: "0.76rem", color: MUTED, ...NUM }}>{count} งาน</Typography>
+        <Typography sx={{ minWidth: 84, textAlign: "right", fontSize: "0.9rem", fontWeight: 800, color: INK, ...NUM }}>{baht(total)}</Typography>
+      </Stack>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.6 }}>
+        <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: TRACK, overflow: "hidden" }}>
+          <Box sx={{ width: `${Math.max(pct, 1.5)}%`, height: "100%", bgcolor: color, borderRadius: 3 }} />
+        </Box>
+        <Typography sx={{ width: 36, textAlign: "right", fontSize: "0.74rem", fontWeight: 700, color: MUTED, ...NUM }}>{Math.round(pct)}%</Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+const LIST_SX = { bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: "14px", overflow: "hidden" };
+
+const PERSON_KIND = {
+  self: { label: "ลงเอง", short: "ลงเอง", tone: "blue" },
+  proxy: { label: "ลงแทนโดย", short: "ลงแทน", tone: "warn" },
+  legacy: { label: "ยอดเดิม (ลงเป็นมูลค่าครั้งนี้ของงาน)", short: "ยอดเดิม", tone: "slate" },
+};
+
 /**
- * แผ่นแจกแจงที่มาของยอด
- * @param filter    "all" | "whole" | "counted" (null = ปิด)
- * @param onFilter  เปลี่ยนตัวกรอง
- * @param onOpenJob (eventId) => void
+ * มุมมองผลงานรายคน — งานที่คนนั้นอยู่ในทีม: ลงแล้วเท่าไร ใครเป็นคนลง · งานไหนยังไม่ลง
+ * ✅ (18 พ.ย. 2569 ผู้ใช้: "ให้กดดูที่มาได้แบบดูทั้งหมดทุกคนด้วย")
  */
-export function WorkValueSourceSheet({ filter, onFilter, onClose, s, periodText, onOpenJob, employees = [] }) {
-  const open = !!filter;
+function PersonValueBody({ s, member, filter, onFilter, onOpenJob, employees }) {
+  const list = useMemo(() => s.personItems || [], [s.personItems]);
+  const doneCount = list.filter((it) => it.value !== null).length;
+  const notYet = list.length - doneCount;
+  const personOf = (name) => {
+    const emp = findEmployee(employees, name);
+    return { name: emp ? [emp.fname, emp.lname].filter(Boolean).join(" ") : name, src: emp?.imageUrl || "" };
+  };
+  // ยอดมาจากใคร: ลงเอง · ลงแทน (แยกตามคนลง) · ยอดเดิม
+  const byWho = useMemo(() => {
+    const m = new Map();
+    list.filter((it) => it.value !== null).forEach((it) => {
+      const k = it.kind === "proxy" ? `proxy:${it.by}` : it.kind;
+      if (!m.has(k)) m.set(k, { key: k, kind: it.kind, by: it.by, count: 0, total: 0 });
+      const r = m.get(k);
+      r.count += 1; r.total += it.value;
+    });
+    const order = { self: 0, proxy: 1, legacy: 2 };
+    return [...m.values()].sort((a, b) => order[a.kind] - order[b.kind] || b.total - a.total);
+  }, [list]);
+  const items = list.filter((it) => (filter === "p-done" ? it.value !== null : filter === "p-missing" ? it.value === null : true));
+  const firstName = (n) => String(n || "").split(" ")[0];
+
+  return (
+    <>
+      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1.3fr 1fr", mb: 1.5 }}>
+        <Tile hero icon={PaymentsRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)} sub={`ลงแล้ว ${s.ownCount} งาน`} />
+        <Tile icon={HourglassEmptyRounded} tone={WARN} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน" />
+      </Box>
+
+      {byWho.length > 0 && (
+        <BreakdownBox icon={GroupsRounded} title="ใครเป็นคนลง" sub={`รวม ${baht(s.own)} จาก ${s.ownCount} งาน · ก่อน VAT`}>
+          {byWho.map((r) => {
+            const p = personOf(r.kind === "proxy" ? r.by : member);
+            return (
+              <ShareRow key={r.key} lead={<ByAvatar name={p.name} src={p.src} size={24} />}
+                label={r.kind === "proxy" ? `${PERSON_KIND.proxy.label} ${firstName(p.name)}` : PERSON_KIND[r.kind].label}
+                count={r.count} total={r.total} pct={s.own ? (r.total / s.own) * 100 : 0}
+                color={r.kind === "legacy" ? "#94a3b8" : r.kind === "proxy" ? BAR_WARN : BAR_BLUE} />
+            );
+          })}
+        </BreakdownBox>
+      )}
+
+      <FilterChips value={filter} onChange={onFilter}
+        items={[["p-all", "ทั้งหมด", list.length], ["p-done", "ลงแล้ว", doneCount], ["p-missing", "ยังไม่ลง", notYet, true]]} />
+
+      <Box sx={LIST_SX}>
+        {!items.length && <Typography sx={{ p: 2.5, textAlign: "center", fontSize: "0.88rem", color: FAINT }}>ไม่มีรายการ</Typography>}
+        {items.map((it, i) => {
+          const done = it.value !== null;
+          const p = done ? personOf(it.by) : null;
+          return (
+            <JobRow key={it.id || i} first={!i} onClick={() => onOpenJob(it.id)}>
+              {/* บรรทัด 1: โครงการ · ผลงาน */}
+              <Stack direction="row" alignItems="center" gap={1}>
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.94rem", fontWeight: 700, color: INK }}>{it.site}</Typography>
+                {done
+                  ? <Typography sx={{ flexShrink: 0, fontSize: "0.98rem", fontWeight: 800, color: INK, ...NUM }}>{baht(it.value)}</Typography>
+                  : <Pill tone="warn">ยังไม่ลง</Pill>}
+              </Stack>
+              {/* บรรทัด 2: งาน · วันที่ · มูลค่าครั้งนี้ของงาน (ไว้เทียบ) */}
+              <Typography noWrap sx={{ mt: 0.3, fontSize: "0.78rem", color: MUTED }}>
+                {[it.title, thaiDate(it.start), it.sessions > 1 ? `${it.sessions} ช่วงวัน` : "", it.jobValue !== null ? `ของงาน ${baht(it.jobValue)}` : ""].filter(Boolean).join(" · ")}
+              </Typography>
+              {/* บรรทัด 3: ผู้ลง (รูป + ชื่อ + วันที่ลง) · VAT · ป้าย */}
+              {done && (
+                <Stack direction="row" alignItems="center" gap={0.85} sx={{ mt: 0.9 }}>
+                  <ByAvatar name={p.name} src={p.src} size={24} />
+                  <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: INK_2 }}>
+                    {p.name}
+                    <Box component="span" sx={{ fontWeight: 400, color: FAINT }}>
+                      {it.at ? ` · ${thaiDate(it.at)}` : ""}{it.vatIncluded ? ` · ${baht(it.amount)} รวม VAT` : ""}
+                    </Box>
+                  </Typography>
+                  <Pill tone={PERSON_KIND[it.kind].tone}>{PERSON_KIND[it.kind].short}</Pill>
+                </Stack>
+              )}
+            </JobRow>
+          );
+        })}
+      </Box>
+    </>
+  );
+}
+
+/** มุมมองมูลค่าครั้งนี้ของงาน (1 ค่าต่องาน) — แยกตามที่มา · ต้องตรวจ · ผู้ลงมูลค่า */
+function JobValueBody({ open, s, member, filter, onFilter, onOpenJob, employees }) {
   const [who, setWho] = useState(null); // กรองตามผู้ลง (null = ทุกคน · "" = ไม่ทราบผู้ลง)
   useEffect(() => { if (!open) setWho(null); }, [open]);
   // ผู้ลงมูลค่า → รูป/ชื่อเต็มจากทะเบียนพนักงาน
@@ -210,127 +446,115 @@ export function WorkValueSourceSheet({ filter, onFilter, onClose, s, periodText,
   const items = s.items
     .filter((it) => (filter === "whole" ? it.whole : filter === "counted" ? !it.whole : true))
     .filter((it) => who === null || String(it.by || "").trim() === who);
-  const FILTERS = [["all", "ทั้งหมด", s.items.length], ["whole", "ต้องตรวจ", s.wholeCount], ["counted", "นับแล้ว", s.withValue]];
 
   return (
-    <MobileSheet open={open} onClose={onClose} maxWidth="md" title="แจกแจงมูลค่าครั้งนี้"
-      subtitle={`งานไหน เท่าไร มาจากไหน${periodText ? ` · ${periodText}` : ""} · กดงานเพื่อเปิดไปแก้`}>
-      <Box sx={{ p: { xs: 1.25, sm: 2 } }}>
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr", mb: 1.25 }}>
-          <Tile icon={CheckCircleRounded} tone={ACCENT} label="มูลค่าครั้งนี้ · นับแล้ว" value={baht(s.total)} sub={`${s.withValue} งาน`} />
-          <Tile icon={ErrorRounded} tone={WARN} label="ใส่เท่ามูลค่างานรวม" value={s.wholeCount ? baht(s.wholeTotal) : "—"} sub={s.wholeCount ? `${s.wholeCount} งาน · ไม่นับ` : "ไม่มี"} />
-        </Box>
+    <>
+      {member && (
+        <Stack direction="row" gap={0.75} sx={{ mb: 1.25, px: 1.25, py: 1, borderRadius: "12px", bgcolor: ACCENT_SOFT, border: `1px solid ${ACCENT_LINE}` }}>
+          <InfoRounded sx={{ fontSize: 17, color: ACCENT, mt: "1px" }} />
+          <Typography sx={{ fontSize: "0.78rem", color: INK_2, lineHeight: 1.55 }}>
+            มูลค่าครั้งนี้ของงานที่ <b>{member}</b> อยู่ในทีม — 1 ค่าต่องาน เป็นของทั้งงาน ไม่ใช่ผลงานของ {member} คนเดียว
+          </Typography>
+        </Stack>
+      )}
+      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1.3fr 1fr", mb: 1.5 }}>
+        <Tile hero icon={TaskAltRounded} tone={ACCENT} label="นับแล้ว" value={baht(s.total)} sub={`${s.withValue} งาน`} />
+        <Tile icon={ReportProblemRounded} tone={WARN} label="ต้องตรวจ" value={s.wholeCount ? baht(s.wholeTotal) : "—"} dim
+          sub={s.wholeCount ? `${s.wholeCount} งาน · ไม่นับ` : "ไม่มี"} />
+      </Box>
 
-        {bySource.length > 0 && (
-          <Box sx={{ mb: 1.5, p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>ยอดที่นับ มาจากไหน</Typography>
-            <Typography sx={{ fontSize: "0.72rem", color: MUTED, mb: 1 }}>รวม {baht(s.total)} จาก {s.withValue} งาน</Typography>
-            <Stack spacing={1}>
-              {bySource.map((r) => {
-                const pct = s.total ? (r.total / s.total) * 100 : 0;
-                const auto = r.key === "job";
-                return (
-                  <Box key={r.key || "none"}>
-                    <Stack direction="row" alignItems="baseline" gap={1}>
-                      <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.79rem", color: auto ? WARN : "#334155", fontWeight: 700 }}>{r.label}</Typography>
-                      <Typography sx={{ fontSize: "0.72rem", color: MUTED, ...NUM }}>{r.count} งาน</Typography>
-                      <Typography sx={{ minWidth: 96, textAlign: "right", fontSize: "0.85rem", fontWeight: 800, color: INK, ...NUM }}>{baht(r.total)}</Typography>
-                      <Typography sx={{ width: 38, textAlign: "right", fontSize: "0.72rem", color: MUTED, ...NUM }}>{Math.round(pct)}%</Typography>
-                    </Stack>
-                    <Box sx={{ mt: 0.45, height: 6, borderRadius: 3, bgcolor: "#eef2f7", overflow: "hidden" }}>
-                      <Box sx={{ width: `${Math.max(pct, 1.5)}%`, height: "100%", bgcolor: auto ? alpha(WARN, 0.55) : alpha(ACCENT, 0.55), borderRadius: 3 }} />
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Stack>
-          </Box>
-        )}
+      {bySource.length > 0 && (
+        <BreakdownBox icon={AccountTreeRounded} title="ยอดที่นับ มาจากไหน" sub={`รวม ${baht(s.total)} จาก ${s.withValue} งาน`}>
+          {bySource.map((r) => (
+            <ShareRow key={r.key || "none"} label={r.label} count={r.count} total={r.total}
+              pct={s.total ? (r.total / s.total) * 100 : 0} color={r.key === "job" ? BAR_WARN : BAR_BLUE} />
+          ))}
+        </BreakdownBox>
+      )}
 
-        <Stack direction="row" gap={0.75} sx={{ mb: 1, flexWrap: "wrap" }}>
-          {FILTERS.map(([k, label, count]) => {
-            const on = filter === k;
-            const tone = k === "whole" ? WARN : INK;
+      <FilterChips value={filter} onChange={onFilter}
+        items={[["all", "ทั้งหมด", s.items.length], ["whole", "ต้องตรวจ", s.wholeCount, true], ["counted", "นับแล้ว", s.withValue]]} />
+      {people.length > 1 && (
+        <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+          <Typography sx={{ flexShrink: 0, fontSize: "0.76rem", fontWeight: 700, color: MUTED, mr: 0.25 }}>ผู้ลง</Typography>
+          {people.map((p) => {
+            const on = who === p.key;
             return (
-              <ButtonBase key={k} onClick={() => onFilter(k)} disabled={!count && k !== "all"}
-                sx={{ gap: 0.6, px: 1.4, py: 0.55, borderRadius: 99, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
-                  color: on ? "#fff" : k === "whole" ? WARN : "#475569", bgcolor: on ? tone : k === "whole" ? alpha(WARN, 0.08) : "#f1f5f9",
-                  opacity: !count && k !== "all" ? 0.45 : 1 }}>
-                {label}<Box component="span" sx={{ fontWeight: 900, ...NUM }}>{count}</Box>
+              <ButtonBase key={p.key || "none"} onClick={() => setWho(on ? null : p.key)}
+                sx={{ flexShrink: 0, gap: 0.7, pl: 0.45, pr: 1.1, py: 0.4, borderRadius: 99, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 700,
+                  color: on ? ACCENT : INK_2, bgcolor: on ? ACCENT_SOFT : "#fff", border: `1px solid ${on ? ACCENT : LINE}`, transition: "all .15s ease" }}>
+                <ByAvatar name={p.name} src={p.src} size={24} />
+                <span>{p.name ? p.name.split(" ")[0] : "ไม่ทราบ"}</span>
+                <Box component="span" sx={{ fontWeight: 800, color: on ? ACCENT : FAINT, ...NUM }}>{p.count}</Box>
               </ButtonBase>
             );
           })}
         </Stack>
-        {people.length > 1 && (
-          <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 1, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-            <Typography sx={{ flexShrink: 0, fontSize: "0.72rem", fontWeight: 700, color: MUTED, mr: 0.25 }}>ผู้ลงมูลค่า</Typography>
-            {people.map((p) => {
-              const on = who === p.key;
-              return (
-                <ButtonBase key={p.key || "none"} onClick={() => setWho(on ? null : p.key)}
-                  sx={{ flexShrink: 0, gap: 0.6, pl: 0.4, pr: 1, py: 0.35, borderRadius: 99, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700,
-                    color: on ? ACCENT : "#334155", bgcolor: on ? alpha(ACCENT, 0.08) : "#fff", border: `1px solid ${on ? alpha(ACCENT, 0.5) : LINE}`,
-                    transition: "all .15s ease" }}>
-                  <ByAvatar name={p.name} src={p.src} size={22} />
-                  <span>{p.name ? p.name.split(" ")[0] : "ไม่ทราบ"}</span>
-                  <Box component="span" sx={{ fontWeight: 900, color: on ? ACCENT : MUTED, ...NUM }}>{p.count}</Box>
-                </ButtonBase>
-              );
-            })}
-          </Stack>
-        )}
-        {items.some((it) => it.whole) && (
-          <Box sx={{ mb: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: alpha(WARN, 0.06), border: `1px solid ${alpha(WARN, 0.18)}` }}>
-            <Typography sx={{ fontSize: "0.75rem", color: WARN, lineHeight: 1.55 }}>
-              <b>ต้องตรวจ</b> = มูลค่าครั้งนี้ที่ใส่ไว้เท่ากับมูลค่างานรวมทั้งงาน (มักถูกเติมจากมูลค่างานรวม) จึงไม่นับเป็นมูลค่าครั้งนี้
-              — กดงานเพื่อแก้เป็นยอดของครั้งนี้ หรือล้างค่า · ถ้างานนั้นเข้าครั้งเดียวจริง ยอดถูกต้องแล้ว ไม่ต้องแก้
-            </Typography>
-          </Box>
-        )}
+      )}
+      {items.some((it) => it.whole) && (
+        <Stack direction="row" gap={0.85} sx={{ mb: 1.25, px: 1.25, py: 1, borderRadius: "12px", bgcolor: WARN_SOFT, border: `1px solid ${WARN_LINE}` }}>
+          <ReportProblemRounded sx={{ fontSize: 17, color: WARN, mt: "1px" }} />
+          <Typography sx={{ fontSize: "0.78rem", color: "#78350f", lineHeight: 1.6 }}>
+            <b>ต้องตรวจ</b> = ใส่มูลค่าครั้งนี้เท่ากับมูลค่างานรวมทั้งงาน จึงไม่นับ — กดงานเพื่อแก้เป็นยอดของครั้งนี้
+            · ถ้างานนั้นเข้าครั้งเดียวจริง ยอดถูกต้องแล้ว
+          </Typography>
+        </Stack>
+      )}
 
-        <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden" }}>
-          {!items.length && <Typography sx={{ p: 2, textAlign: "center", fontSize: "0.84rem", color: FAINT }}>ไม่มีรายการ</Typography>}
-          {items.map((it, i) => {
-            const warn = it.whole || it.source === "job";
-            const p = personOf(it.by);
-            return (
-              <ButtonBase key={it.id} component="div" onClick={() => onOpenJob(it.id)}
-                sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%", pl: 1.25, pr: 0.75, py: 1.15, textAlign: "left", fontFamily: "inherit",
-                  borderTop: i ? `1px solid ${LINE}` : 0, borderLeft: `3px solid ${it.whole ? WARN : "transparent"}`,
-                  transition: "background-color .15s ease", "&:hover": { bgcolor: "#f8fafc" } }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  {/* บรรทัด 1: โครงการ · ยอด */}
-                  <Stack direction="row" alignItems="baseline" gap={1}>
-                    <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.88rem", fontWeight: 800, color: INK }}>{it.site}</Typography>
-                    <Typography sx={{ flexShrink: 0, fontSize: "0.92rem", fontWeight: 900, color: it.whole ? WARN : INK, ...NUM }}>{baht(it.value)}</Typography>
-                  </Stack>
-                  {/* บรรทัด 2: งาน · วันที่ · เทียบมูลค่างานรวม */}
-                  <Stack direction="row" alignItems="baseline" gap={1}>
-                    <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: MUTED }}>
-                      {[it.title, thaiDate(it.start), it.sessions > 1 ? `${it.sessions} ช่วงวัน · นับครั้งเดียว` : ""].filter(Boolean).join(" · ")}
-                    </Typography>
-                    {it.whole
-                      ? <Typography noWrap sx={{ flexShrink: 0, fontSize: "0.68rem", fontWeight: 800, color: WARN }}>= มูลค่างานรวม · ไม่นับ</Typography>
-                      : it.total !== null && <Typography noWrap sx={{ flexShrink: 0, fontSize: "0.68rem", color: MUTED, ...NUM }}>มูลค่างานรวม {baht(it.total)}</Typography>}
-                  </Stack>
-                  {/* บรรทัด 3: ผู้ลง (รูป + ชื่อ + วันที่ลง) · ที่มาของยอด */}
-                  <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.75 }}>
-                    <ByAvatar name={p?.name} src={p?.src} size={22} />
-                    <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.75rem", fontWeight: 700, color: p?.name ? "#334155" : FAINT }}>
-                      {p?.name || "ไม่ทราบผู้ลง"}
-                      {it.at && <Box component="span" sx={{ fontWeight: 400, color: FAINT }}> · ลง {thaiDate(it.at)}</Box>}
-                    </Typography>
-                    <Box component="span" sx={{ flexShrink: 0, px: 0.8, py: 0.15, borderRadius: "6px", fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap",
-                      color: warn ? WARN : "#475569", bgcolor: warn ? alpha(WARN, 0.1) : "#f1f5f9" }}>
-                      {SOURCE_SHORT[sourceKey(it.source)]}
-                    </Box>
-                  </Stack>
-                </Box>
-                <ChevronRightRounded sx={{ fontSize: 18, color: "#cbd5e1", flexShrink: 0 }} />
-              </ButtonBase>
-            );
-          })}
-        </Box>
+      <Box sx={LIST_SX}>
+        {!items.length && <Typography sx={{ p: 2.5, textAlign: "center", fontSize: "0.88rem", color: FAINT }}>ไม่มีรายการ</Typography>}
+        {items.map((it, i) => {
+          const p = personOf(it.by);
+          return (
+            <JobRow key={it.id} first={!i} onClick={() => onOpenJob(it.id)}>
+              {/* บรรทัด 1: โครงการ · ยอด */}
+              <Stack direction="row" alignItems="center" gap={1}>
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.94rem", fontWeight: 700, color: INK }}>{it.site}</Typography>
+                <Typography sx={{ flexShrink: 0, fontSize: "0.98rem", fontWeight: 800, color: it.whole ? SLATE : INK, ...NUM }}>{baht(it.value)}</Typography>
+              </Stack>
+              {/* บรรทัด 2: งาน · วันที่ · เทียบมูลค่างานรวม */}
+              <Typography noWrap sx={{ mt: 0.3, fontSize: "0.78rem", color: MUTED }}>
+                {[it.title, thaiDate(it.start), it.sessions > 1 ? `${it.sessions} ช่วงวัน · นับครั้งเดียว` : "", !it.whole && it.total !== null ? `งานรวม ${baht(it.total)}` : ""].filter(Boolean).join(" · ")}
+              </Typography>
+              {/* บรรทัด 3: ผู้ลง (รูป + ชื่อ + วันที่ลง) · ที่มาของยอด */}
+              <Stack direction="row" alignItems="center" gap={0.85} sx={{ mt: 0.9 }}>
+                <ByAvatar name={p?.name} src={p?.src} size={24} />
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: p?.name ? INK_2 : FAINT }}>
+                  {p?.name || "ไม่ทราบผู้ลง"}
+                  {it.at && <Box component="span" sx={{ fontWeight: 400, color: FAINT }}> · {thaiDate(it.at)}</Box>}
+                </Typography>
+                {it.whole
+                  ? <Pill tone="warn">ต้องตรวจ · ไม่นับ</Pill>
+                  : <Pill tone={it.source === "job" ? "warn" : it.source === "manual" ? "blue" : "slate"}>{SOURCE_SHORT[sourceKey(it.source)]}</Pill>}
+              </Stack>
+            </JobRow>
+          );
+        })}
+      </Box>
+    </>
+  );
+}
+
+/**
+ * แผ่นแจกแจงที่มาของยอด
+ * @param filter    "all" | "whole" | "counted" = มูลค่าครั้งนี้ของงาน · "p-all" | "p-done" | "p-missing" = ผลงานรายคน (null = ปิด)
+ * @param onFilter  เปลี่ยนตัวกรอง
+ * @param member    ชื่อผู้ปฏิบัติงานที่กรองอยู่ ("" = ทุกคน) — มีชื่อ = สลับดูผลงานรายคน/มูลค่าครั้งนี้ของงานได้
+ * @param onOpenJob (eventId) => void
+ */
+export function WorkValueSourceSheet({ filter, onFilter, onClose, s, periodText, onOpenJob, employees = [], member = "" }) {
+  const open = !!filter;
+  const view = member && String(filter || "").startsWith("p-") ? "person" : "job";
+  const period = periodText ? ` · ${periodText}` : "";
+  return (
+    <MobileSheet open={open} onClose={onClose} maxWidth="md"
+      title={view === "person" ? `แจกแจงผลงานของ ${member}` : "แจกแจงมูลค่าครั้งนี้"}
+      subtitle={view === "person" ? `งานไหนลงแล้ว เท่าไร ใครลง${period} · กดงานเพื่อเปิด` : `งานไหน เท่าไร มาจากไหน${period} · กดงานเพื่อเปิดไปแก้`}>
+      <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+        {member && <ViewSwitch member={member} value={view} onChange={(v) => onFilter(v === "person" ? "p-all" : "all")} />}
+        {view === "person"
+          ? <PersonValueBody s={s} member={member} filter={filter} onFilter={onFilter} onOpenJob={onOpenJob} employees={employees} />
+          : <JobValueBody open={open} s={s} member={member} filter={filter} onFilter={onFilter} onOpenJob={onOpenJob} employees={employees} />}
       </Box>
     </MobileSheet>
   );

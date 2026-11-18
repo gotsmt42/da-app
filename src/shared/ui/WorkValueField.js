@@ -153,7 +153,7 @@ export default function WorkValueField({ value, vatIncluded = false, event, onSa
               ฿{fmt(value)} <Box component="span" sx={{ fontSize: "0.7rem", fontWeight: 500, color: "#64748b" }}>{vatLabel(vatIncluded)}</Box>
               {SOURCE_TEXT[savedSource] && <Box component="span" sx={{ ml: 0.5, fontSize: "0.66rem", fontWeight: 600, color: savedSource === "job" ? "#b45309" : "#94a3b8" }}>· {SOURCE_TEXT[savedSource]}</Box>}
             </Typography>
-          : <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#d97706" }}>ยังไม่ใส่</Typography>}
+          : <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#94a3b8" }}>ยังไม่ใส่</Typography>}
         {!disabled && (
           <IconButton size="small" onClick={start} title={has ? "แก้มูลค่างาน" : "ใส่มูลค่างาน"} sx={{ p: 0.4, color: "#64748b" }}>
             <Edit sx={{ fontSize: 15 }} />

@@ -37,8 +37,8 @@ export const WORK_VALUE_CSS = `
   .ee-wv-use { flex-shrink: 0; border: 1px solid #93c5fd; background: #fff; color: #1d4ed8; font: inherit; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
   .ee-wv-use:hover { background: #2563eb; color: #fff; border-color: #2563eb; }
   .ee-wv-ai { margin-top: 10px; }
-  .ee-wv-ai-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #c7d2fe; background: #fff; color: #4338ca; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-  .ee-wv-ai-btn:hover { background: #eef2ff; }
+  .ee-wv-ai-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #e2e8f0; background: #fff; color: #2563eb; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .ee-wv-ai-btn:hover { background: #eff6ff; border-color: #bfdbfe; }
   .ee-wv-ai-btn:disabled { opacity: .6; cursor: default; }
   .ee-wv-ai-res { margin-top: 8px; padding: 9px 11px; border-radius: 10px; border: 1px solid #e0e7ff; background: #f8faff; font-size: 12.5px; color: #334155; line-height: 1.5; }
   .ee-wv-ai-res .ee-wv-ai-src { color: #64748b; font-size: 11.5px; }
@@ -57,6 +57,18 @@ export const WORK_VALUE_CSS = `
   .ee-wv-ct-vat.warn { color: #b45309; }
   .ee-wv-ct-link { flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid #bfdbfe; background: #fff; color: #2563eb; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   .ee-wv-ct-link:hover { background: #eff6ff; }
+  .ee-wv-people-head { display: flex; align-items: baseline; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef2f7; }
+  .ee-wv-people-head b { font-size: 14px; font-weight: 800; color: #0f172a; }
+  .ee-wv-people-head span { margin-left: auto; font-size: 12px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+  .ee-wv-people { margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 2px 12px; }
+  .ee-wv-person { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 0; }
+  .ee-wv-person + .ee-wv-person { border-top: 1px solid #eef2f7; }
+  .ee-wv-person-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ee-wv-person-name small { font-size: 11.5px; font-weight: 500; color: #94a3b8; margin-left: 4px; }
+  .ee-wv-person-val { flex-shrink: 0; font-size: 14px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
+  .ee-wv-person-val small { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
+  .ee-wv-person-empty { flex-shrink: 0; font-size: 13px; font-weight: 600; color: #94a3b8; }
+  .ee-wv-note { margin-top: 8px; font-size: 11.5px; color: #94a3b8; line-height: 1.5; }
   .ee-wv-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid #c7d2fe; border-top-color: #4338ca; animation: ee-boot-spin .8s linear infinite; }
 `;
 
@@ -96,18 +108,21 @@ export function workerValuesSummaryHtml(p = {}) {
   const rows = [p];
   const workers = workersOfRows(rows);
   if (!workers.length) {
-    return `<div class="ee-wv-break" style="display:block">${hasWorkValue(p.workValue) ? `ยอดเดิม ${esc(baht(p.workValue))} · ` : ""}ยังไม่มีทีมเข้างาน — เลือกหัวหน้าทีม/ลูกทีมก่อน แล้วให้ช่างลงมูลค่าครั้งนี้ของตัวเอง</div>`;
+    return `<div class="ee-wv-note">${hasWorkValue(p.workValue) ? `ยอดเดิม ${esc(baht(p.workValue))} · ` : ""}ยังไม่มีทีมเข้างาน — เลือกผู้ปฏิบัติงานก่อน แล้วให้ช่างลงผลงานของตัวเอง</div>`;
   }
+  // 🔁 (18 พ.ย. 2569 ผู้ใช้: "ตรงนี้จัดวางให้ดูง่าย สวยงามกว่านี้ยังดูไม่ลงตัว") แถวเรียบ ขนาดตัวอักษรคงที่ · ยังไม่ลง = เทาอ่อน (ไม่ใช้ส้มตัวใหญ่)
   const lines = workers.map((n, i) => {
     const v = personValueOf(rows, n);
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-top:${i ? "1px solid #e2e8f0" : "0"}">
-      <span style="flex:1;min-width:0;font-weight:700;color:#1e293b">${esc(n)}${i === 0 ? ' <span style="font-size:.72rem;font-weight:600;color:#64748b">หัวหน้าทีม</span>' : ""}${v?.legacy ? ' <span style="font-size:.7rem;color:#94a3b8">ยอดเดิม</span>' : ""}</span>
-      <span style="font-weight:800;${v ? "color:#0f172a" : "color:#d97706"}">${v ? `${esc(baht(v.amount))} <span style="font-size:.72rem;font-weight:500;color:#64748b">${v.vatIncluded ? "รวม VAT" : "ก่อน VAT"}</span>` : "ยังไม่ลง"}</span>
+    return `<div class="ee-wv-person">
+      <span class="ee-wv-person-name">${esc(n)}${i === 0 ? ' <small>หัวหน้าทีม</small>' : ""}${v?.legacy ? ' <small>ยอดเดิม</small>' : ""}</span>
+      ${v ? `<span class="ee-wv-person-val">${esc(baht(v.amount))} <small>${v.vatIncluded ? "รวม VAT" : "ก่อน VAT"}</small></span>` : '<span class="ee-wv-person-empty">ยังไม่ลง</span>'}
     </div>`;
   }).join("");
+  const filled = workers.filter((n) => personValueOf(rows, n)).length;
   // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ไม่มีบรรทัดรวมทั้งทีม
-  return `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:4px 12px;background:#fff">${lines}</div>
-    <div class="ee-wv-break" style="display:block;margin-top:6px">ยอดของแต่ละคน = ผลงานของคนนั้น (ไม่รวมกัน · ไม่ใช่มูลค่าครั้งนี้ของงาน) · ช่างลงของตัวเองที่การ์ดงาน · แอดมินลงแทนได้</div>`;
+  return `<div class="ee-wv-people-head"><b>ผลงานรายคน</b><span>ลงแล้ว ${filled}/${workers.length} คน</span></div>
+    <div class="ee-wv-people">${lines}</div>
+    <div class="ee-wv-note">ช่างแต่ละคนลงของตัวเองที่การ์ดงาน (แอดมินลงแทนได้) · ไม่รวมกัน ไม่ใช่มูลค่าครั้งนี้ของงาน</div>`;
 }
 
 export function workValueCardHtml(init, { disabled = false } = {}) {
@@ -118,7 +133,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
   const ct = init.contract;
   const inputHtml = `
     <div class="ee-value-box">
-      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
+      <input id="editWorkValue" type="text" aria-label="มูลค่าครั้งนี้" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
         value="${amount === null ? "" : fmt(amount)}" ${dis}>
       <span class="ee-value-unit">บาท</span>
     </div>`;
@@ -145,7 +160,7 @@ export function workValueCardHtml(init, { disabled = false } = {}) {
     </div>`;
   return `
     <div class="ee-value-box">
-      <input id="editWorkValue" type="text" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
+      <input id="editWorkValue" type="text" aria-label="มูลค่าครั้งนี้" inputmode="decimal" autocomplete="off" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด"
         value="${amount === null ? "" : fmt(amount)}" ${dis}>
       <span class="ee-value-unit">บาท</span>
     </div>

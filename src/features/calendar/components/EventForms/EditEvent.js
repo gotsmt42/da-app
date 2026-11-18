@@ -598,6 +598,14 @@ function injectStyles() {
     #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 16px 14px !important; }
     #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 14px 12px; }
     #ee-keyGroup .ee-key-files .ee-card-body { padding: 4px; }
+    /* 🔁 (18 พ.ย. 2569 ผู้ใช้: "ช่องรายละเอียดงานที่ทำ ให้ขยายกว้างขึ้นอีก ให้ดูดี") สูงขึ้น · ขยายตามข้อความ · ตัวอักษรอ่านง่าย */
+    #ee-keyGroup .ee-desc-input { min-height: 150px; font-size: 15px; line-height: 1.65; padding: 12px 14px; border-radius: 12px; resize: none; overflow: hidden;
+      transition: height .18s ease-out, border-color .15s ease, box-shadow .15s ease; }
+    @media (max-width: 600px) {
+      #ee-keyGroup .ee-key-card .ee-card-head { padding: 12px 12px 4px !important; }
+      #ee-keyGroup .ee-key-card .ee-card-body { padding: 6px 10px 12px !important; }
+      #ee-keyGroup .ee-desc-input { min-height: 170px; }
+    }
     .ee-worker-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ee-worker-row .ee-worker-field { flex: 1 1 auto; min-width: 0; margin: 0; }
     .ee-worker-no {
@@ -1171,7 +1179,14 @@ function injectStyles() {
     #ee-dirty-bar.show { display: flex; }
     #ee-dirty-bar .ee-dirty-txt { flex: 1; min-width: 150px; }
     #ee-dirty-bar button { border: 1px solid #fcd34d; background: #fff; color: #92400e; font: inherit; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
-    .ee-dirty-mark { box-shadow: 0 0 0 2px #fbbf24 !important; border-radius: 10px; }
+    /* 🐛 (18 พ.ย. 2569 ผู้ใช้: "แก้ปัญหากรอบเหลืองลอยๆ ไม่ตรง") เดิมวงกรอบทั้งกล่องช่อง (รวมตัวนับอักษร) ด้วยมุมโค้งตายตัว
+          → ไฮไลต์ที่ตัวช่องเอง: ขอบส้ม + เงาจางตามรูปทรงช่อง (ไม่ซ้อนกรอบลอยรอบนอก) */
+    .ee-dirty-mark { box-shadow: 0 0 0 2px rgba(245,158,11,.55) !important; }
+    textarea.ee-dirty-mark, input.ee-dirty-mark, select.ee-dirty-mark { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,.16) !important; }
+    textarea.ee-dirty-mark:focus, input.ee-dirty-mark:focus, select.ee-dirty-mark:focus { box-shadow: 0 0 0 3px rgba(245,158,11,.22) !important; }
+    .ts-wrapper.ee-dirty-mark { box-shadow: none !important; }
+    .ts-wrapper.ee-dirty-mark .ts-control { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,.16) !important; }
+    .ee-vat-seg.ee-dirty-mark { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,.16) !important; }
     .ee-st-overlay { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15,23,42,.45); animation: eeStFade .15s ease; }
     @keyframes eeStFade { from { opacity: 0 } to { opacity: 1 } }
     .ee-st-card { width: 100%; max-width: 420px; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px -12px rgba(15,23,42,.45); overflow: hidden; text-align: left; }
@@ -2316,7 +2331,7 @@ export const getEditEvent = async ({
       <div class="ee-card-body">
         <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
         <div class="ee-field">
-          <textarea id="editDescription" rows="4" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
+          <textarea id="editDescription" class="ee-desc-input" rows="5" aria-label="รายละเอียดงานที่ทำ" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
           <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
         </div>
         ${/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") บันทึกเก่าของช่าง (workNote) ก่อนรวมเป็นช่องเดียว — แสดงอ่านอย่างเดียว ไม่หาย */""}
@@ -2332,7 +2347,6 @@ export const getEditEvent = async ({
       </div>
       <div class="ee-card-body">
         ${workValueCardHtml(wvInit, { disabled: isViewOnly || !canEditJobValueSingle })}
-        <div style="margin-top:12px;font-weight:800;font-size:.86rem;color:#0f172a">ผลงานรายคน <span style="font-weight:500;color:#64748b;font-size:.76rem">· ช่างแต่ละคนลงเอง ไม่รวมกัน</span></div>
         ${workerValuesSummaryHtml(ev.extendedProps || {})}
       </div>
     </section>`}
@@ -3062,25 +3076,42 @@ export const getEditEvent = async ({
         // แสดงเนื้อหาเมื่อช่องเลือก/ปฏิทิน/แผงต่างๆ จัดตัวเสร็จ (หลังร่างข้อมูลเริ่มทำงาน 300ms + เฟรมถัดไป) — ไม่เห็นการจัดตัวทีละส่วน
         setTimeout(() => requestAnimationFrame(() => popupEl?.querySelector("#ee-modal-inner")?.classList.remove("ee-booting")), 360);
         const labelOf = (el) => (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
+        // 🐛 (18 พ.ย. 2569 ผู้ใช้: "เวลาแก้แค่รายการเดียวแต่ขึ้น (2) สับสน") เดิมนับทีละช่อง — เปลี่ยนหัวหน้าทีม 1 ครั้ง
+        //    ระบบปรับช่องที่ผูกกันให้เอง (ช่องหัวหน้าทีมบนหัวกล่อง/รายชื่อลูกทีม) จึงขึ้น 2–3 รายการ
+        //    → นับเป็น "เรื่องที่แก้" ตามชื่อช่อง: ผู้ปฏิบัติงานทุกช่อง = 1 รายการ · ช่องชื่อซ้ำกัน = 1 รายการ
+        const labelCache = new Map(); // ชื่อช่องที่เคยเห็น — ใช้กับช่องที่ถูกลบออกไปแล้ว (เช่น แถวลูกทีม)
+        const groupOf = (n) => (/^ผู้ปฏิบัติงาน/.test(n) ? "ผู้ปฏิบัติงาน" : n);
         const renderDirty = (keys) => {
           popupEl.querySelectorAll(".ee-dirty-mark").forEach((n) => n.classList.remove("ee-dirty-mark"));
           const names = [];
+          const groups = new Set();
           keys.forEach((k) => {
             const el = k.startsWith("radio:") ? popupEl.querySelector(`input[type="radio"][name="${CSS.escape(k.slice(6))}"]`) : popupEl.querySelector(`#${CSS.escape(k)}`);
-            if (!el) return;
-            const target = el.tomselect?.wrapper || el.closest(".ee-hm-value")?.querySelector(".ee-pick-btn") || el.closest(".ee-money-input") || el.closest(".ee-field") || el;
-            target.classList.add("ee-dirty-mark");
-            const n = labelOf(el);
-            if (n && !names.includes(n)) names.push(n);
+            let n = "";
+            if (el) {
+              // ช่องพิมพ์/เลือกที่มองเห็น = ไฮไลต์ตัวช่องเอง · ตัวเลือกแบบปุ่ม (VAT) = กรอบกลุ่มปุ่ม · อื่นๆ = กล่องช่อง
+              const isBox = el.matches("textarea, select, input:not([type=radio]):not([type=checkbox])") && !el.tomselect && el.offsetParent !== null;
+              const target = el.tomselect?.wrapper || el.closest(".ee-hm-value")?.querySelector(".ee-pick-btn") || el.closest(".ee-money-input")
+                || (isBox ? el : null) || el.closest(".ee-vat-seg") || el.closest(".ee-field") || el;
+              target.classList.add("ee-dirty-mark");
+              n = labelOf(el);
+              if (n) labelCache.set(k, n);
+            } else {
+              n = labelCache.get(k) || (/^tomselect-/.test(k) ? "ผู้ปฏิบัติงาน" : "");
+            }
+            const g = n ? groupOf(n) : `#${k}`;
+            groups.add(g);
+            if (n && !names.includes(g)) names.push(g);
           });
+          const count = groups.size;
           const bar = document.getElementById("ee-dirty-bar");
           const btn = document.getElementById("btnConfirm");
           if (bar) {
-            bar.classList.toggle("show", keys.length > 0);
+            bar.classList.toggle("show", count > 0);
             const t = bar.querySelector(".ee-dirty-txt");
-            if (t) t.textContent = keys.length ? `แก้ไขแล้ว ${keys.length} รายการ${names.length ? ` (${names.slice(0, 3).join(" · ")}${names.length > 3 ? " …" : ""})` : ""} — ยังไม่บันทึก กด “บันทึก” เพื่อยืนยัน` : "";
+            if (t) t.textContent = count ? `แก้ไขแล้ว ${count} รายการ${names.length ? ` (${names.slice(0, 3).join(" · ")}${names.length > 3 ? " …" : ""})` : ""} — ยังไม่บันทึก กด “บันทึก” เพื่อยืนยัน` : "";
           }
-          if (btn && !btn.dataset.busy) btn.textContent = keys.length ? `💾 บันทึก (${keys.length})` : "💾 บันทึก";
+          if (btn && !btn.dataset.busy) btn.textContent = count ? `💾 บันทึก (${count})` : "💾 บันทึก";
         };
         // 🔁 (17 พ.ย. 2569) การ์ดมูลค่าครั้งนี้เป็นแบบอ่านอย่างเดียว (รายคน) — ผูกเฉพาะเมื่อยังมีช่องกรอกแบบเดิม
         if (popupEl.querySelector("#editWorkValue")) wvCtl = bindWorkValueCard(popupEl, {
@@ -3339,9 +3370,25 @@ export const getEditEvent = async ({
       const countEl = document.getElementById("charCount");
       if (descEl) {
         descEl.value = eventDescription || "";
+        // ✅ (18 พ.ย. 2569 ผู้ใช้: "อยากให้ขยายตามจำนวนตัวอักษรที่พิมพ์ให้สมูท และสวยงาม · ความยาวเริ่มต้นเท่าที่แจ้งให้ขยายไป")
+        //    สูงเริ่มต้น = min-height ใน CSS (150px · มือถือ 170px) → พิมพ์เกิน = ค่อยๆ ยืดลงตามข้อความ (transition height)
+        //    วัดความสูงจริงด้วย height:auto ชั่วคราว (ไม่มีแอนิเมชัน) แล้วเลื่อนจากความสูงเดิม → ความสูงใหม่แบบนุ่ม
+        const grow = () => {
+          const from = descEl.getBoundingClientRect().height;
+          descEl.style.transition = "none";
+          descEl.style.height = "auto";
+          const to = Math.ceil(descEl.scrollHeight + 2);
+          if (Math.abs(to - from) < 1) { descEl.style.height = `${to}px`; descEl.style.transition = ""; return; }
+          descEl.style.height = `${from}px`;
+          void descEl.offsetHeight; // ให้เบราว์เซอร์รับความสูงเดิมก่อน แล้วค่อยเลื่อนไปความสูงใหม่
+          descEl.style.transition = "";
+          descEl.style.height = `${to}px`;
+        };
         const upd = () => {
           if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
+          grow();
         };
+        requestAnimationFrame(grow);
         descEl.addEventListener("input", upd);
         upd();
       }
@@ -4596,7 +4643,8 @@ export const getEditEvent = async ({
         const changed = [];
         keys.forEach((k) => {
           const el = k.startsWith("radio:") ? popup.querySelector(`input[type="radio"][name="${CSS.escape(k.slice(6))}"]`) : popup.querySelector(`#${CSS.escape(k)}`);
-          const n = el && (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
+          const raw = el && (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
+          const n = raw && /^ผู้ปฏิบัติงาน/.test(raw) ? "ผู้ปฏิบัติงาน" : raw; // ช่องหัวหน้าทีม/ลูกทีม = เรื่องเดียว (ตรงกับแถบ "แก้ไขแล้ว")
           if (n && !changed.includes(n)) changed.push(n);
         });
         const icoSave = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z"/></svg>';

@@ -68,7 +68,10 @@ export const draftAgoText = (at) => {
 const fieldsOf = (root) => [...root.querySelectorAll("input, select, textarea")]
   .filter((el) => (el.id || (el.type === "radio" && el.name)) && !["file", "password", "hidden", "button", "submit"].includes(el.type) && !el.closest("[data-no-draft]"))
   // ⚠️ id แบบ ":r5:" = id อัตโนมัติของ React (ช่องในปฏิทิน พ.ศ./MUI) เปลี่ยนทุกครั้งที่เปิด — ไม่ใช่ช่องของฟอร์ม
-  .filter((el) => !/^:.*:$/.test(el.id || ""));
+  .filter((el) => !/^:.*:$/.test(el.id || ""))
+  // 🐛 (18 พ.ย. 2569 ผู้ใช้: "แก้แค่รายการเดียวแต่ขึ้น (2)") ช่องพิมพ์ค้นหาของ TomSelect (…-ts-control) ไม่ใช่ข้อมูลของฟอร์ม
+  //    ค่าที่เลือกจริงอยู่ที่ <select> ตัวเดิม — ไม่นับช่องค้นหาเป็น "แก้ไขแล้ว" อีกรายการ
+  .filter((el) => el.tagName === "SELECT" || !el.closest(".ts-wrapper, .ts-dropdown"));
 
 const collect = (root) => {
   const out = {};

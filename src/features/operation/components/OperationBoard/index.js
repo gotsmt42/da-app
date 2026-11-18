@@ -101,7 +101,7 @@ import AppsIcon from "@mui/icons-material/AppsRounded";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import WorkValueField from "@/shared/ui/WorkValueField";
-import { personValueOf, workersOfRows, jobTotalNet, jobWorkValueHit, jobWorkValueNet, vatLabel, visitValueKey, isWholeJobValue } from "@/shared/utils/workValue";
+import { personValueOf, workersOfRows, jobTotalNet, jobWorkValueHit, jobWorkValueNet, vatLabel, visitValueKey, isWholeJobValue, sameWorkerName } from "@/shared/utils/workValue";
 import WorkerValuesPanel from "@/shared/ui/WorkerValuesPanel";
 import { WorkValueSummaryCard, WorkValueSourceSheet } from "../WorkValueSummary";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
@@ -725,6 +725,17 @@ const FileRow = React.memo(
  * ✅ (12 พ.ย. 2569 ผู้ใช้: "มูลค่ารวมให้แก้ตรงนี้ได้ด้วย ให้สอดคล้อง · งานของผู้รับผิดชอบนั้นๆ")
  *    แอดมิน/manager หรือผู้รับผิดชอบงานนั้น · บันทึกแล้วอัปเดตทุกวัน/ทุกครั้งในกลุ่มเดียวกัน (PUT /events/basic-info)
  */
+/** แถวมูลค่าในรายละเอียดงาน — ชื่อ + หน้าที่ (ซ้าย) · ยอด (ขวา) · ตอนแก้ ช่องกรอกตกบรรทัดใหม่เต็มความกว้าง */
+const ValueRow = ({ label, hint, divider = false, children }) => (
+  <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 1, rowGap: 0.5, py: 0.9, borderTop: divider ? `1px solid ${LINE}` : 0 }}>
+    <Box sx={{ flex: "1 1 auto", minWidth: 0 }}>
+      <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2, lineHeight: 1.35 }}>{label}</Typography>
+      {hint && <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8", lineHeight: 1.35 }}>{hint}</Typography>}
+    </Box>
+    <Box sx={{ flex: "0 1 auto", display: "flex", justifyContent: "flex-end", minWidth: 0, "&:has(.MuiTextField-root)": { flex: "1 1 100%" } }}>{children}</Box>
+  </Box>
+);
+
 const JobValueEdit = ({ event, canEdit }) => {
   const [val, setVal] = useState(event.jobValue);
   const [editing, setEditing] = useState(false);
@@ -765,12 +776,12 @@ const JobValueEdit = ({ event, canEdit }) => {
     );
   }
   return (
-    <Stack direction="row" alignItems="center" spacing={0.75}>
+    <Stack direction="row" alignItems="center" spacing={0.5}>
       {has
-        ? <span>฿{Number(val).toLocaleString("th-TH")}<Box component="span" sx={{ color: MUTED, fontWeight: 500, fontSize: "0.8rem" }}>{event.contractGroupId ? " · ทั้งสัญญา" : " · ทั้งงาน"}</Box></span>
-        : <Box component="span" sx={{ color: MUTED, fontWeight: 500 }}>ยังไม่ระบุ</Box>}
+        ? <Typography component="span" sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#1e293b", fontVariantNumeric: "tabular-nums" }}>฿{Number(val).toLocaleString("th-TH")}</Typography>
+        : <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#94a3b8" }}>ยังไม่ระบุ</Typography>}
       {canEdit && (
-        <IconButton size="small" onClick={start} aria-label="แก้มูลค่างานรวม" sx={{ color: MUTED }}><Edit sx={{ fontSize: 17 }} /></IconButton>
+        <IconButton size="small" onClick={start} aria-label="แก้มูลค่างานรวม" sx={{ p: 0.4, color: "#64748b" }}><Edit sx={{ fontSize: 15 }} /></IconButton>
       )}
     </Stack>
   );
@@ -1630,24 +1641,27 @@ const EventRowCard = ({
                     const canVisit = Boolean(onStatusUpdate) && (isAdminOrManager || (responsible && event.status !== "ดำเนินการเสร็จสิ้น"));
                     const hasWorkers = workersOfRows([event]).length > 0;
                     return (
-                      <Box sx={{ mt: 0.75, mb: 0.5, px: 1.25, py: 1, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fafbfc" }}>
-                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, mb: 0.25 }}>มูลค่า</Typography>
-                        <InfoLine label="มูลค่างานรวม" center>
+                      // 🔁 (18 พ.ย. 2569 ผู้ใช้: "มูลค่าตรงนี้ด้วย · จัดวางให้ดูง่าย สวยงาม") กล่องขาวเดียว · แถวละช่อง: ชื่อ + หน้าที่ (ซ้าย) · ยอด + ดินสอ (ขวา)
+                      //    แก้ยอด = ช่องกรอกลงบรรทัดใหม่เต็มความกว้าง (ไม่บีบชื่อ) · ตัดหมายเหตุยาวท้ายกล่อง เหลือคำอธิบายสั้นใต้ชื่อแต่ละช่อง
+                      <Box sx={{ mt: 1, mb: 0.5, px: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+                        <ValueRow label="มูลค่างานรวม" hint={event.contractGroupId ? "ทั้งสัญญา" : "ทั้งงาน"}>
                           <JobValueEdit event={event} canEdit={can(currentUser, "editContracts") || responsible} />
-                        </InfoLine>
-                        <InfoLine label="มูลค่าครั้งนี้" center>
+                        </ValueRow>
+                        <ValueRow label="มูลค่าครั้งนี้" hint="1 ค่าต่องาน · ใช้สรุปงาน/วางบิล" divider>
                           <WorkValueField compact value={event.workValue} vatIncluded={event.workValueVatIncluded} event={event} source={event.workValueSource}
                             disabled={!canVisit} onSave={(v, meta) => onStatusUpdate?.(event._id, { workValue: v, ...meta })} />
-                        </InfoLine>
+                        </ValueRow>
                         {hasWorkers && (
-                          <InfoLine label="ผลงานรายคน">
-                            <WorkerValuesPanel variant="inline" event={event} me={currentUser} canManage={isAdminOrManager}
-                              disabled={!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น"} onPatched={onPatched} />
-                          </InfoLine>
+                          <Box sx={{ borderTop: `1px solid ${LINE}`, pt: 0.9, pb: 0.5 }}>
+                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2 }}>
+                              ผลงานรายคน <Box component="span" sx={{ fontSize: "0.7rem", fontWeight: 500, color: "#94a3b8" }}>· ช่างแต่ละคนลงเอง ไม่รวมกัน</Box>
+                            </Typography>
+                            <Box sx={{ mt: 0.25 }}>
+                              <WorkerValuesPanel variant="inline" event={event} me={currentUser} canManage={isAdminOrManager}
+                                disabled={!isAdminOrManager && event.status === "ดำเนินการเสร็จสิ้น"} onPatched={onPatched} />
+                            </Box>
+                          </Box>
                         )}
-                        <Typography sx={{ mt: 0.5, pt: 0.75, borderTop: `1px dashed ${LINE}`, fontSize: "0.7rem", color: MUTED, lineHeight: 1.5 }}>
-                          มูลค่างานรวม = ทั้งงาน/สัญญา · มูลค่าครั้งนี้ = ของงานครั้งนี้ ใช้สรุปงาน/วางบิล · ผลงานรายคน = ช่างแต่ละคนลงเอง ใช้ประเมินช่าง ไม่รวมกัน
-                        </Typography>
                       </Box>
                     );
                   })()}
@@ -3272,11 +3286,23 @@ const Operation = () => {
     let wholeTotal = 0; let wholeCount = 0;
     // ✅ (18 พ.ย. 2569 ผู้ใช้: "ทำไมยอดเยอะขนาดนี้ แสดงผลอะไรกันแน่") เก็บรายการงานที่มีมูลค่าครั้งนี้ + ที่มาของยอด — กดดูได้
     const items = [];
+    // ✅ (18 พ.ย. 2569 ผู้ใช้: "ให้กดดูที่มาได้แบบดูทั้งหมดทุกคนด้วย") เลือกคน = เก็บผลงานรายคนทีละงาน (ลงแล้ว/ยังไม่ลง · ใครลง)
+    const personItems = [];
     const counted = new Set(); // 🔁 (18 พ.ย. 2569) งานหลายช่วงวัน = นับมูลค่าครั้งนี้ครั้งเดียว (visitValueKey)
     allJobGroups.forEach((g) => {
       if (valueMember) {
         const pv = personValueOf(g, valueMember);
         if (pv) { own += pv.net; ownCount += 1; }
+        const head = g[0] || {};
+        personItems.push({
+          id: head._id, site: head.site || head.company || "-",
+          title: [head.title, head.system, head.time ? `ครั้งที่ ${head.time}` : ""].filter(Boolean).join(" · "),
+          start: g.map((e) => e.start || e.date).filter(Boolean).sort()[0] || null, sessions: g.length,
+          value: pv ? pv.net : null, amount: pv ? pv.amount : null, vatIncluded: Boolean(pv?.vatIncluded), at: pv?.at || null,
+          // ใครลง: self = ลงเอง · proxy = คนอื่นลงแทน · legacy = ยอดเดิม (ลงเป็นมูลค่าครั้งนี้ของงานก่อนแยกช่อง)
+          kind: !pv ? "missing" : pv.legacy ? "legacy" : pv.by && !sameWorkerName(pv.by, valueMember) ? "proxy" : "self",
+          by: pv ? (pv.by || valueMember) : "", jobValue: jobWorkValueNet(g),
+        });
       }
       const wv = jobWorkValueNet(g);
       if (wv === null) { missing += 1; return; }
@@ -3296,7 +3322,8 @@ const Operation = () => {
     });
     // ยอดเท่ามูลค่างานรวม (ต้องตรวจ) ขึ้นก่อน แล้วค่อยมูลค่าครั้งนี้ — เรียงจากมากไปน้อย
     items.sort((a, b) => Number(b.whole) - Number(a.whole) || b.value - a.value);
-    return { total, withValue, missing, own, ownCount, wholeTotal, wholeCount, jobs: allJobGroups.length, items };
+    personItems.sort((a, b) => (a.value === null) - (b.value === null) || (b.value || 0) - (a.value || 0) || String(b.start || "").localeCompare(String(a.start || "")));
+    return { total, withValue, missing, own, ownCount, wholeTotal, wholeCount, jobs: allJobGroups.length, items, personItems };
   }, [allJobGroups, valueMember]);
   const [valueSheet, setValueSheet] = useState(null); // แผ่นแจกแจงมูลค่า: null | "all" | "whole" | "counted"
   const valuePeriodText = showAll ? "ทุกเดือน" : selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "";
@@ -4069,7 +4096,7 @@ const Operation = () => {
               periodText={valuePeriodText} />
           )}
           <WorkValueSourceSheet s={valueSummary} employees={employee} filter={valueSheet} onFilter={setValueSheet} onClose={() => setValueSheet(null)}
-            periodText={valuePeriodText}
+            periodText={valuePeriodText} member={valueMember}
             onOpenJob={(jid) => { setValueSheet(null); openJobById(jid); }} />
 
           {loading ? (

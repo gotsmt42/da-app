@@ -79,8 +79,8 @@ export default function WorkerValuesPanel({ event, sessions, me, canManage = fal
         const editable = !disabled && (canManage || isMe);
         return (
           <Stack key={name} direction="row" alignItems="center" gap={1}
-            sx={variant === "inline" ? { minHeight: 28 } : { px: 1.25, py: 0.75, borderTop: i ? `1px solid ${LINE}` : 0 }}>
-            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.84rem", fontWeight: 700, color: "#1e293b" }}>
+            sx={variant === "inline" ? { minHeight: 32, flexWrap: "wrap", rowGap: 0.5, py: 0.25, "& > :last-child:has(.MuiTextField-root)": { flex: "1 1 100%" } } : { px: 1.25, py: 0.75, borderTop: i ? `1px solid ${LINE}` : 0 }}>
+            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.84rem", fontWeight: 600, color: "#1e293b" }}>
               {name}
               {i === 0 && <Box component="span" sx={{ ml: 0.5, fontSize: "0.68rem", fontWeight: 600, color: "#64748b" }}>หัวหน้าทีม</Box>}
               {isMe && <Box component="span" sx={{ ml: 0.5, fontSize: "0.68rem", fontWeight: 700, color: "#2563eb" }}>คุณ</Box>}

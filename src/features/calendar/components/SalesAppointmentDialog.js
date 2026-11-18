@@ -6,6 +6,7 @@
  *
  *   ขั้นตอน:  นัดหมายแล้ว ──(แนบรูปหน้างาน ≥ 1)──▶ เข้าพบแล้ว ──(สรุปผลการเข้าพบ)──▶ ปิดงานแล้ว
  *             เลื่อนนัด / ยกเลิกนัด ได้ตลอดก่อนปิดงาน · เปิดงานที่ปิดแล้วอีกครั้ง = แอดมิน/ผู้จัดการ
+ *   ✅ (18 พ.ย. 2569) เอกสารแนบ (SalesDocsSection) แนบ/แก้รายละเอียดได้ตลอด แม้ปิดงานแล้ว — ตามใบเสนอราคาย้อนหลัง
  *   ⚠️ server ตรวจซ้ำทุกเงื่อนไข (PUT /events/:id/sales-status) — การปิดปุ่มบนจอมีไว้ให้รู้ว่าขาดอะไร
  *   ⚠️ แก้ข้อมูลนัด (วัน/เวลา/สถานที่/ประเภท) ยังใช้ฟอร์มเดิม (getEditSalesAppointment) ผ่าน onEdit
  */
@@ -28,6 +29,7 @@ import { SALES_TYPE_META, salesStatusMeta, toSalesStatus } from "../salesAppoint
 import SiteMapCard from "@/shared/ui/SiteMapCard";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
+import SalesDocsSection from "./SalesDocsSection";
 
 const GREEN = "#16a34a";
 const TEAL = "#0d9488";
@@ -453,6 +455,9 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               </Section>
             )}
 
+            {/* ── เอกสารแนบ (ใบเสนอราคา/เอกสารอื่น + รายละเอียด) — แนบได้แม้ปิดงานแล้ว (18 พ.ย. 2569) ── */}
+            <SalesDocsSection ev={ev} canEdit={canAct && !cancelled} closed={closed} Section={Section}
+              onChanged={async () => { await load(); onChanged?.(); }} />
 
             {!canAct && (
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 2, color: MUTED }}>
