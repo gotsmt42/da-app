@@ -271,7 +271,7 @@ export default function DesktopOverview({ events, users = [], loading, teamView,
           sub={`${t.closed} จาก ${t.total} งาน`} subColor={t.total && t.closeRate >= 80 ? OK : undefined} />
         {showValue ? (
           <KpiTile loading={loading} to="/jobs/report" label="มูลค่าครั้งนี้ของงาน" value={baht(t.value)}
-            sub={`ก่อน VAT${t.jobTotal ? ` · มูลค่างานรวม ${baht(t.jobTotal)}` : ""}${t.missing ? ` · ยังไม่ใส่ ${t.missing} งาน` : ""}`} subColor={t.missing ? WARN : undefined} />
+            sub={`ก่อน VAT${t.wholeCount ? ` · ไม่รวม ${t.wholeCount} งานที่ใส่เท่ามูลค่างานรวม` : ""}${t.missing ? ` · ยังไม่ใส่ ${t.missing} งาน` : ""}`} subColor={t.missing || t.wholeCount ? WARN : undefined} />
         ) : (
           <KpiTile loading={loading} to="/jobs/workers" label="มูลค่างานที่ฉันทำ" value={baht(myTotal)}
             sub={data.team.issueCount ? `ข้อมูลยังไม่ครบ ${data.team.issueCount} รายการ` : "ข้อมูลครบ"} subColor={data.team.issueCount ? WARN : OK} />

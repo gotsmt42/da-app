@@ -207,3 +207,15 @@ export function visitValueKey(row, net) {
   return `sig:${sig}|${Math.round(Number(net || 0) * 100)}`;
 }
 
+/**
+ * ✅ (18 พ.ย. 2569 ผู้ใช้: "มันควรบอกว่ามูลค่ารวม ไม่ใช่มูลค่าครั้งนี้ ถ้าเอายอดมูลค่ารวมมาบวกกันแบบนี้")
+ *    มูลค่าครั้งนี้ของงาน "เท่ากับมูลค่างานรวมทั้งงาน" = จริงๆ คือยอดรวมทั้งงาน (มักถูกเติมจากมูลค่างานรวม) ไม่ใช่ยอดของครั้งนี้
+ *    → ไม่นับรวมในยอด "มูลค่าครั้งนี้" · แสดงแยกเป็น "เท่ามูลค่างานรวม" ให้ตรวจ/แก้
+ */
+export function isWholeJobValue(rows) {
+  const hit = jobWorkValueHit(rows);
+  const total = jobTotalNet(rows);
+  if (!hit || total === null) return false;
+  return Math.abs(workValueNet(hit) - total) < 1;
+}
+

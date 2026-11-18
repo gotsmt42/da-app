@@ -78,9 +78,15 @@ function JobRow({ j, avatarOf, onClick, showValue }) {
         {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "แต่ละงานมีมูลค่าครั้งนี้ 1 ค่า · งานไหนมีมูลค่ารวมก็ให้แสดงเทียบ") */}
         {showValue && (
           <Box sx={{ mt: 0.5 }}>
-            <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: j.value === null ? "#cbd5e1" : INK, fontVariantNumeric: "tabular-nums" }}>
-              {j.value === null ? "ยังไม่ใส่" : baht(j.value)}
-            </Typography>
+            {j.valueWhole ? (
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#b45309" }} title="มูลค่าครั้งนี้ที่ใส่ไว้เท่ากับมูลค่างานรวมทั้งงาน — ไม่นับเป็นมูลค่าครั้งนี้">
+                ใส่เท่ามูลค่างานรวม
+              </Typography>
+            ) : (
+              <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: j.value === null ? "#cbd5e1" : INK, fontVariantNumeric: "tabular-nums" }}>
+                {j.value === null ? "ยังไม่ใส่" : baht(j.value)}
+              </Typography>
+            )}
             {j.jobTotal !== null && (
               <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>จากมูลค่างานรวม {baht(j.jobTotal)}</Typography>
             )}
@@ -220,7 +226,7 @@ export default function JobReport() {
       <TotalHero
         label="งานทั้งหมดตามตัวกรอง"
         value={`${t.total} งาน`}
-        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่าครั้งนี้ ${baht(t.value)}${t.jobTotal ? ` · มูลค่างานรวม ${baht(t.jobTotal)}` : ""}` : ""}`}
+        sub={`เสร็จสิ้น ${t.closed} งาน (${t.closeRate}%) · ยังไม่ปิด ${t.open} งาน · เข้างาน ${t.visits} ช่วง${showValue ? ` · มูลค่าครั้งนี้ ${baht(t.value)}${t.wholeCount ? ` (ไม่รวม ${t.wholeCount} งานที่ใส่เท่ามูลค่างานรวม)` : ""}${t.jobTotal ? ` · มูลค่างานรวม ${baht(t.jobTotal)}` : ""}` : ""}`}
         stats={summary.statusRows.map((g) => (
           <Stat key={g.key} label={g.label} value={`${g.count} งาน`} tone={g.count ? g.color : undefined}
             active={listGroup === g.key} onClick={() => setListGroup(listGroup === g.key ? "all" : g.key)} />

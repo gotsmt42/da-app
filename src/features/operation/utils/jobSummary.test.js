@@ -58,5 +58,19 @@ describe("jobSummary — กติกาเดียวกับหน้าก�
     const sm = summarizeJobs(buildJobs(evs, new Map()));
     expect(sm.totals.value).toBe(58000);
   });
+
+  // ✅ (18 พ.ย. 2569 ผู้ใช้: "ควรบอกว่ามูลค่ารวม ไม่ใช่มูลค่าครั้งนี้ ถ้าเอายอดมูลค่ารวมมาบวกกัน")
+  it("มูลค่าครั้งนี้ที่ใส่เท่ามูลค่างานรวม = ไม่นับเป็นมูลค่าครั้งนี้ · แยกเป็น wholeCount", () => {
+    const evs = [
+      ev({ _id: "w1", site: "Centara", title: "ติดตั้ง", start: d(15), end: d(15), jobValue: 8121148.49, workValue: 8121148.49, workValueSource: "job" }),
+      ev({ _id: "w2", site: "Riviera", title: "PM", start: d(12), end: d(12), jobValue: 100000, workValue: 25000 }),
+    ];
+    const js = buildJobs(evs, new Map());
+    const sm = summarizeJobs(js);
+    expect(sm.totals.value).toBe(25000);
+    expect(sm.totals.wholeCount).toBe(1);
+    expect(sm.totals.missing).toBe(0);
+    expect(js.find((j) => j.eventId === "w1").valueWhole).toBe(true);
+  });
 });
 
