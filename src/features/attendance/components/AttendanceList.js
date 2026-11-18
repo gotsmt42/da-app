@@ -11,7 +11,7 @@
  *    • ตัวหนังสือ: หัวข้อ 600 · เนื้อหา 400–500 · สีเทาเป็นหลัก น้ำเงินเฉพาะสิ่งที่กดได้ ส้มเฉพาะเรื่องที่ต้องตรวจ
  */
 import { createContext, lazy, Suspense, useContext, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useInRouterContext } from "react-router-dom";
 import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Dialog, IconButton, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -369,6 +369,10 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
   const docs = photos.filter((p) => !isImg(p));
   const gal = useFileGallery();
   const galleryList = photos.map((p) => ({ ...p, _id: p.fileId }));
+  // 🐛 (18 พ.ย. 2569 ผู้ใช้: "กดดูบันทึกเข้างานแล้วไม่มีอะไรเกิดขึ้น") ในฟอร์มแก้ไขงาน (SweetAlert · createRoot แยก) ไม่มี Router
+  //    <Link> พังทั้งก้อน → กล่องเข้างานหายทั้งกล่อง · นอก Router = ไม่แสดงปุ่ม "เปิดงาน" (อยู่ในหน้างานนั้นแล้ว)
+  const inRouter = useInRouterContext();
+  const canOpenJob = Boolean(row.eventId) && inRouter;
   const openFile = (p) => {
     const i = photos.findIndex((x) => x.fileId === p.fileId);
     if (onPreview) onPreview(p.fileUrl, p.fileName, galleryList, i);
@@ -489,7 +493,7 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
         </Stack>
       </Box>
 
-      {(mine || isApprover) || row.eventId ? (
+      {(mine || isApprover) || canOpenJob ? (
         <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.5 }}>
           {(mine || isApprover) && (
             <Button variant="outlined" startIcon={<EditCalendarRounded />} onClick={() => setFixOpen(true)}
@@ -497,7 +501,7 @@ function AttendanceDetail({ row, me, isApprover, onPreview, onChanged }) {
               {isApprover ? "แก้เวลา" : "ขอแก้เวลา"}
             </Button>
           )}
-          {row.eventId && (
+          {canOpenJob && (
             <Button component={Link} to={`/operation/${row.eventId}`} variant="contained" disableElevation endIcon={<ChevronRight />}
               sx={{ ...SMALL_BTN, minHeight: 40, px: 2.25, fontSize: "0.86rem", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
               เปิดงาน

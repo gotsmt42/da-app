@@ -951,22 +951,29 @@ function injectStyles() {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #ee-head-mini svg { flex-shrink: 0; }
-    /* 🔁 (26 ต.ค. 2569 ผู้ใช้: "เลื่อนขึ้นบนสุดมันวาบๆ เด้งไปรูปแบบหนึ่ง ไม่สมูท") เดิม display:none สลับทันที
-       → พับ/กางแบบนุ่ม (ความสูง + ความจาง) ไม่กระตุกทั้งกล่อง */
-    .swal-edit-event #ee-head-meta, .swal-edit-event #ee-head-status {
-      max-height: 640px; opacity: 1;
-      transition: max-height .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease, margin .28s ease, padding .28s ease;
+    /* 🔁 (18 พ.ย. 2569 ผู้ใช้: "การเลื่อนขึ้นลงของ Header ยังไม่สมูท คาบเกี่ยวกับช่วงข้อมูล ใช้งานยาก")
+       แถบชื่องาน (#ee-status-header) อยู่นอกกล่องเลื่อน ความสูงคงที่ · รายละเอียดหัวกล่อง (#ee-head-details) + เนื้อหา (#ee-body)
+       อยู่ในกล่องเลื่อนเดียวกัน (#ee-scroll) → เลื่อนไปพร้อมกันเป็นธรรมชาติ ไม่มีพับ/กางความสูง ไม่มีเนื้อหากระโดด
+       เลื่อนพ้นรายละเอียด (ee-head--compact) = ป้ายสถานะเล็กบนแถบ + เส้น/เงาใต้แถบ (จางเข้า) */
+    .swal-edit-event #ee-scroll {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch; background: #f8fafc;
     }
-    .swal-edit-event .ee-head--compact #ee-head-meta, .swal-edit-event .ee-head--compact #ee-head-status {
-      max-height: 0 !important; opacity: 0; margin-top: 0 !important; margin-bottom: 0 !important;
-      padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; pointer-events: none;
+    .swal-edit-event #ee-scroll > #ee-body { flex: none; overflow: visible; min-height: auto; }
+    .swal-edit-event #ee-head-details {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 12px; row-gap: 10px;
+      background: #fff; border-bottom: 1px solid #e6e9ef; padding: 0 16px 12px 20px; text-align: left;
     }
-    /* ตัดส่วนเกินเฉพาะตอนพับ/กำลังกาง — กางเสร็จแล้วต้องไม่ตัด (เมนูเลือกผู้รับผิดชอบ/สถานะยื่นออกนอกกล่องได้) */
-    .swal-edit-event .ee-head--compact #ee-head-meta, .swal-edit-event .ee-head--compact #ee-head-status,
-    .swal-edit-event .ee-head--anim #ee-head-meta, .swal-edit-event .ee-head--anim #ee-head-status { overflow: hidden; }
-    .ee-head--compact #ee-head-mini { display: inline-flex; }
-    .swal-edit-event .ee-head--compact#ee-status-header { padding-top: 8px; padding-bottom: 8px; }
-    .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; font-size: 14.5px; line-height: 1.6; }
+    .swal-edit-event #ee-status-header {
+      position: relative; z-index: 3; flex-wrap: nowrap !important;
+      border-bottom-color: transparent !important; transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .swal-edit-event .ee-head--scrolled#ee-status-header { border-bottom-color: #e6e9ef !important; }
+    .swal-edit-event .ee-head--compact#ee-status-header { border-bottom-color: #e6e9ef !important; box-shadow: 0 4px 12px -6px rgba(15,23,42,.18); }
+    #ee-head-mini { opacity: 0; transition: opacity .18s ease; }
+    .ee-head--compact #ee-head-mini { display: inline-flex; opacity: 1; animation: ee-mini-in .18s ease-out; }
+    @keyframes ee-mini-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; }
     .swal-edit-event #ee-head-meta {
       flex: 1 1 100%; min-width: 0; display: grid; gap: 8px;
       /* 🐛 (19 ต.ค. 2569 ผู้ใช้: "ทำไมเพี้ยนๆ ไม่เหมือนกัน") auto-fit + แถววันที่เต็มแถว ทำให้มีคอลัมน์ว่างค้าง ช่องคนแคบลง
@@ -1218,6 +1225,7 @@ function injectStyles() {
         height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; box-shadow: none !important;
       }
       .swal-edit-event #ee-status-header { padding: 10px 12px; gap: 10px; }
+      .swal-edit-event #ee-head-details { padding: 0 12px 10px; gap: 10px; row-gap: 8px; }
       .swal-edit-event #ee-status-icon { width: 36px; height: 36px; font-size: 17px; }
       .swal-edit-event #ee-status-title h3 { font-size: 15px; }
       #ee-head-status { margin-left: 0; }
@@ -2096,10 +2104,14 @@ export const getEditEvent = async ({
     .join("");
 
   const html = `
-<div id="ee-modal-inner" class="ee-booting">
+<div id="ee-modal-inner" class="ee-booting" style="--ee-status:${cfg0.color};--ee-status-soft:${cfg0.soft};--ee-status-line:${cfg0.line}">
 
-  <!-- ── Header ── -->
-  <div id="ee-status-header" style="--ee-status:${cfg0.color};--ee-status-soft:${cfg0.soft};--ee-status-line:${cfg0.line}">
+  <!-- ── Header (แถบชื่องาน — ค้างบนสุดเสมอ) ──
+       🔁 (18 พ.ย. 2569 ผู้ใช้: "การเลื่อนขึ้นลงของ Header ยังไม่สมูท คาบเกี่ยวกับช่วงข้อมูล ใช้งานยาก")
+       เดิมทั้งหัวกล่องอยู่นอกกล่องเลื่อน แล้วพับ/กางด้วย JS → ความสูงเปลี่ยน เนื้อหาด้านล่างกระโดดตาม
+       ตอนนี้: แถบชื่องานค้างบนสุด · รายละเอียดหัวกล่อง (ผู้รับผิดชอบ/ทีม/วันที่/สถานะ) อยู่ "ในกล่องเลื่อน"
+       เลื่อนไปพร้อมเนื้อหาเป็นธรรมชาติ ไม่มีการกระโดด · เลื่อนพ้นแล้วป้ายสถานะเล็กขึ้นบนแถบแทน -->
+  <div id="ee-status-header">
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount, ev))}` : ""}</span></h3>
     </div>
@@ -2107,6 +2119,10 @@ export const getEditEvent = async ({
     <button id="ee-head-toggle" type="button" title="พับ/กางหัวข้อ" aria-expanded="true"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
+  </div>
+
+  <div id="ee-scroll">
+  <div id="ee-head-details">
     ${/* ✅ ข้อมูลคนของงาน — มีป้ายกำกับชัดเจน (ผู้ใช้สั่ง 3 ต.ค. 2569: "อธิบายด้วยว่า หัวหน้าทีม ผู้รับผิดชอบ ให้ชัดเจน
          และสวยงาม") เดิมเป็นชิปลอยๆ ไม่บอกว่าชื่อไหนคือบทบาทอะไร · แถวเต็มความกว้าง แสดงครบทุกตัว */""}
     <div id="ee-head-meta">
@@ -2805,6 +2821,7 @@ export const getEditEvent = async ({
     ` : ""}
 
   </div>
+  </div>
 
   <div id="ee-dirty-bar" role="status" aria-live="polite"><span class="ee-dirty-txt"></span><button type="button" id="ee-dirty-revert">ยกเลิกการแก้ไข</button></div>
   <!-- ── Action bar (แยก 3 กลุ่มชัดเจน) ── -->
@@ -3337,9 +3354,11 @@ export const getEditEvent = async ({
       statusSel?.addEventListener("change", (e) => {
         const cfg =
           STATUS_CONFIG[e.target.value] || STATUS_CONFIG["กำลังรอยืนยัน"];
-        headerEl.style.setProperty("--ee-status", cfg.color);
-        headerEl.style.setProperty("--ee-status-soft", cfg.soft);
-        headerEl.style.setProperty("--ee-status-line", cfg.line);
+        // ตัวแปรสีสถานะอยู่ที่ #ee-modal-inner — ใช้ทั้งแถบชื่องานและแถวสถานะในกล่องเลื่อน
+        const varHost = document.getElementById("ee-modal-inner") || headerEl;
+        varHost.style.setProperty("--ee-status", cfg.color);
+        varHost.style.setProperty("--ee-status-soft", cfg.soft);
+        varHost.style.setProperty("--ee-status-line", cfg.line);
         iconEl.innerHTML = cfg.icon;
         const mini = document.getElementById("ee-head-mini");
         if (mini) mini.innerHTML = `${cfg.icon}<span id="ee-head-mini-text">${escapeHtml(e.target.value)}</span>`;
@@ -3472,44 +3491,34 @@ export const getEditEvent = async ({
         });
       }
 
-      /* ✅ หัวกล่องพับได้ — ย่ออัตโนมัติเมื่อเลื่อนฟอร์มลง กางเมื่อกลับบนสุด หรือกดปุ่ม ▴/▾ เอง
-         ⚠️ มีช่วงกันกระพริบ (ย่อที่ >48px กางที่ <4px) — หัวกล่องอยู่นอกกล่องเลื่อน ความสูงที่เปลี่ยนไม่ดัน scrollTop
-            แต่ถ้าใช้เกณฑ์เดียวกันสองทาง ค่าที่ก้ำกึ่งจะสลับไปมาตอนเลื่อนช้าๆ */
+      /* ✅ หัวกล่อง — แถบชื่องานค้างบนสุด · รายละเอียด (#ee-head-details) เลื่อนไปพร้อมเนื้อหา
+         🔁 (18 พ.ย. 2569 ผู้ใช้: "การเลื่อนขึ้นลงของ Header ยังไม่สมูท คาบเกี่ยวกับช่วงข้อมูล ใช้งานยาก")
+            เดิมพับ/กางด้วยความสูง (นอกกล่องเลื่อน) → เนื้อหากระโดดทีละหลายร้อย px ตอนข้ามเกณฑ์
+            ตอนนี้ไม่มีการเปลี่ยนความสูงขณะเลื่อน — แค่บอกว่ารายละเอียดเลื่อนพ้นแล้ว (โชว์ป้ายสถานะเล็ก + เส้นใต้แถบ)
+            ปุ่ม ▴/▾ = เลื่อนไปซ่อน/แสดงรายละเอียดแบบนุ่ม */
       {
-        const bodyEl = document.getElementById("ee-body");
+        const scrollEl = document.getElementById("ee-scroll");
+        const detailsEl = document.getElementById("ee-head-details");
         const toggleEl = document.getElementById("ee-head-toggle");
-        let pinned = null; // null = อัตโนมัติ · true/false = ผู้ใช้กดเลือกเอง (จนกว่าจะเลื่อนกลับบนสุด)
-        let animTimer = 0;
+        const hiddenAt = () => Math.max(8, (detailsEl?.offsetHeight || 0) - 12);
         const setCompact = (on) => {
           if (!headerEl || headerEl.classList.contains("ee-head--compact") === on) return;
-          headerEl.classList.add("ee-head--anim");
-          clearTimeout(animTimer);
-          animTimer = setTimeout(() => headerEl.classList.remove("ee-head--anim"), 320);
           headerEl.classList.toggle("ee-head--compact", on);
           toggleEl?.setAttribute("aria-expanded", on ? "false" : "true");
         };
-        // 🔁 (26 ต.ค. 2569) กางกลับเมื่อ "หยุดนิ่งที่บนสุด" เท่านั้น — มือถือเลื่อนแรงๆ จะเด้ง (overscroll) ผ่านจุดบนสุด
-        //    ชั่วขณะ เดิมกางทันทีแล้วย่อกลับ = วาบ · อ่านค่าครั้งเดียวต่อเฟรม (rAF)
         let raf = 0;
-        let expandTimer = 0;
-        bodyEl?.addEventListener("scroll", () => {
+        scrollEl?.addEventListener("scroll", () => {
           if (raf) return;
           raf = requestAnimationFrame(() => {
             raf = 0;
-            const y = bodyEl.scrollTop;
-            if (y <= 2) {
-              clearTimeout(expandTimer);
-              expandTimer = setTimeout(() => { if (bodyEl.scrollTop <= 2) { pinned = null; setCompact(false); } }, 160);
-              return;
-            }
-            clearTimeout(expandTimer);
-            if (pinned === null && y > 56) setCompact(true);
+            headerEl?.classList.toggle("ee-head--scrolled", scrollEl.scrollTop > 2); // เส้นใต้แถบ = มีเนื้อหาเลื่อนอยู่ใต้แถบ
+            setCompact(scrollEl.scrollTop >= hiddenAt());
           });
         }, { passive: true });
         toggleEl?.addEventListener("click", () => {
-          const next = !headerEl.classList.contains("ee-head--compact");
-          pinned = next;
-          setCompact(next);
+          if (!scrollEl) return;
+          const h = detailsEl?.offsetHeight || 0;
+          scrollEl.scrollTo({ top: scrollEl.scrollTop >= hiddenAt() ? 0 : h, behavior: "smooth" });
         });
       }
 

@@ -3302,11 +3302,14 @@ function EventCalendar() {
             day: "วัน",
             list: "รายการ",
           }}
+          // 🔁 (18 พ.ย. 2569 ผู้ใช้: "แก้ให้มือถือแสดงรายการเต็มเลยไม่ต้องซ่อน") มือถือ = แสดงทุกงานในช่องวัน
+          //    (เดิมเกิน 7 แถวยุบเป็น "+N เพิ่มเติม" ต้องกดดูอีกชั้น) · ช่องวันสูงตามจำนวนงาน (contentHeight="auto")
+          //    จอใหญ่คงไว้ 10 แถว
           views={{
-            listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
-            dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
-            timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
-            timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
+            listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : false },
+            dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : false },
+            timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : false },
+            timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : false },
           }}
           eventClassNames={(arg) => {
             const classes = !canEditEvent(arg.event.extendedProps) ? ["fc-event-locked"] : [];
