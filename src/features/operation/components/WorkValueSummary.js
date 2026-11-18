@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ChevronRightRounded, ErrorRounded, CheckCircleRounded, RadioButtonUncheckedRounded, PersonOutlineRounded } from "@mui/icons-material";
+import { ChevronRightRounded, ErrorRounded, CheckCircleRounded, RadioButtonUncheckedRounded, PersonOutlineRounded, InsightsRounded } from "@mui/icons-material";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import UserAvatar from "@/shared/ui/UserAvatar";
 import { INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
@@ -84,22 +84,46 @@ function Tile({ icon: Icon, tone, label, value, sub, onClick }) {
   );
 }
 
-/** แถบความครบ: นับแล้ว · ต้องตรวจ · ยังไม่ใส่ (สัดส่วนตามจำนวนงาน) */
-function CoverageBar({ s }) {
-  const n = s.withValue + s.wholeCount + s.missing;
+/** แถบความครบ (สัดส่วนตามจำนวนงาน) · parts = [[จำนวน, สี], ...] */
+function CoverageBar({ parts, done, n, label }) {
   if (!n) return null;
-  const parts = [[s.withValue, ACCENT], [s.wholeCount, WARN], [s.missing, "#cbd5e1"]].filter(([c]) => c);
+  const shown = parts.filter(([c]) => c);
   return (
     <Stack direction="row" alignItems="center" gap={1.25} sx={{ mt: 1.1, px: 0.25 }}>
-      <Box sx={{ flex: 1, display: "flex", gap: "2px", height: 6, borderRadius: 3, overflow: "hidden" }}>
-        {parts.map(([c, color]) => <Box key={color} sx={{ flex: c, bgcolor: color }} />)}
+      <Box sx={{ flex: 1, display: "flex", gap: "2px", height: 6, borderRadius: 3, overflow: "hidden", bgcolor: shown.length ? "transparent" : "#e2e8f0" }}>
+        {shown.map(([c, color]) => <Box key={color} sx={{ flex: c, bgcolor: color }} />)}
       </Box>
       <Typography sx={{ flexShrink: 0, fontSize: "0.72rem", color: MUTED, ...NUM }}>
-        ใส่มูลค่าครั้งนี้แล้ว <b style={{ color: INK }}>{s.withValue}/{n}</b> งาน ({Math.round((s.withValue / n) * 100)}%)
+        {label} <b style={{ color: INK }}>{done}/{n}</b> งาน ({Math.round((done / n) * 100)}%)
       </Typography>
     </Stack>
   );
 }
+
+/** หัวกล่อง: ชื่อ + รายละเอียด (มือถือขึ้นบรรทัดใหม่) + ปุ่มขวา */
+function CardHead({ title, sub, action }) {
+  return (
+    <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, px: 0.25 }}>
+      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "baseline" }, columnGap: 0.75 }}>
+        <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>{title}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>{sub}</Typography>
+      </Box>
+      {action}
+    </Stack>
+  );
+}
+
+/** ตารางช่อง: ช่องแรกเต็มแถวบนมือถือ · จอกว้าง 3 ช่องเรียงกัน */
+function TileGrid({ first, children }) {
+  return (
+    <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "1.4fr 1fr 1fr" } }}>
+      <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, minWidth: 0 }}>{first}</Box>
+      {children}
+    </Box>
+  );
+}
+
+const CARD_SX = { mb: 1.5, p: { xs: 1.25, sm: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` };
 
 /**
  * กล่องสรุปมูลค่า (แอดมิน/ผู้จัดการ)
@@ -110,47 +134,42 @@ function CoverageBar({ s }) {
  */
 export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
   const period = periodText ? ` · ${periodText}` : "";
+  // 🐛 (18 พ.ย. 2569 ผู้ใช้: "ค้นหาแล้วแสดงเพี้ยนมากๆ") เลือกผู้ปฏิบัติงานแล้วหัวข้อถูกบีบเหลือคำละบรรทัด
+  //    → ใช้โครงเดียวกับกล่องรวม: หัวกล่อง + ช่องตัวเลข + แถบความครบ
   if (member) {
-    const notYet = s.jobs - s.ownCount;
+    const notYet = Math.max(0, s.jobs - s.ownCount);
     return (
-      <Box sx={{ mb: 1.5, px: 2, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: MUTED }}>ผลงานของ {member} · ยอดที่ลงเอง (ก่อน VAT){period}</Typography>
-          <Typography noWrap sx={{ fontSize: "1.35rem", fontWeight: 900, color: INK, lineHeight: 1.25, ...NUM }}>{baht(s.own)}</Typography>
-        </Box>
-        <Stack direction="row" gap={2} sx={{ fontSize: "0.8rem", color: "#334155", flexWrap: "wrap" }}>
-          <span>ลงแล้ว <b>{s.ownCount}</b> งาน</span>
-          {notYet > 0 && <span style={{ color: WARN }}>ยังไม่ลง <b>{notYet}</b> งาน</span>}
-          {s.ownCount > 0 && <span>เฉลี่ย <b>{baht(s.own / s.ownCount)}</b> / งาน</span>}
-        </Stack>
+      <Box sx={CARD_SX}>
+        <CardHead title={`ผลงานของ ${member}`} sub={`ยอดที่ลงเอง · ก่อน VAT${period} · ${s.jobs} งาน`} />
+        <TileGrid first={
+          <Tile icon={CheckCircleRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
+            sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} />
+        }>
+          <Tile icon={InsightsRounded} tone={GRAY} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
+          <Tile icon={RadioButtonUncheckedRounded} tone={notYet ? WARN : GRAY} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน" />
+        </TileGrid>
+        <CoverageBar parts={[[s.ownCount, ACCENT], [notYet, "#cbd5e1"]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว" />
       </Box>
     );
   }
   const jobs = s.withValue + s.wholeCount + s.missing;
   return (
-    <Box sx={{ mb: 1.5, p: { xs: 1.25, sm: 1.5 }, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, px: 0.25 }}>
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { sm: "baseline" }, columnGap: 0.75 }}>
-          <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK }}>มูลค่าครั้งนี้ของงาน</Typography>
-          <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>ก่อน VAT{period} · {jobs} งาน</Typography>
-        </Box>
-        {s.items.length > 0 && (
-          <ButtonBase onClick={() => onOpenDetail("all")} sx={{ flexShrink: 0, px: 1, py: 0.5, borderRadius: 1.5, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800, color: ACCENT, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
-            แจกแจงที่มา<ChevronRightRounded sx={{ fontSize: 17 }} />
-          </ButtonBase>
-        )}
-      </Stack>
-      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "1.4fr 1fr 1fr" } }}>
-        <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}>
-          <Tile icon={CheckCircleRounded} tone={ACCENT} label="มูลค่าครั้งนี้ · นับแล้ว" value={baht(s.total)}
-            sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
-            onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
-        </Box>
+    <Box sx={CARD_SX}>
+      <CardHead title="มูลค่าครั้งนี้ของงาน" sub={`ก่อน VAT${period} · ${jobs} งาน`} action={s.items.length > 0 && (
+        <ButtonBase onClick={() => onOpenDetail("all")} sx={{ flexShrink: 0, px: 1, py: 0.5, borderRadius: 1.5, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800, color: ACCENT, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
+          แจกแจงที่มา<ChevronRightRounded sx={{ fontSize: 17 }} />
+        </ButtonBase>
+      )} />
+      <TileGrid first={
+        <Tile icon={CheckCircleRounded} tone={ACCENT} label="มูลค่าครั้งนี้ · นับแล้ว" value={baht(s.total)}
+          sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
+          onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
+      }>
         <Tile icon={ErrorRounded} tone={WARN} label="ใส่เท่ามูลค่างานรวม" value={s.wholeCount ? baht(s.wholeTotal) : "—"}
           sub={s.wholeCount ? `${s.wholeCount} งาน · ไม่นับ ต้องตรวจ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
         <Tile icon={RadioButtonUncheckedRounded} tone={GRAY} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
-      </Box>
-      <CoverageBar s={s} />
+      </TileGrid>
+      <CoverageBar parts={[[s.withValue, ACCENT], [s.wholeCount, WARN], [s.missing, "#cbd5e1"]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว" />
     </Box>
   );
 }
