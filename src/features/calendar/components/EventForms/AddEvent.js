@@ -11,6 +11,7 @@ import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
+import { getFormLookups, hasFormLookups, refreshFormLookups, showOpeningLoader } from "./formLookups";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -791,12 +792,17 @@ export const getAddEvent = async ({
 
   // ✅ เดิม titleOpts/systemOpts เป็น array ฝังโค้ดตายตัว แก้ไขเองไม่ได้นอกจากแก้โค้ด —
   // ดึงจากตาราง "ประเภทงาน"/"ระบบ" ที่จัดการได้จริงผ่านหน้า /worktype (Settings) แทน
-  const [customers, employees, jobTypes, systemTypes] = await Promise.all([
-    CustomerService.getCustomers(),
-    AuthService.getAllUserData(),
-    JobTypeService.getAll(),
-    SystemTypeService.getAll(),
-  ]);
+  // ⚡ (19 พ.ย. 2569 ผู้ใช้: "กดจะเพิ่มงานในปฏิทิน มันจะหน่วงช้า") ใช้ข้อมูลที่ดึงเก็บไว้ล่วงหน้า (formLookups.js)
+  const lookupSvc = { CustomerService, AuthService, JobTypeService, SystemTypeService };
+  if (!hasFormLookups(lookupSvc)) showOpeningLoader(Swal, "กำลังเปิดฟอร์ม…");
+  let lookups;
+  try {
+    lookups = await getFormLookups(lookupSvc);
+  } catch {
+    Swal.fire({ icon: "error", title: "เปิดฟอร์มไม่สำเร็จ", text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่" });
+    return;
+  }
+  const { customers, employees, jobTypes, systemTypes } = lookups;
   const employeeList = employees?.allUser || [];
   // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
   // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
@@ -1161,6 +1167,7 @@ export const getAddEvent = async ({
     html,
     width: "1100px",
     showConfirmButton: false,
+    buttonsStyling: false, // ⚡ ไม่ใช้ปุ่มของ SweetAlert — ไม่ต้องให้มันอ่านสีปุ่ม (บังคับคำนวณสไตล์ทั้งฟอร์มก่อนเวลา)
     showCancelButton: false,
     showCloseButton: true,
     customClass: { popup: "swal-add-event" },
@@ -1983,6 +1990,7 @@ export const getAddEvent = async ({
           setDefaultTextColor(payload.textColor);
           setDefaultBackgroundColor(payload.backgroundColor);
           setDefaultFontSize(payload.fontSize);
+          refreshFormLookups(lookupSvc); // ฟอร์มครั้งถัดไปได้ลูกค้า/โครงการ/ประเภทงานที่เพิ่งเพิ่ม
           await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           stopSaving();
 

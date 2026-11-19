@@ -27,6 +27,7 @@ import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@for
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
+import { getFormLookups, hasFormLookups, refreshFormLookups, showOpeningLoader } from "./formLookups";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import {
   colorPickerHtml,
@@ -1962,12 +1963,18 @@ export const getEditEvent = async ({
 
   // ✅ เดิม titleOpts/systemOpts เป็น array ฝังโค้ดตายตัว แก้ไขเองไม่ได้นอกจากแก้โค้ด —
   // ดึงจากตาราง "ประเภทงาน"/"ระบบ" ที่จัดการได้จริงผ่านหน้า /worktype (Settings) แทน
-  const [res, employees, jobTypes, systemTypes] = await Promise.all([
-    CustomerService.getCustomers(),
-    AuthService.getAllUserData(),
-    JobTypeService.getAll(),
-    SystemTypeService.getAll(),
-  ]);
+  // ⚡ (19 พ.ย. 2569 ผู้ใช้: "กดเปิดงาน มันหน่วงช้า") ใช้ข้อมูลที่ดึงเก็บไว้ล่วงหน้า (formLookups.js) — ไม่รอเน็ต 4 คำขอทุกครั้งที่แตะ
+  //    ยังไม่มีในหน่วยความจำ (เปิดปฏิทินแล้วแตะเร็วมาก) → กล่อง "กำลังเปิดงาน…" ขึ้นทันที ไม่ดูเหมือนแตะไม่ติด
+  const lookupSvc = { CustomerService, AuthService, JobTypeService, SystemTypeService };
+  if (!hasFormLookups(lookupSvc)) showOpeningLoader(Swal, "กำลังเปิดงาน…");
+  let lookups;
+  try {
+    lookups = await getFormLookups(lookupSvc);
+  } catch {
+    Swal.fire({ icon: "error", title: "เปิดงานไม่สำเร็จ", text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่" });
+    return;
+  }
+  const { customers: res, employees, jobTypes, systemTypes } = lookups;
   const employeeList = employees?.allUser || [];
   // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
   // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
@@ -3033,6 +3040,9 @@ export const getEditEvent = async ({
     // ✅ กว้างขึ้นให้พอดีกับกริด 4 คอลัมน์ของกลุ่ม "ข้อมูลโครงการ" (ดู .ee-grid-4) — เท่ากับ AddEvent.js
     width: "1320px",
     showConfirmButton: false,
+    // ⚡ ไม่ใช้ปุ่มของ SweetAlert (มีแถบปุ่มของตัวเอง) — ปิดการแต่งปุ่ม ไม่งั้นมันอ่านสีปุ่มด้วย getComputedStyle
+    //    บังคับคำนวณสไตล์ทั้งฟอร์มก่อนเวลา (วัดได้ ~0.3 วิ บนคอม · ~1 วิ บนมือถือ) ทุกครั้งที่เปิด
+    buttonsStyling: false,
     showCancelButton: false,
     showCloseButton: false,
     customClass: { popup: "swal-edit-event" },
@@ -3074,7 +3084,8 @@ export const getEditEvent = async ({
         // ⚠️ กรอบนอก (overflow:hidden) ห้ามเลื่อน — โฟกัสช่องใกล้ขอบทำให้เบราว์เซอร์เลื่อนกรอบนอก หัวกล่อง/แถบปุ่มหลุดตำแหน่ง
         [popupEl, Swal.getHtmlContainer()].forEach((n) => n?.addEventListener("scroll", () => { if (n.scrollTop) n.scrollTop = 0; }));
         // แสดงเนื้อหาเมื่อช่องเลือก/ปฏิทิน/แผงต่างๆ จัดตัวเสร็จ (หลังร่างข้อมูลเริ่มทำงาน 300ms + เฟรมถัดไป) — ไม่เห็นการจัดตัวทีละส่วน
-        setTimeout(() => requestAnimationFrame(() => popupEl?.querySelector("#ee-modal-inner")?.classList.remove("ee-booting")), 360);
+        // ⚡ (19 พ.ย. 2569) 360 → 120ms — ช่องเลือก/ปฏิทินจัดตัวเสร็จในเฟรมแรกๆ อยู่แล้ว เดิมรอนานจนรู้สึกหน่วง
+        setTimeout(() => requestAnimationFrame(() => popupEl?.querySelector("#ee-modal-inner")?.classList.remove("ee-booting")), 120);
         const labelOf = (el) => (el.closest(".ee-field")?.querySelector("label")?.textContent || el.getAttribute("aria-label") || "").replace(/[*✱]/g, "").trim();
         // 🐛 (18 พ.ย. 2569 ผู้ใช้: "เวลาแก้แค่รายการเดียวแต่ขึ้น (2) สับสน") เดิมนับทีละช่อง — เปลี่ยนหัวหน้าทีม 1 ครั้ง
         //    ระบบปรับช่องที่ผูกกันให้เอง (ช่องหัวหน้าทีมบนหัวกล่อง/รายชื่อลูกทีม) จึงขึ้น 2–3 รายการ
@@ -3388,9 +3399,10 @@ export const getEditEvent = async ({
           if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
           grow();
         };
-        requestAnimationFrame(grow);
         descEl.addEventListener("input", upd);
-        upd();
+        if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
+        // ⚡ ความสูงเริ่มต้นตั้งหลังเฟรมแรก — ไม่บังคับคำนวณ layout ทั้งฟอร์มระหว่างเปิดกล่อง (เนื้อหายังซ่อนอยู่ ไม่เห็นการยืด)
+        requestAnimationFrame(grow);
       }
 
       /* status header reactive */
@@ -4395,7 +4407,7 @@ export const getEditEvent = async ({
                 timer: 1200,
                 showConfirmButton: false,
               });
-              await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+              refreshFormLookups(lookupSvc); await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรอง + ข้อมูลฟอร์มครั้งถัดไป (formLookups) ให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
             } catch (err) {
               setLoading(false);
               // ✅ err.message ของ axios เป็นข้อความทั่วไป (เช่น "Request failed with status code 409")
@@ -4520,7 +4532,7 @@ export const getEditEvent = async ({
               timer: 1200,
               showConfirmButton: false,
             });
-            await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+            refreshFormLookups(lookupSvc); await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรอง + ข้อมูลฟอร์มครั้งถัดไป (formLookups) ให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           } catch (err) {
             setLoading(false);
             // ✅ err.message ของ axios เป็นข้อความทั่วไป ไม่ใช่ข้อความ Thai ที่ backend ส่งมา — ดูคอมเมนต์

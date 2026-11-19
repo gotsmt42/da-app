@@ -68,6 +68,7 @@ import "tom-select/dist/css/tom-select.css";
 
 
 import { getAddEvent } from "../EventForms/AddEvent";
+import { prefetchFormLookups } from "../EventForms/formLookups";
 import { getAddSalesAppointment } from "../EventForms/AddSalesAppointment";
 import { getEditSalesAppointment } from "../EventForms/EditSalesAppointment";
 import { SALES_APPOINTMENT_TYPES, SALES_STATUSES, toSalesStatus, salesEventColors } from "../../salesAppointmentTypes";
@@ -520,6 +521,23 @@ function EventCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingDept]);
 
+  /* ⚡ (19 พ.ย. 2569 ผู้ใช้: "กดเปิดงาน หรือกดจะเพิ่มงานในปฏิทิน มันจะหน่วงช้า")
+     ดึงข้อมูลประกอบฟอร์ม (ลูกค้า · พนักงาน · ประเภทงาน · ระบบ) เก็บไว้ล่วงหน้าหลังปฏิทินขึ้นแล้ว
+     → แตะงาน/แตะวัน ฟอร์มใช้ของที่มีอยู่ทันที ไม่ต้องรอเน็ต (ดู EventForms/formLookups.js)
+     กลับมาที่แท็บ/แอปอีกครั้ง = ดึงใหม่ถ้าเก่าแล้ว · ปฏิทินเซลใช้ฟอร์มนัดหมาย ไม่ต้องดึง */
+  useEffect(() => {
+    if (!firstEventsLoaded || isSalesView) return undefined;
+    const svc = { CustomerService, AuthService, JobTypeService, SystemTypeService };
+    const run = () => prefetchFormLookups(svc);
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(run, { timeout: 1500 }) : window.setTimeout(run, 400);
+    const onVis = () => { if (document.visibilityState === "visible") run(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (window.cancelIdleCallback && window.requestIdleCallback) window.cancelIdleCallback(idle); else window.clearTimeout(idle);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [firstEventsLoaded, isSalesView]);
+
   // ✅ ลิงก์เก่า ?draft=<id> (บุ๊กมาร์ก/แจ้งเตือนเดิม) — แผงแผนล่วงหน้าไม่มีแล้ว ส่งไปหน้า "งานใหม่" แทน
   useEffect(() => {
     if (searchParams.get("draft")) navigate("/jobs/intake", { replace: true });
@@ -803,6 +821,13 @@ function EventCalendar() {
        ไม่ทำอะไรเลยถ้าวันนั้นมีงานใบเดียว) ไม่มีช่วงกำกวมที่ค้างแล้วยังนับเป็นแตะอีกต่อไป
        ⚠️ ถ้าจะแก้ค่านี้ ต้องแก้ LONG_PRESS_MS ให้ตรงกันเสมอ */
     const MAX_TAP_MS = 300;
+    /* ⚡ (19 พ.ย. 2569 ผู้ใช้: "ไม่ให้กระทบเวลาเลื่อนซูมแล้วนิ้วไปแตะเปิดไม่ได้ตั้งใจ")
+       ปัดเลื่อนแรงๆ แล้วจอยังไหลต่อ (momentum) → ผู้ใช้แตะเพื่อ "หยุด" จอ ซึ่งนิ้วนิ่ง สั้น ตรงทุกเกณฑ์ของการแตะ
+       แต่ไม่ได้ตั้งใจเปิดอะไร (เบราว์เซอร์เองก็ไม่ยิง click ให้การแตะแบบนี้ — แต่ FullCalendar ยิง dateClick เองตอนยกนิ้ว)
+       → จอเพิ่งเลื่อน/ซูมภายใน SETTLE_MS ก่อนนิ้วแตะ = แตะเพื่อหยุดจอ ไม่ใช่แตะเปิด */
+    const SETTLE_MS = 160;
+    let lastScrollAt = 0;
+    const onScroll = () => { lastScrollAt = Date.now(); };
     let st = null; // { x, y, t, scrollY, multi }
 
     const scrollPos = () => {
@@ -822,7 +847,7 @@ function EventCalendar() {
         return;
       }
       const t = e.touches[0];
-      st = { x: t.clientX, y: t.clientY, t: Date.now(), scrollY: scrollPos(), multi: false };
+      st = { x: t.clientX, y: t.clientY, t: Date.now(), scrollY: scrollPos(), multi: false, settling: Date.now() - lastScrollAt < SETTLE_MS };
     };
 
     const onMove = (e) => {
@@ -848,7 +873,7 @@ function EventCalendar() {
       if (!st) return;
       const tooLong = Date.now() - st.t > MAX_TAP_MS;
       const scrolled = Math.abs(scrollPos() - st.scrollY) > 2;
-      if (st.multi || st.moved || tooLong || scrolled) block();
+      if (st.multi || st.moved || tooLong || scrolled || st.settling) block();
       st = null;
     };
 
@@ -858,11 +883,18 @@ function EventCalendar() {
     document.addEventListener("touchmove", onMove, opts);
     document.addEventListener("touchend", onEnd, opts);
     document.addEventListener("touchcancel", onEnd, opts);
+    // การเลื่อนทุกจุด (หน้าเว็บ + กล่องเลื่อนของปฏิทิน — scroll ไม่ bubble จึงฟังแบบ capture) และการซูม/เลื่อนตอนซูมอยู่
+    window.addEventListener("scroll", onScroll, opts);
+    window.visualViewport?.addEventListener("scroll", onScroll, { passive: true });
+    window.visualViewport?.addEventListener("resize", onScroll, { passive: true });
     return () => {
       document.removeEventListener("touchstart", onStart, true);
       document.removeEventListener("touchmove", onMove, true);
       document.removeEventListener("touchend", onEnd, true);
       document.removeEventListener("touchcancel", onEnd, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.visualViewport?.removeEventListener("scroll", onScroll);
+      window.visualViewport?.removeEventListener("resize", onScroll);
     };
   }, []);
   /** true = สัมผัสครั้งล่าสุดไม่ใช่ "การแตะที่ตั้งใจ" (ซูม/ปัด/กดค้าง) → อย่าเพิ่งเปิดฟอร์ม
@@ -1020,6 +1052,18 @@ function EventCalendar() {
     });
   };
 
+  /* ⚡ (19 พ.ย. 2569) กันเปิดฟอร์มซ้อน — แตะซ้ำระหว่างฟอร์มกำลังเปิด (มือถือช้า) เดิมสร้างฟอร์มสองรอบทับกัน
+     ทั้งหน่วงเป็นสองเท่าและกล่องกระพริบ · ยอมให้เปิดใหม่ได้เมื่อไม่มีกล่องค้างอยู่ และพ้นช่วงกันซ้ำสั้นๆ
+     ⚠️ แจ้งเตือนเล็ก (toast เช่น "คัดลอกงานแล้ว — คลิกวันที่ที่ต้องการวาง") ไม่นับเป็นกล่องค้าง */
+  const openGateRef = useRef(0);
+  const passOpenGate = () => {
+    const popup = Swal.isVisible() ? Swal.getPopup() : null;
+    if (popup && !popup.classList.contains("swal2-toast")) return false;
+    if (Date.now() < openGateRef.current) return false;
+    openGateRef.current = Date.now() + 700;
+    return true;
+  };
+
   const handleAddEvent = async (arg) => {
     // ❌ เซลที่เปิดดูตารางช่างอยู่ สร้างงานให้ช่างไม่ได้ — เป็นมุมมองอ่านอย่างเดียวล้วนๆ
     // ⚠️ ถ้าอยากให้ช่างไปทำงานให้ ต้องผ่าน "ใบแจ้งงาน" (/dispatch) ซึ่งเป็นทางที่ออกแบบไว้ให้ข้ามแผนก
@@ -1047,6 +1091,7 @@ function EventCalendar() {
       });
       return;
     }
+    if (!passOpenGate()) return;
     await getAddEvent({
       arg,
       events,
@@ -1135,6 +1180,7 @@ function EventCalendar() {
       if (id) setSalesDialogId(String(id));
       return;
     }
+    if (!passOpenGate()) return;
     await getEditEvent({
       navigate,
       events,

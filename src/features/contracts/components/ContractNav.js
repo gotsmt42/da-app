@@ -10,6 +10,7 @@
  *     3) สถานะย่อย : หน้าแรก = ทั้งหมด / เลยกำหนด · หน้าปิดแล้ว = หมดอายุ·รอต่อสัญญา / เข้างานครบแล้ว
  *   ตัวเลขบนแถบหมวด นับตามหน้า+สถานะที่เลือก · ตัวเลขบนสถานะ นับตามหมวดที่เลือก — อ่านตรงกันเสมอ
  */
+import { useEffect, useRef, useState } from "react";
 import { Box, Stack, Typography, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { DescriptionRounded as Description, BuildRounded as Build, EngineeringRounded as Engineering, HourglassEmptyRounded as HourglassEmpty, AppsRounded as Apps, PlayCircleOutlineRounded as PlayCircleOutline, Inventory2Rounded as Inventory2, EventBusyRounded as EventBusy } from "@mui/icons-material";
@@ -50,7 +51,7 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
    *    → แยกเป็น 3 ปุ่มระดับเดียวกัน: กำลังดำเนินการ · หมดอายุ รอต่อสัญญา (ต้องทำ) · จบแล้ว (ประวัติ)
    */
   const scopes = [
-    { k: "active", label: "กำลังดำเนินการ", icon: <PlayCircleOutline />, n: counts.scope.active, on: !closed, color: BLUE, go: () => onScope("active") },
+    { k: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", icon: <PlayCircleOutline />, n: counts.scope.active, on: !closed, color: BLUE, go: () => onScope("active") },
     ...(isContractish(category) || (counts.scope.expired ?? 0) > 0 ? [{
       k: "expired", label: "หมดอายุ · รอต่อสัญญา", short: "รอต่อสัญญา", icon: <EventBusy />, n: counts.scope.expired ?? 0, on: closed && stage === "expired", color: "#ea580c",
       go: () => { onScope("closed"); onStage("expired"); },
@@ -66,21 +67,24 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
    *   หัวการ์ด: แท็บหมวดงาน (ซ้าย) · สวิตช์ กำลังดำเนินการ / ปิดแล้ว (ขวา) — มือถือสวิตช์อยู่บนแท็บ
    *   แถบล่าง (พื้นเทาอ่อน): สถานะย่อย + คำอธิบายสั้น — โผล่เฉพาะตอนมีให้เลือก
    */
+  /* 🐛 (19 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานมือถือแถบค้นหามันเลยขอบ") สวิตช์ 3 ปุ่มบนมือถือ — เดิมปุ่มกว้างตามข้อความ
+     (ไอคอน + "กำลังดำเนินการ 41" ไม่ยอมหด) รวมแล้วกว้างกว่าจอ ปุ่ม "เข้าครบ" ทะลุขอบการ์ด
+     → มือถือ: 3 ปุ่มกว้างเท่ากันพอดีจอเสมอ (หดได้) · ชื่อสั้น (กำลังทำ / รอต่อสัญญา / เข้าครบ) · ไม่มีไอคอน · ยาวเกินตัดด้วย … */
   const scopeSwitch = (
-    <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#f1f5f9", flexShrink: 0, width: { xs: "100%", md: "auto" } }}>
+    <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#f1f5f9", flexShrink: 0, width: { xs: "100%", md: "auto" }, minWidth: 0 }}>
       {scopes.map((o) => {
         const on = o.on;
         return (
           <ButtonBase key={o.k} onClick={() => !on && o.go()} aria-pressed={on} title={o.label}
             sx={{
-              flex: { xs: 1, md: "initial" }, gap: 0.6, px: 1.25, height: 32, borderRadius: "8px", whiteSpace: "nowrap",
+              flex: isMobile ? "1 1 0" : { xs: 1, md: "initial" }, minWidth: 0, gap: isMobile ? 0.5 : 0.6, px: isMobile ? 0.75 : 1.25, height: isMobile ? 34 : 32, borderRadius: "8px", whiteSpace: "nowrap",
               fontSize: "0.8rem", fontWeight: 800,
               color: on ? INK : MUTED, bgcolor: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(15,23,42,.14)" : "none",
               "& svg": { fontSize: 16, color: on ? o.color : "#94a3b8" },
             }}>
-            {o.icon}
-            {isMobile && o.short ? o.short : o.label}
-            <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color: on ? "#475569" : "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
+            {!isMobile && o.icon}
+            <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{isMobile && o.short ? o.short : o.label}</Box>
+            <Box component="span" sx={{ flexShrink: 0, fontSize: "0.72rem", fontWeight: 800, color: on ? o.color : "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
               {o.n.toLocaleString()}
             </Box>
           </ButtonBase>
@@ -88,6 +92,32 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
       })}
     </Stack>
   );
+  /* ✅ (19 พ.ย. 2569) แถบหมวดงานบนจอแคบเลื่อนซ้าย-ขวาได้ — เดิมแท็บท้ายโดนตัดกลางคำที่ขอบการ์ด ดูเหมือนล้นขอบ
+     → ขอบที่ยังมีแท็บซ่อนอยู่ค่อยๆ จางลง (บอกว่าเลื่อนต่อได้) · เลือกหมวดแล้วเลื่อนแท็บนั้นมาให้เห็นเต็ม */
+  const catRef = useRef(null);
+  const [fade, setFade] = useState({ l: false, r: false });
+  useEffect(() => {
+    const el = catRef.current;
+    if (!el) return undefined;
+    const upd = () => setFade({ l: el.scrollLeft > 2, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+    upd();
+    el.addEventListener("scroll", upd, { passive: true });
+    window.addEventListener("resize", upd);
+    return () => { el.removeEventListener("scroll", upd); window.removeEventListener("resize", upd); };
+  }, [cats.length]);
+  useEffect(() => {
+    const el = catRef.current;
+    const btn = el?.querySelector("[aria-pressed=true]");
+    if (!el || !btn) return;
+    const left = btn.offsetLeft - el.offsetLeft;
+    if (left < el.scrollLeft || left + btn.offsetWidth > el.scrollLeft + el.clientWidth) {
+      el.scrollTo({ left: Math.max(0, left - 24), behavior: "smooth" });
+    }
+  }, [category]);
+  const fadeMask = fade.l || fade.r
+    ? `linear-gradient(to right, ${fade.l ? "transparent 0, #000 28px" : "#000 0"}, ${fade.r ? "#000 calc(100% - 28px), transparent 100%" : "#000 100%"})`
+    : "none";
+
   // หน้า "จบแล้ว"/"รอต่อสัญญา" เลือกจากปุ่มด้านบนแล้ว — แถบล่างเหลือแค่คำอธิบาย
   const showStageRow = (!closed && stages.length > 1) || closed;
 
@@ -96,7 +126,7 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
       {isMobile && <Box sx={{ px: 1, pt: 1 }}>{scopeSwitch}</Box>}
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 0.5, md: 1.25 }, borderBottom: showStageRow ? `1px solid ${LINE}` : 0 }}>
         {/* หมวดงาน */}
-        <Stack direction="row" sx={{ flex: 1, minWidth: 0, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+        <Stack ref={catRef} direction="row" sx={{ flex: 1, minWidth: 0, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, maskImage: fadeMask, WebkitMaskImage: fadeMask }}>
           {cats.map((k) => {
             const m = CATEGORY_META[k];
             const on = category === k;
