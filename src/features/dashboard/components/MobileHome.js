@@ -147,7 +147,7 @@ export default function MobileHome({ userData, rankText, dateText, summary = [],
         // ✅ (1 พ.ย. 2569 ผู้ใช้: "งานของฉันหายไปไหน") — ทุกคนยกเว้นเซลมี "งานของฉัน" (แอดมิน/ผู้จัดการก็รับผิดชอบงานได้)
         // 🔁 (1 พ.ย. 2569 ผู้ใช้: "ปุ่มดูไม่เข้าธีม") หน้าตาเดียวกับปุ่ม 4 ช่อง — ไอคอนในวงกลมสีอ่อน · ชื่อตัวหนา · สรุปใต้ชื่อ
         <Link to="/technician/jobs" className="mh-myjobs">
-          <span className="mh-myjobs-art" aria-hidden="true"><AppIcon.MyJobs className="mh-myjobs-icon" style={{ color: "#2563eb", fill: "#2563eb" }} /></span>
+          <span className="mh-myjobs-art" aria-hidden="true"><AppIcon.MyJobs className="mh-myjobs-icon" style={{ color: "#dc2626", fill: "#dc2626" }} /></span>
           <span className="mh-myjobs-text">
             <span className="mh-myjobs-title">งานของฉัน</span>
             <span className="mh-myjobs-sum">
