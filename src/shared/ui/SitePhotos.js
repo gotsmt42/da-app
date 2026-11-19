@@ -32,8 +32,10 @@ const isImage = (f) => /^image\//.test(f?.fileType || "") || /\.(jpe?g|png|webp|
 /**
  * @param onPendingChange (ไม่บังคับ) โหมด "เลือกไว้ก่อน" — ใช้ในฟอร์มลงงานใหม่ที่ยังไม่มีงานให้แนบ:
  *   ไม่อัปโหลดทันที เก็บไฟล์ไว้ในเครื่อง แล้วส่งรายการ File[] ให้ผู้เรียกอัปโหลดหลังลงงานสำเร็จ
+ *   ⚠️ ส่ง event ที่คงที่ (useMemo) — object ใหม่ทุกรอบจะทำให้รายการที่เลือกไว้ถูกล้าง (ดู useEffect ด้านล่าง)
+ * @param bare (ไม่บังคับ) ไม่แสดงหัวกล่อง — ใช้เมื่อหน้าแม่มีหัวข้อ "ไฟล์แนบ / หลักฐาน" ของตัวเองอยู่แล้ว (19 พ.ย. 2569)
  */
-export default function SitePhotos({ event, canEdit = false, onPreview, onChange, confirmFn, sx, onPendingChange }) {
+export default function SitePhotos({ event, canEdit = false, onPreview, onChange, confirmFn, sx, onPendingChange, bare = false }) {
   const [files, setFiles] = useState(event?.sitePhotoFiles || []);
   const [uploading, setUploading] = useState(0);
   const [err, setErr] = useState("");
@@ -117,7 +119,8 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
 
   return (
     <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", ...sx }} onClick={(e) => e.stopPropagation()}>
-      <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+      {bare && <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />}
+      {!bare && <Stack direction="row" alignItems="flex-start" spacing={1.25}>
         <Box sx={{ width: 36, height: 36, borderRadius: "10px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: "#eff6ff", color: BLUE }}>
           <PhotoLibraryRounded sx={{ fontSize: 20 }} />
         </Box>
@@ -144,12 +147,12 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
           </Button>
         )}
         <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
-      </Stack>
+      </Stack>}
 
       {!files.length ? (
         <Box component="button" type="button" onClick={() => inputRef.current?.click()} sx={{
           // ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน") ช่องว่างเป็นโทนเทา · ข้อความสั้นบรรทัดเดียว
-          mt: 1, width: "100%", py: 1.75, px: 1.5, borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: "#f8fafc",
+          mt: bare ? 0 : 1, width: "100%", py: 1.75, px: 1.5, borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: "#f8fafc",
           color: MUTED, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
           "&:hover": { borderColor: alpha(BLUE, 0.5), color: BLUE },
         }}>
@@ -193,6 +196,13 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
                 </Stack>
               ))}
             </Stack>
+          )}
+          {/* ไม่มีหัวกล่อง (ไม่มีปุ่ม "แนบ") → ปุ่มแนบเพิ่มใต้รายการ */}
+          {bare && canEdit && (
+            <Button size="small" fullWidth disabled={Boolean(uploading)} onClick={() => inputRef.current?.click()} startIcon={<AddAPhotoRounded sx={{ fontSize: 17 }} />}
+              sx={{ mt: 1, textTransform: "none", fontWeight: 800, color: BLUE, border: `1px dashed ${alpha(BLUE, 0.4)}`, borderRadius: 2, minHeight: 38, "&:hover": { bgcolor: "#eff6ff" } }}>
+              แนบเพิ่ม
+            </Button>
           )}
         </>
       )}

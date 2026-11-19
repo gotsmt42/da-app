@@ -29,11 +29,11 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress, useMediaQuery } from "@mui/material";
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress, useMediaQuery, TextField } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { alpha } from "@mui/material/styles";
-import { PostAddRounded, AddRounded, EditRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close, EventAvailableRounded, FlagRounded, NotesRounded, CalendarMonthRounded, GroupsRounded, PersonOutlineRounded, BuildRounded, CallReceivedRounded, DescriptionRounded, PhoneRounded, HourglassTopRounded, ReportProblemRounded, BlockRounded, RestoreRounded, PersonOffRounded, LocalShippingRounded, ReceiptLongRounded, TaskAltRounded, UploadFileRounded, AttachFileRounded, SearchRounded as Search, ViewAgendaRounded, TableRowsRounded, RequestQuoteRounded, ExpandMoreRounded, VerifiedRounded, SendRounded, NotificationsActiveRounded, EditNoteRounded, CheckCircleRounded, CancelRounded, DoNotDisturbOnRounded, LinkRounded, HistoryRounded, FlagCircleRounded } from "@mui/icons-material";
+import { PostAddRounded, AddRounded, EditRounded, ChevronRightRounded as ChevronRight, CloseRounded as Close, EventAvailableRounded, FlagRounded, NotesRounded, CalendarMonthRounded, GroupsRounded, PersonOutlineRounded, BuildRounded, CallReceivedRounded, DescriptionRounded, PhoneRounded, HourglassTopRounded, ReportProblemRounded, BlockRounded, RestoreRounded, PersonOffRounded, LocalShippingRounded, ReceiptLongRounded, TaskAltRounded, UploadFileRounded, AttachFileRounded, SearchRounded as Search, ViewAgendaRounded, TableRowsRounded, RequestQuoteRounded, ExpandMoreRounded, VerifiedRounded, SendRounded, NotificationsActiveRounded, EditNoteRounded, CheckCircleRounded, CancelRounded, DoNotDisturbOnRounded, LinkRounded, HistoryRounded, FlagCircleRounded, AccessTimeRounded, GroupAddRounded } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
 import JobTypeService from "@/shared/services/JobTypeService";
@@ -47,6 +47,7 @@ import { PageHeader, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE, PAGE_SX } fr
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import AttachmentList from "@/shared/ui/AttachmentList";
+import SitePhotos from "@/shared/ui/SitePhotos";
 import RefQuotesBar from "@/shared/ui/RefQuotesBar";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
@@ -81,7 +82,10 @@ const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
 const STALL_DAYS = 2;
 // 🐛 (20 ต.ค. 2569 ผู้ใช้: "ทำไมขึ้นค้างงาน ทั้งที่กำหนดเข้าเดือน ม.ค.") งานที่วางแผนเข้าเดือนข้างหน้า ยังไม่ถึงเวลาส่งลงตาราง
 //    = ไม่ค้าง · นับค้างจาก "วันรับงาน หรือ ต้นเดือนที่วางแผนไว้ แล้วแต่อันไหนช้ากว่า" (server: OverdueReminder ใช้กติกาเดียวกัน)
+// 🔁 (19 พ.ย. 2569 ผู้ใช้: "งงกับหน้านี้ขึ้นไม่อนุมัติ") งานที่ไม่อนุมัติ = รอคนขอแก้ไขแล้วส่งใหม่ ไม่ใช่ทีมทำค้าง → ไม่นับค้าง
+//    (เดิมขึ้นทั้ง "ไม่อนุมัติ" และ "ค้าง 9 วัน · ต้องทำให้เสร็จ" อ่านแล้วขัดกัน · server OverdueReminder ก็ไม่เตือนงานที่ไม่อนุมัติอยู่แล้ว)
 const stalledDays = (e, st) => {
+  if (e.approvalStatus === "rejected") return 0;
   let since = st.i === 0 ? e.intakeAt : st.nv && st.i === 2 ? (e.deliveredAt || e.scheduledAt) : null;
   if (!since) return 0;
   if (st.i === 0 && e.plannedMonth && !st.nv && !st.note) {
@@ -364,11 +368,11 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
               ? (!j.unscheduled && !s.nv && !s.note ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button> : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
               : s.note
                 ? (s.i === 0
-                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>ยืนยันทำเสร็จ</Button>
+                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>บันทึกว่าทำเสร็จ</Button>
                   : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
                 : s.nv
                   ? (s.i === 0
-                    ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งของแล้ว</Button>
+                    ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>บันทึกการส่งของ</Button>
                     : s.i === 2
                       ? (
                         <Button component="label" size="small" sx={{ ...PRIMARY, height: 30, px: 1.25 }}>
@@ -426,6 +430,14 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                     {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">ค้าง {stall} วัน</Chip>}
                     {j.approvalStatus === "pending" && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip>}
                     {j.infoPending && s.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
+                    {/* ตารางแคบ → ป้ายสั้น + ชี้ดูรายละเอียด (กดแถวเปิดแผ่นรายละเอียดมีกล่องเต็ม) */}
+                    {j.approvalStatus === "rejected" && (
+                      <Tooltip arrow title={approvalText(j)}>
+                        <Box component="span" sx={{ display: "inline-flex" }}>
+                          <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">ไม่อนุมัติ{j.approvalDecidedBy ? ` · ${j.approvalDecidedBy}` : ""}</Chip>
+                        </Box>
+                      </Tooltip>
+                    )}
                   </Stack>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 240 }}>
@@ -700,6 +712,13 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
   const [start, setStart] = useState(defStart);
   const [end, setEnd] = useState(defStart);
   const [team, setTeam] = useState(job.team || "");
+  // ✅ (19 พ.ย. 2569 ผู้ใช้: "งานที่ช่างขอลงแผนงาน ให้ช่างระบุทีมที่เข้างานได้ด้วย และรายละเอียด รวมถึงการแนบไฟล์หลักฐานต่างๆ ให้สอดคล้อง")
+  //    ช่องชุดเดียวกับฟอร์ม "ขอลงงาน" ในตารางงาน (AddEvent): หัวหน้าทีม + ลูกทีม · รายละเอียดงาน (ขอลง = บังคับ ≥10 ตัวอักษร) · ไฟล์แนบ/หลักฐาน
+  const initialMembers = useMemo(() => [...new Set((job.teamMembers || []).map((m) => (typeof m === "string" ? m : m?.name)).filter((n) => n && n !== job.team))], [job]);
+  const [members, setMembers] = useState(initialMembers);
+  const [desc, setDesc] = useState(job.description || "");
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const noFiles = useMemo(() => ({ sitePhotoFiles: [] }), []); // ต้องคงที่ — object ใหม่ทุกรอบ SitePhotos จะล้างไฟล์ที่เลือกไว้
   const initialResp = job.responsiblePerson || "";
   const [resp, setResp] = useState(initialResp);
   const [saving, setSaving] = useState(false);
@@ -714,7 +733,12 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
     ...(v && !people.some((u) => u.fname === v) ? [{ id: v, name: v }] : []),
   ];
   const PICK = { width: "100%", height: 48, borderRadius: 2.5 };
-  const ok = start && (!end || end >= start);
+  const descShort = requestMode && desc.replace(/\s+/g, "").length < 10;
+  const ok = start && (!end || end >= start) && !descShort;
+  const pickTeam = (v) => { setTeam(v); setMembers((m) => m.filter((n) => n !== v)); };
+  const addMember = (v) => { if (v && v !== team) setMembers((m) => (m.includes(v) ? m : [...m, v])); };
+  const memberOptions = optionsWith("").filter((o) => o.id !== team && !members.includes(o.id));
+  const oldFiles = (job.sitePhotoFiles || []).length;
 
   const save = async () => {
     if (!ok) return;
@@ -722,10 +746,19 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
     try {
       const emp = employees.find((u) => u.fname === team);
       const last = end || start;
+      const membersChanged = members.join("|") !== initialMembers.join("|");
       await EventService.ScheduleDraftEvent(job._id, {
         date: start, start, end: moment(last).add(1, "day").format("YYYY-MM-DD"),
         ...(team ? { team, resPerson: emp?._id || "" } : {}),
+        ...(membersChanged || members.length ? { teamMembers: members.map((name) => ({ userId: String(employees.find((u) => u.fname === name)?._id || ""), name })) } : {}),
+        ...(desc.trim() !== String(job.description || "").trim() ? { description: desc.trim() } : {}),
       });
+      // ไฟล์แนบ/หลักฐาน — อัปโหลดหลังลงตารางสำเร็จ (ช่องเดียวกับ "ไฟล์แนบ" ในหน้าแก้ไขงาน · sitePhoto)
+      let fileFailed = 0;
+      for (const f of pendingFiles) {
+        // eslint-disable-next-line no-await-in-loop -- อัปทีละไฟล์ กันเน็ตมือถือหลุดกลางคันทั้งชุด
+        try { await EventService.Upload(job._id, f, "sitePhoto"); } catch { fileFailed += 1; }
+      }
       // ผู้รับผิดชอบงาน — หลังลงตารางสำเร็จเท่านั้น (ถ้าส่งลงตารางไม่ผ่าน จะไม่มีอะไรถูกเปลี่ยน)
       let respFailed = false;
       if (canAssignResponsible && resp !== initialResp) {
@@ -737,8 +770,9 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
         }
       }
       onDone();
-      if (respFailed) {
-        Swal.fire({ icon: "warning", title: "ส่งลงตารางแล้ว", text: "แต่บันทึกผู้รับผิดชอบงานไม่สำเร็จ — แก้ได้จากหน้าแก้ไขงาน" });
+      if (respFailed || fileFailed) {
+        Swal.fire({ icon: "warning", title: requestMode ? "ส่งขออนุมัติแล้ว" : "ส่งลงตารางแล้ว",
+          text: [respFailed ? "บันทึกผู้รับผิดชอบงานไม่สำเร็จ" : "", fileFailed ? `ไฟล์แนบอัปโหลดไม่สำเร็จ ${fileFailed} ไฟล์` : ""].filter(Boolean).join(" · ") + " — แก้/แนบเพิ่มได้จากหน้าแก้ไขงาน" });
         return;
       }
       Swal.fire(requestMode
@@ -777,12 +811,51 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
             <ThaiDatePicker label="ถึงวันที่" value={end} onChange={(v) => setEnd(v || "")} minDate={start ? moment(start) : undefined} />
           </Box>
         </Section>
-        <Section n={3} title="หัวหน้าทีมที่เข้างาน" hint="นำทีมเข้าหน้างานรอบนี้ · ไม่บังคับ มอบหมายทีหลังได้" last>
+        <Section n={3} title="ทีมที่เข้างาน" hint="หัวหน้าทีมนำทีมเข้าหน้างานรอบนี้ · ลูกทีมเพิ่มได้หลายคน · ไม่บังคับ แก้ทีหลังได้">
+          <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED, mb: 0.5 }}>หัวหน้าทีม</Typography>
           <PersonSelectField
-            label="" title="เลือกหัวหน้าทีม" value={team} onChange={setTeam}
+            label="" title="เลือกหัวหน้าทีม" value={team} onChange={pickTeam}
             allValue="" allLabel="ยังไม่ระบุ" allIcon={PersonOffRounded}
             options={optionsWith(team)} sx={PICK}
           />
+          <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED, mt: 1.25, mb: 0.5 }}>
+            ลูกทีม{members.length ? <Box component="span" sx={{ color: "#94a3b8", fontWeight: 500 }}> · {members.length} คน</Box> : null}
+          </Typography>
+          {members.length > 0 && (
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mb: 0.75 }}>
+              {members.map((n) => {
+                const u = people.find((x) => x.fname === n);
+                return (
+                  <Stack key={n} direction="row" alignItems="center" gap={0.6} sx={{ pl: 0.5, pr: 0.25, py: 0.35, borderRadius: 99, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+                    <PersonPic name={n} owner={u} size={22} />
+                    <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK }}>{n}</Typography>
+                    <IconButton size="small" aria-label={`เอา ${n} ออกจากทีม`} onClick={() => setMembers((m) => m.filter((x) => x !== n))} sx={{ width: 22, height: 22, color: "#94a3b8" }}>
+                      <Close sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Stack>
+                );
+              })}
+            </Stack>
+          )}
+          <PersonSelectField
+            label="" title="เพิ่มลูกทีม" value="" onChange={addMember}
+            allValue="" allLabel={members.length ? "เพิ่มลูกทีมอีก" : "เพิ่มลูกทีม"} allIcon={GroupAddRounded}
+            options={memberOptions} sx={{ ...PICK, height: 44, borderStyle: "dashed" }}
+          />
+        </Section>
+        <Section n={4} title={requestMode ? "รายละเอียดงาน *" : "รายละเอียดงาน"}>
+          <TextField
+            fullWidth multiline minRows={3} maxRows={10} value={desc} onChange={(e) => setDesc(e.target.value)}
+            placeholder="ทำอะไร จุดไหน อุปกรณ์อะไร เช่น ตรวจเช็คระบบ Fire Alarm ชั้น 1–5 · เปลี่ยน Smoke Detector ที่แจ้งเสีย 2 จุด"
+            inputProps={{ maxLength: 3000, "aria-label": "รายละเอียดงาน" }}
+            error={descShort && desc.length > 0}
+            helperText={requestMode ? (descShort ? "กรอกอย่างน้อย 10 ตัวอักษร ให้ผู้อนุมัติเห็นว่างานคืออะไร" : "ผู้อนุมัติเห็นข้อความนี้ในคำขอ") : "ไม่บังคับ · แก้ได้ภายหลัง"}
+            FormHelperTextProps={{ sx: { mx: 0.25, color: descShort && desc.length > 0 ? RED : MUTED } }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.5, fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start" } }}
+          />
+        </Section>
+        <Section n={5} title="ไฟล์แนบ / หลักฐาน" hint={`รูปหน้างาน ใบแจ้ง ใบเสนอราคา หรือเอกสารประกอบ · ไม่บังคับ${oldFiles ? ` · งานนี้มีไฟล์แนบอยู่แล้ว ${oldFiles} ไฟล์` : ""}`} last>
+          <SitePhotos bare event={noFiles} canEdit sx={{ mt: 0, border: 0, p: 0 }} onPendingChange={setPendingFiles} />
         </Section>
         <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 2, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
           {requestMode
@@ -793,7 +866,7 @@ function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onC
       <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
         <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
         <Button variant="contained" disabled={!ok || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
-          {saving ? "กำลังส่ง..." : requestMode ? "ส่งขออนุมัติ" : "ส่งลงตาราง"}
+          {saving ? (pendingFiles.length ? "กำลังส่งและอัปโหลด..." : "กำลังส่ง...") : requestMode ? "ส่งขออนุมัติ" : "ส่งลงตาราง"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -836,7 +909,7 @@ function DeliverDialog({ job, onClose, onDone }) {
           <LocalShippingRounded sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งของแล้ว</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>บันทึกการส่งของ</Typography>
           <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</Typography>
         </Box>
         <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
@@ -954,7 +1027,7 @@ function NoteHistory({ job }) {
     });
     const has = (t) => list.some((r) => r.title === t);
     if (job.intakeAt && !has("รับงานใหม่")) list.push({ at: job.intakeAt, who: job.intakeBy, title: "บันทึกงาน", detail: "", color: ACCENT });
-    if (job.noteDoneAt && !list.some((r) => /ทำเสร็จ/.test(r.title))) list.push({ at: job.noteDoneAt, who: job.noteDoneBy, title: "ยืนยันทำเสร็จ", detail: "", color: GREEN });
+    if (job.noteDoneAt && !list.some((r) => /ทำเสร็จ/.test(r.title))) list.push({ at: job.noteDoneAt, who: job.noteDoneBy, title: "บันทึกว่าทำเสร็จ", detail: "", color: GREEN });
     return list.filter((r) => r.at).sort((a, b) => new Date(b.at) - new Date(a.at));
   }, [log, job.intakeAt, job.intakeBy, job.noteDoneAt, job.noteDoneBy]);
   return (
@@ -1034,7 +1107,7 @@ function NoteDoneDialog({ job, onClose, onDone }) {
   return (
     <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
       <Box sx={{ px: 2.5, pt: 2.25, pb: 1 }}>
-        <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: INK }}>ยืนยันว่าทำงานนี้เสร็จแล้ว</Typography>
+        <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: INK }}>บันทึกว่าทำงานนี้เสร็จ</Typography>
         <Typography sx={{ mt: 0.75, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.86rem", color: "#334155", whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{job.description || "บันทึกงาน"}</Typography>
       </Box>
       <DialogContent sx={{ pt: 1 }}>
@@ -1064,7 +1137,7 @@ function NoteDoneDialog({ job, onClose, onDone }) {
       <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
         <Button onClick={onClose} disabled={saving} sx={{ ...BTN, color: MUTED, border: `1px solid ${LINE}` }}>ยกเลิก</Button>
         <Button variant="contained" onClick={confirm} disabled={saving} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />} sx={{ ...PRIMARY, px: 2 }}>
-          {saving ? (list.length ? "กำลังอัปโหลดและบันทึก…" : "กำลังบันทึก…") : "ยืนยันทำเสร็จ"}
+          {saving ? (list.length ? "กำลังอัปโหลดและบันทึก…" : "กำลังบันทึก…") : "บันทึกว่าทำเสร็จ"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1079,9 +1152,43 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
+/**
+ * ✅ (19 พ.ย. 2569 ผู้ใช้: "งงกับหน้านี้ขึ้นไม่อนุมัติ โดยที่ไม่ได้มีทำอะไร")
+ *    เดิมเป็นป้าย "ไม่อนุมัติ" เฉยๆ ไม่บอกว่าใคร/เมื่อไร/ทำไม → บอกให้ครบในกล่องเดียว
+ *    (ไม่อนุมัติมาจากแท็บ "คำขอ" — ผู้มีสิทธิ์อนุมัติกด "ไม่อนุมัติ" · คนขอแก้ไขแล้วบันทึก = ส่งขออนุมัติใหม่)
+ */
+const approvalText = (j) => [
+  `ไม่อนุมัติ${j.approvalDecidedBy ? ` โดย ${j.approvalDecidedBy}` : ""}${j.approvalDecidedAt ? ` · ${formatThai(moment(j.approvalDecidedAt), "D MMM YY HH:mm")}` : ""}`,
+  j.approvalRejectReason ? `เหตุผล: ${j.approvalRejectReason}` : "ไม่ได้ระบุเหตุผล",
+].join(" — ");
+const ApprovalNote = ({ job, sx, hint = false }) => {
+  if (job.approvalStatus !== "rejected") return null;
+  const when = job.approvalDecidedAt ? formatThai(moment(job.approvalDecidedAt), hint ? "D MMM YY HH:mm" : "D MMM YY") : "";
+  return (
+    <Stack direction="row" gap={0.85} alignItems="flex-start" sx={{ px: 1.1, py: 0.85, borderRadius: 2, bgcolor: "#fef2f2", minWidth: 0, ...sx }}>
+      <DoNotDisturbOnRounded sx={{ fontSize: 17, color: RED, mt: "1px", flexShrink: 0 }} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#b91c1c", lineHeight: 1.4, overflowWrap: "anywhere" }}>
+          ไม่อนุมัติ{job.approvalDecidedBy ? ` · โดย ${job.approvalDecidedBy}` : ""}
+          {when && <Box component="span" sx={{ fontWeight: 600, color: "#dc2626" }}> · {when}</Box>}
+        </Typography>
+        <Typography sx={{ fontSize: "0.76rem", color: "#475569", lineHeight: 1.45, overflowWrap: "anywhere" }}>
+          {job.approvalRejectReason ? `เหตุผล: ${job.approvalRejectReason}` : "ไม่ได้ระบุเหตุผล"}
+        </Typography>
+        {hint && (
+          <Typography sx={{ fontSize: "0.72rem", color: "#94a3b8", lineHeight: 1.45, mt: 0.25 }}>
+            ไม่อนุมัติมาจากแท็บ “คำขอ” · ถ้าคนขอแก้ไขแล้วบันทึก ระบบจะส่งขออนุมัติใหม่ให้
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+};
+
 function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onNoteChanged, onEdit, onCancel, onRestore, inRow = false, inSheet = false, actionsOnly = false, hideActions = false, employees = [] }) {
   const owner = job.responsiblePerson ? employees.find((u) => u.fname === job.responsiblePerson || [u.fname, u.lname].filter(Boolean).join(" ") === job.responsiblePerson) : null;
   const st = stageOf(job);
+  const rejected = job.approvalStatus === "rejected"; // ไม่อนุมัติ → ไม่ขึ้นเตือนค้าง/เลยกำหนด (ดู stalledDays)
   const stall = stalledDays(job, st);
   // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
   const intakeDocs = intakeFilesOf(job);
@@ -1119,7 +1226,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
-          sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ยืนยันทำเสร็จ</Button>
+          sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>บันทึกว่าทำเสร็จ</Button>
       </>
     ) : (
       <Button variant="outlined" onClick={() => onNoteDone(job, true)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
@@ -1132,7 +1239,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingRounded sx={{ fontSize: "17px !important" }} />}
-        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งของแล้ว</Button>
+        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>บันทึกการส่งของ</Button>
     </>
   ) : st.nv ? (
     <>
@@ -1171,8 +1278,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   // ปุ่มหลักของการ์ดมือถือ (เม็ดยามุมขวาล่าง) — ตรงกับปุ่มเด่นของแต่ละขั้น · null = "รายละเอียด ›" (เช่น อัปโหลดใบวางบิลทำในแผ่นรายละเอียด)
   const primaryAct = readOnly ? null
     : st.i === -1 ? { label: "นำกลับมา", onClick: () => onRestore(job) }
-    : st.note ? (st.i === 0 ? { label: "ทำเสร็จแล้ว", onClick: () => onNoteDone(job) } : { label: "นำกลับมาทำต่อ", onClick: () => onNoteDone(job, true) })
-    : st.nv ? (st.i === 0 ? { label: "ส่งของแล้ว", onClick: () => onDeliver(job) } : null)
+    : st.note ? (st.i === 0 ? { label: "บันทึกว่าทำเสร็จ", onClick: () => onNoteDone(job) } : { label: "นำกลับมาทำต่อ", onClick: () => onNoteDone(job, true) })
+    : st.nv ? (st.i === 0 ? { label: "บันทึกการส่งของ", onClick: () => onDeliver(job) } : null)
     : st.i === 0 ? { label: requestMode ? "ขอลงตาราง" : "ส่งลงตาราง", onClick: () => onSchedule(job) }
     : viewOnly ? { label: "ดูงาน", to: `/operation/${job._id}` } : null;
 
@@ -1183,9 +1290,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้านี้ทำให้สวยงาม และดูข้อมูลง่ายด้วย")
   //    การ์ดแยกใบ: หัว (สถานะ · เลข Job · ป้าย) → ชื่องาน + โครงการ → ตารางข้อมูล "ป้าย : ค่า" → แถบขั้นตอนพื้นเทาด้านล่าง
   const nx = job.cancelledAt ? null : st.note
-    ? (st.i === 0 ? { title: "ทำงานนี้", desc: "ทำเสร็จแล้วกด “ยืนยันทำเสร็จ” (แนบไฟล์ เช่น ใบเสนอราคา ได้ตอนกด)" } : null)
+    ? (st.i === 0 ? { title: "ทำงานนี้", desc: "ทำเสร็จแล้วกด “บันทึกว่าทำเสร็จ” (แนบไฟล์ เช่น ใบเสนอราคา ได้ตอนกด)" } : null)
     : st.nv
-      ? (st.i === 0 ? { title: "ส่งของ", desc: "ส่งของให้ลูกค้าแล้ว กด “ส่งของแล้ว” (แนบใบวางบิลได้เลย)" }
+      ? (st.i === 0 ? { title: "ส่งของ", desc: "ส่งของให้ลูกค้าแล้ว กด “บันทึกการส่งของ” (แนบใบวางบิลได้เลย)" }
         : st.i === 2 ? { title: "วางบิล", desc: "กด “อัปโหลดใบวางบิล” แล้วตามรับเงินที่หน้าติดตามวางบิล" } : null)
       : job.unscheduled
         ? { title: "ส่งลงตาราง", desc: "เลือกวันเข้างาน ผู้รับผิดชอบงาน และหัวหน้าทีม" }
@@ -1205,18 +1312,22 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
    *      แดง = เลยกำหนด / ค้าง · ส้ม = รอให้กดดำเนินการ (ส่งลงตาราง · ส่งของ · ทำเสร็จ) หรือยังไม่มอบหมายผู้รับผิดชอบ
    */
   const attn = (() => {
-    if (st.i === -1 || st.i >= 4 || readOnly) return null;
+    if (st.i === -1 || st.i >= 4 || readOnly || rejected) return null;
     const lateDue = Boolean(due) && moment(job.dueDate).isBefore(moment(), "day");
     const lateDate = scheduleTagOf(job, schedule).accent === RED;
     const why = [stall > 0 ? `ค้าง ${stall} วัน` : "", lateDue ? "เลยกำหนดเสร็จ" : lateDate ? "เลยวันที่กำหนด" : ""].filter(Boolean);
     const todo = st.note ? (st.i === 0 ? "ทำงานนี้ให้เสร็จ" : "") : st.nv ? (st.i === 0 ? "ส่งของ" : st.i === 2 ? "วางบิล" : "")
       : st.i === 0 ? (requestMode ? "ขอลงตาราง" : "ส่งลงตาราง") : "";
     const noOwner = !job.responsiblePerson && !job.intakeNote;
-    if (why.length) return { color: RED, text: [todo ? `ต้อง${todo}` : "", ...why].filter(Boolean).join(" · ") };
-    if (todo) return { color: AMBER, text: `ต้อง${todo}` };
-    if (noOwner && !job.unscheduled) return { color: AMBER, text: "ยังไม่มอบหมายผู้รับผิดชอบ" };
+    if (why.length) return { kind: "late", color: RED, text: [todo ? `ต้อง${todo}` : "", ...why].filter(Boolean).join(" · "), short: why.join(" · ") };
+    if (todo) return { kind: "todo", color: AMBER, text: `ต้อง${todo}` };
+    if (noOwner && !job.unscheduled) return { kind: "owner", color: AMBER, text: "ยังไม่มอบหมายผู้รับผิดชอบ" };
     return null;
   })();
+  // 🔁 (19 พ.ย. 2569 ผู้ใช้: "จัดวาง สีสันต่างๆ ให้ดูง่าย สวยงาม ตามธีมระบบ") เดิมกรอบการ์ดสีทั้งใบ (แดง/ส้ม) ทุกใบที่ "ต้องทำ"
+  //    → แท็บรอเริ่มแดงทั้งหน้า · ใหม่ = การ์ดขาวกรอบเทาเหมือนกันหมด + แถบสีบางด้านซ้ายเฉพาะที่ผิดปกติจริง
+  //    (แดง = ค้าง/เลยกำหนด · ส้ม = ลงตารางแล้วแต่ยังไม่มีผู้รับผิดชอบ) · "ต้องทำ" เฉยๆ ปุ่มสีน้ำเงินบอกอยู่แล้ว
+  const strip = attn && attn.kind !== "todo" ? attn.color : null;
 
   // ✅ (10 พ.ย. 2569 ผู้ใช้: "ข้อมูลการแสดงจัดการให้ดี ไม่แสดงมั่วๆ และให้สวยงามลงตัว")
   //    แผ่นรายละเอียดงาน (ไม่ใช่บันทึกงาน): เดิม 7 กล่องกระจาย (กำหนดการ · การรับงาน · ผู้รับผิดชอบ · รายละเอียด · เอกสารอ้างอิง · ใบเสนอราคา · ขั้นตอน)
@@ -1260,7 +1371,6 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       isUrgent(job) && st.i < 4 ? <Chip key="u" color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip> : null,
       stall > 0 ? <Chip key="s" color={RED} bg={alpha(RED, 0.08)} border="transparent">ค้าง {stall} วัน</Chip> : null,
       job.approvalStatus === "pending" ? <Chip key="p" color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip> : null,
-      job.approvalStatus === "rejected" ? <Chip key="r" color={RED} bg={alpha(RED, 0.08)} border="transparent">ไม่อนุมัติ</Chip> : null,
       job.infoPending && st.i < 4 ? <Chip key="i" color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip> : null,
     ].filter(Boolean);
     const hasRef = Boolean(job.intakeDocNo || intakeDocs.length);
@@ -1272,6 +1382,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           <Stack direction="row" alignItems="center" sx={{ flexWrap: "wrap", gap: 0.5, mb: 0.9 }}>
             <StageChip st={st} />{flags}
           </Stack>
+          <ApprovalNote job={job} hint sx={{ mb: 1 }} />
           <Stack direction="row" alignItems="center" gap={1.25}>
             <Box sx={{ width: 34, height: 34, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: SURFACE, color: t.accent || "#64748b" }}>
               <t.icon sx={{ fontSize: 19 }} />
@@ -1385,7 +1496,11 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         if (e.target.closest("button, a, input, label, textarea, [role=button]")) return;
         setSheetOpen(true); // 🔁 (21 ต.ค. 2569) จอคอมก็เปิดเป็นหน้าต่าง (เดิมกางลงในการ์ด)
       }}
-      sx={inSheet ? { bgcolor: "transparent" } : inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { cursor: "pointer", bgcolor: "#fff", border: attn ? `1.5px solid ${alpha(attn.color, 0.55)}` : `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "none", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: attn ? attn.color : "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+      sx={inSheet ? { bgcolor: "transparent" } : inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : {
+        position: "relative", cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: "14px", overflow: "hidden", boxShadow: "none",
+        transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" },
+        ...(strip ? { "&::before": { content: '""', position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: strip } } : {}),
+      }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={inSheet ? {} : { px: { xs: 1.75, sm: 2.25 }, py: { xs: 1.5, sm: 1.75 } }}>
         <Stack direction="row" gap={1.5} sx={{ minWidth: 0 }}>
@@ -1410,15 +1525,22 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const whoTxt = job.responsiblePerson || (team && !job.unscheduled ? team : "");
               const flags = [
                 isUrgent(job) && st.i < 4 ? <Chip key="u" color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip> : null,
-                stall > 0 && !attn ? <Chip key="s" color={RED} bg={alpha(RED, 0.08)} border="transparent">ค้าง {stall} วัน</Chip> : null,
                 job.approvalStatus === "pending" ? <Chip key="p" color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip> : null,
-                job.approvalStatus === "rejected" ? <Chip key="r" color={RED} bg={alpha(RED, 0.08)} border="transparent">ไม่อนุมัติ</Chip> : null,
                 job.infoPending && st.i < 4 ? <Chip key="i" color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip> : null,
                 // ปุ่ม "ลงตารางแล้ว?" อยู่ในแผ่นรายละเอียด — การ์ดบอกไว้ก่อนว่าน่าจะซ้ำกับงานในตาราง
                 dupeN > 0 ? <Chip key="d" color="#475569" bg={SURFACE} border="transparent">อาจลงตารางแล้ว ({dupeN})</Chip> : null,
               ].filter(Boolean);
+              // บรรทัดคน: บันทึก = ใครจด (บันทึกไม่ต้องมีผู้รับผิดชอบ — เดิมขึ้น "ยังไม่มอบหมายผู้รับผิดชอบ" สีส้ม ทำให้ดูเหมือนผิด)
+              const person = job.intakeNote
+                ? (job.intakeBy ? { text: `บันทึกโดย ${job.intakeBy}` } : null)
+                : job.responsiblePerson ? { pic: true, text: whoTxt }
+                  : whoTxt ? { text: `หัวหน้าทีม ${whoTxt}` }
+                    : { text: "ยังไม่มอบหมายผู้รับผิดชอบ", tone: AMBER };
+              const lateTxt = attn?.kind === "late" ? attn.short : "";
+              const info = { fontSize: "0.82rem", fontWeight: 600, color: "#475569", minWidth: 0 };
               return (
                 <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                  {/* หัว: รูปแบบงาน · เลขงาน | สถานะ */}
                   <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
                     <ModeIcon sx={{ fontSize: 16, color: "#94a3b8", flexShrink: 0 }} />
                     <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 600, color: "#94a3b8" }}>
@@ -1426,7 +1548,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                     </Typography>
                     <StageChip st={st} />
                   </Stack>
-                  <Typography sx={{ mt: 0.75, fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.4, overflowWrap: "anywhere",
+                  {/* ชื่องาน (บันทึก = ข้อความที่จด) */}
+                  <Typography sx={{ mt: 0.75, fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.45, overflowWrap: "anywhere",
                     whiteSpace: job.intakeNote ? "pre-line" : undefined, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ชื่อโครงการให้เด่นชัด") ชื่อโครงการเป็นหัวตัวหนา · งาน · ระบบ เป็นบรรทัดรอง — แบบเดียวกับหน้าการดำเนินงาน */}
                     {job.intakeNote ? (job.description || "บันทึกงาน") : (projectName || [job.title || "งาน", job.system].filter(Boolean).join(" · "))}
@@ -1439,54 +1562,56 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                   )}
                   {job.intakeNote && place && <Typography sx={{ fontSize: "0.82rem", color: MUTED, mt: 0.25, overflowWrap: "anywhere" }}>{place}</Typography>}
                   {flags.length > 0 && <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.75 }}>{flags}</Stack>}
-                  {/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "ปรับแต่งหน้านี้ด้วย ตามลักษณะที่เคยบอก ของทุกๆหน้า" — ไม่รก · กระชับ · สีน้อย)
-                      ข้อมูล 2 บรรทัดสั้น (ไอคอน + ค่า) ซ้าย · ปุ่มหลักขวาแถวเดียวกัน — ตัด "ดูรายละเอียด" (แตะการ์ดเปิดได้อยู่แล้ว)
-                      เดิม: เส้นคั่น + ตารางป้าย 2–3 แถว + แถวปุ่มอีกแถว */}
-                  {/* กล่องกำหนดการ/ผู้รับผิดชอบ มีกรอบ (อ่านเป็นกลุ่มเดียว) · ปุ่มหลักขวา */}
-                  <Stack direction="row" alignItems="center" gap={1.25} sx={{ mt: 1.1 }}>
-                    <Box sx={{ flex: 1, minWidth: 0, display: "grid", rowGap: 0.5, px: 1.1, py: 0.85, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
-                      <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
-                        <CalendarMonthRounded sx={{ fontSize: 16, color: "#94a3b8", flexShrink: 0 }} />
-                        <Typography noWrap sx={{ minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: t.dashed ? "#94a3b8" : INK }}>
-                          {t.text.replace(/^(แผนเข้างาน|เข้างาน|บันทึก|ส่งของ) /, "")}
-                          {dayTxt && <Box component="span" sx={{ color: dayTxt === "วันนี้" ? ACCENT : MUTED, fontWeight: dayTxt === "วันนี้" ? 800 : 500 }}> · {dayTxt}</Box>}
-                          {t.rel && <Box component="span" sx={{ fontWeight: 800, color: t.accent || MUTED }}> · {t.rel}</Box>}
+                  <ApprovalNote job={job} sx={{ mt: 1 }} />
+                  {/* 🔁 (19 พ.ย. 2569 ผู้ใช้: "จัดวางการแสดงผล สีสันต่างๆ ให้ดูง่าย สวยงาม ตามธีมระบบ")
+                      ข้อมูลเป็นบรรทัดไอคอน+ข้อความ (ไม่มีกล่องซ้อนในการ์ด) → แถวล่าง: เรื่องที่ผิดปกติ (ซ้าย) · ปุ่มหลัก (ขวา)
+                      เดิม: กล่องเทาข้างปุ่ม + กล่องแดง "ต้องทำงานนี้ให้เสร็จ · ค้าง X วัน" + กรอบการ์ดแดง ซ้อนกัน 3 ชั้น */}
+                  <Stack spacing={0.6} sx={{ mt: 1.1 }}>
+                    <Stack direction="row" alignItems="center" gap={0.85} sx={{ minWidth: 0 }}>
+                      <CalendarMonthRounded sx={{ fontSize: 17, color: "#94a3b8", flexShrink: 0 }} />
+                      <Typography noWrap sx={{ ...info, fontWeight: 700, color: t.dashed ? "#94a3b8" : INK }}>
+                        {t.text.replace(/^(แผนเข้างาน|เข้างาน|บันทึก|ส่งของ) /, "")}
+                        {dayTxt && <Box component="span" sx={{ color: dayTxt === "วันนี้" ? ACCENT : MUTED, fontWeight: dayTxt === "วันนี้" ? 800 : 500 }}> · {dayTxt}</Box>}
+                        {t.rel && <Box component="span" sx={{ fontWeight: 800, color: t.accent || MUTED }}> · {t.rel}</Box>}
+                      </Typography>
+                    </Stack>
+                    {due && st.i < 4 && (
+                      <Stack direction="row" alignItems="center" gap={0.85} sx={{ minWidth: 0 }}>
+                        <FlagRounded sx={{ fontSize: 17, color: late ? RED : "#94a3b8", flexShrink: 0 }} />
+                        <Typography noWrap sx={{ ...info, color: late ? RED : "#475569" }}>
+                          เสร็จภายใน {due}{late && <Box component="span" sx={{ fontWeight: 800 }}> · เลยกำหนด</Box>}
                         </Typography>
                       </Stack>
-                      {due && st.i < 4 && (
-                        <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
-                          <FlagRounded sx={{ fontSize: 16, color: late ? RED : "#94a3b8", flexShrink: 0 }} />
-                          <Typography noWrap sx={{ minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: late ? RED : INK }}>
-                            เสร็จภายใน {due}{late && <Box component="span" sx={{ fontWeight: 800 }}> · เลยกำหนด</Box>}
-                          </Typography>
-                        </Stack>
-                      )}
-                      <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
-                        {job.responsiblePerson
+                    )}
+                    {person && (
+                      <Stack direction="row" alignItems="center" gap={0.85} sx={{ minWidth: 0 }}>
+                        {person.pic
                           ? <PersonPic name={job.responsiblePerson} owner={owner} size={18} />
-                          : <PersonOutlineRounded sx={{ fontSize: 16, color: "#94a3b8", flexShrink: 0 }} />}
-                        <Typography noWrap sx={{ minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: whoTxt ? "#475569" : AMBER }}>
-                          {/* ไม่มีผู้รับผิดชอบแต่มีทีม = บอกชัดว่าเป็นหัวหน้าทีม (ไม่ให้สับสนกับแถบ "ยังไม่มอบหมายผู้รับผิดชอบ") */}
-                          {job.responsiblePerson ? whoTxt : whoTxt ? `หัวหน้าทีม ${whoTxt}` : "ยังไม่มอบหมายผู้รับผิดชอบ"}
-                        </Typography>
+                          : <PersonOutlineRounded sx={{ fontSize: 17, color: person.tone || "#94a3b8", flexShrink: 0 }} />}
+                        <Typography noWrap sx={{ ...info, color: person.tone || "#475569", fontWeight: person.tone ? 700 : 600 }}>{person.text}</Typography>
                       </Stack>
-                    </Box>
-                    {primaryAct && (() => {
-                      // "ดูงาน" ไม่ใช่งานที่ต้องทำ → ปุ่มเส้นเทาเบาๆ · ปุ่มน้ำเงินทึบเฉพาะงานที่รอให้กด (ส่งลงตาราง/ส่งของ/ทำเสร็จ)
-                      const quiet = Boolean(primaryAct.to);
-                      const pill = { flexShrink: 0, height: 34, px: 1.75, borderRadius: 99, fontSize: "0.82rem", fontWeight: 800, whiteSpace: "nowrap",
-                        ...(quiet ? { color: "#334155", bgcolor: "#fff", border: `1px solid ${LINE}`, "&:hover": { bgcolor: SURFACE } }
-                          : { color: "#fff", bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8" } }) };
-                      return primaryAct.to
-                        ? <ButtonBase component={Link} to={primaryAct.to} sx={pill}>{primaryAct.label}</ButtonBase>
-                        : <ButtonBase onClick={primaryAct.onClick} sx={pill}>{primaryAct.label}</ButtonBase>;
-                    })()}
-                    {!primaryAct && <ChevronRight sx={{ fontSize: 22, color: "#cbd5e1", flexShrink: 0 }} />}
+                    )}
                   </Stack>
-                  {attn && (
-                    <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 1, px: 1.1, py: 0.75, borderRadius: 2, bgcolor: alpha(attn.color, 0.07), border: `1px solid ${alpha(attn.color, 0.35)}` }}>
-                      <ReportProblemRounded sx={{ fontSize: 17, color: attn.color, flexShrink: 0 }} />
-                      <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: attn.color, lineHeight: 1.4 }}>{attn.text}</Typography>
+                  {(primaryAct || lateTxt) && (
+                    <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, pt: 1.1, borderTop: `1px solid ${LINE}`, minWidth: 0 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        {lateTxt && (
+                          <Stack direction="row" alignItems="center" gap={0.6} sx={{ minWidth: 0 }}>
+                            <AccessTimeRounded sx={{ fontSize: 17, color: RED, flexShrink: 0 }} />
+                            <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: RED, lineHeight: 1.35 }}>{lateTxt}</Typography>
+                          </Stack>
+                        )}
+                      </Box>
+                      {primaryAct && (() => {
+                        // "ดูงาน" ไม่ใช่งานที่ต้องทำ → ปุ่มเส้นเทาเบาๆ · ปุ่มน้ำเงินทึบเฉพาะงานที่รอให้กด (ส่งลงตาราง/ส่งของ/ทำเสร็จ)
+                        const quiet = Boolean(primaryAct.to);
+                        const pill = { flexShrink: 0, height: 36, px: 2, borderRadius: 99, fontSize: "0.84rem", fontWeight: 800, whiteSpace: "nowrap", fontFamily: "inherit",
+                          ...(quiet ? { color: "#334155", bgcolor: "#fff", border: `1px solid ${LINE}`, "&:hover": { bgcolor: SURFACE } }
+                            : { color: "#fff", bgcolor: ACCENT, boxShadow: "0 4px 10px -6px rgba(37,99,235,.7)", "&:hover": { bgcolor: "#1d4ed8" } }) };
+                        return primaryAct.to
+                          ? <ButtonBase component={Link} to={primaryAct.to} sx={pill}>{primaryAct.label}<ChevronRight sx={{ fontSize: 18, ml: 0.25, mr: -0.5 }} /></ButtonBase>
+                          : <ButtonBase onClick={primaryAct.onClick} sx={pill}>{primaryAct.label}</ButtonBase>;
+                      })()}
                     </Stack>
                   )}
                 </Box>
@@ -1528,10 +1653,10 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               {isUrgent(job) && st.i < 4 && <Chip color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip>}
               {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">⏰ ค้าง {stall} วัน</Chip>}
               {job.approvalStatus === "pending" && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip>}
-              {job.approvalStatus === "rejected" && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">ไม่อนุมัติ</Chip>}
               {job.infoPending && st.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
             </Stack>
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
+            <ApprovalNote job={job} sx={{ mt: 0.9, display: "inline-flex", maxWidth: "100%" }} />
             </Box>
             {actions && <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, display: { xs: "none", md: "flex" } }}>{actions}</Stack>}
             {viewOnly && (
@@ -1749,6 +1874,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                     </Chip>
                   )}
                 </Stack>
+                <ApprovalNote job={job} hint sx={{ mt: 1 }} />
               </Box>
             )}
             {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดแสดงให้ครบ แนบไฟล์ไปไม่ขึ้น") ไฟล์ของบันทึกงาน — ตอนบันทึก / ตอนทำเสร็จ / ใบเสนอราคา
@@ -1953,7 +2079,8 @@ const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE, dot = 
   </Box>
 );
 /** ป้ายสถานะขั้นงาน — สีของขั้น + จุด + ขอบ (แยกขั้นได้ทันที ไม่กลืนกับลิงก์สีน้ำเงินอื่นในตาราง) */
-const StageChip = ({ st }) => <Chip dot color={st.color} bg={alpha(st.color, 0.1)} border={alpha(st.color, 0.35)}>{st.label}</Chip>;
+// 🔁 (19 พ.ย. 2569) เม็ดยาพื้นอ่อนไม่มีขอบ (แบบเดียวกับหน้าอื่น) — เดิมมีขอบสี ดูหนักเมื่ออยู่คู่กับป้ายอื่น
+const StageChip = ({ st }) => <Chip dot color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>;
 /**
  * ป้ายข้อมูลสำคัญ (กำหนดเวลา · ที่มา · เอกสาร)
  * 🔁 (17 ต.ค. 2569 ผู้ใช้: "สีดูรกเกินไป ไม่มืออาชีพ") — ป้ายโทนเทาเดียวกันหมด · สีใช้เฉพาะ "สิ่งที่ต้องรีบดู"
@@ -2104,7 +2231,7 @@ export default function JobIntake() {
       title: undo ? "นำบันทึกนี้กลับมาทำต่อ?" : "ทำงานนี้เสร็จแล้ว?",
       html: `<div style="font-size:14px;color:#475569;white-space:pre-line">${String(job.description || "บันทึกงาน").replace(/[<>&]/g, "")}</div>`,
       showCancelButton: true,
-      confirmButtonText: undo ? "นำกลับมาทำต่อ" : "ทำเสร็จแล้ว",
+      confirmButtonText: undo ? "นำกลับมาทำต่อ" : "บันทึกว่าทำเสร็จ",
       confirmButtonColor: undo ? ACCENT : GREEN,
     });
     if (!ok.isConfirmed) return;
@@ -2112,7 +2239,7 @@ export default function JobIntake() {
       await EventService.NoteDone(job._id, undo ? { undo: true } : {});
       await load(); refreshAppBadges();
       if (undo) setTab("waiting");
-      Swal.fire({ icon: "success", title: undo ? "นำกลับมาทำต่อแล้ว" : "ทำเสร็จแล้ว", timer: 1200, showConfirmButton: false });
+      Swal.fire({ icon: "success", title: undo ? "นำกลับมาทำต่อแล้ว" : "บันทึกว่าทำเสร็จแล้ว", timer: 1200, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: "error", title: "ไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
     }

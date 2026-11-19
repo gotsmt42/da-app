@@ -23,7 +23,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { HourglassTopRounded as HourglassTop, CancelRounded as Cancel, EventNoteRounded as EventNote, CalendarMonthRounded as CalendarMonth, ArrowForwardIosRounded as ArrowForwardIos, TaskAltRounded as TaskAlt } from "@mui/icons-material";
+import { HourglassTopRounded as HourglassTop, CancelRounded as Cancel, EventNoteRounded as EventNote, CalendarMonthRounded as CalendarMonth, ArrowForwardIosRounded as ArrowForwardIos, TaskAltRounded as TaskAlt, AttachFileRounded as AttachFile } from "@mui/icons-material";
 import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
@@ -379,10 +379,13 @@ export default function PendingApprovalsPanel({ onCountChange, active = true, em
                   {jcMeta && <SoftPill color={jcMeta.color}>{jcMeta.label}</SoftPill>}
                   {head.unscheduled && <SoftPill color="#0e7490" icon={<EventNote />}>ยังไม่ลงตาราง</SoftPill>}
                   {sessions.length > 1 && <SoftPill color={BLUE}>เข้างาน {sessions.length} ช่วง</SoftPill>}
+                  {/* ✅ (19 พ.ย. 2569) ไฟล์แนบ/หลักฐานที่คนขอแนบมา (ขอลงตาราง/ขอลงงาน) — กดดูงานเพื่อเปิดไฟล์ */}
+                  {(head.sitePhotoFiles || []).length > 0 && <SoftPill color="#475569" icon={<AttachFile />}>ไฟล์แนบ {head.sitePhotoFiles.length}</SoftPill>}
                 </>}
                 title={[head.company, head.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
                 sub={[head.title, head.system, head.time ? `ครั้งที่ ${formatRoundLabel(head.time, head.visitCount, head)}` : ""].filter(Boolean).join(" · ")}
                 detail={`📅 ${dateLabelOf(sessions)}${team.length ? `  ·  ทีม ${team.join(", ")}` : ""}`}
+                note={head.description || ""}
                 people={<>
                   <PeopleField label="ผู้ส่ง">{head.approvalRequestedBy ? <PersonChip name={head.approvalRequestedBy} size={20} /> : "-"}</PeopleField>
                   {head.approvalRequestedAt && <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>ส่ง {moment(head.approvalRequestedAt).locale("th").fromNow()}</Typography>}

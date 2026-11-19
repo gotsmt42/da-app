@@ -143,7 +143,7 @@ export function AllClear({ text }) {
  * การ์ดคำขอที่ต้องจัดการ — กล่องวันที่ · เนื้อหา · ปุ่มทำงาน (ขวาบนจอใหญ่ / ล่างบนมือถือ)
  * แถบซ้ายสีส้ม = รอคุณตัดสินใจ
  */
-export function ActionCard({ date, dateEnd, dateTone, dateLabel, top, title, sub, detail, people, actions, extra, onOpen, urgent }) {
+export function ActionCard({ date, dateEnd, dateTone, dateLabel, top, title, sub, detail, note, people, actions, extra, onOpen, urgent }) {
   const edge = urgent ? "#dc2626" : AMBER;
   return (
     <Box sx={{
@@ -163,6 +163,13 @@ export function ActionCard({ date, dateEnd, dateTone, dateLabel, top, title, sub
             {detail && (
               <Typography sx={{ fontSize: "0.78rem", color: MUTED, mt: 0.5, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {detail}
+              </Typography>
+            )}
+            {/* ✅ (19 พ.ย. 2569) รายละเอียดงานที่คนขอกรอกมา — ผู้อนุมัติเห็นก่อนตัดสินใจ (ไม่เกิน 3 บรรทัด · กดดูงานเพื่ออ่านเต็ม) */}
+            {note && (
+              <Typography sx={{ mt: 0.75, px: 1, py: 0.75, borderRadius: 1.5, bgcolor: "#f8fafc", border: `1px solid ${LINE}`, fontSize: "0.8rem", color: INK_2, lineHeight: 1.5,
+                whiteSpace: "pre-line", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {note}
               </Typography>
             )}
             {people && <Stack direction="row" spacing={1.5} useFlexGap sx={{ mt: 0.85, flexWrap: "wrap", alignItems: "center" }}>{people}</Stack>}
