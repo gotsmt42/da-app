@@ -608,6 +608,12 @@ function injectStyles() {
       #ee-keyGroup .ee-key-card .ee-card-body { padding: 6px 10px 12px !important; }
       #ee-keyGroup .ee-desc-input { min-height: 170px; }
     }
+    /* ✅ (20 พ.ย. 2569) อุปกรณ์/อะไหล่ที่ต้องเตรียม — อยู่ใต้รายละเอียดงานในการ์ดเดียวกัน · ยืดตามรายการ (autoGrow.js) */
+    #ee-keyGroup .ee-equip { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+    #ee-keyGroup .ee-equip > label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #334155; margin: 0 0 6px; }
+    #ee-keyGroup .ee-equip > label .ee-opt { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
+    #ee-keyGroup .ee-equip-input { width: 100%; box-sizing: border-box; min-height: 76px; font-size: 14.5px; line-height: 1.6; padding: 10px 14px; border-radius: 12px; resize: none; overflow: hidden;
+      transition: height .18s ease-out, border-color .15s ease, box-shadow .15s ease; }
     .ee-worker-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ee-worker-row .ee-worker-field { flex: 1 1 auto; min-width: 0; margin: 0; }
     .ee-worker-no {
@@ -1612,6 +1618,7 @@ export const getEditEvent = async ({
   // ยังอยู่ครบ ไม่ได้ถูกลบ — แค่ไม่แสดง/ไม่แก้จากหน้านี้อีกต่อไป
   const eventDescription = ev.extendedProps?.description || "";
   const eventWorkNote = ev.extendedProps?.workNote || "";
+  const eventEquipment = ev.extendedProps?.equipment || "";
   // ✅ normalize เผื่อข้อมูลเก่าที่กรอกเป็น text อิสระมาก่อน (เช่น "8.00" ใช้จุดแทนโคลอน ไม่มีเลขศูนย์นำหน้า)
   // ตอนนี้เปลี่ยนช่องเป็น <input type="time"> ซึ่งรับได้แค่รูปแบบ HH:mm มาตรฐานเท่านั้น
   // ถ้าไม่ normalize ค่าเก่าที่ไม่ตรงรูปแบบจะโชว์ว่างเปล่า แล้วถ้าผู้ใช้กดบันทึกโดยไม่ได้แก้ไข
@@ -2342,6 +2349,14 @@ export const getEditEvent = async ({
           <textarea id="editDescription" class="ee-desc-input" rows="5" aria-label="รายละเอียดงานที่ทำ" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
           <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
         </div>
+        ${/* ✅ (20 พ.ย. 2569 ผู้ใช้: "สิ่งที่ต้องเตรียมเพิ่มรายละเอียดไป ทำไมไม่มีจุดที่แสดง")
+             ช่องนี้กรอกได้ตอนลงงาน/รับงาน (การ์ดข้อมูล Job) แต่ฟอร์มแก้ไขงานตัดการ์ดนั้นออกไป (10 ต.ค.) ค่าเลยมองไม่เห็นเลย
+             → แสดง + แก้ได้ใต้รายละเอียดงานที่ทำ (ทีมเห็นก่อนออกหน้างาน) · บันทึกแล้วใช้ร่วมทุกวันของงานหลายวัน (server: pickJobInfo) */""}
+        ${ev.extendedProps?.department === "sales" ? "" : `
+        <div class="ee-field ee-equip">
+          <label for="ee-equipment">🧰 อุปกรณ์ / อะไหล่ที่ต้องเตรียม <span class="ee-opt">ไม่บังคับ · บรรทัดละรายการ</span></label>
+          <textarea id="ee-equipment" class="ee-equip-input" rows="2" aria-label="อุปกรณ์ / อะไหล่ที่ต้องเตรียม" placeholder="เช่น บันไดอลูมิเนียม 3 ม.&#10;Smoke detector × 2" ${canEditDocFields ? "" : "disabled"}>${attrHtml(eventEquipment)}</textarea>
+        </div>`}
         ${/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") บันทึกเก่าของช่าง (workNote) ก่อนรวมเป็นช่องเดียว — แสดงอ่านอย่างเดียว ไม่หาย */""}
         ${eventWorkNote ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px dashed #dbe3ef;font-size:12.5px;color:#334155;white-space:pre-line;"><b style="display:block;font-size:11.5px;color:#64748b;margin-bottom:2px;">บันทึกเดิมจากช่าง</b>${attrHtml(eventWorkNote)}</div>` : ""}
       </div>
@@ -3388,6 +3403,7 @@ export const getEditEvent = async ({
         // 🔁 (20 พ.ย. 2569) ใช้ตัวช่วยเดียวกับฟอร์มลงงาน (autoGrow.js) — วัดใหม่เมื่อความกว้างเปลี่ยน/ช่องเพิ่งแสดงด้วย
         //    (เดิมวัดครั้งเดียวตอนเปิด ถ้ากล่องยังจัดตัวไม่เสร็จ ความสูงไม่พอดีข้อความ)
         autoGrowTextarea(descEl);
+        autoGrowTextarea(document.getElementById("ee-equipment"));
         descEl.addEventListener("input", () => { if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`; });
         if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
       }
@@ -4162,6 +4178,8 @@ export const getEditEvent = async ({
         // เสมอ = กดบันทึกทีไรก็ล้างค่า subject เดิมในฐานข้อมูลทิ้งทุกครั้งโดยไม่มีใครรู้
         // ✅ ตัดออกจาก payload ไปเลย — backend อัปเดตเฉพาะฟิลด์ที่ส่งมา (allowedFields) ค่าเดิมจึงคงอยู่
         description: getVal("editDescription"),
+        // อุปกรณ์/อะไหล่ที่ต้องเตรียม — ส่งเฉพาะเมื่อมีช่อง (นัดฝ่ายขายไม่มี) · ไม่เปลี่ยน = ไม่ส่ง (ไม่ไปทับค่าของวันอื่นในงาน)
+        ...(document.getElementById("ee-equipment") && getVal("ee-equipment") !== eventEquipment.trim() ? { equipment: getVal("ee-equipment") } : {}),
         startTime: getVal("editStartTime"),
         endTime: getVal("editEndTime"),
       });
