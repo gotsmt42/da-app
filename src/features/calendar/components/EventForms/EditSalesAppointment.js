@@ -34,6 +34,7 @@ import {
 import { SALES_FORM_CSS, salesFormHeader, salesTypePicker } from "./salesFormStyle";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { domFormDraft } from "@/shared/utils/formDraft";
+import { autoGrowTextarea } from "./autoGrow";
 // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
 let formDraftCtl = null;
 
@@ -227,6 +228,8 @@ export const getEditSalesAppointment = async ({
       popup.__thaiDpCleanup?.();
     },
     didOpen: () => {
+      // ✅ (20 พ.ย. 2569) รายละเอียดนัดยืดตามข้อความ (ไม่มีแถบเลื่อนในช่อง) — เหมือนฟอร์มงานช่าง
+      autoGrowTextarea(document.getElementById("saDetail"));
       // ✅ (20 พ.ย. 2569) ช่องมูลค่า: ออกจากช่องแล้วจัดรูปเป็นหลักพัน (250000 → 250,000) อ่านง่าย · ค่าที่บันทึกตัดจุลภาคออกเองอยู่แล้ว
       {
         const mv = document.getElementById("saValue");

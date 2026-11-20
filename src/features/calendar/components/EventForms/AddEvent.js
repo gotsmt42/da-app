@@ -12,6 +12,7 @@ import { domFormDraft } from "@/shared/utils/formDraft";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 import { getFormLookups, hasFormLookups, refreshFormLookups, showOpeningLoader } from "./formLookups";
+import { autoGrowTextarea } from "./autoGrow";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -522,6 +523,12 @@ function injectAddStyles() {
     .swal-add-event .ae-card .ae-checkbox-row { font-size: 14px; font-weight: 600; color: #334155; margin: 0 0 16px; gap: 10px; }
     .swal-add-event .ae-card .ae-checkbox-row input { width: 18px !important; height: 18px; accent-color: #2563eb; flex-shrink: 0; }
     .swal-add-event .ae-card .ae-char-count { font-size: 12px; color: #64748b; }
+    /* รายละเอียดงานที่ทำ — สูงเริ่มต้นเท่าฟอร์มแก้ไขงาน (150px · มือถือ 170px) แล้วยืดตามข้อความแบบนุ่ม (autoGrow.js) */
+    .swal-add-event .ae-card .ae-field > textarea#description {
+      min-height: 150px; line-height: 1.65; resize: none; overflow: hidden;
+      transition: height .18s ease-out, border-color .15s ease, box-shadow .15s ease;
+    }
+    @media (max-width: 600px) { .swal-add-event .ae-card .ae-field > textarea#description { min-height: 170px; } }
     .swal-add-event .ae-card .ae-field > label.ae-desc-hint { font-size: 12.5px; font-weight: 500; color: #64748b; }
     @media (max-width: 600px) {
       .swal-add-event .ae-card .ae-card-body { padding: 8px 12px 0; }
@@ -1506,6 +1513,8 @@ export const getAddEvent = async ({
           descCountEl.textContent = `${descEl.value.length} ตัวอักษร`;
         });
       }
+      // ✅ (20 พ.ย. 2569 ผู้ใช้: "รายละเอียดงานของหน้า event ยังไม่เห็นขยายยาวตามข้อมูลเลย") ยืดตามข้อความแบบนุ่ม — เหมือนฟอร์มแก้ไขงาน
+      autoGrowTextarea(descEl);
 
       const contractPickInfo = document.getElementById("ae-contractPickInfo");
       const cpTeamSelect = document.getElementById("ae-cpTeam");

@@ -7,6 +7,7 @@
  * ⚠️ ช่องวันที่เป็น <input type="date"> — mountThaiDatePickers ของฟอร์มเปลี่ยนเป็นปฏิทิน พ.ศ. ให้เอง
  */
 import { jobInfoPayload } from "@/shared/utils/jobFlow";
+import { autoGrowTextarea } from "./autoGrow";
 
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -93,6 +94,8 @@ export function bindJobInfo(root = document) {
   const cb = root.querySelector("#ji-infoPending");
   const wrap = root.querySelector("#ji-noteWrap");
   if (cb && wrap) cb.addEventListener("change", () => { wrap.style.display = cb.checked ? "" : "none"; });
+  // ✅ (20 พ.ย. 2569 ผู้ใช้ส่งภาพช่อง "อุปกรณ์ / อะไหล่ที่ต้องเตรียม" มีแถบเลื่อน) ยืดตามรายการที่พิมพ์ — ทุกฟอร์มที่ใช้การ์ดนี้
+  autoGrowTextarea(root.querySelector("#ji-equipment"));
 }
 
 /** อ่านค่าในการ์ด → payload ของ server */

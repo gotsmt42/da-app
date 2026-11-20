@@ -28,6 +28,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import JobDocsSummaryCard from "@/shared/ui/JobDocsSummaryCard";
 import { getFormLookups, hasFormLookups, refreshFormLookups, showOpeningLoader } from "./formLookups";
+import { autoGrowTextarea } from "./autoGrow";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import {
   colorPickerHtml,
@@ -3384,25 +3385,11 @@ export const getEditEvent = async ({
         // ✅ (18 พ.ย. 2569 ผู้ใช้: "อยากให้ขยายตามจำนวนตัวอักษรที่พิมพ์ให้สมูท และสวยงาม · ความยาวเริ่มต้นเท่าที่แจ้งให้ขยายไป")
         //    สูงเริ่มต้น = min-height ใน CSS (150px · มือถือ 170px) → พิมพ์เกิน = ค่อยๆ ยืดลงตามข้อความ (transition height)
         //    วัดความสูงจริงด้วย height:auto ชั่วคราว (ไม่มีแอนิเมชัน) แล้วเลื่อนจากความสูงเดิม → ความสูงใหม่แบบนุ่ม
-        const grow = () => {
-          const from = descEl.getBoundingClientRect().height;
-          descEl.style.transition = "none";
-          descEl.style.height = "auto";
-          const to = Math.ceil(descEl.scrollHeight + 2);
-          if (Math.abs(to - from) < 1) { descEl.style.height = `${to}px`; descEl.style.transition = ""; return; }
-          descEl.style.height = `${from}px`;
-          void descEl.offsetHeight; // ให้เบราว์เซอร์รับความสูงเดิมก่อน แล้วค่อยเลื่อนไปความสูงใหม่
-          descEl.style.transition = "";
-          descEl.style.height = `${to}px`;
-        };
-        const upd = () => {
-          if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
-          grow();
-        };
-        descEl.addEventListener("input", upd);
+        // 🔁 (20 พ.ย. 2569) ใช้ตัวช่วยเดียวกับฟอร์มลงงาน (autoGrow.js) — วัดใหม่เมื่อความกว้างเปลี่ยน/ช่องเพิ่งแสดงด้วย
+        //    (เดิมวัดครั้งเดียวตอนเปิด ถ้ากล่องยังจัดตัวไม่เสร็จ ความสูงไม่พอดีข้อความ)
+        autoGrowTextarea(descEl);
+        descEl.addEventListener("input", () => { if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`; });
         if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
-        // ⚡ ความสูงเริ่มต้นตั้งหลังเฟรมแรก — ไม่บังคับคำนวณ layout ทั้งฟอร์มระหว่างเปิดกล่อง (เนื้อหายังซ่อนอยู่ ไม่เห็นการยืด)
-        requestAnimationFrame(grow);
       }
 
       /* status header reactive */

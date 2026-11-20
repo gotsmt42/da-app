@@ -6,6 +6,7 @@ import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { can } from "@/shared/utils/roles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { autoGrowTextarea } from "./autoGrow";
 import { domFormDraft } from "@/shared/utils/formDraft";
 import { fileKindOf, fileSizeText } from "@/shared/utils/fileKind";
 // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
@@ -882,6 +883,8 @@ export const getAddDraftEvent = async ({
         // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
         Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
         bindJobInfo(Swal.getPopup());
+        // ✅ (20 พ.ย. 2569) รายละเอียดงานยืดตามข้อความ (ไม่มีแถบเลื่อนในช่อง) — เหมือนฟอร์มลงงาน/แก้ไขงาน
+        autoGrowTextarea(document.getElementById("adeDescription"));
         // 🔁 (12 พ.ย. 2569) ช่องเลือกเปิดเป็นแผ่นรายการแบบเดียวกับหน้าลงงาน/แก้ไขงาน (ค้นหาบนสุด · เรียง ก-ฮ · ปัดลงปิด)
         const TS_TITLE = { "#adeCompany": "บริษัท", "#adeSite": "โครงการ", "#adeTitle": "ประเภทงาน", "#adeSystem": "ระบบงาน", "#adeTime": "ครั้งที่" };
         const mkTs = (id, placeholder = "") => {
