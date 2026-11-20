@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { useSearchParams } from "react-router-dom";
 import { Box, Chip, CircularProgress, InputAdornment, Stack, TextField, Typography } from "@mui/material";
-import { EngineeringRounded, SearchRounded } from "@mui/icons-material";
+import { EngineeringRounded, SearchRounded, WorkOutlineRounded, EventAvailableRounded, CalendarMonthRounded, PaymentsRounded } from "@mui/icons-material";
 
 import SectionTabs from "@/shared/ui/SectionTabs";
 import SelectField from "@/shared/ui/SelectField";
@@ -188,10 +188,10 @@ export default function WorkerReport() {
           value={`${t.people} คน`}
           sub={periodLabel}
           stats={[
-            <Stat key="j" label="จำนวนงาน" value={`${t.jobs} งาน`} />,
-            <Stat key="v" label="เข้างาน (คน × งาน)" value={`${t.visits} ครั้ง`} />,
-            <Stat key="d" label="วันทำงานรวม" value={`${t.days} วัน`} />,
-            <Stat key="m" label="บันทึกมูลค่าแล้ว" value={`${t.valued} / ${t.visits}`} tone={t.missing ? "#b45309" : undefined} />,
+            <Stat key="j" icon={WorkOutlineRounded} label="จำนวนงาน" value={`${t.jobs} งาน`} />,
+            <Stat key="v" icon={EventAvailableRounded} label="เข้างาน (คน × งาน)" value={`${t.visits} ครั้ง`} />,
+            <Stat key="d" icon={CalendarMonthRounded} label="วันทำงานรวม" value={`${t.days} วัน`} />,
+            <Stat key="m" icon={PaymentsRounded} label="บันทึกมูลค่าแล้ว" value={`${t.valued} / ${t.visits}`} tone={t.missing ? "#b45309" : undefined} />,
           ]}
           note={<>"มูลค่าครั้งนี้" ที่ช่างแต่ละคนลง = ผลงานของคนนั้น ไม่นำมารวมกัน — ดูยอดของแต่ละคนในตารางด้านล่าง</>}
         />

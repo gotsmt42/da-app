@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { Box, ButtonBase, Stack, Typography } from "@mui/material";
+import { Box, ButtonBase, Stack, Typography, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   ChevronRightRounded, PersonOutlineRounded, PaymentsRounded, ReportProblemRounded, HourglassEmptyRounded, InsightsRounded,
@@ -88,7 +88,7 @@ function IconBadge({ icon: Icon, tone, size = 30 }) {
 }
 
 /** ช่องตัวเลข · hero = ยอดหลัก (พื้นฟ้าอ่อน ตัวเลขใหญ่) */
-function Tile({ icon, tone = SLATE, label, value, sub, onClick, hero = false, dim = false }) {
+function Tile({ icon, tone = SLATE, label, value, sub, onClick, hero = false, dim = false, valueColor }) {
   return (
     <ButtonBase onClick={onClick} disabled={!onClick} component="div"
       sx={{ display: "block", height: "100%", textAlign: "left", fontFamily: "inherit", p: { xs: 1.4, sm: 1.6 }, borderRadius: "14px", minWidth: 0,
@@ -102,7 +102,7 @@ function Tile({ icon, tone = SLATE, label, value, sub, onClick, hero = false, di
         {onClick && <ChevronRightRounded sx={{ fontSize: 18, color: hero ? ACCENT : "#cbd5e1" }} />}
       </Stack>
       <Typography noWrap sx={{ mt: 1, fontSize: hero ? { xs: "1.6rem", sm: "1.75rem" } : { xs: "1.18rem", sm: "1.3rem" }, fontWeight: 800,
-        color: dim ? SLATE : INK, lineHeight: 1.15, letterSpacing: "-0.01em", ...NUM }}>{value}</Typography>
+        color: valueColor || (dim ? SLATE : INK), lineHeight: 1.15, letterSpacing: "-0.01em", ...NUM }}>{value}</Typography>
       <Typography sx={{ mt: 0.4, fontSize: "0.76rem", color: MUTED, lineHeight: 1.4 }}>{sub}</Typography>
     </ButtonBase>
   );
@@ -162,6 +162,82 @@ function DetailButton({ onClick }) {
   );
 }
 
+/* ── จอคอม: แถบตัวเลขต่อกันเป็นแผ่นเดียว + วงความครบ ───────────────────────────────
+   🔁 (20 พ.ย. 2569 ผู้ใช้: "ตรงนี้ก็ยังดูไม่สวย") จอกว้าง 3 กล่องลอยแยกกันกว้างเกือบ 600px ต่อกล่อง เหลือที่ว่างเยอะ
+   แถบความครบเส้นบางยาวเต็มจอมีสีแค่ปลายนิดเดียว ดูแปลก · "ต้องตรวจ" ตัวเลขสีเทาจาง ดูเหมือนปิดใช้งาน
+   → แผ่นเดียวคั่นเส้น 4 ช่อง: ยอดหลัก (พื้นฟ้าอ่อน) · ช่องรอง 2 ช่อง · วงความครบ (% กลางวง + คำอธิบายสีครบ)
+   มือถือใช้แบบเดิม (ยอดหลักเต็มแถว + 2 ช่อง + แถบ) */
+function StripCell({ icon, tone = SLATE, label, value, sub, onClick, hero = false, valueColor }) {
+  return (
+    <ButtonBase onClick={onClick} disabled={!onClick} component="div"
+      sx={{ display: "block", textAlign: "left", fontFamily: "inherit", px: 2, py: 1.75, minWidth: 0, height: "100%",
+        background: hero ? `linear-gradient(135deg, ${alpha(ACCENT, 0.1)} 0%, ${alpha(ACCENT, 0.02)} 85%)` : "#fff",
+        transition: "background-color .15s ease", "&:hover": onClick ? { bgcolor: hero ? undefined : "#f8fbff", backgroundImage: hero ? `linear-gradient(135deg, ${alpha(ACCENT, 0.14)} 0%, ${alpha(ACCENT, 0.04)} 85%)` : undefined } : {} }}>
+      <Stack direction="row" alignItems="center" gap={1}>
+        <IconBadge icon={icon} tone={tone} size={hero ? 32 : 28} />
+        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: hero ? ACCENT : INK_2 }}>{label}</Typography>
+        {onClick && <ChevronRightRounded sx={{ fontSize: 18, color: hero ? ACCENT : "#cbd5e1" }} />}
+      </Stack>
+      <Typography noWrap sx={{ mt: 1.1, fontSize: hero ? "1.85rem" : "1.4rem", fontWeight: 800, color: valueColor || INK, lineHeight: 1.12, letterSpacing: "-0.01em", ...NUM }}>{value}</Typography>
+      <Typography sx={{ mt: 0.45, fontSize: "0.76rem", color: MUTED, lineHeight: 1.4 }}>{sub}</Typography>
+    </ButtonBase>
+  );
+}
+
+/** วงความครบ — parts = [[จำนวน, สี], ...] วนตามเข็มจากด้านบน */
+function Ring({ parts, n, size = 74, stroke = 9 }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const done = parts[0]?.[0] || 0;
+  let off = 0;
+  return (
+    <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)", display: "block" }} aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={TRACK} strokeWidth={stroke} />
+        {parts.filter(([v, color]) => v > 0 && color !== BAR_EMPTY).map(([v, color]) => {
+          const len = Math.max((v / n) * c, 2.5); // ส่วนเล็กมากยังเห็นเป็นจุด
+          const el = <circle key={color} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+            strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-off} strokeLinecap="round" />;
+          off += len;
+          return el;
+        })}
+      </svg>
+      <Box sx={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
+        <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: INK, ...NUM }}>{n ? Math.round((done / n) * 100) : 0}%</Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function CoverageCell({ parts, done, n, label, legend }) {
+  return (
+    <Stack direction="row" alignItems="center" gap={1.75} sx={{ px: 2, py: 1.5, minWidth: 0, bgcolor: "#fcfdff" }}>
+      <Ring parts={parts} n={n} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2 }}>{label}</Typography>
+        <Typography sx={{ fontSize: "1.05rem", fontWeight: 800, color: INK, ...NUM }}>{done.toLocaleString()} <Box component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: MUTED }}>/ {n.toLocaleString()} งาน</Box></Typography>
+        <Stack sx={{ mt: 0.5, gap: 0.25 }}>
+          {legend.map(([color, text]) => (
+            <Stack key={text} direction="row" alignItems="center" gap={0.75}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+              <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, ...NUM }}>{text}</Typography>
+            </Stack>
+          ))}
+        </Stack>
+      </Box>
+    </Stack>
+  );
+}
+
+function StatStrip({ children }) {
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1.25fr", border: `1px solid ${LINE}`, borderRadius: "14px", overflow: "hidden",
+      "& > *:not(:first-of-type)": { borderLeft: `1px solid ${LINE}` } }}>
+      {children}
+    </Box>
+  );
+}
+
 const CARD_SX = { mb: 1.5, p: { xs: 1.5, sm: 1.75 }, borderRadius: "16px", bgcolor: "#fff", border: `1px solid ${LINE}`, boxShadow: "0 1px 2px rgba(15,23,42,.04)" };
 const BAR_BLUE = ACCENT;
 const BAR_WARN = "#f59e0b";
@@ -176,6 +252,7 @@ const BAR_EMPTY = TRACK;
  */
 export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
   const period = periodText ? ` · ${periodText}` : "";
+  const desk = useMediaQuery("(min-width:900px)");
   // 🐛 (18 พ.ย. 2569 ผู้ใช้: "ค้นหาแล้วแสดงเพี้ยนมากๆ") เลือกผู้ปฏิบัติงานแล้วหัวข้อถูกบีบเหลือคำละบรรทัด
   //    → ใช้โครงเดียวกับกล่องรวม: หัวกล่อง + ช่องตัวเลข + แถบความครบ
   if (member) {
@@ -185,15 +262,29 @@ export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
       <Box sx={CARD_SX}>
         <CardHead icon={GroupsRounded} title={`ผลงานของ ${member}`} sub={`ยอดที่ลงเอง · ก่อน VAT${period} · ${s.jobs} งาน`}
           action={<DetailButton onClick={() => onOpenDetail(s.ownCount ? "p-done" : "p-all")} />} />
-        <TileGrid first={
-          <Tile hero icon={PaymentsRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
-            sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} onClick={s.ownCount ? () => onOpenDetail("p-done") : undefined} />
-        }>
-          <Tile icon={InsightsRounded} tone={TEAL} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
-          <Tile icon={HourglassEmptyRounded} tone={WARN} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน"
-            onClick={notYet ? () => onOpenDetail("p-missing") : undefined} />
-        </TileGrid>
-        <CoverageBar parts={[[s.ownCount, BAR_BLUE], [notYet, BAR_EMPTY]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว" />
+        {desk ? (
+          <StatStrip>
+            <StripCell hero icon={PaymentsRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
+              sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} onClick={s.ownCount ? () => onOpenDetail("p-done") : undefined} />
+            <StripCell icon={InsightsRounded} tone={TEAL} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
+            <StripCell icon={HourglassEmptyRounded} tone={WARN} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน"
+              onClick={notYet ? () => onOpenDetail("p-missing") : undefined} />
+            <CoverageCell parts={[[s.ownCount, BAR_BLUE], [notYet, BAR_EMPTY]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว"
+              legend={[[BAR_BLUE, `ลงแล้ว ${s.ownCount} งาน`], ["#cbd5e1", `ยังไม่ลง ${notYet} งาน`]]} />
+          </StatStrip>
+        ) : (
+          <>
+            <TileGrid first={
+              <Tile hero icon={PaymentsRounded} tone={ACCENT} label="ผลงานที่ลงเอง" value={baht(s.own)}
+                sub={s.ownCount ? `ลงแล้ว ${s.ownCount} งาน` : "ยังไม่ได้ลงผลงาน"} onClick={s.ownCount ? () => onOpenDetail("p-done") : undefined} />
+            }>
+              <Tile icon={InsightsRounded} tone={TEAL} label="เฉลี่ยต่องาน" value={s.ownCount ? baht(s.own / s.ownCount) : "—"} sub="เฉพาะงานที่ลงแล้ว" />
+              <Tile icon={HourglassEmptyRounded} tone={WARN} label="ยังไม่ลง" value={`${notYet} งาน`} sub="ยังไม่มีผลงานรายคน"
+                onClick={notYet ? () => onOpenDetail("p-missing") : undefined} />
+            </TileGrid>
+            <CoverageBar parts={[[s.ownCount, BAR_BLUE], [notYet, BAR_EMPTY]]} done={s.ownCount} n={s.jobs} label="ลงผลงานแล้ว" />
+          </>
+        )}
       </Box>
     );
   }
@@ -202,16 +293,31 @@ export function WorkValueSummaryCard({ s, periodText, member, onOpenDetail }) {
     <Box sx={CARD_SX}>
       <CardHead icon={PaymentsRounded} title="มูลค่าครั้งนี้ของงาน" sub={`ก่อน VAT${period} · ${jobs} งาน`}
         action={s.items.length > 0 && <DetailButton onClick={() => onOpenDetail("all")} />} />
-      <TileGrid first={
-        <Tile hero icon={TaskAltRounded} tone={ACCENT} label="นับแล้ว" value={baht(s.total)}
-          sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
-          onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
-      }>
-        <Tile icon={ReportProblemRounded} tone={WARN} label="ต้องตรวจ" value={s.wholeCount ? baht(s.wholeTotal) : "—"} dim
-          sub={s.wholeCount ? `${s.wholeCount} งาน · ใส่เท่ามูลค่างานรวม ไม่นับ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
-        <Tile icon={HourglassEmptyRounded} tone={SLATE} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
-      </TileGrid>
-      <CoverageBar parts={[[s.withValue, BAR_BLUE], [s.wholeCount, BAR_WARN], [s.missing, BAR_EMPTY]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว" />
+      {desk ? (
+        <StatStrip>
+          <StripCell hero icon={TaskAltRounded} tone={ACCENT} label="นับแล้ว" value={baht(s.total)}
+            sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
+            onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
+          <StripCell icon={ReportProblemRounded} tone={WARN} label="ต้องตรวจ" value={s.wholeCount ? baht(s.wholeTotal) : "—"} valueColor={s.wholeCount ? WARN_TEXT : FAINT}
+            sub={s.wholeCount ? `${s.wholeCount} งาน · ใส่เท่ามูลค่างานรวม ไม่นับ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
+          <StripCell icon={HourglassEmptyRounded} tone={SLATE} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
+          <CoverageCell parts={[[s.withValue, BAR_BLUE], [s.wholeCount, BAR_WARN], [s.missing, BAR_EMPTY]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว"
+            legend={[[BAR_BLUE, `นับแล้ว ${s.withValue} งาน`], ...(s.wholeCount ? [[BAR_WARN, `ต้องตรวจ ${s.wholeCount} งาน`]] : []), ["#cbd5e1", `ยังไม่ใส่ ${s.missing} งาน`]]} />
+        </StatStrip>
+      ) : (
+        <>
+          <TileGrid first={
+            <Tile hero icon={TaskAltRounded} tone={ACCENT} label="นับแล้ว" value={baht(s.total)}
+              sub={s.withValue ? `${s.withValue} งาน · เฉลี่ย ${baht(s.total / s.withValue)} / งาน` : "ยังไม่มีงานที่นับได้"}
+              onClick={s.withValue ? () => onOpenDetail("counted") : undefined} />
+          }>
+            <Tile icon={ReportProblemRounded} tone={WARN} label="ต้องตรวจ" value={s.wholeCount ? baht(s.wholeTotal) : "—"} valueColor={s.wholeCount ? WARN_TEXT : FAINT}
+              sub={s.wholeCount ? `${s.wholeCount} งาน · ใส่เท่ามูลค่างานรวม ไม่นับ` : "ไม่มี"} onClick={s.wholeCount ? () => onOpenDetail("whole") : undefined} />
+            <Tile icon={HourglassEmptyRounded} tone={SLATE} label="ยังไม่ใส่" value={`${s.missing} งาน`} sub="ยังไม่มีมูลค่าครั้งนี้" />
+          </TileGrid>
+          <CoverageBar parts={[[s.withValue, BAR_BLUE], [s.wholeCount, BAR_WARN], [s.missing, BAR_EMPTY]]} done={s.withValue} n={jobs} label="ใส่มูลค่าครั้งนี้แล้ว" />
+        </>
+      )}
     </Box>
   );
 }

@@ -56,6 +56,17 @@ export const SALES_FORM_CSS = `
   .sa-wrap textarea { resize: vertical; min-height: 96px; line-height: 1.6; }
   .sa-wrap input:not(.MuiInputBase-input):focus, .sa-wrap textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
   .sa-wrap ::placeholder { color: #94a3b8; }
+  /* 🔁 (20 พ.ย. 2569 ผู้ใช้: "ช่องใส่มูลค่ามันยังดูแปลกๆ หน้าจอคอมดูยาก ไม่สวย และยาวเกินไป")
+     ช่องเงิน: ฿ หน้า · บาท ท้าย · ตัวเลขหนาชิดขวา (อ่านหลักง่าย) · จอใหญ่กว้างพอดีตัวเลข ไม่ยืดเต็มการ์ด */
+  .sa-opt { font-weight: 500; color: #94a3b8; margin-left: 4px; }
+  .sa-money { position: relative; width: 100%; max-width: 300px; }
+  .sa-wrap .sa-money input[type="text"]:not(.MuiInputBase-input) {
+    padding: 10px 48px 10px 30px; text-align: right; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em;
+  }
+  .sa-money-pre, .sa-money-suf { position: absolute; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; }
+  .sa-money-pre { left: 12px; font-weight: 800; font-size: 15px; }
+  .sa-money-suf { right: 12px; font-size: 13px; color: #64748b; }
+  @media (max-width: 600px) { .sa-money { max-width: none; } }
   .sa-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .sa-row > div { min-width: 0; }
 

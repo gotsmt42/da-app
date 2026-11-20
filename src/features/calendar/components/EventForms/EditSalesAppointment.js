@@ -142,8 +142,8 @@ export const getEditSalesAppointment = async ({
             <input type="text" id="saContactTel" placeholder="08x-xxx-xxxx" inputmode="tel" value="${esc(pick("contactTel"))}" />
           </div>
         </div>
-        <div class="sa-label">มูลค่าโอกาสการขาย (บาท)</div>
-        <input type="text" id="saValue" placeholder="เช่น 250,000 — ไม่บังคับ" inputmode="decimal" value="${currentValue ? esc(currentValue.toLocaleString("th-TH")) : ""}" />
+        <div class="sa-label">มูลค่าโอกาสการขาย<span class="sa-opt">ไม่บังคับ</span></div>
+        <div class="sa-money"><span class="sa-money-pre">฿</span><input type="text" id="saValue" placeholder="0" inputmode="decimal" autocomplete="off" aria-label="มูลค่าโอกาสการขาย (บาท)" value="${currentValue ? esc(currentValue.toLocaleString("th-TH")) : ""}" /><span class="sa-money-suf">บาท</span></div>
       </div>
 
       <div class="sa-card">
@@ -227,6 +227,14 @@ export const getEditSalesAppointment = async ({
       popup.__thaiDpCleanup?.();
     },
     didOpen: () => {
+      // ✅ (20 พ.ย. 2569) ช่องมูลค่า: ออกจากช่องแล้วจัดรูปเป็นหลักพัน (250000 → 250,000) อ่านง่าย · ค่าที่บันทึกตัดจุลภาคออกเองอยู่แล้ว
+      {
+        const mv = document.getElementById("saValue");
+        mv?.addEventListener("blur", () => {
+          const raw = mv.value.replace(/[,\s฿]/g, "");
+          if (raw && Number.isFinite(Number(raw))) mv.value = Number(raw).toLocaleString("th-TH", { maximumFractionDigits: 2 });
+        });
+      }
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่อง (รวมแถวช่วงวันที่ที่เพิ่ม/prefill ทีหลังด้วย —
       // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
       {

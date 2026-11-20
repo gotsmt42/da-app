@@ -18,7 +18,8 @@
 import { useMemo, useState } from "react";
 import { Box, Button, ButtonBase, Collapse, Stack, Typography, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircleRounded, ErrorRounded, MenuBookRounded, ExpandMoreRounded, ChevronRightRounded, ArrowDownwardRounded } from "@mui/icons-material";
+import { CheckCircleRounded, ErrorRounded, MenuBookRounded, ExpandMoreRounded, ChevronRightRounded, ArrowDownwardRounded,
+  EventAvailableRounded, CalendarMonthRounded, InsightsRounded, PaymentsRounded, ReportProblemRounded } from "@mui/icons-material";
 import { INK, MUTED, LINE, ACCENT } from "@/shared/ui/PageKit";
 import { thaiDate } from "@/shared/utils/thaiDate";
 import { ReportSection, PersonAvatar, R_CARD, baht } from "./ReportKit";
@@ -27,59 +28,115 @@ import useElementWidth from "@/shared/hooks/useElementWidth";
 import { monthLabel } from "../utils/reportPeriod";
 import { buildPersonKpis, sortPeople, formatKpi, RATE_KPIS, KPI_DEFS, KPI_GUIDE, ISSUE_DEFS } from "../utils/workerKpi";
 
+/* 🔁 (20 พ.ย. 2569 ผู้ใช้: "หน้าผลงานรายบุคคล สีสันมันยังดูไม่สวย ไม่สดใส ไม่คลีน ทื่อๆ และดูแล้วยังมองยาก")
+   โทนเดียวกับกล่องสรุปมูลค่า (WorkValueSummary) ที่ผู้ใช้รับแล้ว — สดใสแต่มืออาชีพ:
+   • หัวผลงานพื้นฟ้าอ่อนไล่ขาว · ตัวเลขหลักมีไอคอนสีพื้นอ่อนบอกความหมาย
+   • ความครบของข้อมูล = แถบความคืบหน้าสีตามเป้า (เขียว ถึงเป้า · ส้ม ยังไม่ถึง) อ่านได้ทันทีโดยไม่ต้องคิด %
+   • สิ่งที่ต้องแก้ = ป้ายเล็กสีส้มอ่อนทีละเรื่อง (เดิมเป็นประโยคสีส้มยาวต่อกัน ตัดท้าย อ่านยาก)
+   • ตาราง: แถบเทียบยอดกับคนที่สูงสุด · "ลงมูลค่าแล้ว" เป็นแถบสี · อันดับ 1–3 มีวงสีฟ้า
+   🔁 (20 พ.ย. 2569 ผู้ใช้: "สียังดูรกอยู่") ลดสีให้เหลือ 3 ความหมายเท่านั้น:
+     น้ำเงิน = ข้อมูล/ตัวที่เลือก · เขียว = ครบ/ถึงเป้า · ส้ม = ป้าย "ต้องแก้ N" จุดเดียวต่อคน/ต่องาน
+     ป้ายรายการที่ขาด = เทาอ่อน (อ่านง่าย ไม่แย่งสายตา) · ไอคอนตัวเลขหลักสีเดียว · บทบาท/เข้างาน/สถานะ เป็นข้อความเทา */
 const OK = "#15803d";
+const OK_SOFT = "#f0fdf4";
 const WARN = "#b45309";
+const WARN_SOFT = "#fffbeb";
+const WARN_LINE = "#fde68a";
 const FAINT = "#94a3b8";
+const TRACK = "#e8edf4";
+const ACCENT_SOFT = "#eff6ff";
 const SHOW_FIRST_ROWS = 15;
 const NUM = { fontVariantNumeric: "tabular-nums" };
 // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ขยายให้เต็ม · ทำให้สมูทดูดีกว่านี้") เปลี่ยนคน/มุมมอง = ค่อยๆ ปรากฏ · แถว hover นุ่ม
 const FADE_IN = { "@keyframes kpiIn": { from: { opacity: 0, transform: "translateY(6px)" }, to: { opacity: 1, transform: "none" } }, animation: "kpiIn .28s ease-out" };
-const ROW_HOVER = { transition: "background-color .15s ease", "&:hover": { bgcolor: "#f8fafc" } };
+const ROW_HOVER = { transition: "background-color .15s ease", "&:hover": { bgcolor: "#f8fbff" } };
 
-/** สถานะข้อมูลของคน — ใช้ทั้งตารางและแผงรายละเอียด (จุดเดียวที่มีสี) */
+/** ป้ายเม็ดยาพื้นอ่อน (ไม่มีขอบ) */
+const Pill = ({ tone = "slate", children, sx }) => {
+  const t = { ok: [OK, OK_SOFT], warn: [WARN, WARN_SOFT], blue: [ACCENT, ACCENT_SOFT], slate: ["#475569", "#f1f5f9"] }[tone] || ["#475569", "#f1f5f9"];
+  return (
+    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 99, whiteSpace: "nowrap",
+      fontSize: "0.7rem", fontWeight: 800, color: t[0], bgcolor: t[1], ...sx }}>
+      {children}
+    </Box>
+  );
+};
+
+/** สถานะข้อมูลของคน — ใช้ทั้งตารางและแผงรายละเอียด */
 function DataStatus({ p, size = "sm" }) {
   const big = size === "lg";
   if (!p.past) return <Typography component="span" sx={{ fontSize: big ? "0.84rem" : "0.78rem", color: FAINT }}>ยังไม่มีงานที่ผ่านไป</Typography>;
   const ok = p.issueCount === 0;
   return (
-    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: big ? 1.1 : 0.9, py: big ? 0.35 : 0.2, borderRadius: 99,
-      bgcolor: alpha(ok ? OK : WARN, 0.09), color: ok ? OK : WARN, fontSize: big ? "0.82rem" : "0.76rem", fontWeight: 800, whiteSpace: "nowrap" }}>
+    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: big ? 1.1 : 0.9, height: big ? 28 : 24, borderRadius: 99,
+      bgcolor: ok ? OK_SOFT : WARN_SOFT, color: ok ? OK : WARN,
+      fontSize: big ? "0.8rem" : "0.74rem", fontWeight: 800, whiteSpace: "nowrap" }}>
       {ok ? <CheckCircleRounded sx={{ fontSize: big ? 17 : 15 }} /> : <ErrorRounded sx={{ fontSize: big ? 17 : 15 }} />}
-      {ok ? "ครบ" : `ต้องแก้ ${p.issueCount}`}
+      {ok ? "ข้อมูลครบ" : `ต้องแก้ ${p.issueCount}`}
     </Box>
   );
 }
 
-/** แถบสัดส่วน — สีเดียว อ่อน ไม่แย่งสายตาจากตัวเลข */
-const ShareBar = ({ share }) => (
-  <Box sx={{ height: 5, borderRadius: 3, bgcolor: "#eef2f7", overflow: "hidden" }}>
-    <Box sx={{ width: `${Math.round((share || 0) * 100)}%`, height: "100%", bgcolor: alpha(ACCENT, 0.55), borderRadius: 3, transition: "width .4s ease" }} />
+/** แถบความคืบหน้า — สีตามสถานะ */
+const Bar = ({ value, color = ACCENT, height = 6 }) => (
+  <Box sx={{ height, borderRadius: 99, bgcolor: TRACK, overflow: "hidden" }}>
+    <Box sx={{ width: `${Math.max(0, Math.min(1, value || 0)) * 100}%`, height: "100%", bgcolor: color, borderRadius: 99, transition: "width .45s ease" }} />
+  </Box>
+);
+const ShareBar = ({ share }) => <Bar value={share} color={alpha(ACCENT, 0.7)} height={5} />;
+
+/** สี/สถานะของ "ลงมูลค่าแล้ว x/y" */
+const fillTone = (done, base) => (!base ? FAINT : done >= base ? OK : done === 0 ? "#cbd5e1" : ACCENT);
+
+/** ไอคอนในวงพื้นอ่อน */
+const IconBadge = ({ icon: Icon, color, size = 34 }) => (
+  <Box sx={{ width: size, height: size, borderRadius: "10px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color }}>
+    <Icon sx={{ fontSize: size * 0.56 }} />
   </Box>
 );
 
 // ── ตารางเทียบทุกคน ────────────────────────────────────────────────────────────
 // 🔁 (17 พ.ย. 2569 ผู้ใช้: "รองรับทุกขนาดหน้าจอ") เลือกรูปตาม "ความกว้างของกล่องจริง" (useElementWidth) ไม่ใช่ความกว้างจอ
 // 🔁 (17 พ.ย. 2569 ผู้ใช้: "ข้อมูลตรงนี้ยังดูงง ไม่เข้าใจว่าแต่ละแถวคืออะไร")
-//    • หัวคอลัมน์ 2 บรรทัด: ชื่อ + หน่วย/ความหมายสั้นๆ · แยก "เข้างาน" กับ "วันทำงาน" คนละคอลัมน์ (เดิม "2 / 5" ไม่รู้ว่าอะไร)
-//    • ยังไม่ลงมูลค่าเลย = "ยังไม่ลง" (ไม่ใช่ ฿0 ที่ดูเหมือนทำงานได้ศูนย์บาท) · เพิ่มคอลัมน์ "ลงมูลค่าแล้ว x/y"
-//    • ความครบของข้อมูล บอกว่าขาดอะไรกี่รายการ (ไม่ลงมูลค่า / ไม่กดเข้างาน / ไม่ขอปิด) · คำอธิบายทุกคอลัมน์ใต้ตาราง
-//    ≥1180 = ครบทุกคอลัมน์ · 760–1179 = ตัดสัดส่วน/ลงมูลค่าแล้ว · <760 = รายการย่อ
-// 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") ตัดสัดส่วนในทีม/ยอดรวมทุกคนออก — แสดงรายคนอย่างเดียว
-const COLS = "40px minmax(170px, 1fr) 132px 78px 86px 120px 112px 196px 20px";
-const COLS_MID = "34px minmax(150px, 1fr) 118px 66px 74px 108px 180px 18px";
+//    • หัวคอลัมน์ 2 บรรทัด: ชื่อ + หน่วย/ความหมายสั้นๆ · แยก "เข้างาน" กับ "วันทำงาน" คนละคอลัมน์
+//    • ยังไม่ลงมูลค่าเลย = "ยังไม่ลง" (ไม่ใช่ ฿0) · คอลัมน์ "ลงมูลค่าแล้ว x/y"
+//    • ความครบของข้อมูล บอกว่าขาดอะไรกี่รายการ · คำอธิบายทุกคอลัมน์ใต้ตาราง
+//    ≥1060 = ครบทุกคอลัมน์ · 760–1059 = ตัดลงมูลค่าแล้ว · <760 = รายการย่อ
+// 🔁 (17 พ.ย. 2569 ผู้ใช้: "ยอดที่ลงไม่นำมารวมกัน แยกเป็นผลงานของแต่ละคน") แสดงรายคนอย่างเดียว ไม่มียอดรวมทุกคน
+const COLS = "48px minmax(180px, 1fr) 150px 74px 82px 112px 116px 230px 20px";
+const COLS_MID = "40px minmax(150px, 1fr) 128px 62px 70px 100px 200px 18px";
 const W_FULL = 1060;
 const W_MID = 760;
 
-/** ขาดอะไรบ้าง — ข้อความสั้นใต้ป้ายสถานะ */
-const BRIEF = [["missingValue", "ไม่ลงมูลค่า"], ["noCheckIn", "ไม่กดเข้างาน"], ["notClosed", "ไม่ขอปิด"], ["noReport", "ไม่มี Report"], ["docsIncomplete", "เอกสาร PM"], ["noSummary", "ไม่มีสรุปงาน"]];
-const issueBrief = (p) => BRIEF.map(([k, label]) => (p.issues?.[k]?.length ? `${label} ${p.issues[k].length}` : "")).filter(Boolean).join(" · ");
+/** ขาดอะไรบ้าง — ป้ายสั้นทีละเรื่อง (ชื่อสั้น · จำนวน) */
+const BRIEF = [["missingValue", "มูลค่า"], ["noCheckIn", "เข้างาน"], ["notClosed", "ขอปิด"], ["noReport", "Report"], ["docsIncomplete", "เอกสาร PM"], ["noSummary", "สรุปงาน"]];
+const BRIEF_FULL = { missingValue: "ไม่ลงมูลค่า", noCheckIn: "ไม่กดเข้างาน", notClosed: "ไม่ขอปิดงาน", noReport: "ไม่มี Service Report", docsIncomplete: "เอกสาร PM ไม่ครบ", noSummary: "ไม่มีสรุปงาน" };
+const issueItems = (p) => BRIEF.map(([k, label]) => ({ k, label, n: p.issues?.[k]?.length || 0 })).filter((x) => x.n > 0);
+const issueTitle = (p) => issueItems(p).map((x) => `${BRIEF_FULL[x.k]} ${x.n}`).join(" · ");
+
+function IssueChips({ p, max = 3, justify = "center" }) {
+  const items = issueItems(p);
+  if (!items.length) return null;
+  const shown = items.slice(0, max);
+  return (
+    <Stack direction="row" title={issueTitle(p)} sx={{ mt: 0.5, gap: 0.4, flexWrap: "wrap", justifyContent: justify }}>
+      {shown.map((x) => (
+        <Box key={x.k} component="span" sx={{ height: 20, px: 0.7, borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: 0.35, whiteSpace: "nowrap",
+          fontSize: "0.66rem", fontWeight: 700, color: "#475569", bgcolor: "#f1f5f9" }}>
+          {x.label}<Box component="span" sx={{ fontWeight: 900, ...NUM }}>{x.n}</Box>
+        </Box>
+      ))}
+      {items.length > max && <Box component="span" sx={{ height: 20, px: 0.6, display: "inline-flex", alignItems: "center", fontSize: "0.66rem", fontWeight: 800, color: FAINT }}>+{items.length - max}</Box>}
+    </Stack>
+  );
+}
 
 function SortHead({ label, sub, k, sortBy, onSort, align = "right" }) {
   const active = sortBy === k;
   return (
     <ButtonBase onClick={() => onSort(k)} title="กดเพื่อเรียง"
       sx={{ flexDirection: "column", alignItems: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start", fontFamily: "inherit",
-        px: 1.25, py: 1, color: active ? INK : MUTED, "&:hover": { color: INK } }}>
+        px: 1.25, py: 1.1, color: active ? ACCENT : MUTED, "&:hover": { color: active ? ACCENT : INK } }}>
       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.25, fontSize: "0.76rem", fontWeight: 800 }}>
         {label}{active && <ArrowDownwardRounded sx={{ fontSize: 14 }} />}
       </Box>
@@ -88,7 +145,7 @@ function SortHead({ label, sub, k, sortBy, onSort, align = "right" }) {
   );
 }
 const Head = ({ children, sub, align = "left" }) => (
-  <Box sx={{ px: 1.25, py: 1, textAlign: align }}>
+  <Box sx={{ px: 1.25, py: 1.1, textAlign: align }}>
     <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: MUTED, lineHeight: 1.35 }}>{children}</Typography>
     {sub && <Typography sx={{ fontSize: "0.66rem", color: FAINT, lineHeight: 1.3 }}>{sub}</Typography>}
   </Box>
@@ -97,17 +154,25 @@ const Head = ({ children, sub, align = "left" }) => (
 /** มูลค่างานที่ทำ — ยังไม่ลงสักครั้ง = "ยังไม่ลง" (ไม่ใช่ ฿0) */
 const ValueText = ({ p, size = "1rem" }) => (p.valued
   ? <Typography sx={{ fontSize: size, fontWeight: 900, color: INK, ...NUM }}>{baht(p.total)}</Typography>
-  : <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: FAINT }}>ยังไม่ลง</Typography>);
+  : <Pill tone="slate" sx={{ color: FAINT }}>ยังไม่ลง</Pill>);
 
 /** สถานะข้อมูล + ขาดอะไร */
 const DataCell = ({ p, align = "center" }) => (
   <Box sx={{ textAlign: align, minWidth: 0 }}>
     <DataStatus p={p} />
-    {p.issueCount > 0 && <Typography noWrap sx={{ mt: 0.3, fontSize: "0.68rem", color: MUTED }}>{issueBrief(p)}</Typography>}
+    <IssueChips p={p} justify={align === "center" ? "center" : "flex-start"} />
   </Box>
 );
 
-const TABLE_LEGEND = "มูลค่างานที่ทำ = ผลรวม \"มูลค่าครั้งนี้\" ที่คนนั้นลงเองทุกงาน · เข้างาน = จำนวนงานที่อยู่ในทีม (งานหลายวันนับ 1) · วันทำงาน = รวมวันที่อยู่ในทีม · ต่อวัน = มูลค่าที่ลง ÷ วันของงานที่ลงแล้ว · ความครบของข้อมูล = งานที่ผ่านไปแล้วแต่ยังขาด: ลงมูลค่า · กดเข้างาน · ขอปิดงาน · Service Report · เอกสารงาน PM · สรุปงานที่ทำ";
+/** อันดับ — 1–3 วงสีฟ้า */
+const Rank = ({ n }) => (
+  <Box sx={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "0.78rem", fontWeight: 900, ...NUM,
+    ...(n <= 3 ? { bgcolor: n === 1 ? ACCENT : ACCENT_SOFT, color: n === 1 ? "#fff" : ACCENT } : { color: FAINT }) }}>
+    {n}
+  </Box>
+);
+
+const TABLE_LEGEND = "มูลค่างานที่ทำ = ผลรวม \"มูลค่าครั้งนี้\" ที่คนนั้นลงเองทุกงาน (แถบ = เทียบกับคนที่สูงสุด) · เข้างาน = จำนวนงานที่อยู่ในทีม (งานหลายวันนับ 1) · วันทำงาน = รวมวันที่อยู่ในทีม · ต่อวัน = มูลค่าที่ลง ÷ วันของงานที่ลงแล้ว · ความครบของข้อมูล = งานที่ผ่านไปแล้วแต่ยังขาด: ลงมูลค่า · กดเข้างาน · ขอปิดงาน · Service Report · เอกสารงาน PM · สรุปงานที่ทำ";
 
 function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
   const [boxRef, width] = useElementWidth();
@@ -116,6 +181,7 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
   const mobile = w < W_MID;
   const mid = !mobile && w < W_FULL;
   const cols = mid ? COLS_MID : COLS;
+  const maxTotal = Math.max(1, ...rows.map((p) => (p.valued ? p.total : 0)));
 
   if (mobile) {
     return (
@@ -123,19 +189,24 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
         <Box sx={R_CARD}>
           {rows.map((p, i) => (
             <ButtonBase key={p.name} component="div" onClick={onPick ? () => onPick(p.name) : undefined} disabled={!onPick}
-              sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, width: "100%", px: 1.5, py: 1.25, textAlign: "left", fontFamily: "inherit", borderTop: i ? `1px solid ${LINE}` : 0, ...ROW_HOVER }}>
-              <PersonAvatar name={p.name} avatar={avatarOf?.(p.name)} size={38} />
+              sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, width: "100%", px: 1.5, py: 1.35, textAlign: "left", fontFamily: "inherit", borderTop: i ? `1px solid ${LINE}` : 0, ...ROW_HOVER }}>
+              <Box sx={{ position: "relative", flexShrink: 0 }}>
+                <PersonAvatar name={p.name} avatar={avatarOf?.(p.name)} size={40} />
+                {i < 3 && <Box sx={{ position: "absolute", right: -4, bottom: -4, boxShadow: "0 0 0 2px #fff", borderRadius: "50%" }}><Rank n={i + 1} /></Box>}
+              </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Stack direction="row" alignItems="baseline" gap={1}>
+                <Stack direction="row" alignItems="center" gap={1}>
                   <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.95rem", fontWeight: 800, color: INK }}>{p.name}</Typography>
                   <ValueText p={p} />
                 </Stack>
-                <Typography sx={{ fontSize: "0.74rem", color: "#475569", mt: 0.4 }}>
-                  เข้างาน {p.visits} ครั้ง · {p.days} วัน · บันทึกมูลค่าแล้ว {p.valued}/{p.visits}{p.perDay !== null ? ` · ต่อวัน ${formatKpi("perDay", p.perDay)}` : ""}
+                {p.valued > 0 && <Box sx={{ mt: 0.6 }}><ShareBar share={p.total / maxTotal} /></Box>}
+                <Typography sx={{ fontSize: "0.74rem", color: "#475569", mt: 0.6 }}>
+                  เข้างาน <b>{p.visits}</b> ครั้ง · <b>{p.days}</b> วัน · ลงมูลค่าแล้ว <b style={{ color: p.visits && p.valued >= p.visits ? OK : INK }}>{p.valued}/{p.visits}</b>
+                  {p.perDay !== null ? ` · ต่อวัน ${formatKpi("perDay", p.perDay)}` : ""}
                 </Typography>
-                <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.5, flexWrap: "wrap" }}>
+                <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.6, flexWrap: "wrap" }}>
                   <DataStatus p={p} />
-                  {p.issueCount > 0 && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{issueBrief(p)}</Typography>}
+                  <IssueChips p={p} max={4} justify="flex-start" />
                 </Stack>
               </Box>
             </ButtonBase>
@@ -149,15 +220,28 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
     );
   }
 
-  const cell = { px: mid ? 1 : 1.25, py: 1.25, minWidth: 0, display: "flex", alignItems: "center" };
+  const cell = { px: mid ? 1 : 1.25, py: 1.35, minWidth: 0, display: "flex", alignItems: "center" };
   const right = { ...cell, justifyContent: "flex-end" };
   const center = { ...cell, justifyContent: "center" };
-  const num = (v, strong) => <Typography sx={{ fontSize: "0.88rem", fontWeight: strong ? 800 : 600, color: "#334155", ...NUM }}>{v}</Typography>;
+  const num = (v, strong, unit) => (
+    <Typography sx={{ fontSize: "0.9rem", fontWeight: strong ? 900 : 700, color: "#334155", ...NUM }}>
+      {v}{unit && <Box component="span" sx={{ ml: 0.35, fontSize: "0.68rem", fontWeight: 600, color: FAINT }}>{unit}</Box>}
+    </Typography>
+  );
+  const fill = (done, base, strong) => {
+    const c = fillTone(done, base);
+    return (
+      <Box sx={{ width: "100%", maxWidth: 84, textAlign: "center" }}>
+        <Typography sx={{ fontSize: "0.86rem", fontWeight: strong ? 900 : 800, color: c === OK ? OK : c === "#cbd5e1" ? MUTED : INK, ...NUM }}>{done} / {base}</Typography>
+        <Box sx={{ mt: 0.4 }}><Bar value={base ? done / base : 0} color={c} height={4} /></Box>
+      </Box>
+    );
+  };
   return (
     <Box ref={boxRef}>
       <Box sx={R_CARD}>
         <Box sx={{ display: "grid", gridTemplateColumns: cols, alignItems: "end", bgcolor: "#f8fafc", borderBottom: `1px solid ${LINE}` }}>
-          <Head align="center">#</Head>
+          <Head align="center">อันดับ</Head>
           <Head sub="กดแถวเพื่อดูรายละเอียด">ผู้ปฏิบัติงาน</Head>
           <SortHead label="มูลค่างานที่ทำ" sub="ก่อน VAT" k="total" sortBy={sortBy} onSort={onSort} />
           <Head align="center" sub="งาน">เข้างาน</Head>
@@ -171,21 +255,24 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
           <ButtonBase key={p.name} component="div" onClick={onPick ? () => onPick(p.name) : undefined} disabled={!onPick}
             sx={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", width: "100%", textAlign: "left", fontFamily: "inherit",
               borderTop: i ? `1px solid ${LINE}` : 0, ...ROW_HOVER }}>
-            <Box sx={center}><Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: FAINT }}>{i + 1}</Typography></Box>
+            <Box sx={center}><Rank n={i + 1} /></Box>
             <Box sx={{ ...cell, gap: 1.25 }}>
-              <PersonAvatar name={p.name} avatar={avatarOf?.(p.name)} size={mid ? 30 : 34} />
+              <PersonAvatar name={p.name} avatar={avatarOf?.(p.name)} size={mid ? 32 : 36} />
               <Box sx={{ minWidth: 0 }}>
                 <Typography noWrap sx={{ fontSize: "0.92rem", fontWeight: 800, color: INK }}>{p.name}</Typography>
                 <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>
-                  {p.lead ? `หัวหน้าทีม ${p.lead} ครั้ง · ` : ""}{p.last ? `ล่าสุด ${thaiDate(p.last)}` : ""}
+                  {p.lead ? <><Box component="span" sx={{ color: ACCENT, fontWeight: 700 }}>หัวหน้าทีม {p.lead} ครั้ง</Box> · </> : ""}{p.last ? `ล่าสุด ${thaiDate(p.last)}` : ""}
                 </Typography>
               </Box>
             </Box>
-            <Box sx={right}><ValueText p={p} /></Box>
+            <Box sx={{ ...right, flexDirection: "column", alignItems: "flex-end", justifyContent: "center", gap: 0.5 }}>
+              <ValueText p={p} />
+              {p.valued > 0 && <Box sx={{ width: "100%", maxWidth: 110 }}><ShareBar share={p.total / maxTotal} /></Box>}
+            </Box>
             <Box sx={center}>{num(p.visits)}</Box>
             <Box sx={center}>{num(p.days)}</Box>
-            <Box sx={right}><Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: p.perDay === null ? FAINT : INK, ...NUM }}>{p.perDay === null ? "—" : formatKpi("perDay", p.perDay)}</Typography></Box>
-            {!mid && <Box sx={center}>{num(`${p.valued} / ${p.visits}`)}</Box>}
+            <Box sx={right}><Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: p.perDay === null ? FAINT : INK, ...NUM }}>{p.perDay === null ? "—" : formatKpi("perDay", p.perDay)}</Typography></Box>
+            {!mid && <Box sx={center}>{fill(p.valued, p.visits)}</Box>}
             <Box sx={center}><DataCell p={p} /></Box>
             <ChevronRightRounded sx={{ fontSize: 18, color: "#cbd5e1" }} />
           </ButtonBase>
@@ -193,12 +280,12 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
         <Box sx={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}` }}>
           <Box />
           {/* แถวสรุป — เฉพาะจำนวน (ไม่มียอดเงินรวมทุกคน ตามกติกา "ไม่นำมารวมกัน") */}
-          <Box sx={cell}><Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>{total} คน{rows.length < total ? ` (แสดง ${rows.length})` : ""}</Typography></Box>
+          <Box sx={cell}><Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>รวม {total} คน{rows.length < total ? ` (แสดง ${rows.length})` : ""}</Typography></Box>
           <Box sx={right}><Typography sx={{ fontSize: "0.72rem", color: FAINT }}>รายคน ไม่รวมกัน</Typography></Box>
           <Box sx={center}>{num(team.visits, true)}</Box>
           <Box sx={center}>{num(team.days, true)}</Box>
           <Box />
-          {!mid && <Box sx={center}>{num(`${team.valued} / ${team.visits}`, true)}</Box>}
+          {!mid && <Box sx={center}>{fill(team.valued, team.visits, true)}</Box>}
           <Box sx={center}><DataCell p={team} /></Box>
           <Box />
         </Box>
@@ -209,75 +296,96 @@ function KpiTable({ rows, total, team, sortBy, onSort, avatarOf, onPick }) {
 }
 
 // ── รายละเอียดคนเดียว ──────────────────────────────────────────────────────────
-/** ช่องตัวเลขในแถบสถิติ (แถบเดียวคั่นเส้น — ไม่เป็นกล่องลอยหลายใบ) */
-function BigStat({ label, value, sub, empty }) {
+/** ช่องตัวเลข — ไอคอนสีพื้นอ่อนบอกความหมาย + ตัวเลขเข้ม */
+function BigStat({ icon, color, label, value, sub, empty }) {
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, minWidth: 0 }}>
-      <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{label}</Typography>
-      {empty
-        ? <Typography noWrap sx={{ fontSize: "0.9rem", fontWeight: 700, color: FAINT, lineHeight: 1.75 }}>{empty}</Typography>
-        : <Typography noWrap sx={{ fontSize: "1.15rem", fontWeight: 900, color: INK, ...NUM }}>{value}</Typography>}
-      {sub && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>{sub}</Typography>}
-    </Box>
+    <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: { xs: 1.25, sm: 1.75 }, py: 1.35, minWidth: 0 }}>
+      <IconBadge icon={icon} color={color} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontSize: "0.72rem", fontWeight: 700, color: MUTED }}>{label}</Typography>
+        {empty
+          ? <Typography noWrap sx={{ fontSize: "0.88rem", fontWeight: 700, color: FAINT, lineHeight: 1.6 }}>{empty}</Typography>
+          : <Typography noWrap sx={{ fontSize: "1.12rem", fontWeight: 900, color: INK, lineHeight: 1.3, ...NUM }}>{value}</Typography>}
+        {sub && <Typography noWrap sx={{ fontSize: "0.68rem", color: FAINT }}>{sub}</Typography>}
+      </Box>
+    </Stack>
   );
 }
 
 const SubTitle = ({ children, right }) => (
   <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, minHeight: 28 }}>
-    <Typography sx={{ flex: 1, fontSize: "0.9rem", fontWeight: 800, color: INK }}>{children}</Typography>
+    <Typography sx={{ flex: 1, fontSize: "0.92rem", fontWeight: 800, color: INK }}>{children}</Typography>
     {right}
   </Stack>
 );
 
 const timeOf = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }); };
 /** สถานะงานของแถว — คำเดียวกับหน้าการดำเนินงาน */
-const jobStateOf = (r) => (r.done ? { text: "เสร็จสิ้น", ok: true } : r.closeRequested ? { text: "รอตรวจปิดงาน" } : { text: r.status || "—" });
+const jobStateOf = (r) => (r.done ? { text: "เสร็จสิ้น", tone: "ok" } : r.closeRequested ? { text: "รอตรวจปิดงาน", tone: "warn" } : { text: r.status || "—", tone: "slate" });
 
-/** แถวงาน 1 รายการของคนนั้น — วันที่ · งาน · บทบาท/เข้างาน/สถานะ · มูลค่างานที่ทำ · ปัญหา */
+/** แถวงาน 1 รายการของคนนั้น — วันที่ · งาน · บทบาท/เข้างาน/สถานะ · มูลค่างานที่ทำ · สิ่งที่ต้องแก้ */
 function EntryRow({ r, issues, first, onOpen }) {
   const d = r.date ? r.date.split("-") : [];
   const st = jobStateOf(r);
-  const meta = { fontSize: "0.72rem", color: MUTED, whiteSpace: "nowrap" };
   return (
     <ButtonBase component="div" onClick={onOpen}
-      sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, width: "100%", px: 1.25, py: 1.1, textAlign: "left", fontFamily: "inherit",
+      sx={{ display: "flex", alignItems: "flex-start", gap: 1.35, width: "100%", px: 1.5, py: 1.25, textAlign: "left", fontFamily: "inherit",
         borderTop: first ? 0 : `1px solid ${LINE}`, ...ROW_HOVER }}>
-      <Box sx={{ width: 48, flexShrink: 0, textAlign: "center", borderRadius: "10px", border: `1px solid ${LINE}`, overflow: "hidden", bgcolor: "#fff" }}>
-        <Box sx={{ bgcolor: "#f1f5f9", fontSize: "0.62rem", fontWeight: 800, color: MUTED, py: 0.15 }}>{(() => { const t = r.date ? thaiDate(r.date).split(" ") : []; return t.length > 2 ? `${t[1]} ${String(t[2]).slice(-2)}` : ""; })()}</Box>
-        <Box sx={{ fontSize: "1.05rem", fontWeight: 900, color: INK, lineHeight: 1.4 }}>{d[2] ? Number(d[2]) : "-"}</Box>
-        {r.days > 1 && <Box sx={{ fontSize: "0.6rem", color: MUTED, pb: 0.15 }}>{r.days} วัน</Box>}
+      <Box sx={{ width: 50, flexShrink: 0, textAlign: "center", borderRadius: "11px", border: `1px solid ${LINE}`, overflow: "hidden", bgcolor: "#fff" }}>
+        <Box sx={{ bgcolor: "#f1f5f9", fontSize: "0.62rem", fontWeight: 800, color: MUTED, py: 0.2 }}>{(() => { const t = r.date ? thaiDate(r.date).split(" ") : []; return t.length > 2 ? `${t[1]} ${String(t[2]).slice(-2)}` : ""; })()}</Box>
+        <Box sx={{ fontSize: "1.1rem", fontWeight: 900, color: INK, lineHeight: 1.45 }}>{d[2] ? Number(d[2]) : "-"}</Box>
+        {r.days > 1 && <Box sx={{ fontSize: "0.6rem", color: MUTED, pb: 0.2 }}>{r.days} วัน</Box>}
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography noWrap sx={{ fontSize: "0.9rem", fontWeight: 800, color: INK }}>{r.site || r.company || "-"}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.92rem", fontWeight: 800, color: INK }}>{r.site || r.company || "-"}</Typography>
         <Typography noWrap sx={{ fontSize: "0.76rem", color: "#475569" }}>
           {[r.title, r.system, r.time ? `ครั้งที่ ${r.time}` : "", r.jobNo].filter(Boolean).join(" · ") || "—"}
         </Typography>
-        <Stack direction="row" sx={{ mt: 0.4, flexWrap: "wrap", columnGap: 1.25, rowGap: 0.25 }}>
-          <Typography component="span" sx={{ ...meta, fontWeight: 700, color: r.lead ? INK : MUTED }}>{r.lead ? "หัวหน้าทีม" : "ลูกทีม"}{r.teamSize > 1 ? ` · ทีม ${r.teamSize} คน` : ""}</Typography>
-          <Typography component="span" sx={meta}>{r.checkIns?.length ? `✓ กดเข้างาน ${timeOf(r.checkIns[0])}${r.checkIns.length > 1 ? ` (${r.checkIns.length} วัน)` : ""}` : "ไม่มีบันทึกเข้างาน"}</Typography>
-          <Typography component="span" sx={{ ...meta, color: st.ok ? OK : MUTED, fontWeight: st.ok ? 800 : 400 }}>{st.ok ? "✓ " : ""}{st.text}</Typography>
-        </Stack>
+        {/* บทบาท · เข้างาน · สถานะ = ข้อความเทาบรรทัดเดียว (สีเฉพาะ ✓ ที่ทำครบแล้ว) */}
+        <Typography sx={{ mt: 0.45, fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>
+          <Box component="span" sx={{ fontWeight: 700, color: "#334155" }}>{r.lead ? "หัวหน้าทีม" : "ลูกทีม"}</Box>{r.teamSize > 1 ? ` · ทีม ${r.teamSize} คน` : ""}
+          {" · "}{r.checkIns?.length
+            ? <><Box component="span" sx={{ color: OK, fontWeight: 800 }}>✓</Box> เข้างาน {timeOf(r.checkIns[0])}{r.checkIns.length > 1 ? ` (${r.checkIns.length} วัน)` : ""}</>
+            : <Box component="span" sx={{ color: FAINT }}>ไม่มีบันทึกเข้างาน</Box>}
+          {" · "}{st.tone === "ok" ? <Box component="span" sx={{ color: OK, fontWeight: 800 }}>✓ {st.text}</Box> : st.text}
+        </Typography>
         {issues?.length > 0 && (
-          <Typography sx={{ mt: 0.35, fontSize: "0.72rem", fontWeight: 800, color: WARN }}>ต้องแก้: {issues.join(" · ")}</Typography>
+          <Stack direction="row" alignItems="center" sx={{ mt: 0.6, flexWrap: "wrap", gap: 0.5 }}>
+            <Box component="span" sx={{ height: 21, px: 0.75, borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: 0.35, whiteSpace: "nowrap",
+              fontSize: "0.68rem", fontWeight: 800, color: WARN, bgcolor: WARN_SOFT }}>
+              <ErrorRounded sx={{ fontSize: 13 }} />ต้องแก้
+            </Box>
+            {issues.map((t) => (
+              <Box key={t} component="span" sx={{ height: 21, px: 0.75, borderRadius: "6px", display: "inline-flex", alignItems: "center", whiteSpace: "nowrap",
+                fontSize: "0.68rem", fontWeight: 600, color: "#475569", bgcolor: "#f1f5f9" }}>{t}</Box>
+            ))}
+          </Stack>
         )}
       </Box>
       <Box sx={{ textAlign: "right", flexShrink: 0, pt: 0.2 }}>
         {r.value === null || r.value === undefined
-          ? <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: FAINT }}>ยังไม่ลง</Typography>
-          : <Typography sx={{ fontSize: "0.95rem", fontWeight: 900, color: INK, ...NUM }}>{baht(r.value)}</Typography>}
-        {r.valueLegacy && <Typography sx={{ fontSize: "0.66rem", color: FAINT }}>ยอดเดิม</Typography>}
+          ? <Pill tone="slate" sx={{ color: FAINT }}>ยังไม่ลง</Pill>
+          : <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: INK, ...NUM }}>{baht(r.value)}</Typography>}
+        {r.valueLegacy && <Typography sx={{ mt: 0.25, fontSize: "0.66rem", color: FAINT }}>ยอดเดิม</Typography>}
       </Box>
       <ChevronRightRounded sx={{ fontSize: 18, color: "#cbd5e1", mt: 0.25 }} />
     </ButtonBase>
   );
 }
 
-const FilterPill = ({ active, onClick, children }) => (
-  <ButtonBase onClick={onClick} sx={{ px: 1.25, py: 0.4, borderRadius: 99, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 800,
-    color: active ? "#fff" : "#475569", bgcolor: active ? INK : "#f1f5f9", transition: "background-color .15s ease" }}>
-    {children}
-  </ButtonBase>
-);
+/** ปุ่มกรอง — เลือกอยู่ = พื้นสี (ทั้งหมด น้ำเงิน · ต้องแก้ ส้ม) + ตัวเลขในวง */
+const FilterPill = ({ active, onClick, children, count, warn }) => {
+  const c = ACCENT; // เลือกอยู่ = น้ำเงินเสมอ (สีของตัวที่เลือกทั้งระบบ)
+  return (
+    <ButtonBase onClick={onClick} sx={{ height: 30, pl: 1.25, pr: 0.6, gap: 0.6, borderRadius: 99, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 800,
+      color: active ? "#fff" : "#475569", bgcolor: active ? c : "#fff", border: `1px solid ${active ? c : LINE}`, transition: "background-color .15s ease, border-color .15s ease",
+      "&:hover": { borderColor: c } }}>
+      {children}
+      <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 900, ...NUM,
+        bgcolor: active ? "rgba(255,255,255,.25)" : (warn && count ? WARN_SOFT : "#f1f5f9"), color: active ? "#fff" : (warn && count ? WARN : "#475569") }}>{count}</Box>
+    </ButtonBase>
+  );
+};
 
 /**
  * แผงรายละเอียดของ 1 คน
@@ -301,71 +409,89 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
   const list = filter === "issues" ? issueRows : sorted;
   const shown = showAll ? list : list.slice(0, 8);
   // 🔁 (17 พ.ย. 2569 ผู้ใช้: "จัดให้ดูง่าย ลงตัว สวยงามกว่านี้") จัดตามความกว้างจริงของกล่อง
-  //    กว้าง = คอลัมน์ซ้ายแคบ (ความครบของข้อมูล) · ขวากว้าง (งานที่เข้า) · แถบสถิติ 4 ช่องเส้นคั่น
+  //    กว้าง = คอลัมน์ซ้ายแคบ (ความครบของข้อมูล) · ขวากว้าง (งานที่เข้า)
   const [boxRef, boxW] = useElementWidth();
   const wide = boxW >= 900;
-  const statCols = boxW && boxW < 560 ? 2 : 4;
+  const statCols = boxW && boxW < 620 ? 2 : 4;
+  const fillC = fillTone(p.valued, p.visits);
 
   return (
     <Box ref={boxRef} sx={R_CARD}>
-      {/* หัว: คน + ยอดใหญ่ */}
-      <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.75 }}>
-        <PersonAvatar name={p.name} avatar={avatar} size={52} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontSize: "1.15rem", fontWeight: 900, color: INK }}>{p.name}</Typography>
-          <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED }}>
-            {p.jobs} งาน · หัวหน้าทีม {p.lead} ครั้ง{p.last ? ` · เข้างานล่าสุด ${thaiDate(p.last)}` : ""}
-          </Typography>
-        </Box>
-        <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+      {/* หัว: คน + ยอดใหญ่ — พื้นฟ้าอ่อนไล่ขาว (ชุดเดียวกับกล่องเด่นในหน้าสรุปมูลค่า) */}
+      <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} gap={1.5}
+        sx={{ px: { xs: 1.5, sm: 2.25 }, py: 2, background: `linear-gradient(135deg, ${ACCENT_SOFT} 0%, #ffffff 72%)`, borderBottom: `1px solid ${LINE}` }}>
+        <Stack direction="row" alignItems="center" gap={1.5} sx={{ flex: 1, minWidth: 0 }}>
+          <PersonAvatar name={p.name} avatar={avatar} size={56} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontSize: "1.2rem", fontWeight: 900, color: INK }}>{p.name}</Typography>
+            <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED }}>
+              {p.jobs} งาน · <Box component="span" sx={{ color: ACCENT, fontWeight: 700 }}>หัวหน้าทีม {p.lead} ครั้ง</Box>{p.last ? ` · เข้างานล่าสุด ${thaiDate(p.last)}` : ""}
+            </Typography>
+          </Box>
+        </Stack>
+        <Box sx={{ textAlign: { xs: "left", sm: "right" }, flexShrink: 0, px: { xs: 1.5, sm: 0 }, py: { xs: 1.1, sm: 0 }, borderRadius: { xs: 2.5, sm: 0 }, bgcolor: { xs: "rgba(255,255,255,.7)", sm: "transparent" } }}>
           <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>มูลค่างานที่ทำ (ก่อน VAT)</Typography>
-          <Typography sx={{ fontSize: { xs: "1.4rem", sm: "1.7rem" }, fontWeight: 900, color: INK, lineHeight: 1.15, ...NUM }}>{baht(p.total)}</Typography>
-          <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>
-            บันทึกมูลค่าแล้ว {p.valued}/{p.visits} ครั้ง
-          </Typography>
+          <Typography sx={{ fontSize: { xs: "1.55rem", sm: "1.8rem" }, fontWeight: 900, color: INK, lineHeight: 1.15, ...NUM }}>{p.valued ? baht(p.total) : <Box component="span" sx={{ fontSize: "1.1rem", color: FAINT }}>ยังไม่ลง</Box>}</Typography>
+          <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.6, justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
+            <Box sx={{ width: 90 }}><Bar value={p.visits ? p.valued / p.visits : 0} color={fillC} height={5} /></Box>
+            <Typography sx={{ fontSize: "0.72rem", color: MUTED, ...NUM }}>ลงมูลค่าแล้ว <b style={{ color: fillC === "#cbd5e1" ? MUTED : fillC }}>{p.valued}/{p.visits}</b> ครั้ง</Typography>
+          </Stack>
         </Box>
       </Stack>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${statCols}, minmax(0, 1fr))`, bgcolor: "#f8fafc", borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`,
+      {/* ตัวเลขหลัก 4 ช่อง — ไอคอนสีบอกความหมาย */}
+      <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${statCols}, minmax(0, 1fr))`, borderBottom: `1px solid ${LINE}`,
         "& > *": { borderLeft: `1px solid ${LINE}` }, [`& > *:nth-of-type(${statCols}n+1)`]: { borderLeft: 0 },
         ...(statCols === 2 ? { "& > *:nth-of-type(n+3)": { borderTop: `1px solid ${LINE}` } } : {}) }}>
-        <BigStat label="เข้างาน" value={`${p.visits} ครั้ง`} sub={p.upcoming ? `ยังไม่ถึงวัน/กำลังทำ ${p.upcoming}` : `ผ่านไปแล้ว ${p.past} ครั้ง`} />
-        <BigStat label="วันทำงาน" value={`${p.days} วัน`} sub={p.visits ? `เฉลี่ย ${(p.days / p.visits).toFixed(1)} วัน/ครั้ง` : undefined} />
-        <BigStat label="เฉลี่ยต่อครั้ง" value={formatKpi("avgPerVisit", p.avgPerVisit)} empty={p.avgPerVisit === null ? "ยังไม่มียอด" : null}
+        <BigStat icon={EventAvailableRounded} color={ACCENT} label="เข้างาน" value={`${p.visits} ครั้ง`} sub={p.upcoming ? `ยังไม่ถึงวัน/กำลังทำ ${p.upcoming}` : `ผ่านไปแล้ว ${p.past} ครั้ง`} />
+        <BigStat icon={CalendarMonthRounded} color={ACCENT} label="วันทำงาน" value={`${p.days} วัน`} sub={p.visits ? `เฉลี่ย ${(p.days / p.visits).toFixed(1)} วัน/ครั้ง` : undefined} />
+        <BigStat icon={InsightsRounded} color={ACCENT} label="เฉลี่ยต่อครั้ง" value={formatKpi("avgPerVisit", p.avgPerVisit)} empty={p.avgPerVisit === null ? "ยังไม่มียอด" : null}
           sub={p.valued ? `คิดจาก ${p.valued} ครั้งที่ลงแล้ว` : "ลงมูลค่าแล้วจึงคำนวณได้"} />
-        <BigStat label="มูลค่าต่อวันทำงาน" value={formatKpi("perDay", p.perDay)} empty={p.perDay === null ? "ยังไม่มียอด" : null}
+        <BigStat icon={PaymentsRounded} color={ACCENT} label="มูลค่าต่อวันทำงาน" value={formatKpi("perDay", p.perDay)} empty={p.perDay === null ? "ยังไม่มียอด" : null}
           sub={p.valuedDays ? `คิดจาก ${p.valuedDays} วันที่ลงแล้ว` : undefined} />
       </Box>
 
-      <Box sx={{ display: "grid", gap: wide ? 3 : 2, px: { xs: 1.5, sm: 2 }, py: 2, gridTemplateColumns: wide ? "minmax(300px, 380px) minmax(0, 1fr)" : "1fr" }}>
-        {/* ความครบของข้อมูล */}
+      <Box sx={{ display: "grid", gap: wide ? 3 : 2.25, px: { xs: 1.5, sm: 2 }, py: 2, gridTemplateColumns: wide ? "minmax(300px, 380px) minmax(0, 1fr)" : "1fr" }}>
+        {/* ความครบของข้อมูล — แถบความคืบหน้าสีตามเป้า */}
         <Box>
           <SubTitle right={<DataStatus p={p} size="lg" />}>ความครบของข้อมูล</SubTitle>
           {/* 🔁 (17 พ.ย. 2569 ผู้ใช้: "ความครบของข้อมูลควรมีมากกว่านี้ ให้สมบูรณ์") 2 กลุ่ม: ของคนนี้ · ของงานที่อยู่ในทีม */}
           {[["self", "ของคนนี้"], ["job", "ของงานที่อยู่ในทีม (รับผิดชอบร่วมกัน)"]].map(([scope, title]) => (
-            <Box key={scope} sx={{ mb: 1 }}>
-              <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, mb: 0.5, px: 0.25 }}>{title}</Typography>
-              <Box sx={{ borderRadius: 2, border: `1px solid ${LINE}` }}>
+            <Box key={scope} sx={{ mb: 1.25 }}>
+              <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: FAINT, mb: 0.6, px: 0.25, letterSpacing: ".02em" }}>{title}</Typography>
+              <Box sx={{ borderRadius: "12px", border: `1px solid ${LINE}`, overflow: "hidden" }}>
                 {RATE_KPIS.filter((d) => d.scope === scope).map((d, i) => {
                   const done = p[d.num] || 0;
                   const base = p[d.base] || 0;
-                  const ok = base > 0 && done === base;
+                  const pct = base ? Math.round((done / base) * 100) : 0;
+                  const hit = base > 0 && pct >= d.good;
+                  const full = base > 0 && done === base;
+                  const c = !base ? FAINT : hit ? OK : ACCENT; // ถึงเป้า = เขียว · ยังไม่ถึง = น้ำเงิน (สถานะดูจากไอคอนหน้าแถว)
                   return (
-                    <Box key={d.key} title={d.desc} sx={{ px: 1.25, py: 0.9, borderTop: i ? `1px solid ${LINE}` : 0 }}>
+                    <Box key={d.key} title={d.desc} sx={{ px: 1.35, py: 1.05, borderTop: i ? `1px solid ${LINE}` : 0 }}>
                       <Stack direction="row" alignItems="center" gap={1}>
                         {!base ? <CheckCircleRounded sx={{ fontSize: 18, color: "#e2e8f0" }} />
-                          : ok ? <CheckCircleRounded sx={{ fontSize: 18, color: OK }} /> : <ErrorRounded sx={{ fontSize: 18, color: WARN }} />}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#334155" }}>{d.label}</Typography>
-                          <Typography sx={{ fontSize: "0.68rem", color: FAINT }}>เป้า ≥{d.good}%{d.key === "docsRate" ? " · นับเฉพาะงาน PM" : ""}</Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "right" }}>
-                          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: base ? INK : FAINT, ...NUM }}>{base ? `${done} / ${base}` : "ไม่มีงานที่ต้องนับ"}</Typography>
-                          {base > 0 && <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: ok ? OK : WARN, ...NUM }}>{Math.round((done / base) * 100)}%</Typography>}
-                        </Box>
+                          : full || hit ? <CheckCircleRounded sx={{ fontSize: 18, color: OK }} /> : <ErrorRounded sx={{ fontSize: 18, color: "#f59e0b" }} />}
+                        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 700, color: "#334155" }}>{d.label}</Typography>
+                        {base > 0
+                          ? <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: hit ? OK : INK, ...NUM }}>{pct}%</Typography>
+                          : <Typography sx={{ fontSize: "0.74rem", color: FAINT }}>ไม่มีงานที่ต้องนับ</Typography>}
                       </Stack>
+                      {base > 0 && (
+                        <Box sx={{ pl: 3.25, mt: 0.6 }}>
+                          <Box sx={{ position: "relative" }}>
+                            <Bar value={done / base} color={c} height={6} />
+                            {/* เส้นเป้า */}
+                            <Box title={`เป้า ${d.good}%`} sx={{ position: "absolute", top: -2, bottom: -2, left: `${d.good}%`, width: 2, borderRadius: 1, bgcolor: alpha(INK, 0.25) }} />
+                          </Box>
+                          <Stack direction="row" sx={{ mt: 0.4 }}>
+                            <Typography sx={{ flex: 1, fontSize: "0.68rem", color: FAINT, ...NUM }}>{done} / {base} ครั้ง</Typography>
+                            <Typography sx={{ fontSize: "0.68rem", color: FAINT }}>เป้า ≥{d.good}%{d.key === "docsRate" ? " · เฉพาะงาน PM" : ""}</Typography>
+                          </Stack>
+                        </Box>
+                      )}
                       {d.key === "doneRate" && p.pastPending > 0 && (
-                        <Typography sx={{ pl: 3.25, fontSize: "0.7rem", color: MUTED }}>รวมรอแอดมินตรวจปิด {p.pastPending} ครั้ง</Typography>
+                        <Typography sx={{ pl: 3.25, mt: 0.25, fontSize: "0.7rem", color: MUTED }}>รวมรอแอดมินตรวจปิด {p.pastPending} ครั้ง</Typography>
                       )}
                     </Box>
                   );
@@ -373,20 +499,20 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
               </Box>
             </Box>
           ))}
-          <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: FAINT, lineHeight: 1.5 }}>
-            นับเฉพาะงานที่ผ่านไปแล้ว ({p.past} ครั้ง) — งานที่ยังไม่ถึงวันไม่นับว่าขาด · ชี้ที่แต่ละข้อเพื่อดูความหมาย
+          <Typography sx={{ mt: 0.25, fontSize: "0.72rem", color: FAINT, lineHeight: 1.5 }}>
+            นับเฉพาะงานที่ผ่านไปแล้ว ({p.past} ครั้ง) — งานที่ยังไม่ถึงวันไม่นับว่าขาด · เส้นเทาในแถบ = เป้า · ชี้ที่แต่ละข้อเพื่อดูความหมาย
           </Typography>
 
           {months?.length > 1 && (
             <Box sx={{ mt: 2 }}>
               <SubTitle>แนวโน้มรายเดือน</SubTitle>
-              <Box sx={{ borderRadius: 2, border: `1px solid ${LINE}` }}>
+              <Box sx={{ borderRadius: "12px", border: `1px solid ${LINE}`, overflow: "hidden" }}>
                 {months.map((m, i) => {
                   const max = Math.max(1, ...months.map((x) => x.total));
                   return (
-                    <Stack key={m.key} direction="row" alignItems="center" gap={1.25} sx={{ px: 1.25, py: 0.9, borderTop: i ? `1px solid ${LINE}` : 0 }}>
+                    <Stack key={m.key} direction="row" alignItems="center" gap={1.25} sx={{ px: 1.35, py: 0.95, borderTop: i ? `1px solid ${LINE}` : 0 }}>
                       <Typography sx={{ width: 64, flexShrink: 0, fontSize: "0.78rem", fontWeight: 700, color: "#334155" }}>{monthLabel(m.key)}</Typography>
-                      <Box sx={{ flex: 1 }}><ShareBar share={m.total / max} /></Box>
+                      <Box sx={{ flex: 1 }}><Bar value={m.total / max} color={ACCENT} height={6} /></Box>
                       <Typography sx={{ width: 44, textAlign: "right", fontSize: "0.72rem", color: MUTED, ...NUM }}>{m.visits} ครั้ง</Typography>
                       <Typography sx={{ width: 84, textAlign: "right", fontSize: "0.84rem", fontWeight: 800, color: INK, ...NUM }}>{baht(m.total)}</Typography>
                     </Stack>
@@ -400,25 +526,26 @@ function PersonDetail({ p, avatar, teamSize, onOpenJob, months, entries = [], de
         {/* รายการงานของคนนี้ */}
         <Box sx={{ minWidth: 0 }}>
           <SubTitle right={(
-            <Stack direction="row" gap={0.5}>
-              <FilterPill active={filter === "all"} onClick={() => { setFilter("all"); setShowAll(false); }}>ทั้งหมด {sorted.length}</FilterPill>
-              <FilterPill active={filter === "issues"} onClick={() => { setFilter("issues"); setShowAll(false); }}>ต้องแก้ {issueRows.length}</FilterPill>
+            <Stack direction="row" gap={0.75}>
+              <FilterPill active={filter === "all"} count={sorted.length} onClick={() => { setFilter("all"); setShowAll(false); }}>ทั้งหมด</FilterPill>
+              <FilterPill warn active={filter === "issues"} count={issueRows.length} onClick={() => { setFilter("issues"); setShowAll(false); }}>ต้องแก้</FilterPill>
             </Stack>
           )}>
             งานที่เข้า
           </SubTitle>
           {!list.length ? (
-            <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 1.5, borderRadius: 2, border: `1px solid ${LINE}`, color: OK }}>
+            <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5, py: 1.5, borderRadius: "12px", bgcolor: OK_SOFT, border: `1px solid ${alpha(OK, 0.18)}`, color: OK }}>
               <CheckCircleRounded sx={{ fontSize: 18 }} />
               <Typography sx={{ fontSize: "0.86rem", fontWeight: 800 }}>{filter === "issues" ? "ไม่มีงานที่ต้องแก้ — ข้อมูลครบ ใช้ประเมินได้" : "ไม่มีงานในช่วงนี้"}</Typography>
             </Stack>
           ) : (
-            <Box sx={{ borderRadius: 2, border: `1px solid ${LINE}`, overflow: "hidden" }}>
+            <Box sx={{ borderRadius: "12px", border: `1px solid ${LINE}`, overflow: "hidden" }}>
               {shown.map((r, i) => (
                 <EntryRow key={r.id} r={r} issues={issuesById.get(r.id)} first={i === 0} onOpen={() => onOpenJob?.(r.eventId)} />
               ))}
               {list.length > 8 && (
-                <Button fullWidth size="small" onClick={() => setShowAll((v) => !v)} sx={{ borderTop: `1px solid ${LINE}`, borderRadius: 0, textTransform: "none", fontWeight: 800 }}>
+                <Button fullWidth size="small" onClick={() => setShowAll((v) => !v)}
+                  sx={{ height: 40, borderTop: `1px solid ${LINE}`, borderRadius: 0, textTransform: "none", fontWeight: 800, color: ACCENT, bgcolor: "#fbfdff", "&:hover": { bgcolor: ACCENT_SOFT } }}>
                   {showAll ? "แสดงน้อยลง" : `ดูทั้งหมด ${list.length} งาน`}
                 </Button>
               )}
@@ -509,9 +636,9 @@ export default function WorkerKpiPanel({ entries, avatarOf, activePerson = "all"
         <Button size="small" variant="outlined" onClick={() => onPickPerson("all")} sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>‹ ดูทุกคน</Button>
       ) : null}>
       {multi && team.issueCount > 0 && (
-        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25, px: 1.5, py: 0.9, borderRadius: "12px", border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
-          <ErrorRounded sx={{ fontSize: 18, color: WARN }} />
-          <Typography sx={{ fontSize: "0.82rem", color: "#334155" }}>
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25, px: 1.5, py: 1, borderRadius: "12px", border: `1px solid ${WARN_LINE}`, bgcolor: WARN_SOFT }}>
+          <ReportProblemRounded sx={{ fontSize: 19, color: "#d97706" }} />
+          <Typography sx={{ fontSize: "0.82rem", color: "#78350f" }}>
             ยังมีงานที่ข้อมูลไม่ครบ <b>{team.issueCount}</b> รายการ — ยอดของบางคนอาจต่ำกว่าจริง ดูคอลัมน์ "ความครบของข้อมูล"
           </Typography>
         </Stack>

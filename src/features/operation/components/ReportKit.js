@@ -109,7 +109,11 @@ export function TotalRow({ label, value, valueSub }) {
 // มือถือ: กล่องสถิติในหัวสรุป (TotalHero) เป็นชิปแถวเดียว เลื่อนซ้าย-ขวาได้
 const HeroCompact = createContext(false);
 
-export function Stat({ label, value, tone, onClick, active }) {
+/**
+ * @param icon   (ไม่บังคับ) ไอคอน MUI — แสดงในวงพื้นอ่อนสี `color` หน้าตัวเลข (จอคอม)
+ *               ✅ (20 พ.ย. 2569 ผู้ใช้: "สีสันยังดูไม่สวย ไม่สดใส ทื่อๆ") ช่องตัวเลขมีไอคอนสีบอกความหมาย
+ */
+export function Stat({ label, value, tone, onClick, active, icon: Icon, color = ACCENT }) {
   const compact = useContext(HeroCompact);
   if (compact) {
     return (
@@ -125,10 +129,17 @@ export function Stat({ label, value, tone, onClick, active }) {
   return (
     <ButtonBase onClick={onClick} disabled={!onClick} component="div"
       // 🔁 (12 พ.ย. 2569 ผู้ใช้: "ข้อมูลให้กระชับ") กล่องเตี้ยลง · กล่องที่กดกรองได้มีลูกศรเล็ก · กล่องที่เลือกอยู่ขอบน้ำเงินชัด
-      sx={{ display: "block", textAlign: "left", px: 1.25, py: 1, borderRadius: "12px", border: `1.5px solid ${active ? ACCENT : LINE}`,
+      sx={{ display: Icon ? "flex" : "block", alignItems: "center", justifyContent: "flex-start", gap: 1.25, textAlign: "left", px: 1.25, py: 1, borderRadius: "12px", border: `1.5px solid ${active ? ACCENT : LINE}`,
         bgcolor: active ? alpha(ACCENT, 0.06) : "#fff", fontFamily: "inherit", minWidth: 0, position: "relative" }}>
+      {Icon && (
+        <Box sx={{ width: 36, height: 36, borderRadius: "10px", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color }}>
+          <Icon sx={{ fontSize: 20 }} />
+        </Box>
+      )}
+      <Box sx={{ minWidth: 0 }}>
       <Typography noWrap sx={{ fontSize: "0.76rem", color: active ? ACCENT : MUTED, fontWeight: 700, pr: onClick ? 1.5 : 0 }}>{label}</Typography>
       <Typography noWrap sx={{ fontSize: "1.05rem", fontWeight: 800, color: tone || INK, fontVariantNumeric: "tabular-nums", lineHeight: 1.35 }}>{value}</Typography>
+      </Box>
       {onClick && <Box component="span" sx={{ position: "absolute", top: 8, right: 10, fontSize: "0.8rem", color: active ? ACCENT : "#cbd5e1", fontWeight: 800 }}>{active ? "✓" : "›"}</Box>}
     </ButtonBase>
   );
@@ -164,7 +175,8 @@ export function TotalHero({ label, value, sub, note, stats }) {
     );
   }
   return (
-    <Box sx={{ ...R_CARD, p: { xs: 2, sm: 2.5 }, mb: { xs: 2.5, sm: 3 } }}>
+    // 🔁 (20 พ.ย. 2569) พื้นฟ้าอ่อนไล่ขาว (ชุดเดียวกับกล่องเด่นทั้งระบบ) — เดิมขาวล้วน ดูทื่อ
+    <Box sx={{ ...R_CARD, p: { xs: 2, sm: 2.5 }, mb: { xs: 2.5, sm: 3 }, background: `linear-gradient(135deg, ${alpha(ACCENT, 0.07)} 0%, #ffffff 60%)` }}>
       <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: ACCENT }}>{label}</Typography>
       <Typography sx={{ fontSize: { xs: "2rem", sm: "2.4rem" }, fontWeight: 900, color: INK, lineHeight: 1.15, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
       {sub && <Typography sx={{ fontSize: "0.84rem", color: MUTED, mt: 0.5 }}>{sub}</Typography>}
