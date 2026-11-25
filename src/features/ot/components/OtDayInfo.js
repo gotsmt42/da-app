@@ -65,11 +65,30 @@ const RULE = {
   public: "ทำงานวันหยุด 08:30–17:30 · หลัง 17:30 นับเป็น OT วันหยุด",
 };
 
-export default function OtDayInfo({ date, cfg, holidays }) {
+/**
+ * 🎨 (25 พ.ย. 2569 ผู้ใช้: "จัดให้ดี ดูง่าย" · "สีสันไม่ต้องรก")
+ *   compact = บรรทัดเดียวใต้ช่องเวลาในฟอร์ม: [ไอคอน] ชนิดวัน · กติกา OT ของวันนั้น · หมายเหตุ (หักพักเที่ยง/ข้ามเที่ยงคืน)
+ *   — วันที่อยู่บนการ์ดเลือกงานแล้ว ชั่วโมงอยู่ในช่อง "ชั่วโมง OT" แล้ว จึงไม่แสดงซ้ำ
+ *   ไม่ส่ง compact = แถบข้อมูลวันแบบเต็ม (เดิม)
+ */
+export default function OtDayInfo({ date, cfg, holidays, compact = false, note = "" }) {
   const d = dayKind(date, holidays, cfg);
   if (!d) return null;
   const t = TONE[d.kind];
   const dow = DAY_TH[moment(date).day()];
+  if (compact) {
+    return (
+      <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ px: 0.25, color: TEXT_SUB }}>
+        <Box sx={{ display: "flex", color: t.color, mt: "1px", "& svg": { fontSize: 16 } }}>{t.icon}</Box>
+        <Typography sx={{ fontSize: "0.76rem", lineHeight: 1.45, color: TEXT_SUB }}>
+          <Box component="span" sx={{ fontWeight: 800, color: d.kind === "work" ? TEXT_MAIN : t.color }}>
+            {d.kind === "public" ? `วันหยุดนักขัตฤกษ์ · ${d.label}` : t.tag}
+          </Box>
+          {" · "}{RULE[d.kind]}{note ? ` · ${note}` : ""}
+        </Typography>
+      </Stack>
+    );
+  }
   return (
     <Stack direction="row" spacing={1.25} alignItems="center" sx={{ borderRadius: 2.5, border: `1px solid ${t.border}`, bgcolor: t.bg, px: 1.5, py: 1 }}>
       <Box sx={{ width: 32, height: 32, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#fff", color: t.color, border: `1px solid ${t.border}`, "& svg": { fontSize: 18 } }}>

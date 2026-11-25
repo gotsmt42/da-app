@@ -10,11 +10,11 @@
  * งวดงาน และยอดหักที่ใบอื่นไม่มี ถ้ายัดรวมกันฟอร์มเดิม (1,100+ บรรทัด) จะมีเงื่อนไขซ้อนกันจนแก้ไม่ได้
  * ⚠️ ตัวเลขบนหน้าจอเป็นพรีวิว — server คำนวณใหม่ทั้งหมดเสมอ (contractorMoney ใน routes/expenses.js)
  */
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
-  useMediaQuery, Chip, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup,
+  useMediaQuery, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup,
   Checkbox, FormControlLabel, InputAdornment, LinearProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -31,12 +31,12 @@ import StatusBadge from "./StatusBadge";
 import BankLogo from "./BankLogo";
 import { BANKS, bankMeta, bankLogoUrl, digitsOnly, validateAccount } from "../bankMeta";
 import SheetSelectField, { FORM_FIELD_SX } from "@/shared/ui/SheetSelectField";
-import { SheetPicker, SheetPickerRow, PickerField } from "@/shared/ui/SheetPicker";
 import {
-  KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
+  KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeDates,
   contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
-import { JobOptionRow } from "@/shared/ui/JobTypeChip";
+import JobCalendarPicker, { JobPickCard } from "@/shared/ui/JobCalendarPicker";
+import { useHolidays } from "@/features/ot/components/OtDayInfo";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import FileKindThumb from "@/shared/ui/FileKindThumb";
@@ -139,9 +139,6 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
    */
   const [jobs, setJobs] = useState([]);
   const job = jobs[0] || null;
-  const [jobOptions, setJobOptions] = useState([]);
-  const [jobQuery, setJobQuery] = useState("");
-  const [jobLoading, setJobLoading] = useState(false);
   const [jobSheet, setJobSheet] = useState(false); // แผ่นเลือกงาน
   // ผู้รับเหมา
   const [known, setKnown] = useState([]);
@@ -271,18 +268,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps -- รีเซ็ตเฉพาะตอนเปิดกล่อง/เปลี่ยนใบ
   }, [open, expense?._id, presetJob?._id]);
 
-  // ── ค้นหางาน ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!open) return undefined;
-    setJobLoading(true);
-    const t = setTimeout(() => {
-      ExpenseService.jobs(jobQuery)
-        .then((rows) => setJobOptions(rows))
-        .catch(() => setJobOptions([]))
-        .finally(() => setJobLoading(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [open, jobQuery]);
+  const holidays = useHolidays(null); // ปฏิทินผูกงาน: วันหยุดนักขัตฤกษ์สีแดง
 
   /**
    * ✅ งวดที่เบิกไปแล้วของผู้รับเหมาคนนี้ในงานนี้ — ใช้ทั้งแสดงยอดสะสม และเสนอ "งวดถัดไป"/มูลค่าสัญญาให้
@@ -547,54 +533,21 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
         <Section icon={<Work sx={{ fontSize: 18, color: ACCENT }} />} title="งาน / งวดงาน"
           hint="ผูกงานแล้วระบบรวมยอดทุกงวดของผู้รับเหมาคนนี้ให้ เห็นว่าเบิกไปแล้วเท่าไรและเหลือเท่าไรตามสัญญา">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1.4fr" } }}>
-            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "Select งานยังเป็นแบบเดิม") เลือกงานจากแผ่นรายการแบบหน้าลงงาน — ค้นหาบนสุด · ติ๊กได้หลายช่วง */}
-            {(() => {
-              // ✅ เลือกช่วงแรกแล้ว เหลือให้เลือกเฉพาะช่วงอื่นของ "งานเดียวกัน" — ปนคนละงานไม่ได้
-              const choices = (() => {
-                const merged = [...jobs, ...jobOptions.filter((o) => !jobs.some((j) => j._id === o._id))];
-                if (!job) return jobOptions;
-                return merged.filter((o) => jobs.some((j) => j._id === o._id) || (job.groupKey && o.groupKey === job.groupKey)).sort(byStart);
-              })();
-              const shown = [...jobs, ...choices.filter((o) => !jobs.some((j) => j._id === o._id))];
-              const applyJobs = (v) => {
-                const next = [...v].sort(byStart);
-                // เลือกช่วงแรกของงาน → ค้นด้วยเลขที่/ชื่องานนั้น ให้ช่วงอื่นของงานเดียวกันขึ้นมาครบให้ติ๊กต่อ
-                if (!jobs.length && next.length) setJobQuery(next[0].docNo || next[0].title || "");
-                if (!next.length) setJobQuery("");
-                setJobs(next);
-              };
-              return (
-                <>
-                  <PickerField label="งาน / ช่วงวันที่ของงวดนี้ (แนะนำให้ผูก)" placeholder="แตะเพื่อเลือกงาน" sx={{ gridColumn: "1 / -1" }}
-                    onClick={() => setJobSheet(true)} disabled={Boolean(presetJob) && !editing}
-                    helperText={job
-                      ? `${jobText(job)} · ${jobs.length} ช่วงวันที่${job.groupKey ? " — แตะเพื่อติ๊กช่วงอื่นของงานเดียวกัน (เอาออกหมดเพื่อเปลี่ยนงาน)" : " (งานนี้มีช่วงเดียว)"}`
-                      : "งวดเดียวเลือกได้หลายช่วงวันที่ของงานเดียวกัน"}>
-                    {jobs.length ? (
-                      <Stack direction="row" flexWrap="wrap" gap={0.5}>
-                        {jobs.map((o) => <Chip key={o._id} size="small" label={rangeChip(o)} sx={{ fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: META.dark }} />)}
-                      </Stack>
-                    ) : null}
-                  </PickerField>
-                  <SheetPicker open={jobSheet} onClose={() => setJobSheet(false)}
-                    title={job ? "เลือกช่วงวันที่ของงานนี้" : "เลือกงาน"}
-                    subtitle={job ? `${jobText(job)} · ติ๊กได้หลายช่วง` : "ค้นหาชื่องาน / โครงการ / เลขที่"}
-                    query={jobQuery} onQuery={setJobQuery} loading={jobLoading} count={shown.length}
-                    emptyText={job ? "ไม่มีช่วงวันที่อื่นของงานนี้" : "ไม่พบงาน"}>
-                    {shown.map((o) => {
-                      const sel = jobs.some((j) => j._id === o._id);
-                      return (
-                        <SheetPickerRow key={o._id} multi selected={sel} onClick={() => applyJobs(sel ? jobs.filter((j) => j._id !== o._id) : [...jobs, o])}>
-                          <JobOptionRow job={o} main={jobText(o) || o.title}
-                            extra={jobPartText(o) ? <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800 }} /> : null}
-                            sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
-                        </SheetPickerRow>
-                      );
-                    })}
-                  </SheetPicker>
-                </>
-              );
-            })()}
+            {/* ✅ (25 พ.ย. 2569 ผู้ใช้: "การผูกกับงานทุกๆหน้า ... ให้ทำเป็นรูปแบบเลือกในปฏิทินให้เหมือนกับหน้า ขอ OT")
+                การ์ดผูกงาน + ปฏิทินเลือกงาน (JobCalendarPicker mode "jobs") · งวดเดียวเลือกได้หลายช่วงของ "งานเดียวกัน" เท่านั้น
+                (เลือกช่วงแรกแล้ว งานอื่นในปฏิทินล็อกพร้อมบอกเหตุผล — เอาช่วงเดิมออกหมดก่อนถ้าจะเปลี่ยนงาน) */}
+            <JobPickCard sx={{ gridColumn: "1 / -1" }} jobs={jobs} onClick={() => setJobSheet(true)} disabled={Boolean(presetJob) && !editing}
+              accent={ACCENT} accentDark={META.dark} label="งาน / ช่วงวันที่ของงวดนี้ (แนะนำให้ผูก)"
+              sideText={(o) => rangeChip(o)}
+              helperText={job
+                ? `${jobText(job)} · ${jobs.length} ช่วงวันที่${job.groupKey ? " — กดเพื่อเลือกช่วงอื่นของงานเดียวกัน (เอาออกหมดเพื่อเปลี่ยนงาน)" : " (งานนี้มีช่วงเดียว)"}`
+                : "งวดเดียวเลือกได้หลายช่วงวันที่ของงานเดียวกัน"} />
+            <JobCalendarPicker open={jobSheet} onClose={() => setJobSheet(false)} mode="jobs" onlyMine="auto" holidays={holidays}
+              title={job ? "เลือกช่วงวันที่ของงานนี้" : "เลือกงานของงวดนี้"} accent={ACCENT} accentDark={META.dark}
+              date={jobs[0]?.start ? moment(jobs[0].start).format("YYYY-MM-DD") : undefined} jobs={jobs}
+              canPick={(o, sel) => (sel.length && !sel.some((x) => x._id === o._id) && (!sel[0].groupKey || sel[0].groupKey !== o.groupKey)
+                ? "ใบนี้เลือกได้เฉพาะช่วงของงานเดียวกัน — เอางานเดิมออกก่อนถ้าจะเปลี่ยนงาน" : "")}
+              onPick={({ jobs: picked }) => { setJobs([...picked].sort(byStart)); setJobSheet(false); }} />
             <TextField size="small" label="งวดที่" type="number" value={instNo} onChange={(e) => setInstNo(e.target.value)}
               inputProps={{ min: 0, max: 99, ...numberField }} />
             <TextField size="small" label="จากทั้งหมด (งวด)" type="number" value={instTotal} onChange={(e) => setInstTotal(e.target.value)}

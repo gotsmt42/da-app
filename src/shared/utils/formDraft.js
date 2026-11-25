@@ -253,13 +253,30 @@ export function domFormDraft(root, key, { bannerHost, askRestore = false, onDirt
         bar.style.cssText = "display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;font-weight:600;text-align:left;";
         const n = Object.keys(pending.data).length;
         bar.innerHTML = `<span style="flex:1">↺ กู้คืนข้อมูลที่กรอกค้างไว้ ${n} ช่อง (${draftAgoText(pending.at)})</span><button type="button" style="border:0;background:#fff;color:#1d4ed8;font-weight:800;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid #bfdbfe;font-family:inherit">ล้างทิ้ง</button>`;
-        bar.querySelector("button").addEventListener("click", () => {
+        // ✅ (25 พ.ย. 2569 ผู้ใช้: "ถ้ามีล้างทิ้งให้มีคอนเฟิร์มก่อนทุกตัว") กดครั้งแรก = ถามยืนยันในแถบเดียวกัน (ฟอร์มนี้อยู่ใน SweetAlert เปิดกล่องซ้อนไม่ได้)
+        const doClear = () => {
           const keys = Object.keys(pending?.data || {});
           clearDraft(key);
           pending = null;
           apply(root, pick(baseline, keys), { fire: true });
           bar.remove();
-        });
+        };
+        const askClear = () => {
+          bar.style.background = "#fef2f2";
+          bar.style.borderColor = "#fecaca";
+          bar.style.color = "#7f1d1d";
+          bar.innerHTML = `<span style="flex:1">ล้างข้อมูลที่กรอกค้างไว้ ${n} ช่อง? ฟอร์มจะกลับเป็นค่าเริ่มต้น — กู้คืนไม่ได้</span>`
+            + `<button type="button" data-act="no" style="border:1px solid #e2e8f0;background:#fff;color:#475569;font-weight:700;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;font-family:inherit">ไม่ล้าง</button>`
+            + `<button type="button" data-act="yes" style="border:0;background:#dc2626;color:#fff;font-weight:800;font-size:12px;padding:6px 11px;border-radius:8px;cursor:pointer;font-family:inherit">ล้างทิ้ง</button>`;
+          bar.querySelector('[data-act="yes"]').addEventListener("click", doClear);
+          bar.querySelector('[data-act="no"]').addEventListener("click", () => {
+            bar.style.background = "#eff6ff"; bar.style.borderColor = "#bfdbfe"; bar.style.color = "#1e3a8a";
+            bar.innerHTML = original;
+            bar.querySelector("button").addEventListener("click", askClear);
+          });
+        };
+        const original = bar.innerHTML;
+        bar.querySelector("button").addEventListener("click", askClear);
         host.prepend(bar);
       }
       started = true;

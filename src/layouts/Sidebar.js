@@ -5,7 +5,7 @@ import Tooltip from "@mui/material/Tooltip";
 import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { can, seesOperationBoard, rankLabel, DEPARTMENT } from "@/shared/utils/roles";
+import { can, seesOperationBoard, rankLabel, DEPARTMENT, isServiceCalendarObserver } from "@/shared/utils/roles";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับ ไม่งั้นหลุดจากการ์ดหน้าแรก
 // และแถบล่างมือถือที่ชี้ปลายทางเดียวกัน
 import { dest } from "./navConfig";
@@ -46,7 +46,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   // ✅ ใครลงแผนงานได้ ต้องเห็นเมนูแผนงาน — เซลลงแผนงานของตัวเองด้วยฟอร์ม/ปฏิทินชุดเดียวกับช่าง
   // (ข้อมูลถูกกรองด้วย department ที่ server แล้ว จึงไม่มีทางเห็นงานของอีกฝ่าย)
-  const canPlanWork = canViewOperation || canSell || seeAllSchedules || can(userData, "viewServiceCalendar");
+  const canPlanWork = canViewOperation || canSell || seeAllSchedules || isServiceCalendarObserver(userData);
   // มีอะไรอยู่ในหมวด "งาน" บ้างไหม — ใช้ตัดสินว่าจะโชว์หัวข้อหมวดหรือไม่
   const hasWorkMenu = canPlanWork || canAssign || canViewContracts || can(userData, "receiveDispatch");
 
@@ -114,7 +114,7 @@ const side = (key, extra) => {
           { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales" },
         ],
       }]
-    : can(userData, "viewServiceCalendar")
+    : isServiceCalendarObserver(userData)
       ? [{
           // ✅ เซล — เห็น 2 ปฏิทิน: ของตัวเอง (แก้ได้) และของช่าง (ดูอย่างเดียว)
           // เหตุผล: ต้องเช็คว่าช่างว่างวันไหนก่อนไปรับปากลูกค้าเรื่องวันเข้างาน

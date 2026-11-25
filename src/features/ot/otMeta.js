@@ -119,3 +119,15 @@ export const periodLabel = (p) => {
   const TH = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
   return `${TH[m - 1]} ${y + 543}`;
 };
+
+/**
+ * งานทั้งหมดที่บรรทัด OT อิง — ✅ (25 พ.ย. 2569 ผู้ใช้: "ให้ผูกหลายงานได้รายการเดียว")
+ * ใบใหม่มี line.jobs · ใบเก่ามีแค่ eventId/jobTitle ตัวเดียว → ห่อเป็นรายการเดียวให้อ่านแบบเดียวกัน
+ * @returns {Array<{eventId: string, jobTitle: string}>}
+ */
+export const lineJobs = (l) => {
+  if (Array.isArray(l?.jobs) && l.jobs.length) return l.jobs.filter((j) => j?.jobTitle || j?.eventId);
+  return l?.jobTitle || l?.eventId ? [{ eventId: l.eventId || "", jobTitle: l.jobTitle || "" }] : [];
+};
+/** ชื่องานของบรรทัด (หลายงานคั่นด้วย " + ") */
+export const lineJobText = (l) => lineJobs(l).map((j) => j.jobTitle).filter(Boolean).join(" + ");

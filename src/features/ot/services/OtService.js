@@ -13,8 +13,10 @@ const OtService = {
   async create(fields) { return (await API.post("/ot", fields)).data.request; },
   async update(id, fields) { return (await API.put(`/ot/${id}`, fields)).data.request; },
   /** หลักฐานการทำ OT (ไม่บังคับ) — files: File[] */
-  async addFiles(id, files) {
+  /** @param refs รายการ OT ที่ไฟล์แต่ละไฟล์เป็นหลักฐาน (itemRef · เรียงตรงกับ files · ว่าง = หลักฐานรวมของใบ) */
+  async addFiles(id, files, refs = []) {
     const fd = new FormData();
+    if (refs.length) fd.append("refs", JSON.stringify(refs));
     files.forEach((f) => fd.append("files", f));
     return (await API.post(`/ot/${id}/files`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120_000 })).data.request;
   },

@@ -19,9 +19,8 @@ import { useAuth } from "@/features/auth/AuthContext";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
-import ExpenseService from "@/features/expenses/services/ExpenseService";
-import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
-import { JobOptionRow } from "@/shared/ui/JobTypeChip";
+import JobCalendarPicker, { JobPickCard } from "@/shared/ui/JobCalendarPicker";
+import { useHolidays } from "@/features/ot/components/OtDayInfo";
 import PurchaseService, { errorText } from "../services/PurchaseService";
 import {
   PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, PRIORITIES, PR_CATEGORIES, FILE_KINDS, money, fmtMoney, baht,
@@ -51,9 +50,6 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const editing = Boolean(request?._id);
   const [suggest, setSuggest] = useState({ suppliers: [], deliverTo: [], units: [], products: [] });
-  const [jobOptions, setJobOptions] = useState([]);
-  const [jobQuery, setJobQuery] = useState("");
-  const [jobLoading, setJobLoading] = useState(false);
 
   const [docDate, setDocDate] = useState(moment().format("YYYY-MM-DD"));
   const [subject, setSubject] = useState("");
@@ -120,14 +116,8 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- รีเซ็ตเฉพาะตอนเปิดกล่อง/เปลี่ยนใบ
   }, [open, request?._id]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    setJobLoading(true);
-    const t = setTimeout(() => {
-      ExpenseService.jobs(jobQuery).then(setJobOptions).catch(() => setJobOptions([])).finally(() => setJobLoading(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [open, jobQuery]);
+  const [jobSheet, setJobSheet] = useState(false); // ปฏิทินเลือกงาน
+  const holidays = useHolidays(null);
 
   const setItem = (k, patch) => setItems((rows) => rows.map((r) => (r.key === k ? { ...r, ...patch } : r)));
   const pickProduct = (k, v) => {
@@ -216,24 +206,18 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
             <TextField select size="small" label="ประเภทการซื้อ" value={category} onChange={(e) => setCategory(e.target.value)} sx={{ gridColumn: { sm: "1 / -1" } }}>
               {PR_CATEGORIES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
             </TextField>
-            <Autocomplete
-              sx={{ gridColumn: { sm: "1 / -1" } }}
-              options={job && !jobOptions.some((j) => j._id === job._id) ? [job, ...jobOptions] : jobOptions}
-              value={job} loading={jobLoading} filterOptions={(x) => x}
-              onChange={(_, v) => { setJob(v); if (v && !deliverTo) setDeliverTo(v.site || v.company || ""); }}
-              onInputChange={(_, v, r) => { if (r === "input") setJobQuery(v); }}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              getOptionLabel={(o) => [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ")}
-              renderOption={({ key: k, ...li }, o) => (
-                <li {...li} key={o._id}>
-                  <JobOptionRow job={o} main={jobText(o) || o.title} sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
-                </li>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} size="small" label="ใช้กับงาน / โครงการ" placeholder="ค้นหาชื่องาน / โครงการ (ไม่บังคับ)"
-                  InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
-              )}
-            />
+            {/* ✅ (25 พ.ย. 2569 ผู้ใช้: "การผูกกับงานทุกๆหน้า ... ให้ทำเป็นรูปแบบเลือกในปฏิทินให้เหมือนกับหน้า ขอ OT") */}
+            <JobPickCard sx={{ gridColumn: { sm: "1 / -1" } }} jobs={job ? [job] : []} onClick={() => setJobSheet(true)}
+              accent={PR_ACCENT} accentDark={PR_DARK} label="ใช้กับงาน / โครงการ (ไม่บังคับ)" emptyText="ยังไม่ได้ผูกงาน — กดเพื่อเลือกจากปฏิทิน" />
+            <JobCalendarPicker open={jobSheet} onClose={() => setJobSheet(false)} mode="jobs" max={1} onlyMine="auto" holidays={holidays}
+              title="เลือกงานที่ใช้ของ" subtitle="แตะวันในปฏิทินเพื่อหางาน → แตะงาน → ตกลง" accent={PR_ACCENT} accentDark={PR_DARK}
+              date={job?.start ? moment(job.start).format("YYYY-MM-DD") : undefined} jobs={job ? [job] : []}
+              onPick={({ jobs: picked }) => {
+                const v = picked[0] || null;
+                setJob(v);
+                if (v && !deliverTo) setDeliverTo(v.site || v.company || "");
+                setJobSheet(false);
+              }} />
             <Autocomplete freeSolo options={suggest.deliverTo || []} value={deliverTo} inputValue={deliverTo}
               onInputChange={(_, v) => setDeliverTo(v)} onChange={(_, v) => setDeliverTo(v || "")} sx={{ gridColumn: { sm: "1 / -1" } }}
               renderInput={(params) => <TextField {...params} size="small" label="สถานที่ส่งของ" placeholder="เช่น หน้างาน Centara Grand Bangkok / สำนักงาน" />} />

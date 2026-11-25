@@ -63,6 +63,20 @@ const STATUS_ORDER = ["issued", "sent", "acknowledged", "cancelled"];
 // ⚠️ เดิมประกอบ พ.ศ. เองตรงนี้ — ย้ายไปใช้ตัวกลางที่ shared/utils/thaiDate แล้ว
 const thaiDate = thaiDateNumeric;
 
+/**
+ * ✅ (25 พ.ย. 2569) ใบที่แก้ไขย้อนหลัง / ออกใหม่แทน — บอกในทะเบียนให้ตามได้ว่าใบไหนเป็นฉบับล่าสุด
+ */
+const RevisionTag = ({ r }) => {
+  const text = r.supersededByNumber ? `ถูกแทนด้วย ${r.supersededByNumber}`
+    : r.supersedesNumber ? `แทนใบ ${r.supersedesNumber}`
+    : r.revisionNo ? `แก้ไข ${r.revisionNo} ครั้ง` : "";
+  if (!text) return null;
+  return (
+    <Box component="span" sx={{ display: "inline-block", mt: 0.25, px: 0.75, borderRadius: 1, fontSize: "0.66rem", fontWeight: 800, lineHeight: "18px", whiteSpace: "nowrap",
+      bgcolor: "#f1f5f9", color: "#475569" }}>{text}</Box>
+  );
+};
+
 const IssuedDocuments = () => {
   const isMobile = useMediaQuery("(max-width:900px)");
   const { userData } = useAuth();
@@ -354,6 +368,7 @@ const IssuedDocuments = () => {
               sx={{ px: 1.75, py: 1.5, borderTop: i ? `1px solid ${LINE}` : "none", cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1, "&:active": { bgcolor: SURFACE } }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography>
+                <RevisionTag r={r} />
                 <Box sx={{ flex: 1 }} />
                 <TypeLabel value={r.docType} />
               </Stack>
@@ -393,7 +408,10 @@ const IssuedDocuments = () => {
                 {rows.map((r) => (
                   <TableRow key={r._id} hover onClick={() => openPreview(r)}
                     sx={{ ...TABLE_ROW_SX, cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1 }}>
-                    <TableCell><Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography></TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography>
+                      <RevisionTag r={r} />
+                    </TableCell>
                     <TableCell><TypeLabel value={r.docType} /></TableCell>
                     <TableCell sx={{ maxWidth: 360 }}>
                       <Typography noWrap sx={{ fontWeight: 700, fontSize: "0.84rem", color: INK }}>{r.site || "—"}</Typography>

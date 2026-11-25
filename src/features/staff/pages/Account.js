@@ -24,6 +24,7 @@ import PushService from "@/shared/services/PushService";
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import { rankLabel, systemRoleLabel, titleOf, departmentOf, DEPARTMENT_LABEL, SYSTEM_ROLE_DESC, systemRoleOf } from "@/shared/utils/roles";
+import { PERMISSION_GROUPS, capNotApplicable } from "@/shared/utils/permissionCatalog";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
@@ -31,29 +32,16 @@ import { resizeImage } from "@/shared/utils/imageResize";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
-/** สิทธิ์ที่ผู้ใช้ทั่วไปอยากรู้ว่า "ฉันทำอะไรได้บ้าง" — ชื่อเรียกแบบที่คนใช้งานเข้าใจ */
+/**
+ * สิทธิ์ที่ผู้ใช้ทั่วไปอยากรู้ว่า "ฉันทำอะไรได้บ้าง" — ชื่อเรียกแบบที่คนใช้งานเข้าใจ
+ * ✅ (25 พ.ย. 2569) อ่านจากรายการเดียวกับหน้าตั้งค่าสิทธิ์ (permissionCatalog) — เดิมเขียนแยกแล้วไม่ตรงกัน
+ *    (บอกว่า "ยื่นเบิก · OT · ขอซื้อ" ทั้งที่ใบขอซื้อแยกสิทธิ์แล้ว · ขาดสิทธิ์สต๊อก/เว็บไซต์/ตารางงาน ฯลฯ)
+ *    + กลุ่ม "ดูแลระบบ" ที่มาจาก Role (ไม่ใช่จากตำแหน่ง)
+ */
 const CAPS = [
-  ["งาน", [
-    ["viewAllJobs", "เห็นงานของทุกคน"],
-    ["approveJobs", "อนุมัติแผนงานและการปิดงาน"],
-    ["editOperation", "อัปเดตงานในหน้าการดำเนินงาน"],
-    ["receiveDispatch", "รับงานที่ได้รับมอบหมาย"],
-    ["requestDispatch", "แจ้งงานให้ฝ่ายช่าง"],
-    ["assignDispatch", "จัดคิวคำขอลงงาน"],
-  ]],
-  ["เอกสาร · ลูกค้า", [
-    ["viewContracts", "ดูภาพรวมงานและสัญญา"],
-    ["editContracts", "เพิ่ม/แก้ไขสัญญา"],
-    ["viewFinance", "ใบเสนอราคา / การเงิน"],
-    ["viewDocuments", "เปิดเมนูเอกสาร"],
-    ["editDocuments", "ออกเอกสารให้ลูกค้า"],
-    ["manageMasterData", "จัดการข้อมูลลูกค้า/ประเภทงาน"],
-  ]],
-  ["เบิกจ่าย · OT · จัดซื้อ", [
-    ["requestExpense", "ยื่นเบิก · OT · ขอซื้อ"],
-    ["reviewExpense", "ตรวจสอบใบเบิก"],
-    ["approveExpense", "อนุมัติใบเบิก"],
-    ["disburseExpense", "อนุมัติเบิกจ่าย"],
+  ...PERMISSION_GROUPS.map((g) => [g.title, g.items.map((it) => [it.cap, it.short || it.title])]),
+  ["ดูแลระบบ (ตาม Role)", [
+    ["manageAll", "จัดการบัญชีผู้ใช้"],
     ["manageSystem", "ตั้งค่าองค์กรและสิทธิ์"],
   ]],
 ];
@@ -293,7 +281,7 @@ export default function Account() {
               <Box key={group} sx={{ px: 2, py: 1.25, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
                 <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, mb: 0.75 }}>{group}</Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, rowGap: 0.6, columnGap: 1.5 }}>
-                  {items.map(([cap, label]) => {
+                  {items.filter(([cap]) => !capNotApplicable(userData, cap)).map(([cap, label]) => {
                     const ok = can(cap);
                     return (
                       <Stack key={cap} direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>

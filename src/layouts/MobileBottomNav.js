@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { can, seesOperationBoard, DEPARTMENT } from "@/shared/utils/roles";
+import { can, seesOperationBoard, DEPARTMENT, isServiceCalendarObserver } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่
 // ช่องบนแถบนี้กว้างราว 70px จึงใช้ชื่อที่สั้นที่สุดของปลายทาง (barTitle)
@@ -44,7 +44,7 @@ const bar = (key, match) => {
 export const buildBottomNav = (userData) => {
   // ✅ ตัดสินจากสิทธิ์ล้วน (ตารางสิทธิ์) — ชุดเดียวกับเมนูข้าง/หน้าแรก (ดู Sidebar.js)
   const seeAllSchedules = can(userData, "viewAllJobs");
-  const serviceObserver = !seeAllSchedules && can(userData, "viewServiceCalendar");
+  const serviceObserver = isServiceCalendarObserver(userData);
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   const canPlanWork = canViewOperation || can(userData, "createSalesPlan") || seeAllSchedules || serviceObserver;

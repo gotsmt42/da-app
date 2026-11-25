@@ -9,7 +9,7 @@
  * ⚠️ data ต้องเป็นค่าที่ JSON ได้ (ไม่มีไฟล์/ฟังก์ชัน) · เริ่มบันทึกเมื่อค่าเปลี่ยนจากตอนเปิดฟอร์มแล้วเท่านั้น
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Box, Stack, Typography, Button } from "@mui/material";
+import { Box, Stack, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { HistoryRounded as History } from "@mui/icons-material";
 import { saveDraft, loadDraft, clearDraft, draftAgoText, userActedWithin } from "@/shared/utils/formDraft";
 
@@ -92,8 +92,12 @@ export default function useFormDraft({ key, enabled, data, restore }) {
   return { restoredAt, restoredCount, clear, discard };
 }
 
-/** แถบบอกว่ากู้คืนข้อมูลที่กรอกค้างไว้ + ปุ่มล้างทิ้ง */
+/**
+ * แถบบอกว่ากู้คืนข้อมูลที่กรอกค้างไว้ + ปุ่มล้างทิ้ง
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "ถ้ามีล้างทิ้งให้มีคอนเฟิร์มก่อนทุกตัว") — กด "ล้างทิ้ง" แล้วถามก่อนเสมอ (กันกดผิด ข้อมูลหาย)
+ */
 export function DraftBanner({ draft, sx }) {
+  const [ask, setAsk] = useState(false);
   if (!draft?.restoredAt) return null;
   return (
     <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2, bgcolor: "#eff6ff", border: "1px solid #bfdbfe", ...sx }}>
@@ -102,11 +106,24 @@ export function DraftBanner({ draft, sx }) {
         <Typography sx={{ flex: 1, fontSize: "0.82rem", fontWeight: 700, color: "#1e3a8a" }}>
           กู้คืนข้อมูลที่กรอกค้างไว้{draft.restoredCount ? ` ${draft.restoredCount} ช่อง` : ""} ({draftAgoText(draft.restoredAt)})
         </Typography>
-        <Button size="small" variant="outlined" onClick={draft.discard}
+        <Button size="small" variant="outlined" onClick={() => setAsk(true)}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#1d4ed8", borderColor: "#bfdbfe", bgcolor: "#fff", py: 0.2 }}>
           ล้างทิ้ง
         </Button>
       </Stack>
+      <Dialog open={ask} onClose={() => setAsk(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }} sx={{ zIndex: 20050 }}>
+        <DialogTitle sx={{ fontWeight: 800, pb: 0.5 }}>ล้างข้อมูลที่กรอกค้างไว้?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: "#64748b" }}>
+            ข้อมูลที่กู้คืนมา{draft.restoredCount ? ` ${draft.restoredCount} ช่อง` : ""}จะถูกล้าง แล้วฟอร์มกลับเป็นค่าเริ่มต้น — กู้คืนไม่ได้
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAsk(false)} sx={{ textTransform: "none", color: "#64748b" }}>ไม่ล้าง</Button>
+          <Button variant="contained" color="error" disableElevation onClick={() => { setAsk(false); draft.discard(); }}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>ล้างทิ้ง</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

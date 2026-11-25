@@ -15,9 +15,8 @@ import {
 import { CloseRounded as Close, DeleteOutlineRounded as DeleteOutline, SendRounded as Send, AddRounded as Add, RemoveRounded as Remove } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
-import ExpenseService from "@/features/expenses/services/ExpenseService";
-import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
-import { JobOptionRow } from "@/shared/ui/JobTypeChip";
+import JobCalendarPicker, { JobPickCard } from "@/shared/ui/JobCalendarPicker";
+import { useHolidays } from "@/features/ot/components/OtDayInfo";
 import StockService, { errorText } from "../services/StockService";
 import { STOCK_ACCENT, STOCK_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, kindMeta, available, fmt } from "../stockMeta";
 import { FIELD_SX, Label, Section, Thumb, SignatureToggle } from "./StockBits";
@@ -34,9 +33,6 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
   const [refMode, setRefMode] = useState("job"); // "job" = เลือกงานในตาราง · "project" = พิมพ์ชื่อโครงการเอง
   const [projectName, setProjectName] = useState("");
   const [useSignature, setUseSignature] = useState(true);
-  const [jobQuery, setJobQuery] = useState("");
-  const [jobOptions, setJobOptions] = useState([]);
-  const [jobLoading, setJobLoading] = useState(false);
   const [lines, setLines] = useState([]);
   const [note, setNote] = useState("");
   const [due, setDue] = useState("");
@@ -50,14 +46,8 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
     setLines(preset ? [{ key: key(), itemId: preset._id, qty: 1 }] : [{ key: key(), itemId: "", qty: 1 }]);
   }, [open, preset]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    setJobLoading(true);
-    const t = setTimeout(() => {
-      ExpenseService.jobs(jobQuery).then(setJobOptions).catch(() => setJobOptions([])).finally(() => setJobLoading(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [open, jobQuery]);
+  const [jobSheet, setJobSheet] = useState(false); // ปฏิทินเลือกงาน
+  const holidays = useHolidays(null);
 
   const byId = useMemo(() => new Map(items.map((it) => [it._id, it])), [items]);
   const pickable = useMemo(() => items.filter((it) => it.active !== false), [items]);
@@ -66,7 +56,6 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
   const filled = lines.filter((l) => l.itemId && l.qty > 0);
   const over = filled.some((l) => l.qty > available(byId.get(l.itemId)));
   const hasAsset = filled.some((l) => byId.get(l.itemId)?.kind === "asset");
-  const jobLabel = (j) => (j ? (jobText(j) || j.title || "") : "");
 
   const submit = async () => {
     setTouched(true);
@@ -115,24 +104,15 @@ export default function StockRequestForm({ open, dept, deptLabel, items, preset,
               <TextField fullWidth size="small" sx={FIELD_SX} value={projectName} onChange={(e) => setProjectName(e.target.value)} autoFocus
                 placeholder="เช่น ปรับปรุงสำนักงาน ชั้น 2 / งานซ่อมภายใน" error={touched && !projectName.trim()} inputProps={{ maxLength: 200 }} />
             ) : (
-            <Autocomplete
-              options={jobOptions} value={job} loading={jobLoading} filterOptions={(x) => x}
-              onChange={(_, v) => setJob(v)}
-              onInputChange={(_, v, r) => { if (r === "input") setJobQuery(v); }}
-              onOpen={() => setJobQuery("")}
-              isOptionEqualToValue={(o, v) => o._id === v._id}
-              getOptionLabel={(o) => [jobLabel(o), jobRangeText(o)].filter(Boolean).join(" · ")}
-              renderOption={({ key: k, ...li }, o) => (
-                <li {...li} key={o._id}>
-                  <JobOptionRow job={o} main={jobLabel(o)} sub={[jobRangeText(o), o.docNo ? `เลขที่ ${o.docNo}` : "", o.status || ""].filter(Boolean).join(" · ")} />
-                </li>
-              )}
-              noOptionsText="ไม่พบงาน"
-              renderInput={(params) => (
-                <TextField {...params} size="small" sx={FIELD_SX} placeholder="ค้นหาชื่องาน / โครงการ / เลขที่" error={touched && !job}
-                  InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
-              )}
-            />
+            <>
+              {/* ✅ (25 พ.ย. 2569 ผู้ใช้: "การผูกกับงานทุกๆหน้า ... ให้ทำเป็นรูปแบบเลือกในปฏิทินให้เหมือนกับหน้า ขอ OT") */}
+              <JobPickCard jobs={job ? [job] : []} onClick={() => setJobSheet(true)} error={touched && !job}
+                label="งานที่ใช้ของ" required emptyText="ยังไม่ได้เลือกงาน — กดเพื่อเลือกจากปฏิทิน" />
+              <JobCalendarPicker open={jobSheet} onClose={() => setJobSheet(false)} mode="jobs" max={1} onlyMine="auto" holidays={holidays}
+                title="เลือกงานที่เบิกของไปใช้" subtitle="แตะวันในปฏิทินเพื่อหางาน → แตะงาน → ตกลง"
+                date={job?.start ? moment(job.start).format("YYYY-MM-DD") : undefined} jobs={job ? [job] : []}
+                onPick={({ jobs: picked }) => { setJob(picked[0] || null); setJobSheet(false); }} />
+            </>
             )}
           </Section>
 

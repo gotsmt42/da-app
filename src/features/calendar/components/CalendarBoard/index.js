@@ -77,6 +77,8 @@ import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDial
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import SalesAppointmentDialog from "../SalesAppointmentDialog";
 import SalesAgenda, { SalesTopBar, SalesViewToggle } from "../SalesAgenda";
+import EventSplitView from "../EventSplitView";
+import { ViewAgendaRounded, CalendarMonthRounded, ViewSidebarRounded } from "@mui/icons-material";
 import TechAgenda, { TechTopBar } from "../TechAgenda";
 import { getSaveEventToDB } from "../EventForms/SaveEvent";
 import { getEventDrop } from "../EventForms/EventDrop";
@@ -86,7 +88,7 @@ import { getDeleteEvent } from "../EventForms/DeleteEvent";
 
 import { formatThai } from "@/shared/utils/thaiDate";
 import { isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
-import { can } from "@/shared/utils/roles";
+import { can, isServiceCalendarObserver } from "@/shared/utils/roles";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 // ⚠️ lazy — ฟอร์มใบเบิกใหญ่ (MUI Autocomplete/DatePicker/แนบไฟล์) และน้อยคนที่เปิดจากหน้าปฏิทิน ไม่ควรถ่วง
@@ -279,7 +281,8 @@ function EventCalendar() {
    * การล็อกฝั่งจอนี้มีไว้ให้ผู้ใช้ "ไม่กรอกเสียเที่ยว" ไม่ใช่เพื่อความปลอดภัย
    */
   const isServiceObserver =
-    requestedDept === DEPARTMENT.SERVICE && can(userData, "viewServiceCalendar") && isSaleUser;
+    // 🐛 (25 พ.ย. 2569) เดิมผูกกับ isSaleUser — ติ๊กสิทธิ์ให้ตำแหน่งอื่นนอกฝ่ายช่างแล้วเปิดไม่ได้ (server ยอมให้ดูอยู่แล้ว)
+    requestedDept === DEPARTMENT.SERVICE && isServiceCalendarObserver(userData);
   const viewingDept =
     requestedDept === "sales" ? "sales" : isServiceObserver ? DEPARTMENT.SERVICE : undefined;
   const viewingSalesCalendar = viewingDept === "sales";
@@ -1149,7 +1152,10 @@ function EventCalendar() {
     if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
   };
   const techListMode = !isSalesView && techView === "list";
-  const listMode = salesListMode || techListMode;
+  // ✅ (25 พ.ย. 2569 ผู้ใช้: "ทำปุ่มเมนูสลับรูปแบบการแสดงของหน้า Event ... แค่สลับรูปแบบการแสดงผล แบบเดิมยังคงไว้ทั้งหมด")
+  //    มุมมองที่ 3 "รายวัน" = ปฏิทินย่อ + งานของวันที่เลือก (EventSplitView) · ปฏิทินเดิมยัง mount อยู่ (ซ่อนไว้) เหมือนโหมดรายการ
+  const techSplitMode = !isSalesView && techView === "split";
+  const listMode = salesListMode || techListMode || techSplitMode;
   /** เปิดงานช่างจากมุมมองรายการ — ใช้ EventApi จริงของ FullCalendar (ฟอร์มแก้ไขเรียก setExtendedProp) */
   const openTechFromList = (id) => {
     const api = calendarRef.current?.getApi();
@@ -2720,7 +2726,11 @@ function EventCalendar() {
         <div className="tb-view">
           {isSalesView
             ? <SalesViewToggle view={salesView} onView={setSalesView} />
-            : <SalesViewToggle view={techView} onView={setTechView} accent="#dc2626" />}
+            : <SalesViewToggle view={techView} onView={setTechView} accent="#dc2626" options={[
+              { k: "list", label: "รายการ", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
+              { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
+              { k: "split", label: "รายวัน", icon: <ViewSidebarRounded sx={{ fontSize: 18 }} /> },
+            ]} />}
         </div>
         {/* จอใหญ่: แถว 1 = มุมมอง ......... ปุ่มคำสั่ง · แถว 2 = ค้นหา + ตัวกรอง (ดู .ec-wide-toolbar ใน index.css) */}
         <div className="tb-spacer" />
@@ -2838,6 +2848,17 @@ function EventCalendar() {
           addLabel={addLabel}
           tab={techTab}
           onTab={setTechTab}
+        />
+      )}
+
+      {techSplitMode && (
+        <EventSplitView
+          events={filteredCalendarEvents}
+          // จำ "วันที่ที่เลือก" ไว้ให้ฟอร์มงาน (เหมือนกดช่องวันบนปฏิทินเดิม) แล้วเปิดงานด้วยตัวเปิดเดียวกับโหมดรายการ
+          onOpen={(id, day) => { clickedDateRef.current = day || ""; openTechFromList(id); }}
+          onAdd={(day) => handleAddEvent({ dateStr: day })}
+          canAdd={!isServiceObserver}
+          addLabel={addLabel}
         />
       )}
 

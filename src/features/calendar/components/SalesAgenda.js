@@ -137,13 +137,14 @@ export function ListPager({ page, pageCount, total, go, accent = ACCENT }) {
 }
 
 /** ปุ่มสลับมุมมอง รายการ/ปฏิทิน แบบกะทัดรัด (วางในแถวค้นหา) */
-export function SalesViewToggle({ view, onView, accent = ACCENT }) {
+/** @param options ตัวเลือกมุมมอง (ไม่ส่ง = รายการ · ปฏิทิน) — ตารางงานช่างเพิ่ม "รายวัน" (25 พ.ย. 2569) */
+export function SalesViewToggle({ view, onView, accent = ACCENT, options }) {
   return (
     <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#eef2f7", flexShrink: 0 }}>
-      {[
+      {(options || [
         { k: "list", label: "รายการ", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
         { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
-      ].map((o) => (
+      ]).map((o) => (
         <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.label} aria-label={o.label} aria-pressed={view === o.k}
           sx={{
             gap: 0.6, height: 32, px: { xs: 1, sm: 1.5 }, borderRadius: "8px", fontSize: "0.8rem", fontWeight: 800,

@@ -58,6 +58,8 @@ const DocumentPreviewDialog = ({
   // 🔁 (6 พ.ย. 2569 ผู้ใช้: "เวลาออก PDF หน้ายังกระตุกเด้งๆวาบๆ") false = แสดงทีเดียวตอนวาดครบทุกหน้า
   //    (เอกสารสั้น 1–2 หน้า — ไม่สลับ หมุนโหลด → หน้าแรก → ข้อความ "กำลังเปิดหน้าถัดไป" → ครบ ให้เห็นวาบหลายรอบ)
   progressive = true,
+  // ✅ (25 พ.ย. 2569) ข้อความปุ่มยืนยัน — แก้ไขใบเดิม = "บันทึกการแก้ไข" · ออกใบใหม่แทน = "ออกใบใหม่แทนใบเดิม"
+  confirmLabel = "ยืนยันออกเอกสาร",
 }) => {
   const isMobile = useMediaQuery("(max-width:600px)", { noSsr: true });
   const imageMode = useMemo(() => prefersImagePrint(), []);
@@ -233,7 +235,7 @@ const DocumentPreviewDialog = ({
             <Button variant="contained" onClick={onConfirm} disabled={busy || !preview?.url}
               startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <TaskAlt sx={{ fontSize: 18 }} />}
               sx={{ ...SUCCESS_BTN_SX, px: 2.25 }}>
-              {busy ? "กำลังออกเอกสาร..." : "ยืนยันออกเอกสาร"}
+              {busy ? "กำลังบันทึก..." : confirmLabel}
             </Button>
           </>
         )}

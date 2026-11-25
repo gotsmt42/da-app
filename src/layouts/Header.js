@@ -31,7 +31,7 @@ import { appLogoFor } from "@/shared/services/OrgSettingService";
 import { FaChevronDown, FaCheck } from "react-icons/fa";
 // 🔁 (1 พ.ย. 2569 ผู้ใช้: "icon หน้าอื่นๆ ให้สอดคล้องกับหน้าแรก") — ไอคอนเมนูชุดกลาง Material Rounded
 import { AppIcon } from "@/shared/ui/appIcons";
-import { can, seesOperationBoard, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
+import { can, seesOperationBoard, DEPARTMENT, rankLabel, isServiceCalendarObserver } from "@/shared/utils/roles";
 
 /**
  * ✅ ตัวเลือกของ dropdown "ตารางงาน" — ต่างกันตาม role เพราะ query ?dept= มีความหมายไม่เหมือนกัน
@@ -153,7 +153,9 @@ const Header = ({ toggleMobileSidebar }) => {
   const canViewQuotations = can(userData, "viewFinance");
   // ✅ ทางลัด "ตารางงานช่าง" (ดูอย่างเดียว) — เซลไม่เข้าเงื่อนไข canViewOperation/canViewContracts/
   // canViewQuotations เลยสักข้อ พื้นที่กลาง header จึงว่างเปล่าทั้งจอกว้างและจอมือถือมาตลอด
-  const canViewService = can(userData, "viewServiceCalendar");
+  // ✅ (25 พ.ย. 2569) คนเห็นงานทุกคน = ตารางงานจริง · คนนอกฝ่ายช่างที่มีสิทธิ์ดูอย่างเดียว = ทางลัดดูตารางช่าง
+  //    เดิมผูกกับ viewServiceCalendar ตัวเดียว — ปิดช่องนี้ให้แอดมินแล้วปุ่มตารางงานบนแถบบนหายไปด้วย ทั้งที่ยังเห็นงานทุกคนอยู่
+  const canViewService = can(userData, "viewAllJobs") || isServiceCalendarObserver(userData);
   // ⚠️ ทั้งสองลิงก์ใช้ path "/event" เหมือนกัน ต่างกันแค่ query — เช็ค search แยกจาก pathname
   // ไม่งั้นจะไฮไลต์ "active" พร้อมกันทั้งคู่ไม่ว่าเซลกำลังดูปฏิทินของตัวเองหรือของช่างอยู่
   // ✅ ตัวเลือกของ dropdown "ตารางงาน" ต่างกันตาม role (ดูเหตุผลที่ scheduleOptionsFor ด้านบนไฟล์)
@@ -308,6 +310,18 @@ const Header = ({ toggleMobileSidebar }) => {
                 </DropdownToggle>
                 <ExpenseDropdownMenu items={expenseItems} activeHref={activeExpense?.href} />
               </Dropdown>
+            </NavItem>
+          )}
+          {/* ✅ (25 พ.ย. 2569 ผู้ใช้: "เพิ่มเมนูขอ OT ไว้ Header ด้วย · หน้าจอคอม") — สิทธิ์เดียวกับหน้า OT (ยื่นเบิก/เห็นใบทุกคน) */}
+          {canUseExpenses && (
+            <NavItem>
+              <Link
+                to="/ot"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/ot") ? "active" : ""}`}
+              >
+                <AppIcon.Ot size={13} /> ขอ OT
+                <HeaderCount n={badges.ot} />
+              </Link>
             </NavItem>
           )}
         </Nav>

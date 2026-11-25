@@ -12,6 +12,12 @@
  *
  * ⚠️ เลขที่เอกสารถูก "กินจริง" ตอนกดออกเท่านั้น (DocNumberService.next) ไม่ใช่ตอนเปิดกล่อง —
  * เปิดดูแล้วปิดไปเฉยๆ ต้องไม่ทำให้เลขกระโดดหายไปหนึ่งใบ
+ *
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "ทำให้สามารถกดแก้ไขได้ย้อนหลัง หรือสร้างซ้ำ เผื่อบางทีการแจ้งกำหนดการงานนั้นๆมีการแก้ไข")
+ *    งานที่ออกใบแล้ว → เลือกได้ 2 ทาง (ผู้มีสิทธิ์แก้เอกสาร หรือคนที่ออกใบนั้น):
+ *      • mode "edit"    แก้ไขใบนี้ — เลขที่เดิม · server เก็บฉบับก่อนแก้ไว้ในประวัติ (PUT /issued-documents/:id/revise)
+ *      • mode "reissue" ออกใบใหม่แทน — เลขที่ใหม่ · ใบเดิมถูกยกเลิกให้อัตโนมัติ (POST พร้อม replaceId)
+ *    ทั้งสองทางเริ่มจากข้อความของใบเดิม + บอกถ้าวันในตารางงานเปลี่ยนไปแล้ว (กดปุ่มเดียวใช้วันล่าสุด)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,6 +45,7 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
+import usePermissions from "@/shared/hooks/usePermissions";
 import {
   DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
   OUTLINE_BTN_SX,
@@ -77,6 +84,9 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   const [preview, setPreview] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [issued, setIssued] = useState(false);
+  /** null = ออกใบใหม่ปกติ · "edit" = แก้ไขใบที่ออกแล้ว (เลขเดิม) · "reissue" = ออกใบใหม่แทนใบเดิม (เลขใหม่) */
+  const [mode, setMode] = useState(null);
+  useEffect(() => { if (!open) setMode(null); }, [open]);
 
   // ✅ ตั้งค่าเริ่มต้นใหม่ทุกครั้งที่เปิดกล่อง — ไม่ค้างค่าของงานก่อนหน้าไว้ (กล่องนี้ถูกใช้ซ้ำกับทุกงาน
   // ในหน้าเดียวกัน ถ้าไม่รีเซ็ตจะเปิดงาน B แล้วเห็นข้อมูลงาน A ค้างอยู่)
@@ -135,11 +145,42 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   // ✅ ร่างอัตโนมัติ + กันออกซ้ำ (ผู้ใช้สั่ง 3 ต.ค. 2569) — ⚠️ ต้องอยู่หลัง effect ตั้งค่าเริ่มต้นด้านบน
   const eventId = String(job?.id || job?._id || "");
   const draft = useDocDraft({
-    open, draftKey: eventId ? `notice:${eventId}` : "", form, setFormState, dirtyRef,
+    open, draftKey: eventId && !mode ? `notice:${eventId}` : "", form, setFormState, dirtyRef,
     // เลขที่เดินหน้าออกให้ใหม่ทุกครั้ง — ไม่กู้คืนเลขเก่าจากร่าง
     omit: canUseRunningNumber ? ["docNumber"] : [],
   });
   const existing = useIssuedDoc({ open, eventId, docType: "notice" });
+
+  /**
+   * เริ่มแก้ไข/ออกใหม่แทน — ตั้งต้นจากข้อความของใบเดิม (snapshot) แต่ "วันในตารางงาน" ใช้ของงานตอนนี้
+   * (ปุ่ม "ใช้วันตามตารางงานล่าสุด" จะได้สร้างกำหนดการใหม่ตามวันที่เลื่อนแล้ว)
+   */
+  const { can } = usePermissions();
+  const { userData: me } = useAuth();
+  const canChangeIssued = Boolean(existing.doc) && existing.doc.status !== "cancelled"
+    && (can("editDocuments") || (existing.doc.issuedBy && String(existing.doc.issuedBy) === String(me?.userId || "")));
+  const startChange = (next) => {
+    const snap = existing.doc?.formSnapshot || {};
+    const base = buildWorkNoticeDefaults(job, customer, issuer);
+    dirtyRef.current = false;
+    setFormState({
+      ...base,
+      body: buildWorkNoticeBody(base),
+      cooperationNote: buildWorkNoticeCooperation(),
+      ...snap,
+      jobStartDate: base.jobStartDate, jobEndDate: base.jobEndDate, jobDateText: base.jobDateText,
+      docNumber: next === "edit" ? existing.doc.docNumber : (canUseRunningNumber ? (previewNumber || snap.docNumber || base.docNumber) : (snap.docNumber || base.docNumber)),
+      ...(next === "reissue" ? { issuedAt: moment().format("YYYY-MM-DD") } : {}),
+    });
+    setError("");
+    setMode(next);
+  };
+  /** วันในตารางงานตอนนี้ ต่างจากกำหนดการในใบไหม (เลื่อนวันงานหลังออกใบ) */
+  const jobDays = useMemo(() => (form && mode ? buildDayRows({
+    startAt: form.jobStartDate, endAt: form.jobEndDate, title: form.workLabel, system: "", defaultTime: TIME_PRESETS[0],
+  }).map((r) => r.date) : []), [form, mode]);
+  const docDays = (form?.dayRows || []).map((r) => r.date).filter(Boolean);
+  const scheduleChanged = Boolean(mode) && jobDays.length > 0 && jobDays.join(",") !== docDays.join(",");
 
   /** ทิ้งร่าง แล้วเริ่มใหม่จากข้อมูลงาน */
   const discardDraft = () => {
@@ -313,7 +354,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
 
   /** ขั้นที่ 1 — สร้างไฟล์ตัวอย่างด้วย "เลขที่ที่จะได้" โดยยังไม่กินเลขจริง */
   const handlePreview = async () => {
-    if (existing.doc) return;
+    if (existing.doc && !mode) return;
     if (missing.length > 0) {
       setError(`กรุณากรอก: ${missing.join(" · ")}`);
       return;
@@ -340,9 +381,23 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     try {
       // ⚠️ กินเลขจริงตรงนี้ที่เดียวเท่านั้น และต้องได้เลขมาก่อนถึงจะสร้างไฟล์ — เอกสารที่ไม่มีเลขอ้างอิง
       // คือเอกสารที่ตามกลับไม่ได้ (เฉพาะคนที่มีสิทธิ์ออกเลข ส่วนคนอื่นใช้เลขที่กรอกไว้ในช่องตามเดิม)
-      // ✅ ตรวจซ้ำอีกรอบก่อนออกจริง — อีกคน/อีกแท็บอาจออกใบของงานนี้ไปแล้วระหว่างที่กรอกอยู่
+      const fields = {
+        issuedAt: form.issuedAt, subject: form.subject, site: form.site, customerCompany: form.customerCompany,
+        workLabel: form.workLabel, roundLabel: form.roundLabel, signerName: form.signerName,
+      };
+      // ✅ แก้ไขใบเดิม — เลขที่เดิม ไม่กินเลขใหม่ · บันทึกก่อนแล้วค่อยสร้างไฟล์ (ทะเบียนต้องตรงกับไฟล์ที่ส่ง)
+      if (mode === "edit") {
+        const saved = await IssuedDocumentService.revise(existing.doc._id, { ...fields, formSnapshot: { ...form, docNumber: existing.doc.docNumber } });
+        const { url, blob, fileName } = await buildPdf(saved.docNumber);
+        replacePreview({ url, blob, fileName });
+        setIssued(true);
+        existing.setDoc(saved);
+        setMode(null);
+        return;
+      }
+      // ✅ ตรวจซ้ำอีกรอบก่อนออกจริง — อีกคน/อีกแท็บอาจออกใบของงานนี้ไปแล้วระหว่างที่กรอกอยู่ (ออกใหม่แทน = ข้ามใบที่กำลังถูกแทน)
       const dup = await IssuedDocumentService.activeForEvent(eventId, "notice").catch(() => null);
-      if (dup) {
+      if (dup && !(mode === "reissue" && String(dup._id) === String(existing.doc?._id))) {
         existing.setDoc(dup);
         setPreviewOpen(false);
         setError(`งานนี้ออกใบแจ้งเข้างานไปแล้ว (เลขที่ ${dup.docNumber}) — ออกซ้ำไม่ได้`);
@@ -362,7 +417,9 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       // ⚠️ ห้าม await รวมใน try เดียวกับการสร้างไฟล์ — ถ้าบันทึกทะเบียนล้มเหลว (เน็ตหลุด/สิทธิ์ไม่พอ)
       // ต้องไม่ทำให้ผู้ใช้เห็นว่า "ออกเอกสารไม่สำเร็จ" ทั้งที่เลขถูกกินและไฟล์ออกเรียบร้อยแล้ว
       draft.clear();
+      const replaceId = mode === "reissue" ? existing.doc?._id : undefined;
       IssuedDocumentService.create({
+        ...(replaceId ? { replaceId } : {}),
         docType: "notice",
         docNumber: finalNumber,
         issuedAt: form.issuedAt,
@@ -375,7 +432,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         eventId: job?.id || job?._id || null,
         contractNo: resolveJobFields(job).contractNo || "",
         formSnapshot: { ...form, docNumber: finalNumber },
-      }).then((doc) => existing.setDoc(doc)).catch(() => {});
+      }).then((doc) => { existing.setDoc(doc); setMode(null); }).catch((e) => setError(e?.response?.data?.message || "บันทึกทะเบียนเอกสารไม่สำเร็จ"));
     } catch (err) {
       if (err?.response?.status === 409 && err.response.data?.doc) {
         existing.setDoc(err.response.data.doc);
@@ -416,7 +473,8 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   if (!form) return null;
 
   const fieldSx = { bgcolor: "#fff" };
-  const locked = Boolean(existing.doc);
+  const locked = Boolean(existing.doc) && !mode;
+  const modeLabel = mode === "edit" ? `แก้ไขใบเลขที่ ${existing.doc?.docNumber} (เลขเดิม)` : mode === "reissue" ? `ออกใบใหม่แทนเลขที่ ${existing.doc?.docNumber}` : "";
 
   return (
     <Dialog
@@ -435,6 +493,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
           icon={<EventAvailable />} accent={ACCENT} title="ออกใบแจ้งเข้างาน"
           subtitle={locked
             ? `ออกแล้ว · เลขที่ ${existing.doc.docNumber}`
+            : modeLabel ? modeLabel
             : !canUseRunningNumber
               ? "ใช้เลขที่อ้างอิงของงาน"
               : loadingNumber ? "กำลังตรวจเลขที่..." : previewNumber ? `เลขที่ถัดไป ${previewNumber}` : "ออกเลขที่อัตโนมัติ"}
@@ -445,7 +504,40 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
 
       <DialogContent sx={{ px: { xs: 1.5, sm: 3 }, py: { xs: 1.75, sm: 2.5 }, bgcolor: SURFACE, overflowX: "hidden", ...docFormSx(ACCENT) }}>
         {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 1.75, borderRadius: 2 }}>{error}</Alert>}
-        {locked && <IssuedSummary doc={existing.doc} label="ใบแจ้งเข้างาน" onView={viewExisting} viewing={busy} onNavigate={closeAll} />}
+        {locked && (
+          <IssuedSummary doc={existing.doc} label="ใบแจ้งเข้างาน" onView={viewExisting} viewing={busy} onNavigate={closeAll}
+            onEdit={canChangeIssued ? () => startChange("edit") : undefined}
+            onReissue={canChangeIssued ? () => startChange("reissue") : undefined}
+            changeBlockedReason={existing.doc && !canChangeIssued ? "แก้ไข/ออกใหม่แทนได้เฉพาะผู้ออกใบนี้ หรือผู้มีสิทธิ์แก้เอกสาร" : ""} />
+        )}
+        {mode && (
+          <Box sx={{ mb: 1.75, p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: `4px solid ${ACCENT}` }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK_2 }}>
+                  {mode === "edit" ? `กำลังแก้ไขใบเลขที่ ${existing.doc?.docNumber}` : `กำลังออกใบใหม่แทนเลขที่ ${existing.doc?.docNumber}`}
+                </Typography>
+                <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.5 }}>
+                  {mode === "edit"
+                    ? "ใช้เลขที่เดิม · กดดูตัวอย่าง แล้ว “บันทึกการแก้ไข” — ระบบเก็บฉบับก่อนแก้ไว้ในประวัติ"
+                    : "ได้เลขที่ใหม่ตอนยืนยัน · ใบเดิมถูกยกเลิกในทะเบียนให้อัตโนมัติ (ยังเปิดดูย้อนหลังได้)"}
+                </Typography>
+              </Box>
+              <Button size="small" onClick={() => { setMode(null); setError(""); }} sx={{ ...OUTLINE_BTN_SX, flexShrink: 0 }}>ยกเลิกการแก้</Button>
+            </Stack>
+            {scheduleChanged && (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} sx={{ mt: 1.25, p: 1.1, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+                <Typography sx={{ flex: 1, fontSize: "0.78rem", color: "#92400e", lineHeight: 1.5 }}>
+                  วันในตารางงานตอนนี้ <b>{form.jobDateText}</b> ไม่ตรงกับกำหนดการในใบ ({docDays.length} วัน)
+                </Typography>
+                <Button size="small" onClick={() => { regenerateDays(); }} startIcon={<Refresh sx={{ fontSize: 16 }} />}
+                  sx={{ ...OUTLINE_BTN_SX, flexShrink: 0, color: "#92400e", borderColor: "#fcd34d" }}>
+                  ใช้วันตามตารางงานล่าสุด
+                </Button>
+              </Stack>
+            )}
+          </Box>
+        )}
         {!locked && draft.restoredLabel && <DraftBanner when={draft.restoredLabel} onDiscard={discardDraft} />}
 
         {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
@@ -528,8 +620,8 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
                   <TextField
                     size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
-                    onChange={setField("docNumber")} disabled={canUseRunningNumber} sx={fieldSx}
-                    helperText={canUseRunningNumber ? "ออกให้อัตโนมัติ" : "เลขที่อ้างอิงของงาน"}
+                    onChange={setField("docNumber")} disabled={canUseRunningNumber || mode === "edit"} sx={fieldSx}
+                    helperText={mode === "edit" ? "แก้ไขใบเดิม = ใช้เลขที่เดิม" : mode === "reissue" && canUseRunningNumber ? "เลขที่ใหม่ ออกให้ตอนยืนยัน" : canUseRunningNumber ? "ออกให้อัตโนมัติ" : "เลขที่อ้างอิงของงาน"}
                   />
                   <ThaiDatePicker label="วันที่ออก" value={form.issuedAt} onChange={set("issuedAt")}
                     helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
@@ -723,7 +815,9 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         accent={ACCENT}
         preview={preview}
         issued={issued}
-        docNumber={viewingExisting ? existing.doc?.docNumber : issued ? form.docNumber : (previewNumber || form.docNumber)}
+        docNumber={viewingExisting ? existing.doc?.docNumber : mode === "edit" ? existing.doc?.docNumber : issued ? form.docNumber : (previewNumber || form.docNumber)}
+        confirmLabel={mode === "edit" ? "บันทึกการแก้ไข" : mode === "reissue" ? "ออกใบใหม่แทนใบเดิม" : undefined}
+        headerSub={!issued && mode === "edit" ? `ใช้เลขที่เดิม ${existing.doc?.docNumber} · ยังไม่บันทึกจนกว่าจะยืนยัน` : undefined}
         busy={busy} error={previewOpen ? error : ""}
         onBack={() => setPreviewOpen(false)}
         onConfirm={handleConfirm}

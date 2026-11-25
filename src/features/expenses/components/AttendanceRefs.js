@@ -26,7 +26,8 @@ export function useAttendanceByDay(eventIds) {
     const ids = key ? key.split(",") : [];
     if (!ids.length) { setMap(new Map()); return undefined; }
     let alive = true;
-    Promise.all(ids.map((id) => AttendanceService.ofEvent(id, { group: true }).then((r) => r?.attendance || []).catch(() => [])))
+    // ✅ (25 พ.ย. 2569) ติดรหัสงานที่ขอ (eventId) ให้ทุกรายการ — ฟอร์ม OT กรองเฉพาะงานของรายการนั้นได้
+    Promise.all(ids.map((id) => AttendanceService.ofEvent(id, { group: true }).then((r) => (r?.attendance || []).map((a) => ({ ...a, __eventId: id }))).catch(() => [])))
       .then((lists) => {
         if (!alive) return;
         const m = new Map();
@@ -37,7 +38,7 @@ export function useAttendanceByDay(eventIds) {
           const day = r.workDay || moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD");
           const list = m.get(day) || [];
           list.push({
-            id: r._id, at: r.checkIn.at, outAt: r.checkOut?.at || null,
+            id: r._id, eventId: r.__eventId, at: r.checkIn.at, outAt: r.checkOut?.at || null,
             by: r.userName || "", note: r.checkIn?.note || "", summary: r.checkOut?.summary || "",
             photos: [...(r.checkIn?.photos || []), ...(r.checkOut?.photos || [])].filter((p) => p?.fileUrl),
             team: (r.team || []).length,
@@ -86,7 +87,7 @@ export function AttendanceDayStrip({ entries, onOpen, hasJobs = true }) {
       {photos.length > 0 && (
         <Stack direction="row" gap={0.4} sx={{ flexShrink: 0 }}>
           {photos.slice(0, 3).map((p, i) => (
-            <ButtonBase key={p.fileUrl} onClick={() => onOpen?.(p.fileUrl, p.fileName || `รูป ${i + 1}`, photos)}
+            <ButtonBase key={`${p.fileUrl}-${i}`} onClick={() => onOpen?.(p.fileUrl, p.fileName || `รูป ${i + 1}`, photos, i)}
               sx={{ position: "relative", width: 34, height: 34, borderRadius: 1, overflow: "hidden", border: "1px solid #e6e9ef" }}>
               <Box component="img" src={thumbUrl(p.fileUrl, 80)} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
               {i === 2 && photos.length > 3 && (

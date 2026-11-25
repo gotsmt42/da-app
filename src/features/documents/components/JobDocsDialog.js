@@ -1,173 +1,152 @@
 /**
- * JobDocsDialog.js — เอกสารทั้งหมดของ "ครั้งที่ N" 1 ครั้ง (Service Report / ใบเสนอราคา /
- * ใบวางบิล / ใบส่งมอบงาน) ดูได้จากหน้าภาพรวมงานโดยไม่ต้องข้ามไปหน้าการดำเนินงาน
+ * JobDocsDialog.js — เอกสารประจำงานของ "ครั้งที่ N" 1 ครั้ง (Service Report / ใบเสนอราคาเพิ่มเติม /
+ * เอกสารการเงิน / ใบส่งมอบงาน) เปิดจากหน้าภาพรวมงานโดยไม่ต้องข้ามไปหน้าการดำเนินงาน
  *
- * ⚠️ ดูอย่างเดียว ไม่มีอัปโหลด/ลบ — การจัดการไฟล์ยังเป็นของหน้า "การดำเนินงาน" ที่เดียวเหมือนเดิม
- * (ช่างทำงานที่นั่น มีทั้งแถบความคืบหน้าอัปโหลด สิทธิ์ และการยืนยันลบครบอยู่แล้ว) หน้านี้ยกมาแค่
- * "เปิดดู" ซึ่งเป็นสิ่งที่คนดูภาพรวมงานต้องการจริงๆ — เอาการอัปโหลดมาด้วยจะกลายเป็นของ 2 ที่ที่ต้อง
- * ดูแลพร้อมกันโดยไม่ได้ประโยชน์เพิ่ม
+ * 🔁 (25 พ.ย. 2569 ผู้ใช้: "ทำให้มันเป็นรูปแบบหน้าเอกสารงานแบบเดียวกันกับหน้าการดำเนินงาน ให้อัพเดตตรงกันทั้งหมด")
+ *    เดิมกล่องนี้เขียนรายการเอกสารแบบย่อของตัวเอง (ลบไม่ได้ · แนบทีละไฟล์ · ไม่มีสถานะ "ไม่มี/ช่างยังไม่ยืนยัน/รอช่างตอบ"
+ *    · สิทธิ์คนละชุด) → ใช้ชิ้นส่วนชุดเดียวกับการ์ดงานหน้าการดำเนินงาน (JobDocsBody → JobDocsSummaryCard + JobDocCards)
+ *    แก้ที่ตัวกลางที่เดียว = ทุกหน้าเปลี่ยนตาม · สิทธิ์แนบ/ลบ = jobDocPermissions (กติกาเดียวกับ server)
+ *    แนบ/ลบ/ติ๊ก บันทึกประวัติแบบเดียวกับหน้าการดำเนินงาน แล้วให้หน้าภาพรวมงานดึงข้อมูลใหม่ (ป้ายในตารางอัปเดตพร้อมกัน)
+ *
+ * ⚠️ 1 ครั้งมีได้หลายช่วงวัน (เข้างานไม่ต่อเนื่อง) — ไฟล์กระจายอยู่หลาย document:
+ *    • แสดงรวมทุกช่วง (ติดป้ายวันที่ให้รู้ว่ามาจากช่วงไหน)
+ *    • ไฟล์ใหม่/สถานะเอกสาร → ช่วงล่าสุด (= การ์ดหลักของกลุ่มในหน้าการดำเนินงาน ซึ่งยึดวันล่าสุดถือเอกสาร)
+ *    • ลบ → document ที่ไฟล์นั้นอยู่จริง
  */
-import { useRef, useState } from "react";
-import "@/shared/utils/momentThaiLocale";
-import {
-  Box, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
-  Button, useMediaQuery, LinearProgress, Alert,
-} from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { FolderOpenRounded as FolderOpen, AttachFileRounded as AttachFile } from "@mui/icons-material";
-import { roundDocs, isDocRequired, JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
-import AttachmentList from "@/shared/ui/AttachmentList";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Alert, Button, Stack, Typography } from "@mui/material";
+import MobileSheet from "@/shared/ui/MobileSheet";
 import EventService from "@/shared/services/EventService";
+import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
+import { FilePreviewDialog } from "@/features/operation/components/OperationBoard";
+import JobDocsBody from "@/features/documents/components/JobDocsBody";
+import { uploadJobDocFiles, deleteJobDocFile, jobDocErrorText } from "@/shared/utils/jobDocActions";
 
-const TEXT_SUB = "#64748b";
+const IDLE = { type: null, progress: 0, size: "" };
+const APPLICABLE_KEYS = ["quotationApplicable", "invoiceApplicable", "completionApplicable"];
+const fileKey = (f) => String(f?._id || f?.fileUrl || "");
 
 /**
- * @param {Array}  props.roundVisits  งานทุก document ของครั้งนี้ (null/ว่าง = ปิดกล่อง)
- * @param {string} props.title        หัวข้อกล่อง เช่น "ครั้งที่ 2 · บริษัท ก"
+ * @param {Array}    props.roundVisits  งานทุก document ของครั้งนี้ (null/ว่าง = ปิดกล่อง)
+ * @param {number}   props.round        เลขครั้งที่ (สัญญาจริง) · ไม่ส่ง = งานทั่วไป
+ * @param {string}   props.title        บรรทัดรองสำรอง (ใช้เมื่อไม่มีข้อมูลงาน)
+ * @param {Function} props.onChanged    ดึงข้อมูลหน้าใหม่ (await ได้) — กล่องนี้แสดงข้อมูลสดจาก roundVisits เสมอ
+ * @param {object}   props.currentUser  ผู้ใช้ปัจจุบัน (สิทธิ์แนบ/ลบ · ช่าง = โมดูลเอกสารฝั่งช่าง)
  */
-export default function JobDocsDialog({ roundVisits, title, onClose, canUpload = false, onUploaded }) {
-  const isMobile = useMediaQuery("(max-width:900px)");
-  const [uploadType, setUploadType] = useState(JOB_DOC_TYPES[0].key);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadError, setUploadError] = useState("");
-  const fileInputRef = useRef(null);
+export default function JobDocsDialog({ roundVisits, round, title, onClose, onChanged, currentUser }) {
+  const [up, setUp] = useState(IDLE);
+  const [err, setErr] = useState("");
+  const [overlay, setOverlay] = useState({}); // id → ค่าที่เพิ่งติ๊ก/เลือก (แสดงทันทีระหว่างรอข้อมูลใหม่)
+  const [preview, setPreview] = useState({ url: null, name: "", gallery: null, index: null });
 
-  // ⚠️ hooks ต้องถูกเรียกครบทุกรอบก่อน return null เสมอ (กฎของ React) — เช็คว่างทีหลัง
-  const visits = roundVisits || [];
+  // ⚠️ คงเนื้อหาชุดสุดท้ายไว้ระหว่างกล่องกำลังปิด (แผ่นเลื่อนลง) — ไม่ให้แผ่นว่างวาบ
+  const open = Boolean(roundVisits?.length);
+  const lastRef = useRef({ visits: [], round: null, title: "" });
+  if (open) lastRef.current = { visits: roundVisits, round, title };
+  const { visits: rawVisits, round: shownRound, title: shownTitle } = lastRef.current;
 
-  const handlePick = async (e) => {
-    const file = e.target.files?.[0];
-    // ⚠️ ล้างค่า input ทันที — ไม่งั้นเลือกไฟล์ "ชื่อเดิม" ซ้ำครั้งที่ 2 จะไม่เกิด onChange อีกเลย
-    // (เบราว์เซอร์มองว่าค่าไม่เปลี่ยน) ผู้ใช้จะเจออาการ "กดแล้วไม่มีอะไรเกิดขึ้น" แบบหาสาเหตุไม่เจอ
-    e.target.value = "";
-    if (!file) return;
+  const visits = useMemo(
+    () => rawVisits.map((v) => (overlay[v._id] ? { ...v, ...overlay[v._id] } : v)),
+    [rawVisits, overlay],
+  );
+  // ช่วงล่าสุด = ตัวถือเอกสารของครั้งนี้ (ตรงกับการ์ดหลักของกลุ่มในหน้าการดำเนินงาน)
+  const anchor = useMemo(
+    () => visits.reduce((a, v) => (!a || new Date(v.start) > new Date(a.start) ? v : a), null),
+    [visits],
+  );
+  const multi = visits.length > 1;
 
-    // ⚠️ 1 ครั้งมีได้หลาย document (เข้างานหลายวันไม่ต่อเนื่อง) — แนบไปที่วันแรกของครั้งนั้นเสมอ
-    // เพราะหน้าจอทุกที่รวมไฟล์ของทั้งครั้งมาแสดงเป็นชุดเดียวอยู่แล้ว (ดู roundDocs) ผู้ใช้จึงไม่ต้อง
-    // เลือกว่าจะแนบไปวันไหน ซึ่งเป็นคำถามที่ตอบไม่ได้อยู่ดีสำหรับเอกสารระดับ "ครั้ง" อย่างใบวางบิล
-    const target = visits[0];
-    if (!target?._id) { setUploadError("ไม่พบงานที่จะแนบไฟล์"); return; }
+  // งาน "รวมทั้งครั้ง" สำหรับวาด/นับความครบ — ไฟล์ทุกช่วง · ติ๊กยืนยัน SR/ตอบ "มี" จากช่วงไหนก็นับ
+  const docEvent = useMemo(() => {
+    if (!anchor || !multi) return anchor;
+    const merged = { ...anchor };
+    JOB_DOC_TYPES.forEach((t) => { merged[t.field] = visits.flatMap((v) => v[t.field] || []); });
+    merged.documentSentReport = Boolean(anchor.documentSentReport)
+      || visits.some((v) => v.documentSentReport && (v.reportFiles || []).length > 0);
+    APPLICABLE_KEYS.forEach((k) => { if (visits.some((v) => v[k] === true)) merged[k] = true; });
+    return merged;
+  }, [anchor, visits, multi]);
 
-    setUploading(true);
-    setProgress(0);
-    setUploadError("");
+  // ป้ายวันที่ต่อไฟล์ — เฉพาะครั้งที่เข้าหลายช่วง
+  const tagOf = useMemo(() => {
+    if (!multi) return null;
+    const m = new Map();
+    visits.forEach((v) => JOB_DOC_TYPES.forEach((t) => (v[t.field] || []).forEach((f) => m.set(fileKey(f), formatEventDateRange(v)))));
+    return (f) => m.get(fileKey(f)) || null;
+  }, [visits, multi]);
+
+  const ownerOf = useCallback((type, fileId) => visits.find((v) =>
+    (v[`${type}Files`] || []).some((f) => String(f._id) === String(fileId))) || anchor, [visits, anchor]);
+
+  const onUpload = async (fileList, _id, type) => {
+    if (!anchor?._id) return;
+    setErr("");
+    setUp({ type, progress: 0, size: "" });
     try {
-      await EventService.Upload(target._id, file, uploadType, {
-        onUploadProgress: (evt) => {
-          if (evt.total) setProgress(Math.round((evt.loaded * 100) / evt.total));
-        },
-      });
-      // ✅ ให้หน้าที่เปิดกล่องนี้ดึงข้อมูลใหม่ — ไฟล์ที่เพิ่งแนบต้องโผล่ในกล่องทันทีโดยไม่ต้องปิดเปิดใหม่
-      await onUploaded?.();
-    } catch (err) {
-      setUploadError(
-        err?.response?.data?.error || err?.response?.data || err?.message || "อัปโหลดไม่สำเร็จ"
-      );
-    } finally {
-      setUploading(false);
-      setProgress(0);
+      await uploadJobDocFiles(anchor._id, fileList, type, ({ percent, sizeText }) => setUp({ type, progress: percent, size: sizeText }));
+    } catch (e) {
+      setErr(jobDocErrorText(e, "อัปโหลดไม่สำเร็จ ลองใหม่อีกครั้ง"));
     }
+    // ✅ รอข้อมูลใหม่ก่อนเลิกแถบอัปโหลด — ไฟล์ที่เพิ่งแนบโผล่ในกล่องทันที ไม่มีช่วงที่ "หายไป"
+    await onChanged?.();
+    setUp(IDLE);
+  };
+  const onDelete = async (_id, type, fileId) => {
+    const owner = ownerOf(type, fileId);
+    if (!owner?._id) return;
+    setErr("");
+    const file = (owner[`${type}Files`] || []).find((f) => String(f._id) === String(fileId)) || { _id: fileId };
+    try { await deleteJobDocFile(owner._id, type, file); } catch (e) { setErr(jobDocErrorText(e, "ลบไฟล์ไม่สำเร็จ")); }
+    await onChanged?.();
+  };
+  // ติ๊กยืนยัน Service Report · ตอบ "มี/ไม่มี" (ฝั่งช่าง) — แสดงทันที แล้วดึงข้อมูลจริงตาม
+  const onInputUpdate = async (id, patch) => {
+    setErr("");
+    const { activityLog: _log, ...shown } = patch || {}; // ประวัติไม่ต้องวาด
+    setOverlay((o) => ({ ...o, [id]: { ...(o[id] || {}), ...shown } }));
+    try { await EventService.UpdateEvent(id, patch); } catch (e) { setErr(jobDocErrorText(e, "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง")); }
+    await onChanged?.();
+    setOverlay((o) => { const n = { ...o }; delete n[id]; return n; });
   };
 
-  if (visits.length === 0) return null;
-  const groups = roundDocs(roundVisits);
-  const byKey = new Map(groups.map((g) => [g.key, g.files]));
-  // ⚠️ ครั้งที่มีหลายวัน ต้องบอกได้ว่าไฟล์มาจากการเข้างานวันไหน — ครั้งที่มีวันเดียวไม่ต้องบอก
-  const multiVisit = roundVisits.length > 1;
-  const head = visits[0];
-  const filled = JOB_DOC_TYPES.filter((t) => (byKey.get(t.key) || []).length > 0).length;
-  const pickType = (key) => { setUploadType(key); setTimeout(() => fileInputRef.current?.click(), 0); };
+  const heading = [shownRound ? `ครั้งที่ ${shownRound}` : null, anchor?.site].filter(Boolean).join(" · ") || "เอกสารประจำงาน";
+  const subheading = anchor
+    ? [anchor.company, [anchor.title, anchor.system].filter(Boolean).join(" "), visits.slice().sort((a, b) => new Date(a.start) - new Date(b.start)).map(formatEventDateRange).join(", ")]
+      .filter(Boolean).join(" · ")
+    : shownTitle;
 
-  /**
-   * 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงาน แก้รูปแบบการแสดงเอกสารให้สวยงาม เข้าธีมแอพ ดูง่าย ตอนนี้เหมือนวางโล่งๆ")
-   *    การ์ดเอกสาร 4 ชนิดแบบเดียวกับหน้าการดำเนินงาน/งานของฉัน: กรอบไอคอนสี · ชื่อ · สถานะ (แนบแล้ว x ไฟล์ / ยังไม่แนบ · บังคับ/ถ้ามี)
-   *    · ปุ่ม "+ แนบ" ของชนิดนั้นมุมขวา (ไม่ต้องเลือกชนิดจากช่องก่อน) · แถวไฟล์ภาพย่อ (โมดูลไฟล์กลาง เลื่อนดูไฟล์อื่นได้)
-   */
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={isMobile}
-      PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: "#f8fafc" } }}>
-      <DialogTitle sx={{ p: 0, bgcolor: "#fff", borderBottom: "1px solid #e6e9ef" }}>
-        <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, py: 1.5 }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: "11px", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0 }}>
-            <FolderOpen sx={{ fontSize: 21 }} />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", color: "#0f172a", lineHeight: 1.3 }} noWrap>เอกสารประจำงาน</Typography>
-            <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }} noWrap>{title}</Typography>
-          </Box>
-          <Typography sx={{ flexShrink: 0, fontSize: "1.2rem", fontWeight: 900, color: filled === JOB_DOC_TYPES.length ? "#16a34a" : "#2563eb", fontVariantNumeric: "tabular-nums" }}>
-            {filled}/{JOB_DOC_TYPES.length}
-          </Typography>
-        </Stack>
-        <LinearProgress variant="determinate" value={(filled / JOB_DOC_TYPES.length) * 100}
-          sx={{ height: 4, bgcolor: "#eef2f7", "& .MuiLinearProgress-bar": { bgcolor: filled === JOB_DOC_TYPES.length ? "#16a34a" : "#2563eb" } }} />
-      </DialogTitle>
-
-      <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-        {uploadError && <Alert severity="error" sx={{ mb: 1.25, py: 0 }}>{String(uploadError)}</Alert>}
-        <Stack spacing={1.1} sx={{ pt: 1.5 }}>
-          {JOB_DOC_TYPES.map((t) => {
-            const files = byKey.get(t.key) || [];
-            const busy = uploading && uploadType === t.key;
-            const required = isDocRequired(head, t.key);
-            const has = files.length > 0;
-            return (
-              <Box key={t.key} sx={{ bgcolor: "#fff", borderRadius: "14px", border: "1px solid", borderColor: has ? "#bbf7d0" : "#e6e9ef", px: 1.5, py: 1.25 }}>
-                <Stack direction="row" alignItems="center" gap={1.25}>
-                  <Box sx={{ width: 38, height: 38, borderRadius: "11px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(t.color, 0.1), color: t.color }}>
-                    <t.Icon sx={{ fontSize: 20 }} />
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", lineHeight: 1.3 }}>
-                      {t.label}{required && <Box component="span" sx={{ color: "#dc2626", ml: 0.25 }}>*</Box>}
-                    </Typography>
-                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 0.2 }}>
-                      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: has ? "#16a34a" : required ? "#d97706" : "#cbd5e1" }} />
-                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: has ? "#15803d" : required ? "#b45309" : TEXT_SUB }}>
-                        {has ? `แนบแล้ว ${files.length} ไฟล์` : "ยังไม่แนบ"}
-                      </Typography>
-                      <Typography sx={{ fontSize: "0.74rem", color: "#94a3b8" }}>· {required ? "บังคับ" : "ถ้ามี"}</Typography>
-                    </Stack>
-                  </Box>
-                  {canUpload && (
-                    <Button size="small" onClick={() => pickType(t.key)} disabled={uploading} startIcon={<AttachFile sx={{ fontSize: "17px !important" }} />}
-                      sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, fontSize: "0.8rem", borderRadius: "10px", px: 1.5, minHeight: 34, bgcolor: "#eff6ff", color: "#2563eb", "&:hover": { bgcolor: "#dbeafe" } }}>
-                      {has ? "เพิ่ม" : "แนบ"}
-                    </Button>
-                  )}
-                </Stack>
-                {(has || busy) && (
-                  <Box sx={{ mt: 1 }}>
-                    <AttachmentList readOnly emptyText={null}
-                      files={files.map((f) => ({ ...f, tag: multiVisit && f._visit ? formatEventDateRange(f._visit) : null }))}
-                      uploading={busy ? { progress } : null}
-                      sx={{ maxHeight: 280, overflowY: "auto" }} />
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </Stack>
-        {multiVisit && canUpload && (
-          <Typography sx={{ display: "block", mt: 1.25, fontSize: "0.72rem", color: "#94a3b8" }}>
-            ครั้งนี้เข้างาน {visits.length} ช่วง — ไฟล์ใหม่แนบไว้ที่ช่วงแรก ({formatEventDateRange(visits[0])}) และแสดงรวมเป็นเอกสารของครั้งนี้
-          </Typography>
+    <>
+      {/* ⚠️ zIndex 1300 (ชั้นเดียวกับ Dialog) — มือถือเปิดได้จากในกล่องรายละเอียดงาน (Dialog) ซึ่งแผ่นล่างชั้นปกติ (1200) จะไปอยู่ใต้
+          · ชั้นเท่ากันแล้วตัวที่เปิดทีหลังอยู่บน (เมนู ⋮ / ดูไฟล์ ที่เปิดจากในแผ่นนี้ก็ยังลอยเหนือแผ่น) */}
+      <MobileSheet open={open} onClose={onClose} maxWidth="sm" zIndex={1300} title={heading} subtitle={subheading}
+        footer={(
+          <Stack direction="row" justifyContent="flex-end">
+            <Button onClick={onClose} variant="contained" disableElevation
+              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
+              เสร็จสิ้น
+            </Button>
+          </Stack>
+        )}>
+        {docEvent && (
+          <Stack spacing={1.25} sx={{ p: { xs: 1.25, sm: 2 } }}>
+            {err && <Alert severity="error" onClose={() => setErr("")} sx={{ py: 0 }}>{String(err)}</Alert>}
+            <JobDocsBody layout="operation" event={docEvent} currentUser={currentUser} tagOf={tagOf}
+              onUpload={onUpload} onDelete={onDelete} onInputUpdate={onInputUpdate}
+              onPreview={(url, name, gallery, index) => setPreview({ url, name, gallery, index: Number.isInteger(index) ? index : null })}
+              uploadOf={(t) => ({ uploading: up.type === t, progress: up.progress, size: up.size })} />
+            {multi && (
+              <Typography sx={{ px: 0.5, fontSize: "0.72rem", color: "#94a3b8" }}>
+                ครั้งนี้เข้างาน {visits.length} ช่วง — แสดงเอกสารรวมทุกช่วง · ไฟล์ใหม่แนบไว้ที่ช่วงล่าสุด ({formatEventDateRange(anchor)}) เหมือนหน้าการดำเนินงาน
+              </Typography>
+            )}
+          </Stack>
         )}
-        {!canUpload && filled === 0 && (
-          <Typography sx={{ mt: 1.25, fontSize: "0.78rem", color: TEXT_SUB, textAlign: "center" }}>ยังไม่มีเอกสารแนบ — แนบได้ที่หน้า “การดำเนินงาน” หรือ “งานของฉัน”</Typography>
-        )}
-        {/* ⚠️ จำกัดชนิดไฟล์ให้ตรงกับที่ server รับจริง — ไม่งั้นเลือกได้แล้วเพิ่งมารู้ตอนอัปโหลดเสร็จ */}
-        <input ref={fileInputRef} type="file" hidden onChange={handlePick} accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx" />
-      </DialogContent>
-
-      <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "#fff", borderTop: "1px solid #e6e9ef" }}>
-        <Button onClick={onClose} variant="contained" disableElevation
-          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
-          เสร็จสิ้น
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </MobileSheet>
+      <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} previewIndex={preview.index} gallery={preview.gallery}
+        onNavigate={(f, i) => setPreview((p) => ({ ...p, url: f.fileUrl, name: f.fileName || "", index: Number.isInteger(i) ? i : null }))}
+        onClose={() => setPreview({ url: null, name: "", gallery: null, index: null })} />
+    </>
   );
 }

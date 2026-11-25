@@ -22,7 +22,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { useHolidays, dayKind } from "./OtDayInfo";
 import { EvidenceGallery, prepareEvidence } from "./OtEvidence";
 import {
-  OT_ACCENT, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, typeMeta, hoursText, money, periodLabel, OT_TYPES,
+  OT_ACCENT, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, typeMeta, hoursText, money, periodLabel, OT_TYPES, lineJobs, lineJobText,
 } from "../otMeta";
 
 /**
@@ -238,15 +238,25 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
 
               {/* รายการ — จัดกลุ่มตามงานที่อิง */}
               <Card title="รายการ OT" right={<Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 700 }}>{e.lines.length} รายการ · {hoursText(e.totalHours)}</Typography>} flush>
-                {[...new Set(e.lines.map((l) => l.jobTitle || ""))].map((job, gi) => {
-                  const list = e.lines.filter((l) => (l.jobTitle || "") === job).sort((x, y) => String(x.date).localeCompare(String(y.date)));
-                  const [type, ...rest] = String(job).split(" · ");
+                {/* ✅ (25 พ.ย. 2569) 1 รายการอิงได้หลายงาน — กลุ่ม = ชุดงานเดียวกัน · หัวกลุ่มแสดงทุกงานในชุด (ชั่วโมงนับครั้งเดียว) */}
+                {[...new Set(e.lines.map((l) => lineJobText(l)))].map((job, gi) => {
+                  const list = e.lines.filter((l) => lineJobText(l) === job).sort((x, y) => String(x.date).localeCompare(String(y.date)));
+                  const titles = lineJobs(list[0]).map((j) => j.jobTitle).filter(Boolean);
                   return (
                     <Box key={job || gi} sx={{ borderTop: gi ? `1px solid ${BORDER_MAIN}` : 0 }}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ px: { xs: 1.5, sm: 2 }, py: 1, bgcolor: "#f8fafc" }}>
-                        {job ? <JobTypeChip job={{ title: type }} /> : null}
-                        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: "0.86rem" }}>{job ? (rest.join(" · ") || type) : "ไม่ระบุงาน"}</Typography>
-                        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 700, whiteSpace: "nowrap" }}>{hoursText(list.reduce((t, l) => t + l.hours, 0))}</Typography>
+                      <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ px: { xs: 1.5, sm: 2 }, py: 1, bgcolor: "#f8fafc" }}>
+                        <Stack spacing={0.4} sx={{ flex: 1, minWidth: 0 }}>
+                          {titles.length ? titles.map((t) => {
+                            const [type, ...rest] = String(t).split(" · ");
+                            return (
+                              <Stack key={t} direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                                <JobTypeChip job={{ title: type }} />
+                                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: 700, fontSize: "0.86rem" }}>{rest.join(" · ") || type}</Typography>
+                              </Stack>
+                            );
+                          }) : <Typography sx={{ fontWeight: 700, fontSize: "0.86rem" }}>ไม่ระบุงาน</Typography>}
+                        </Stack>
+                        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 700, whiteSpace: "nowrap", pt: 0.25 }}>{hoursText(list.reduce((t, l) => t + l.hours, 0))}</Typography>
                       </Stack>
                       {list.map((l) => {
                         const tm = typeMeta(l.type);
@@ -275,6 +285,19 @@ export default function OtDetailDialog({ open, id, reloadKey = 0, notice, onClos
                               <Typography noWrap sx={{ fontSize: "0.78rem", color: TEXT_SUB, mt: 0.25 }}>
                                 {[thaiDate(l.date), byPerson.length > 1 ? l.person.name : "", l.task].filter(Boolean).join(" · ")}
                               </Typography>
+                              {/* ✅ (25 พ.ย. 2569) หลักฐานของรายการนี้ (แนบแยกรายการ) */}
+                              {l.itemRef && (e.attachments || []).some((a) => a.itemRef === l.itemRef) && (
+                                <Stack direction="row" spacing={0.5} useFlexGap sx={{ mt: 0.6, flexWrap: "wrap", rowGap: 0.5 }}>
+                                  {(e.attachments || []).filter((a) => a.itemRef === l.itemRef).map((a) => (
+                                    <Box key={a._id} component="a" href={a.url} target="_blank" rel="noreferrer" title={a.name || "หลักฐาน"}
+                                      sx={{ width: 40, height: 40, borderRadius: 1.5, overflow: "hidden", border: `1px solid ${BORDER_MAIN}`, bgcolor: "#f8fafc", display: "grid", placeItems: "center", textDecoration: "none" }}>
+                                      {!a.type || String(a.type).startsWith("image/")
+                                        ? <Box component="img" src={String(a.url).replace("/upload/", "/upload/c_fill,w_96,h_96,q_auto,f_auto/")} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        : <Typography sx={{ fontSize: "0.58rem", fontWeight: 800, color: TEXT_SUB }}>ไฟล์</Typography>}
+                                    </Box>
+                                  ))}
+                                </Stack>
+                              )}
                             </Box>
                             <Typography sx={{ fontWeight: 900, fontSize: "1rem", whiteSpace: "nowrap" }}>{hoursText(l.hours)}</Typography>
                           </Stack>

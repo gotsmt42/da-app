@@ -22,7 +22,7 @@
  * (GET /events/event-op, /events/drafts เช็ค resPerson/team/userId ให้อยู่แล้ว) จึงไม่ต้องกรองซ้ำที่นี่
  */
 
-import { Children, Fragment, cloneElement, createContext, isValidElement, memo, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Children, Fragment, Suspense, cloneElement, createContext, isValidElement, memo, useCallback, useContext, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, Link, useSearchParams, useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -56,7 +56,7 @@ import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing"
 import BillingDialog from "@/features/finance/components/BillingDialog";
 import BillingChip from "@/features/finance/components/BillingChip";
 import JobDocsChip from "@/features/documents/components/JobDocsChip";
-import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import ContractValuePanel from "@/features/contracts/components/ContractValuePanel";
 import ContractDocsPanel, { ContractDocsChip, contractDocSummary } from "@/features/contracts/components/ContractDocsPanel";
 import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, ContactPhoneRounded as ContactPhone, EventAvailableRounded as EventAvailable } from "@mui/icons-material";
@@ -91,6 +91,9 @@ import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 import { resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 import { personValuesOf } from "@/shared/utils/workValue";
+
+// 🔁 (25 พ.ย. 2569) กล่องเอกสารประจำงานใช้ชิ้นส่วนชุดเดียวกับหน้าการดำเนินงาน (ไฟล์ใหญ่) — โหลดตอนเปิดครั้งแรก ไม่ถ่วงการเปิดหน้านี้
+const JobDocsDialog = lazyWithRetry(() => import("@/features/documents/components/JobDocsDialog"));
 
 // ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
 //    แดงเหลือไว้เฉพาะเรื่องที่อันตราย/เร่งด่วนจริง (ลบ · เลยกำหนด · หมดอายุ) — DANGER
@@ -1768,7 +1771,9 @@ export default function ContractOverview() {
   // ที่สร้างใหม่ทุก render เข้าไป memo จะไม่ช่วยอะไรเลย เพราะ prop เปลี่ยนทุกครั้งอยู่ดี
   const handleOpenBilling = useCallback((target) => setBillingTargetId(target._id), []);
   const handleCloseDocs = useCallback(() => setDocsTarget(null), []);
-  const handleOpenDocs = useCallback((rowKey, round, title) => setDocsTarget({ rowKey, round, title }), []);
+  // เปิดกล่องแล้ววาดค้างไว้ — ปิดแล้วแผ่นได้เลื่อนลงจนสุด (ดูจุดวาด JobDocsDialog ท้ายหน้า)
+  const [docsEverOpened, setDocsEverOpened] = useState(false);
+  const handleOpenDocs = useCallback((rowKey, round, title) => { setDocsEverOpened(true); setDocsTarget({ rowKey, round, title }); }, []);
   const handleCloseBilling = useCallback(() => setBillingTargetId(null), []);
   const handleBillingSaved = useCallback((updated) => {
     setEvents((prev) => prev.map((e) => (String(e._id) === String(updated._id) ? { ...e, ...updated } : e)));
@@ -4074,11 +4079,7 @@ export default function ContractOverview() {
 
   // ✅ สิทธิ์แนบไฟล์ในกล่องเอกสาร — อิงจากแถว+ครั้งที่กดเปิดมาจริง (c ไม่อยู่ใน scope ตรงจุดที่เรนเดอร์
   // กล่อง เพราะกล่องอยู่ระดับหน้า ไม่ได้อยู่ในลูปของแถว)
-  const docsCanUpload = useMemo(() => {
-    if (!docsTarget) return false;
-    const row = contracts.find((c) => c.key === docsTarget.rowKey);
-    return row ? canEditRoundTeam(row) : false;
-  }, [docsTarget, contracts, canEditRoundTeam]);
+  // 🔁 (25 พ.ย. 2569) สิทธิ์แนบ/ลบในกล่องเอกสาร ย้ายไปใช้กติกาเดียวกับหน้าการดำเนินงาน (jobDocPermissions) ในตัวกล่องเอง
 
   // ✅ ผู้รับผิดชอบแก้ไขข้อมูลพื้นฐาน (บริษัท/โครงการ/ระบบ/ประเภทงาน/เอกสาร) ของ "งานทั่วไป/งานโปรเจค
   // ที่ตัวเองรับผิดชอบ" ได้ด้วยตามที่ผู้ใช้ขอ — ใช้ identity เดียวกับ canEditRoundTeam เป๊ะๆ (admin/
@@ -8434,14 +8435,22 @@ export default function ContractOverview() {
       />
 
       {/* ✅ เอกสารของงานรายครั้ง — ดึงข้อมูลสดจาก contracts ทุกครั้งที่ render ไม่ได้เก็บ array ไว้
-          ตอนกด จึงไม่มีทางโชว์ไฟล์ชุดที่เก่าค้าง */}
-      <JobDocsDialog
-        roundVisits={docsRoundVisits}
-        title={docsTarget?.title}
-        onClose={handleCloseDocs}
-        canUpload={docsCanUpload}
-        onUploaded={() => fetchData(true)}
-      />
+          ตอนกด จึงไม่มีทางโชว์ไฟล์ชุดที่เก่าค้าง
+          🔁 (25 พ.ย. 2569 ผู้ใช้: "...แบบเดียวกันกับหน้าการดำเนินงาน ให้อัพเดตตรงกันทั้งหมด") รูปแบบ/สิทธิ์/การแนบ-ลบ
+          ชุดเดียวกับการ์ดงานหน้าการดำเนินงาน · แก้แล้วดึงข้อมูลหน้านี้ใหม่ ป้ายเอกสารในตารางเปลี่ยนตามทันที
+          ⚠️ วาดค้างไว้หลังเปิดครั้งแรก — ปิดแล้วแผ่นได้เลื่อนลงจนสุด (ไม่หายวาบ) */}
+      {docsEverOpened && (
+        <Suspense fallback={null}>
+          <JobDocsDialog
+            roundVisits={docsRoundVisits}
+            round={docsTarget && /^ครั้งที่ /.test(docsTarget.title || "") ? docsTarget.round : null}
+            title={docsTarget?.title}
+            onClose={handleCloseDocs}
+            onChanged={() => fetchData(true)}
+            currentUser={userData}
+          />
+        </Suspense>
+      )}
     </Box>
   );
 }

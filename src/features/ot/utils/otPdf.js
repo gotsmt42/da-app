@@ -10,7 +10,7 @@ import moment from "moment";
 import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAssets } from "@/features/documents/utils/deliveryNotePdf";
 import { loadBoldFont, newDoc, wrapText } from "@/features/expenses/utils/expensePdf";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
-import { otStatus, typeMeta, hoursText, periodLabel, OT_TYPES } from "../otMeta";
+import { otStatus, typeMeta, hoursText, periodLabel, OT_TYPES, lineJobs, lineJobText } from "../otMeta";
 
 const W_PAGE = 210;
 const H_PAGE = 297;
@@ -99,7 +99,7 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
     { label: multi ? "พนักงานที่ทำ OT" : "พนักงาน", value: people.join(", ") || r.requester?.name, w: 2.2 },
     { label: "ชั่วโมงรวม", value: hoursText(r.totalHours), w: 0.8 },
   ]);
-  infoRow([{ label: "งานที่อิง", value: [...new Set(lines.map((l) => l.jobTitle).filter(Boolean))].join(" / ") || "-" }]);
+  infoRow([{ label: "งานที่อิง", value: [...new Set(lines.flatMap((l) => lineJobs(l).map((j) => j.jobTitle)).filter(Boolean))].join(" / ") || "-" }]);
   doc.setDrawColor(...RULE); doc.setLineWidth(0.25);
   doc.rect(L, boxTop, W, y - boxTop);
   y += 6;
@@ -131,7 +131,7 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
   lines.forEach((l, idx) => {
     const hol = holidays?.get?.(String(l.date).slice(0, 10))?.name;
     size(12.5); bold(false);
-    const main = [multi ? l.person?.name : "", l.jobTitle].filter(Boolean).join(" · ") || "-";
+    const main = [multi ? l.person?.name : "", lineJobText(l)].filter(Boolean).join(" · ") || "-";
     const descLines = wrapText(doc, T(main), col("desc").w - 4);
     size(11);
     const subLines = l.task ? wrapText(doc, T(l.task), col("desc").w - 4) : [];

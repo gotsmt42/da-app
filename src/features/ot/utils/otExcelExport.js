@@ -5,7 +5,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-import { OT_TYPES, periodLabel, otStatus, typeMeta } from "../otMeta";
+import { OT_TYPES, periodLabel, otStatus, typeMeta, lineJobs, lineJobText } from "../otMeta";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 
 export async function exportOtReport(report) {
@@ -154,7 +154,7 @@ export async function exportOtList({ requests = [], holidays = null, scopeLabel 
     docNo: r.docNo, date: thaiDate(r.docDate), month: periodLabel(monthOf(r)), requester: r.requester?.name,
     people: [...new Set((r.lines || []).map((l) => l.person?.name).filter(Boolean))].join(", "),
     lines: (r.lines || []).length, hours: LIVE(r) ? round2(r.totalHours) : 0, status: otStatus(r.status).label,
-    jobs: [...new Set((r.lines || []).map((l) => l.jobTitle).filter(Boolean))].join(" / "),
+    jobs: [...new Set((r.lines || []).flatMap((l) => lineJobs(l).map((j) => j.jobTitle)).filter(Boolean))].join(" / "),
     reviewedBy: r.reviewedBy?.name || "", reviewedAt: r.reviewedAt ? thaiDate(r.reviewedAt) : "",
     approvedBy: r.approvedBy?.name || "", approvedAt: r.approvedAt ? thaiDate(r.approvedAt) : "",
     files: (r.attachments || []).length || "",
@@ -167,7 +167,7 @@ export async function exportOtList({ requests = [], holidays = null, scopeLabel 
     return {
       sort: `${d} ${l.start}`, docNo: r.docNo, month: periodLabel(monthOf(r)), person: l.person?.name, date: thaiDate(l.date), day: DAY[moment(d).day()],
       holiday: holidays?.get?.(d)?.name || "", start: l.start, end: l.end, type: typeMeta(l.type).label, mult: `×${l.multiplier}`,
-      hours: LIVE(r) ? round2(l.hours) : 0, job: l.jobTitle || "", task: l.task || "", status: otStatus(r.status).label,
+      hours: LIVE(r) ? round2(l.hours) : 0, job: lineJobText(l), task: l.task || "", status: otStatus(r.status).label,
     };
   })).sort((a, b) => b.sort.localeCompare(a.sort));
   sheet(wb, "รายการ OT", "รายการ OT ทุกวัน", sub, [

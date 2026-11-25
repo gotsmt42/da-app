@@ -38,12 +38,13 @@ import AdvancePanel from "./AdvancePanel";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import BankAccountPicker from "./BankAccountPicker";
 import SheetSelectField, { FORM_FIELD_SX } from "@/shared/ui/SheetSelectField";
-import { SheetPicker, SheetPickerRow, PickerField } from "@/shared/ui/SheetPicker";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
-  differenceMeta, money, jobText, jobSubject, jobsSubject, jobChipText, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  differenceMeta, money, jobText, jobSubject, jobsSubject, jobRangeText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
-import JobTypeChip, { JobOptionRow } from "@/shared/ui/JobTypeChip";
+import JobTypeChip from "@/shared/ui/JobTypeChip";
+import JobCalendarPicker, { JobPickCard } from "@/shared/ui/JobCalendarPicker";
+import { useHolidays } from "@/features/ot/components/OtDayInfo";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const MAX_ITEMS = 40;
@@ -137,9 +138,6 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   // ✅ (24 ต.ค. 2569 ผู้ใช้: "ใบเบิก/เคลมทุกใบ อ้างอิงงานได้หลายงานพร้อมกัน") — งานแรก = งานหลักของใบ
   const [jobs, setJobs] = useState([]);
   const job = jobs[0] || null;
-  const [jobOptions, setJobOptions] = useState([]);
-  const [jobQuery, setJobQuery] = useState("");
-  const [jobLoading, setJobLoading] = useState(false);
   const [jobSheet, setJobSheet] = useState(false); // แผ่นเลือกงาน
   /** ใบ Advance ที่มีอยู่แล้วของงานที่เลือก (1 งานออกได้ใบเดียว) — null = ไม่มี (หรือยังตรวจไม่เสร็จ) */
   const [jobAdvance, setJobAdvance] = useState(null);
@@ -291,18 +289,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     // eslint-disable-next-line react-hooks/exhaustive-deps -- โหลดครั้งเดียวต่อการเปิดกล่อง
   }, [open, isClearClaim, editing, advanceProp?._id]);
 
-  // ── ค้นหางานที่จะผูก (หน่วงให้พิมพ์จบก่อนค่อยยิง) ─────────────────────
-  useEffect(() => {
-    if (!open || isClearClaim) return undefined;
-    setJobLoading(true);
-    const t = setTimeout(() => {
-      ExpenseService.jobs(jobQuery)
-        .then((rows) => setJobOptions(rows))
-        .catch(() => setJobOptions([]))
-        .finally(() => setJobLoading(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [open, isClearClaim, jobQuery]);
+  const holidays = useHolidays(null); // ปฏิทินผูกงาน: วันหยุดนักขัตฤกษ์สีแดง
 
 
   const total = useMemo(() => itemsTotal(items), [items]);
@@ -613,6 +600,66 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         {/* ── ข้อมูลเอกสาร ─────────────────────────────────────────── */}
         <Section accent={accent} icon={<DescriptionIcon />} title="ข้อมูลเอกสาร" hint="ตรงกับหัวแบบฟอร์มกระดาษ ใบเบิกค่าใช้จ่าย">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            {/* 🎨 (25 พ.ย. 2569 ผู้ใช้: "จัดวางให้ดูดีใช้ง่าย") ผูกงานขึ้นก่อน — เลือกงานแล้วระบบเติม "เรื่อง" ให้ · ตามด้วยวันที่/ผู้อนุมัติ/ผู้เบิก */}
+            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "Select งานยังเป็นแบบเดิม") ผูกงานจากแผ่นรายการแบบหน้าลงงาน — ค้นหาบนสุด · ติ๊กได้หลายงาน */}
+            {!isClearClaim && (() => {
+              const applyJobs = (v) => {
+                // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" — งานนั้นเอาออกไม่ได้ (เพิ่มงานอื่นได้)
+                let next = v.slice(0, 20);
+                if (presetJob && !editing && !next.some((j) => j._id === presetJob._id)) next = [presetJob, ...next];
+                setJobs(next);
+                // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
+                const subj = jobsSubject(next, subjectPrefix);
+                const autoForms = new Set([autoSubjectRef.current, jobsSubject(jobs, subjectPrefix), jobs[0] ? jobSubject(jobs[0], subjectPrefix) : ""].filter(Boolean));
+                setSubject((cur) => (!String(cur).trim() || autoForms.has(cur) ? subj : cur));
+                autoSubjectRef.current = subj;
+              };
+              const takenOf = (o) => kind === "advance" && o.advance && o.advance._id !== expense?._id;
+              return (
+                <>
+                  {/* ✅ (25 พ.ย. 2569 ผู้ใช้: "การผูกกับงานทุกๆหน้า เช่นหน้าออกใบเบิก เคลม ให้ทำเป็นรูปแบบเลือกในปฏิทินให้เหมือนกับหน้า ขอ OT")
+                      การ์ดผูกงาน + ปฏิทินเลือกงาน (ชิ้นกลาง JobCalendarPicker · mode "jobs" = เลือกหลายงานจากหลายวัน)
+                      Advance: ช่วงงานที่มีใบแล้วล็อกในปฏิทินพร้อมบอกเลขที่ใบ (ข้อมูลจาก /expenses/jobs ของวันนั้น · server ตรวจซ้ำตอนบันทึก) */}
+                  <JobPickCard sx={{ gridColumn: { sm: "1 / -1" } }} jobs={jobs} onClick={() => setJobSheet(true)} error={Boolean(jobAdvance)}
+                    accent={accent} accentDark={meta.dark || accent}
+                    label={jobs.length > 1 ? "งานที่อ้างอิง" : presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ · เลือกได้หลายงาน)"}
+                    sideText={(o, i) => [i === 0 && jobs.length > 1 ? "งานหลัก" : "", o.start ? jobRangeText(o) : ""].filter(Boolean).join(" · ")}
+                    badge={jobAdvanceChecking ? <CircularProgress size={12} /> : null}
+                    helperText={presetJob && !editing
+                      ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว · เพิ่มงานอื่นที่ใช้ค่าใช้จ่ายร่วมกันได้"
+                      : jobs.length > 1
+                        ? "อ้างอิงหลายงานในใบเดียว — งานแรกเป็นงานหลักของใบ (ใช้ในรายงาน)"
+                        : kind === "advance"
+                          ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
+                          : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน · ค่าใช้จ่ายรวมหลายงาน เลือกเพิ่มได้"} />
+                  <JobCalendarPicker open={jobSheet} onClose={() => setJobSheet(false)} mode="jobs" onlyMine="auto" holidays={holidays}
+                    title="เลือกงานที่เบิก" accent={accent} accentDark={meta.dark || accent} max={20}
+                    date={jobs[0]?.start ? moment(jobs[0].start).format("YYYY-MM-DD") : undefined}
+                    jobs={jobs} lockedIds={presetJob && !editing ? [presetJob._id] : []}
+                    loadDayLocks={kind === "advance" ? (d) => ExpenseService.jobs("", d).then((rows) => new Map(rows
+                      .filter((o) => takenOf(o))
+                      .map((o) => [String(o._id), `ช่วงนี้มีใบ Advance แล้ว ${o.advance.docNo}`]))) : null}
+                    onPick={({ jobs: picked }) => { applyJobs(picked); setJobSheet(false); }} />
+                </>
+              );
+            })()}
+            {!isClearClaim && jobAdvance && (
+              <Alert
+                severity="warning"
+                sx={{ gridColumn: { sm: "1 / -1" }, borderRadius: 2, "& .MuiAlert-message": { fontSize: "0.82rem", width: "100%" } }}
+                action={jobAdvance.canOpen ? (
+                  <Button color="inherit" size="small" sx={{ textTransform: "none", fontWeight: 800, whiteSpace: "nowrap" }}
+                    onClick={() => { onClose?.(); navigate(`/expenses/${jobAdvance._id}`); }}>
+                    เปิดดูใบนี้
+                  </Button>
+                ) : undefined}
+              >
+                <b>งานนี้มีใบเบิก Advance แล้ว</b> — {jobAdvance.docNo} · {jobAdvance.statusLabel}
+                {jobAdvance.requesterName ? ` · ผู้เบิก ${jobAdvance.requesterName}` : ""}
+                <br />1 งานออกใบ Advance ได้ใบเดียว{presetJob && !editing ? "" : " — เลือกงานอื่น หรือไม่ผูกงาน"}
+                {jobAdvance.status === "rejected" ? " (ใบเดิมถูกตีกลับ ให้แก้ไขใบนั้นแล้วส่งใหม่)" : ""}
+              </Alert>
+            )}
             <ThaiDatePicker label="วันที่" value={docDate} onChange={(v) => setDocDate(v || moment().format("YYYY-MM-DD"))} />
             <SheetSelectField label="ถึง (ผู้มีอำนาจอนุมัติ)" value={to} allowCreate title="เลือกผู้มีอำนาจอนุมัติ" placeholder="แตะเพื่อเลือก หรือพิมพ์ชื่อ"
               options={toChoices.map((o) => ({ value: o.label, label: o.label, sub: o.position || "ชื่อที่เคยใช้ในใบก่อนหน้า", person: true, avatar: o.imageUrl }))}
@@ -649,88 +696,6 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               error={touched && !String(subject).trim()}
               sx={{ gridColumn: { sm: "1 / -1" } }} inputProps={{ maxLength: 300 }}
             />
-            {/* 🔁 (13 พ.ย. 2569 ผู้ใช้: "Select งานยังเป็นแบบเดิม") ผูกงานจากแผ่นรายการแบบหน้าลงงาน — ค้นหาบนสุด · ติ๊กได้หลายงาน */}
-            {!isClearClaim && (() => {
-              const applyJobs = (v) => {
-                // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" — งานนั้นเอาออกไม่ได้ (เพิ่มงานอื่นได้)
-                let next = v.slice(0, 20);
-                if (presetJob && !editing && !next.some((j) => j._id === presetJob._id)) next = [presetJob, ...next];
-                setJobs(next);
-                // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
-                const subj = jobsSubject(next, subjectPrefix);
-                const autoForms = new Set([autoSubjectRef.current, jobsSubject(jobs, subjectPrefix), jobs[0] ? jobSubject(jobs[0], subjectPrefix) : ""].filter(Boolean));
-                setSubject((cur) => (!String(cur).trim() || autoForms.has(cur) ? subj : cur));
-                autoSubjectRef.current = subj;
-              };
-              const shown = [...jobs, ...jobOptions.filter((o) => !jobs.some((j) => j._id === o._id))];
-              const takenOf = (o) => kind === "advance" && o.advance && o.advance._id !== expense?._id;
-              return (
-                <>
-                  <PickerField sx={{ gridColumn: { sm: "1 / -1" } }} onClick={() => setJobSheet(true)} error={Boolean(jobAdvance)}
-                    label={jobs.length > 1 ? `งานที่อ้างอิง (${jobs.length} งาน)` : presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ · เลือกได้หลายงาน)"}
-                    placeholder="แตะเพื่อเลือกงาน"
-                    helperText={presetJob && !editing
-                      ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว · เพิ่มงานอื่นที่ใช้ค่าใช้จ่ายร่วมกันได้"
-                      : jobs.length > 1
-                        ? "อ้างอิงหลายงานในใบเดียว — งานแรกเป็นงานหลักของใบ (ใช้ในรายงาน)"
-                        : kind === "advance"
-                          ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
-                          : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน · ค่าใช้จ่ายรวมหลายงาน เลือกเพิ่มได้"}>
-                    {jobs.length ? (
-                      <Stack direction="row" flexWrap="wrap" gap={0.5} alignItems="center">
-                        {jobs.map((o, i) => {
-                          const taken = kind === "advance" && jobAdvance?.eventId === o._id;
-                          return <Chip key={o._id} size="small" label={`${i === 0 && jobs.length > 1 ? "หลัก · " : ""}${jobChipText(o) || o.title || ""}`}
-                            sx={{ maxWidth: "100%", fontWeight: 700, ...(taken ? { bgcolor: alpha("#dc2626", 0.1), color: "#b91c1c" } : {}) }} />;
-                        })}
-                        {(jobLoading || jobAdvanceChecking) && <CircularProgress size={14} />}
-                      </Stack>
-                    ) : null}
-                  </PickerField>
-                  <SheetPicker open={jobSheet} onClose={() => setJobSheet(false)} title="เลือกงาน" subtitle="ค้นหาชื่องาน / โครงการ / เลขที่ · ติ๊กได้หลายงาน"
-                    query={jobQuery} onQuery={setJobQuery} loading={jobLoading} count={shown.length} emptyText="ไม่พบงาน">
-                    {shown.map((o) => {
-                      const sel = jobs.some((j) => j._id === o._id);
-                      const locked = presetJob && !editing && o._id === presetJob._id;
-                      const taken = takenOf(o);
-                      return (
-                        <SheetPickerRow key={o._id} multi selected={sel} disabled={(!sel && Boolean(taken)) || Boolean(locked)}
-                          onClick={() => applyJobs(sel ? jobs.filter((j) => j._id !== o._id) : [...jobs, o])}>
-                          <JobOptionRow job={o} main={jobText(o) || o.title}
-                            extra={jobPartText(o) ? (
-                              <Chip size="small" label={jobPartText(o)} sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
-                            ) : null}
-                            sub={[
-                              jobRangeText(o),
-                              o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
-                              o.teamNames?.length ? `ผู้เข้างานช่วงนี้ ${o.teamNames.join(", ")}` : "",
-                              o.docNo ? `เลขที่ ${o.docNo}` : "",
-                              taken ? `ช่วงนี้มีใบแล้ว ${o.advance.docNo}` : o.status || "",
-                            ].filter(Boolean).join(" · ")} />
-                        </SheetPickerRow>
-                      );
-                    })}
-                  </SheetPicker>
-                </>
-              );
-            })()}
-            {!isClearClaim && jobAdvance && (
-              <Alert
-                severity="warning"
-                sx={{ gridColumn: { sm: "1 / -1" }, borderRadius: 2, "& .MuiAlert-message": { fontSize: "0.82rem", width: "100%" } }}
-                action={jobAdvance.canOpen ? (
-                  <Button color="inherit" size="small" sx={{ textTransform: "none", fontWeight: 800, whiteSpace: "nowrap" }}
-                    onClick={() => { onClose?.(); navigate(`/expenses/${jobAdvance._id}`); }}>
-                    เปิดดูใบนี้
-                  </Button>
-                ) : undefined}
-              >
-                <b>งานนี้มีใบเบิก Advance แล้ว</b> — {jobAdvance.docNo} · {jobAdvance.statusLabel}
-                {jobAdvance.requesterName ? ` · ผู้เบิก ${jobAdvance.requesterName}` : ""}
-                <br />1 งานออกใบ Advance ได้ใบเดียว{presetJob && !editing ? "" : " — เลือกงานอื่น หรือไม่ผูกงาน"}
-                {jobAdvance.status === "rejected" ? " (ใบเดิมถูกตีกลับ ให้แก้ไขใบนั้นแล้วส่งใหม่)" : ""}
-              </Alert>
-            )}
           </Box>
         </Section>
 

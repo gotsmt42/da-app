@@ -21,7 +21,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, rankLabel, DEPARTMENT } from "@/shared/utils/roles";
+import { can, rankLabel, DEPARTMENT, isServiceCalendarObserver } from "@/shared/utils/roles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { SALES_TYPE_META, salesStatusMeta } from "@/features/calendar/salesAppointmentTypes";
 import { DISPATCH_STATUS_META, jobStatusColor } from "@/features/dispatch/dispatchMeta";
@@ -70,7 +70,7 @@ export default function SalesDashboard() {
   const [loading, setLoading] = useState(true);
 
   // ✅ ดูตารางงานช่าง (อ่านอย่างเดียว) ได้เฉพาะคนที่มีสิทธิ์ — ไม่มีสิทธิ์ก็ไม่ยิง request และไม่โชว์กล่อง
-  const canViewService = can(userData, "viewServiceCalendar");
+  const canViewService = can(userData, "viewAllJobs") || isServiceCalendarObserver(userData);
   const canRequestDispatch = can(userData, "requestDispatch");
 
   const load = useCallback(async (silent = false) => {

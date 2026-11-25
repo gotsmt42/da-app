@@ -9,10 +9,16 @@
  *
  * ✅ ผู้ใช้สั่ง (28 ก.ย. 2569): "ทำระบบเบิกโอทีด้วย ให้มืออาชีพ และสมบูรณ์"
  * ✅ โทนเรียบแบบเดียวกับระบบเบิก (ผู้ใช้เคยแจ้งว่าสีเยอะแล้วรกตา) — สีเหลือแค่ปุ่มหลักกับป้ายสถานะ
+ * 🎨 (25 พ.ย. 2569 ผู้ใช้: "จัดวางข้อมูลต่างๆให้ดูง่ายใช้ง่าย" · "ทำให้สวยงามด้วย")
+ *    • ตัวเลขสรุปเป็นการ์ดขนาดพอดี (เดิมยืดเต็มจอ ตัวเลขลอยห่างกัน) · ตัดกล่อง "ชั่วโมงเดือนนี้" บนหัวเพจที่ซ้ำกับการ์ดสรุป
+ *    • ตัวกรองสถานะ + ช่องค้นหาอยู่แถวเดียวกัน · รายการจัดกลุ่มตามเดือนเสมอ (เลิกคอลัมน์ "เดือน" ที่ซ้ำ)
+ *    • ตารางเพิ่มคอลัมน์ "วันที่ทำ OT" (เห็นว่าลงวันไหนโดยไม่ต้องเปิดใบ) · ความกว้างคอลัมน์คงที่ ไม่ยืดห่าง
+ *    • รายงานรายเดือน: แยกคอลัมน์ "รอปิดรอบ / ปิดรอบแล้ว / ยังไม่อนุมัติ" + แถวรวม · ใบในรอบกดเปิดดูได้
+ *    • เปิดใบจากแท็บรอดำเนินการ/รายงาน แล้วปิด = กลับแท็บเดิม (เดิมเด้งไปแท็บใบ OT)
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Children, useCallback, useEffect, useMemo, useState } from "react";
 import { alpha } from "@mui/material/styles";
-import { Link as RouterLink, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Button, Chip, TextField, InputAdornment, Skeleton, Alert, Pagination, IconButton,
   Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
@@ -35,7 +41,7 @@ import OtDetailDialog from "../components/OtDetailDialog";
 import OtStatusBadge from "../components/OtStatusBadge";
 import { useHolidays } from "../components/OtDayInfo";
 import {
-  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel,
+  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel, lineJobs,
 } from "../otMeta";
 import { PAGE_SX } from "@/shared/ui/PageKit";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
@@ -43,34 +49,49 @@ import ExportExcelButton from "@/shared/ui/ExportExcelButton";
 const DARK = "#334155";
 const PAGE_SIZE = 10;
 
-const Pill = ({ label, value, alert, active, onClick }) => (
-  <Box role={onClick ? "button" : undefined} onClick={onClick} sx={{
-    flex: "0 0 auto", minWidth: 118, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fff", cursor: onClick ? "pointer" : "default",
-    border: `1px solid ${active ? DARK : alert ? "#fca5a5" : BORDER_MAIN}`, boxShadow: active ? `inset 0 0 0 1px ${DARK}` : "none",
-  }}>
-    <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block" }} noWrap>{label}</Typography>
-    <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: alert ? "#dc2626" : TEXT_MAIN }} noWrap>{value}</Typography>
-  </Box>
-);
-
 const peopleCount = (r) => new Set((r.lines || []).map((l) => l.person.userId)).size;
+/** วันที่ทำ OT ของใบ (ไม่ซ้ำ เรียงวัน) → "10, 17, 27 ต.ค. 2569" · ข้ามเดือน → "29, 30 ก.ย. 2569 · 2 ต.ค. 2569" */
+const otDatesText = (r) => {
+  const days = [...new Set((r.lines || []).map((l) => moment(l.date).format("YYYY-MM-DD")))].sort();
+  if (!days.length) return "—";
+  const byMonth = new Map();
+  days.forEach((d) => { const k = d.slice(0, 7); byMonth.set(k, [...(byMonth.get(k) || []), d]); });
+  return [...byMonth.values()].map((list) => {
+    const [, mon, year] = thaiDate(list[0]).split(" ");
+    return `${list.map((d) => Number(d.slice(8))).join(", ")} ${mon} ${year}`;
+  }).join(" · ");
+};
+/** ชั่วโมงแยกตามประเภท OT ของใบ → [{ type, hours }] */
+const byTypeOf = (r) => OT_TYPES.map((t) => ({ t, hours: (r.lines || []).filter((l) => l.type === t.value).reduce((s, l) => s + (l.hours || 0), 0) })).filter((x) => x.hours > 0);
+const TypeBreakdown = ({ r }) => (
+  <Stack spacing={0.3}>
+    {byTypeOf(r).map(({ t, hours }) => (
+      <Stack key={t.value} direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
+        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color, flexShrink: 0 }} />
+        <Typography noWrap sx={{ fontSize: "0.78rem", color: TEXT_SUB, minWidth: 0 }}>{t.label}</Typography>
+        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_MAIN, ml: "auto !important", whiteSpace: "nowrap" }}>{hoursText(hours)}</Typography>
+      </Stack>
+    ))}
+  </Stack>
+);
+const otDayCount = (r) => new Set((r.lines || []).map((l) => moment(l.date).format("YYYY-MM-DD"))).size;
 /** งานที่อิง (ไม่ซ้ำ) — ประเภทงานคือคำแรกของชื่องาน ("PM · Fire Alarm · …") ใช้ทำสีชิป */
-const jobsList = (r) => [...new Set((r.lines || []).map((l) => l.jobTitle).filter(Boolean))];
-const JobLine = ({ title }) => {
+const jobsList = (r) => [...new Set((r.lines || []).flatMap((l) => lineJobs(l).map((j) => j.jobTitle)).filter(Boolean))];
+const JobLine = ({ title, wrap = false }) => {
   const [type, ...rest] = String(title).split(" · ");
   return (
     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
       <JobTypeChip job={{ title: type }} />
-      <Typography noWrap sx={{ fontSize: "0.84rem", color: TEXT_MAIN, minWidth: 0 }}>{rest.join(" · ") || type}</Typography>
+      <Typography noWrap={!wrap} sx={{ fontSize: "0.84rem", color: TEXT_MAIN, minWidth: 0, lineHeight: 1.35 }}>{rest.join(" · ") || type}</Typography>
     </Stack>
   );
 };
-const Jobs = ({ r, max = 2 }) => {
+const Jobs = ({ r, max = 2, wrap = false }) => {
   const list = jobsList(r);
   if (!list.length) return <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>—</Typography>;
   return (
     <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-      {list.slice(0, max).map((j) => <JobLine key={j} title={j} />)}
+      {list.slice(0, max).map((j) => <JobLine key={j} title={j} wrap={wrap} />)}
       {list.length > max && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>+ อีก {list.length - max} งาน</Typography>}
     </Stack>
   );
@@ -91,48 +112,56 @@ const RowCard = ({ r, onOpen }) => (
       </Box>
     </Stack>
     <Box sx={{ mt: 1.25 }}><Jobs r={r} /></Box>
-    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${BORDER_MAIN}` }}>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-        <MonthTag r={r} />
-        <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }} noWrap>{(r.lines || []).length} รายการ</Typography>
-      </Stack>
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${BORDER_MAIN}` }}>
+      <CalendarMonth sx={{ fontSize: 16, color: OT_ACCENT, flexShrink: 0 }} />
+      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: TEXT_MAIN, fontWeight: 600 }} noWrap>{otDatesText(r)}</Typography>
       <OtStatusBadge status={r.status} short />
     </Stack>
   </Box>
 );
 
+/**
+ * ตารางใบ OT (จอใหญ่) — 🎨 (25 พ.ย. 2569) ความกว้างคอลัมน์คงที่ (เดิมยืดตามจอ ตัวเลขลอยห่างจากชื่อ อ่านข้ามแถวยาก)
+ *   เลขที่/ยื่นเมื่อ · ผู้ยื่น · งานที่อิง · วันที่ทำ OT · ชั่วโมง · สถานะ — เดือนอยู่บนหัวกลุ่มแล้ว จึงไม่มีคอลัมน์เดือน
+ */
 const RowTable = ({ rows, onOpen }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto" }}>
-    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1.1, borderColor: BORDER_MAIN },
-      "& td": { py: 1.25, borderColor: BORDER_MAIN }, "& tbody tr:last-of-type td": { borderBottom: 0 } }}>
+    <Table size="small" sx={{ minWidth: 1080, tableLayout: "fixed", "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1, borderColor: BORDER_MAIN },
+      "& td": { py: 1.25, borderColor: BORDER_MAIN, verticalAlign: "middle" }, "& tbody tr:last-of-type td": { borderBottom: 0 } }}>
+      <colgroup>
+        <col style={{ width: 140 }} /><col style={{ width: 160 }} /><col /><col style={{ width: 175 }} /><col style={{ width: 180 }} /><col style={{ width: 92 }} /><col style={{ width: 120 }} />
+      </colgroup>
       <TableHead>
         <TableRow>
-          <TableCell>เดือน</TableCell><TableCell>ผู้ยื่น</TableCell><TableCell>เลขที่ / วันที่</TableCell><TableCell>งานที่อิง</TableCell>
-          <TableCell align="right">รายการ</TableCell><TableCell align="right">ชั่วโมง</TableCell><TableCell>สถานะ</TableCell>
+          <TableCell>เลขที่ / ยื่นเมื่อ</TableCell><TableCell>ผู้ยื่น</TableCell><TableCell>งานที่อิง</TableCell>
+          <TableCell>วันที่ทำ OT</TableCell><TableCell>แยกตามประเภท</TableCell><TableCell align="right">ชั่วโมงรวม</TableCell><TableCell>สถานะ</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
         {rows.map((r) => (
           <TableRow key={r._id} hover onClick={() => onOpen(r._id)} sx={{ cursor: "pointer" }}>
-            <TableCell sx={{ whiteSpace: "nowrap" }}><MonthTag r={r} /></TableCell>
-            <TableCell sx={{ whiteSpace: "nowrap" }}>
-              <Stack direction="row" spacing={1.25} alignItems="center">
-                <Avatar sx={{ width: 32, height: 32, fontSize: "0.82rem", fontWeight: 800, bgcolor: personColor(r.requester?.name) }}>{personInitial(r.requester?.name)}</Avatar>
-                <Box>
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.88rem" }}>{r.requester?.name}</Typography>
-                  {peopleCount(r) > 1 && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{peopleCount(r)} คน</Typography>}
+            <TableCell>
+              <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{r.docNo}</Typography>
+              <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{thaiDate(r.docDate)}</Typography>
+            </TableCell>
+            <TableCell>
+              <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
+                <Avatar sx={{ width: 30, height: 30, fontSize: "0.8rem", fontWeight: 800, bgcolor: personColor(r.requester?.name), flexShrink: 0 }}>{personInitial(r.requester?.name)}</Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontWeight: 700, fontSize: "0.86rem" }}>{r.requester?.name}</Typography>
+                  {peopleCount(r) > 1 && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{peopleCount(r)} คน</Typography>}
                 </Box>
               </Stack>
             </TableCell>
-            <TableCell sx={{ whiteSpace: "nowrap" }}>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.86rem" }}>{r.docNo}</Typography>
-              <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{thaiDate(r.docDate)}</Typography>
+            <TableCell sx={{ minWidth: 0 }}><Jobs r={r} wrap /></TableCell>
+            <TableCell>
+              <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: TEXT_MAIN, lineHeight: 1.4 }}>{otDatesText(r)}</Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{otDayCount(r)} วัน · {(r.lines || []).length} รายการ</Typography>
             </TableCell>
-            <TableCell sx={{ maxWidth: 420 }}><Jobs r={r} /></TableCell>
-            <TableCell align="right" sx={{ color: TEXT_SUB, whiteSpace: "nowrap" }}>{(r.lines || []).length}</TableCell>
+            <TableCell><TypeBreakdown r={r} /></TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               <Typography component="span" sx={{ fontWeight: 900, fontSize: "1.02rem" }}>{hoursText(r.totalHours).replace(" ชม.", "")}</Typography>
-              <Typography component="span" sx={{ ml: 0.5, fontSize: "0.76rem", color: TEXT_SUB }}>ชม.</Typography>
+              <Typography component="span" sx={{ ml: 0.5, fontSize: "0.74rem", color: TEXT_SUB }}>ชม.</Typography>
             </TableCell>
             <TableCell><OtStatusBadge status={r.status} short /></TableCell>
           </TableRow>
@@ -144,25 +173,38 @@ const RowTable = ({ rows, onOpen }) => (
 
 /** เดือนของใบ (รอบ OT) — ✅ ผู้ใช้: "ให้แสดงเดือนตรงรายการให้ชัดเจน ไม่ต้องแยกค้นหาข้างบน" */
 const monthOf = (r) => r.period || moment(r.docDate).format("YYYY-MM");
-const MonthTag = ({ r }) => (
-  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 1, height: 26, borderRadius: 2, flexShrink: 0,
-    bgcolor: "#ecfeff", color: OT_DARK, border: "1px solid #a5f3fc", fontSize: "0.8rem", fontWeight: 800, whiteSpace: "nowrap" }}>
-    <CalendarMonth sx={{ fontSize: 15 }} />{periodLabel(monthOf(r))}
-  </Box>
-);
-
-const Stat = ({ label, value, unit, tone }) => (
-  <Box sx={{ flex: "1 1 0", minWidth: 120, px: 1.75, py: 1.25, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, position: "relative", overflow: "hidden" }}>
-    <Box sx={{ position: "absolute", left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2, bgcolor: tone }} />
-    <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, fontWeight: 700 }} noWrap>{label}</Typography>
-    <Typography sx={{ fontWeight: 900, fontSize: "1.35rem", color: TEXT_MAIN, lineHeight: 1.25 }} noWrap>
+/**
+ * 🎨 (25 พ.ย. 2569 ผู้ใช้: "จัดวางให้สวยงาม สมบูรณ์" · "สีสันไม่ต้องรก")
+ * แถบตัวเลขสรุปเป็นการ์ดเดียวเต็มแถว แบ่งช่องด้วยเส้นบาง (เดิมการ์ดแยกกว้างไม่เท่ากัน เหลือที่ว่างครึ่งจอ)
+ * สีเหลือแค่จุดเล็กหน้าหัวข้อ
+ */
+const Stat = ({ label, value, unit, tone, hint }) => (
+  <Box sx={{ minWidth: 0, px: { xs: 1.5, sm: 2 }, py: 1.4 }}>
+    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+      {tone && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: tone, flexShrink: 0 }} />}
+      <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, fontWeight: 700 }} noWrap>{label}</Typography>
+    </Stack>
+    <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: TEXT_MAIN, lineHeight: 1.25, mt: 0.25 }} noWrap>
       {value}<Box component="span" sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 600, ml: 0.5 }}>{unit}</Box>
     </Typography>
+    {hint && <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }} noWrap>{hint}</Typography>}
   </Box>
 );
+const StatRow = ({ children, sx }) => {
+  const items = Children.toArray(children).filter(Boolean);
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: `repeat(${items.length}, minmax(0, 1fr))` },
+      bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflow: "hidden", mb: 1.5, ...sx }}>
+      {items.map((c, i) => (
+        <Box key={i} sx={{ minWidth: 0, borderLeft: { xs: i % 2 ? `1px solid ${BORDER_MAIN}` : 0, md: i ? `1px solid ${BORDER_MAIN}` : 0 }, borderTop: { xs: i >= 2 ? `1px solid ${BORDER_MAIN}` : 0, md: 0 } }}>{c}</Box>
+      ))}
+    </Box>
+  );
+};
+const hNum = (h) => hoursText(h).replace(" ชม.", "");
 
 /** ── รายงานรายเดือน + ปิดรอบจ่าย ─────────────────────────────────────── */
-const ReportView = ({ reloadKey, canClose }) => {
+const ReportView = ({ reloadKey, canClose, onOpen }) => {
   const [period, setPeriod] = useState(moment().format("YYYY-MM"));
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -211,52 +253,100 @@ const ReportView = ({ reloadKey, canClose }) => {
       {toast && <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setToast("")}>{toast}</Alert>}
       {!data ? <Skeleton variant="rounded" height={240} /> : (
         <>
-          <Stack direction="row" spacing={1} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5 }}>
-            <Pill label="พนักงานที่มี OT" value={`${data.people.length} คน`} />
-            <Pill label="ชั่วโมงอนุมัติแล้ว" value={hoursText(sum((p) => p.approved.hours + p.paid.hours))} />
-            <Pill label="อนุมัติแล้ว · รอปิดรอบ" value={hoursText(sum((p) => p.approved.hours))} />
-            <Pill label="ปิดรอบแล้ว" value={hoursText(sum((p) => p.paid.hours))} />
-            <Pill label="ยังไม่ผ่านอนุมัติ" value={hoursText(sum((p) => p.waiting.hours))} />
-          </Stack>
+          <StatRow>
+            <Stat label="พนักงานที่มี OT" value={data.people.length} unit="คน" tone={OT_ACCENT} />
+            <Stat label="ชั่วโมงที่อนุมัติแล้ว" value={hNum(sum((p) => p.approved.hours + p.paid.hours))} unit="ชม." tone="#16a34a" />
+            <Stat label="รอปิดรอบ" value={hNum(sum((p) => p.approved.hours))} unit="ชม." tone="#d97706" hint={data.approvedCount ? `${data.approvedCount} ใบ พร้อมปิดรอบ` : "ไม่มีใบรอปิดรอบ"} />
+            <Stat label="ปิดรอบแล้ว" value={hNum(sum((p) => p.paid.hours))} unit="ชม." tone="#64748b" />
+            <Stat label="ยังไม่ผ่านอนุมัติ" value={hNum(sum((p) => p.waiting.hours))} unit="ชม." tone="#94a3b8" hint="ไม่นับในรอบนี้จนกว่าจะอนุมัติ" />
+          </StatRow>
           {!data.people.length ? (
             <Stack alignItems="center" sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}>
               <Inbox sx={{ fontSize: 40, color: "#cbd5e1" }} />
               <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>ไม่มี OT ในรอบนี้</Typography>
             </Stack>
           ) : (
-            <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflowX: "auto" }}>
-              <Table size="small" sx={{ minWidth: 760, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" }, "& td": { borderColor: BORDER_MAIN } }}>
+            <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 880, tableLayout: "fixed", "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1 },
+                "& td": { borderColor: BORDER_MAIN, py: 1.1, whiteSpace: "nowrap" }, "& th.grp": { color: OT_DARK, borderBottom: `2px solid ${alpha(OT_ACCENT, 0.35)}` } }}>
+                <colgroup>
+                  <col style={{ width: 220 }} />{OT_TYPES.map((t) => <col key={t.value} />)}<col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 130 }} />
+                </colgroup>
                 <TableHead>
                   <TableRow>
-                    <TableCell>พนักงาน</TableCell>
-                    {OT_TYPES.map((t) => <TableCell key={t.value} align="right">{t.label}</TableCell>)}
-                    <TableCell align="right">รวมอนุมัติ</TableCell><TableCell align="right">สถานะ</TableCell>
+                    <TableCell rowSpan={2}>พนักงาน</TableCell>
+                    <TableCell className="grp" colSpan={OT_TYPES.length} align="center">ชั่วโมงที่อนุมัติแล้ว แยกตามประเภท</TableCell>
+                    <TableCell rowSpan={2} align="right">รวมอนุมัติ</TableCell>
+                    <TableCell rowSpan={2} align="right">รอปิดรอบ</TableCell>
+                    <TableCell rowSpan={2} align="right">ปิดรอบแล้ว</TableCell>
+                    <TableCell rowSpan={2} align="right">ยังไม่อนุมัติ</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    {OT_TYPES.map((t) => (
+                      <TableCell key={t.value} align="right">
+                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
+                          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color }} /><span>{t.label}</span>
+                        </Stack>
+                      </TableCell>
+                    ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {data.people.map((p) => (
-                    <TableRow key={p.userId}>
-                      <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>{p.name}</TableCell>
-                      {OT_TYPES.map((t) => (
-                        <TableCell key={t.value} align="right" sx={{ whiteSpace: "nowrap" }}>
-                          {p.approved.byType[t.value] ? hoursText(p.approved.byType[t.value].hours) : "—"}
-                        </TableCell>
-                      ))}
-                      <TableCell align="right" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>{hoursText(p.approved.hours + p.paid.hours)}</TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap", fontSize: "0.78rem", color: TEXT_SUB }}>
-                        {p.approved.hours ? `รอปิดรอบ ${hoursText(p.approved.hours)}` : p.paid.hours ? "ปิดรอบแล้ว" : "—"}
-                        {p.waiting.hours ? ` · รออนุมัติ ${hoursText(p.waiting.hours)}` : ""}
+                    <TableRow key={p.userId} hover>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                          <Avatar sx={{ width: 28, height: 28, fontSize: "0.76rem", fontWeight: 800, bgcolor: personColor(p.name), flexShrink: 0 }}>{personInitial(p.name)}</Avatar>
+                          <Typography noWrap sx={{ fontWeight: 700, fontSize: "0.86rem", minWidth: 0 }}>{p.name}</Typography>
+                        </Stack>
                       </TableCell>
+                      {OT_TYPES.map((t) => {
+                        // ⚠️ server รวม "อนุมัติแล้ว + ปิดรอบแล้ว" ไว้ใน approved.byType อยู่แล้ว (routes/ot.js /report) — ห้ามบวก paid ซ้ำ
+                        const v = p.approved.byType[t.value]?.hours || 0;
+                        return <TableCell key={t.value} align="right" sx={{ color: v ? TEXT_MAIN : "#cbd5e1" }}>{v ? hoursText(v) : "—"}</TableCell>;
+                      })}
+                      <TableCell align="right" sx={{ fontWeight: 900, fontSize: "0.92rem" }}>{hoursText(p.approved.hours + p.paid.hours)}</TableCell>
+                      <TableCell align="right" sx={{ color: p.approved.hours ? "#b45309" : "#cbd5e1", fontWeight: p.approved.hours ? 800 : 400 }}>{p.approved.hours ? hoursText(p.approved.hours) : "—"}</TableCell>
+                      <TableCell align="right" sx={{ color: p.paid.hours ? TEXT_SUB : "#cbd5e1" }}>{p.paid.hours ? hoursText(p.paid.hours) : "—"}</TableCell>
+                      <TableCell align="right" sx={{ color: p.waiting.hours ? TEXT_SUB : "#cbd5e1" }}>{p.waiting.hours ? hoursText(p.waiting.hours) : "—"}</TableCell>
                     </TableRow>
                   ))}
+                  {data.people.length > 1 && (
+                    <TableRow sx={{ "& td": { bgcolor: "#f8fafc", fontWeight: 900, borderBottom: 0 } }}>
+                      <TableCell>รวมทั้งหมด</TableCell>
+                      {OT_TYPES.map((t) => {
+                        const v = sum((p) => p.approved.byType[t.value]?.hours || 0);
+                        return <TableCell key={t.value} align="right">{v ? hoursText(v) : "—"}</TableCell>;
+                      })}
+                      <TableCell align="right">{hoursText(sum((p) => p.approved.hours + p.paid.hours))}</TableCell>
+                      <TableCell align="right">{hoursText(sum((p) => p.approved.hours))}</TableCell>
+                      <TableCell align="right">{hoursText(sum((p) => p.paid.hours))}</TableCell>
+                      <TableCell align="right">{hoursText(sum((p) => p.waiting.hours))}</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </Box>
           )}
           {data.docs.length > 0 && (
-            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1 }}>
-              ใบในรอบนี้: {data.docs.map((d) => d.docNo).join(", ")}
-            </Typography>
+            <Box sx={{ mt: 1.5 }}>
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75 }}>ใบในรอบนี้ ({data.docs.length}) — กดเพื่อเปิดดู</Typography>
+              <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+                {data.docs.map((d) => {
+                  const st = otStatus(d.status);
+                  return (
+                    <ButtonBase key={d._id || d.docNo} onClick={() => d._id && onOpen?.(d._id)} sx={{
+                      gap: 0.75, px: 1.1, py: 0.6, borderRadius: 2, fontFamily: "inherit", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`,
+                      "&:hover": { borderColor: OT_ACCENT, bgcolor: alpha(OT_ACCENT, 0.04) },
+                    }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: st.color }} />
+                      <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>{d.docNo}</Typography>
+                      <Typography component="span" sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{d.requester?.name || ""} · {hoursText(d.totalHours)} · {st.short || st.label}</Typography>
+                    </ButtonBase>
+                  );
+                })}
+              </Stack>
+            </Box>
           )}
         </>
       )}
@@ -278,10 +368,13 @@ const ReportView = ({ reloadKey, canClose }) => {
   );
 };
 
-export default function OtPage({ view = "mine" }) {
+export default function OtPage({ view: viewProp = "mine" }) {
   const { can } = usePermissions();
   const { id: routeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // ✅ เปิดใบจากแท็บรอดำเนินการ/รายงาน (/ot/<id>) — ข้างหลังยังเป็นแท็บเดิม ปิดแล้วกลับแท็บเดิม
+  const view = routeId ? (location.state?.fromView || viewProp) : viewProp;
   const isDesktop = useMediaQuery("(min-width:900px)");
   const canUse = can("requestExpense") || can("viewAllExpenses");
   const canHandle = can("reviewExpense") || can("approveExpense");
@@ -394,15 +487,6 @@ export default function OtPage({ view = "mine" }) {
             </Box>
           </Stack>
           {view !== "report" && (
-            <Box sx={{ flexShrink: 0, display: "flex", flexDirection: { xs: "row", sm: "column" }, alignItems: { xs: "center", sm: "flex-end" }, justifyContent: "space-between", gap: 1,
-              px: 1.5, py: { xs: 1, sm: 0 }, borderRadius: { xs: 2, sm: 0 }, bgcolor: { xs: "#f8fafc", sm: "transparent" }, border: { xs: `1px solid ${BORDER_MAIN}`, sm: 0 }, borderLeft: { sm: `1px solid ${BORDER_MAIN}` } }}>
-              <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>ชั่วโมง {periodLabel(thisMonth)}</Typography>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.05rem", sm: "1.1rem" }, color: TEXT_MAIN, lineHeight: 1.25, whiteSpace: "nowrap" }}>
-                {hoursText(liveHours(base.filter((r) => monthOf(r) === thisMonth)))}
-              </Typography>
-            </Box>
-          )}
-          {view !== "report" && (
             <ExportExcelButton onClick={exportExcel} loading={exporting} disabled={loading || !visible.length} count={visible.length} />
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
@@ -427,37 +511,40 @@ export default function OtPage({ view = "mine" }) {
         </Box>
       </Box>
 
-      {view === "report" && <ReportView reloadKey={reloadKey} canClose={can("disburseExpense")} />}
+      {view === "report" && <ReportView reloadKey={reloadKey} canClose={can("disburseExpense")} onOpen={openDetail} />}
 
       {(view === "mine" || view === "inbox") && (
         <>
-          <TextField size="small" fullWidth placeholder="ค้นหาเลขที่ / เรื่อง / ชื่อพนักงาน" value={q} onChange={(e) => setQ(e.target.value)} sx={{ mb: 1.25, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            InputProps={{
-              startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
-              endAdornment: q ? <InputAdornment position="end"><IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 17 }} /></IconButton></InputAdornment> : null,
-            }} />
           {view === "mine" && monthList.length > 0 && (
-            <>
-              <Stack direction="row" spacing={1} sx={{ mb: 1.5, overflowX: "auto", pb: 0.25 }}>
-                <Stat label="อนุมัติเดือนนี้" value={hoursText(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth).filter((r) => ["approved", "paid"].includes(r.status)))).replace(" ชม.", "")} unit="ชม." tone="#16a34a" />
-                <Stat label="รออนุมัติ" value={hoursText(liveHours(inMonth.filter((r) => ["pending", "reviewed"].includes(r.status)))).replace(" ชม.", "")} unit="ชม." tone="#d97706" />
-                <Stat label="ใบทั้งหมด" value={inMonth.length} unit="ใบ" tone={OT_ACCENT} />
-                {(counts.rejected || 0) > 0 && <Stat label="ถูกตีกลับ" value={counts.rejected} unit="ใบ" tone="#dc2626" />}
-              </Stack>
-            </>
+            <StatRow>
+              <Stat label={`ยื่นแล้ว · ${periodLabel(thisMonth)}`} value={hNum(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth)))} unit="ชม." tone={OT_ACCENT} hint="ไม่นับใบที่ยกเลิก/ตีกลับ" />
+              <Stat label={`อนุมัติแล้ว · ${periodLabel(thisMonth)}`} value={hNum(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth).filter((r) => ["approved", "paid"].includes(r.status))))} unit="ชม." tone="#16a34a" />
+              <Stat label="รอตรวจสอบ / อนุมัติ" value={hNum(liveHours(inMonth.filter((r) => ["pending", "reviewed"].includes(r.status))))} unit="ชม." tone="#d97706" hint={`${(counts.pending || 0) + (counts.reviewed || 0)} ใบ`} />
+              {(counts.rejected || 0) > 0
+                ? <Stat label="ถูกตีกลับ · ต้องแก้" value={counts.rejected} unit="ใบ" tone="#dc2626" hint="เปิดใบแล้วกดแก้ไข/ส่งใหม่" />
+                : <Stat label="ใบทั้งหมด" value={inMonth.length} unit="ใบ" tone="#94a3b8" />}
+            </StatRow>
           )}
-          {view === "mine" && (
-            <Box sx={{ mb: 1.5 }}>
-              <ViewTiles compact value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: [
-                { value: "all", label: "ทุกสถานะ", count: inMonth.length, unit: "ใบ", icon: <Apps />, color: "#475569" },
-                ...STATUS_ORDER.filter((st) => st === status || (counts[st] || 0) > 0).map((st) => ({
-                  value: st, label: otStatus(st).label, shortLabel: otStatus(st).short || otStatus(st).label, count: counts[st] || 0, unit: "ใบ",
-                  icon: <Box component="span" sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: otStatus(st).color, display: "inline-block" }} />,
-                  color: otStatus(st).color, alert: st === "rejected",
-                })),
-              ] }]} />
-            </Box>
-          )}
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "center" }} sx={{ mb: 1.5 }}>
+            {view === "mine" && (
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <ViewTiles compact value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: [
+                  { value: "all", label: "ทุกสถานะ", count: inMonth.length, unit: "ใบ", icon: <Apps />, color: "#475569" },
+                  ...STATUS_ORDER.filter((st) => st === status || (counts[st] || 0) > 0).map((st) => ({
+                    value: st, label: otStatus(st).label, shortLabel: otStatus(st).short || otStatus(st).label, count: counts[st] || 0, unit: "ใบ",
+                    icon: <Box component="span" sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: otStatus(st).color, display: "inline-block" }} />,
+                    color: otStatus(st).color, alert: st === "rejected",
+                  })),
+                ] }]} />
+              </Box>
+            )}
+            <TextField size="small" placeholder="ค้นหาเลขที่ / เรื่อง / ชื่อพนักงาน" value={q} onChange={(e) => setQ(e.target.value)}
+              sx={{ width: { xs: "100%", md: view === "mine" ? 320 : "100%" }, flexShrink: 0, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
+                endAdornment: q ? <InputAdornment position="end"><IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 17 }} /></IconButton></InputAdornment> : null,
+              }} />
+          </Stack>
           {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
           {loading ? <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
             : view === "inbox" ? (
@@ -476,10 +563,11 @@ export default function OtPage({ view = "mine" }) {
               ) : <Stack alignItems="center" sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}><Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>ไม่มีใบ OT ที่รอดำเนินการ 🎉</Typography></Stack>
             ) : visible.length ? (
               <>
-                {monthList.length > 1 ? (
-                  <Stack spacing={2}>
+                {/* ✅ หัวเดือนเสมอ (เดือนเดียวก็มี) — เดือนเดียว = แบ่งหน้าละ 10 ใบ · หลายเดือน = แสดงครบทุกเดือน */}
+                <Stack spacing={2}>
                     {monthList.map(([k]) => {
-                      const list = visible.filter((r) => monthOf(r) === k);
+                      const all = visible.filter((r) => monthOf(r) === k);
+                      const list = monthList.length > 1 ? all : pageRows;
                       if (!list.length) return null;
                       return (
                         <Box key={k}>
@@ -487,14 +575,13 @@ export default function OtPage({ view = "mine" }) {
                             <Stack direction="row" spacing={0.75} alignItems="center"><CalendarMonth sx={{ fontSize: 20, color: OT_ACCENT }} />
                               <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN }}>{periodLabel(k)}{k === thisMonth ? " (เดือนนี้)" : ""}</Typography></Stack>
                             <Box sx={{ flex: 1, height: 1, bgcolor: BORDER_MAIN }} />
-                            <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 700 }}>{list.length} ใบ · {hoursText(liveHours(list))}</Typography>
+                            <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 700 }}>{all.length} ใบ · {hoursText(liveHours(all))}</Typography>
                           </Stack>
                           {renderRows(list)}
                         </Box>
                       );
                     })}
-                  </Stack>
-                ) : renderRows(pageRows)}
+                </Stack>
                 {monthList.length <= 1 && pageCount > 1 && (
                   <Stack alignItems="center" sx={{ mt: 1.5 }}>
                     <Pagination count={pageCount} page={cur} onChange={(_, n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); }}

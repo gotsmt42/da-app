@@ -342,3 +342,21 @@ describe("อ่านตำแหน่งได้ทั้งรูปแบ�
     expect(titleOf({ rank: "technician", role: "member" })).toBe("ช่างเทคนิค");
   });
 });
+
+describe("isServiceCalendarObserver (ตรงกับ isServiceObserver ฝั่ง server)", () => {
+  it("คนนอกฝ่ายช่างที่มีสิทธิ์ดูตารางงานช่าง = ผู้เยี่ยมชม (ไม่ผูกกับ Rank ฝ่ายขายอย่างเดียว)", async () => {
+    const { isServiceCalendarObserver, setEffectiveCapabilities, CAPABILITIES: C } = await import("./roles");
+    expect(isServiceCalendarObserver({ role: "sale" })).toBe(true);
+    // ติ๊กให้ผู้ใช้ทั่วไป → ต้องเปิดได้จริง (เดิมได้เมนูแต่กดแล้วเห็นแค่งานตัวเอง)
+    setEffectiveCapabilities({ ...C, viewServiceCalendar: [...C.viewServiceCalendar, "user", "technician"] });
+    try {
+      expect(isServiceCalendarObserver({ role: "user" })).toBe(true);
+      // ช่างอยู่ฝ่ายบริการอยู่แล้ว — server ไม่ให้ผล จึงไม่ได้เมนูผู้เยี่ยมชม
+      expect(isServiceCalendarObserver({ role: "technician" })).toBe(false);
+      // คนเห็นงานทุกคนใช้ตารางงานจริง ไม่ใช่โหมดดูอย่างเดียว
+      expect(isServiceCalendarObserver({ role: "techadmin" })).toBe(false);
+    } finally {
+      setEffectiveCapabilities(null);
+    }
+  });
+});

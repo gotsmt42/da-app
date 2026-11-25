@@ -408,6 +408,17 @@ export const can = (who, capability) => {
 
 export const departmentOf = (who) => ROLE_DEPARTMENT[normalizeRole(who)] || null;
 
+/**
+ * เปิด "ตารางงานช่าง (ดูอย่างเดียว)" ได้จริงไหม — ✅ ตรงกับ isServiceObserver ฝั่ง server
+ * (da-app-server routes/calendarEvent/shared.js: มีสิทธิ์ viewServiceCalendar + ไม่ได้อยู่ฝ่ายบริการ)
+ * 🐛 ที่แก้ (25 พ.ย. 2569 ผู้ใช้: "ตรวจสอบการตั้งค่าต่างๆให้สอดคล้อง ใช้งานได้หมดไม่ผิดเพี้ยน"):
+ *    เดิมหน้าปฏิทินเข้าโหมดดูอย่างเดียวเฉพาะ Rank ฝ่ายขาย — ติ๊กสิทธิ์นี้ให้ตำแหน่งอื่น (เช่น ผู้ใช้ทั่วไป)
+ *    ได้เมนูมาแต่กดแล้วเห็นแค่งานของตัวเอง · ส่วนช่างที่ถูกติ๊กได้เมนูที่ server ไม่ให้ผลอะไรเลย
+ * ⚠️ คนที่เห็นงานของทุกคนอยู่แล้วไม่ใช่ "ผู้เยี่ยมชม" — ใช้ตารางงานช่างตัวจริง (แก้ได้ตามสิทธิ์) ไม่ใช่โหมดอ่านอย่างเดียว
+ */
+export const isServiceCalendarObserver = (who) =>
+  can(who, "viewServiceCalendar") && !can(who, "viewAllJobs") && departmentOf(who) !== DEPARTMENT.SERVICE;
+
 export const isRole = (who, ...roles) =>
   roles.map((r) => String(r).toLowerCase()).includes(normalizeRole(who));
 

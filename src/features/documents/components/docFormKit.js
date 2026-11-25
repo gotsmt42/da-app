@@ -9,8 +9,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { Box, Stack, Typography, Button, IconButton, CircularProgress } from "@mui/material";
-import { CloseRounded as Close, HistoryRounded as History, TaskAltRounded as TaskAlt, VisibilityRounded as Visibility, OpenInNewRounded as OpenInNew, InfoRounded } from "@mui/icons-material";
+import { Box, Stack, Typography, Button, IconButton, CircularProgress, ButtonBase } from "@mui/material";
+import { CloseRounded as Close, HistoryRounded as History, TaskAltRounded as TaskAlt, VisibilityRounded as Visibility, OpenInNewRounded as OpenInNew, InfoRounded, EditNoteRounded as EditNote, FiberNewRounded } from "@mui/icons-material";
 
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX, ACCENT, ACCENT_SOFT } from "@/shared/ui/PageKit";
@@ -248,8 +248,12 @@ export const docFormSx = (accent) => ({
 export const SMALL_BTN_SX = { textTransform: "none", fontWeight: 700, color: INK_2, borderRadius: 2, px: 1.25, minWidth: 0, whiteSpace: "nowrap" };
 export const OUTLINE_BTN_SX = { ...SMALL_BTN_SX, border: `1px solid ${LINE}`, bgcolor: "#fff", "&:hover": { bgcolor: SURFACE } };
 
-/** ป้าย "กู้คืนร่างแล้ว" + ปุ่มเริ่มใหม่จากข้อมูลงาน */
+/**
+ * ป้าย "กู้คืนร่างแล้ว" + ปุ่มเริ่มใหม่จากข้อมูลงาน
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "ถ้ามีล้างทิ้งให้มีคอนเฟิร์มก่อนทุกตัว") — "เริ่มใหม่" = ล้างข้อความที่พิมพ์ไว้ → ถามก่อน
+ */
 export function DraftBanner({ when, onDiscard }) {
+  const [ask, setAsk] = useState(false);
   return (
     <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.75, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: `4px solid ${ACCENT}` }}>
       <History sx={{ fontSize: 20, color: ACCENT }} />
@@ -257,7 +261,15 @@ export function DraftBanner({ when, onDiscard }) {
         <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK }}>กู้คืนข้อความที่พิมพ์ค้างไว้แล้ว</Typography>
         <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>บันทึกล่าสุด {when} · ร่างเก็บไว้ในเครื่องนี้ {DRAFT_TTL_DAYS} วัน</Typography>
       </Box>
-      <Button size="small" onClick={onDiscard} sx={{ ...OUTLINE_BTN_SX, flexShrink: 0 }}>เริ่มใหม่</Button>
+      {ask ? (
+        <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
+          <Button size="small" onClick={() => setAsk(false)} sx={{ ...OUTLINE_BTN_SX }}>ไม่ล้าง</Button>
+          <Button size="small" variant="contained" color="error" disableElevation onClick={() => { setAsk(false); onDiscard(); }}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}>ล้างข้อความที่พิมพ์ไว้</Button>
+        </Stack>
+      ) : (
+        <Button size="small" onClick={() => setAsk(true)} sx={{ ...OUTLINE_BTN_SX, flexShrink: 0 }}>เริ่มใหม่</Button>
+      )}
     </Stack>
   );
 }
@@ -268,14 +280,22 @@ const ISSUED_STATUS = { issued: "ออกแล้ว", sent: "ส่งให�
  * ✅ งานนี้ออกใบนี้ไปแล้ว — แสดงสรุปใบเดิมแทนฟอร์ม (ผู้ใช้: "ถ้างานนี้มีการออกใบไปแล้วไม่ให้ออกซ้ำ"
  *    · "ให้มีลิงก์ไปหน้าเอกสารที่ออกด้วย") — ไม่โชว์ฟอร์มจางๆ ทั้งก้อนที่อ่านยากและแก้ไม่ได้
  */
-export function IssuedSummary({ doc, label, onView, viewing, onNavigate }) {
+/**
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "การออกใบแจ้งเข้างาน ทำให้สามารถกดแก้ไขได้ย้อนหลัง หรือสร้างซ้ำ เผื่อกำหนดการงานมีการแก้ไข")
+ *    onEdit = แก้ไขใบนี้ (เลขเดิม · เก็บฉบับก่อนแก้ไว้ในประวัติ) · onReissue = ออกใบใหม่แทน (เลขใหม่ · ใบเดิมยกเลิกให้อัตโนมัติ)
+ *    ไม่ส่งสองตัวนี้ = แบบเดิม (ดูอย่างเดียว · บอกให้ไปยกเลิกในทะเบียน)
+ */
+export function IssuedSummary({ doc, label, onView, viewing, onNavigate, onEdit, onReissue, changeBlockedReason = "" }) {
+  const canChange = Boolean(onEdit || onReissue);
   const rows = [
     ["เลขที่", doc.docNumber],
     ["วันที่ออก", fmtThaiDate(doc.issuedAt)],
     ["ผู้ออก", doc.issuedByName],
+    doc.revisionNo ? ["แก้ไขแล้ว", `${doc.revisionNo} ครั้ง${doc.revisedAt ? ` · ล่าสุด ${fmtThaiDate(doc.revisedAt)}` : ""}${doc.revisedByName ? ` โดย ${doc.revisedByName}` : ""}`] : null,
+    doc.supersedesNumber ? ["ออกแทนใบ", `เลขที่ ${doc.supersedesNumber} (ยกเลิกแล้ว)`] : null,
     ["โครงการ", doc.site],
     ["เรื่อง", doc.subject],
-  ].filter(([, v]) => v);
+  ].filter((r) => r && r[1]);
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden" }}>
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: { xs: 2, sm: 2.5 }, py: 2, borderBottom: `1px solid ${LINE}` }}>
@@ -295,12 +315,39 @@ export function IssuedSummary({ doc, label, onView, viewing, onNavigate }) {
           </Stack>
         ))}
       </Box>
-      <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mx: { xs: 2, sm: 2.5 }, mb: 2, p: 1.25, borderRadius: 2, bgcolor: SURFACE }}>
-        <InfoRounded sx={{ fontSize: 17, color: MUTED, mt: 0.15 }} />
-        <Typography sx={{ fontSize: "0.78rem", color: INK_2, lineHeight: 1.55 }}>
-          หนึ่งงานออก{label}ได้ใบเดียว — ถ้าต้องออกใหม่ ให้เปลี่ยนสถานะใบเดิมเป็น "ยกเลิก" ในทะเบียนเอกสารก่อน
-        </Typography>
-      </Stack>
+      {canChange ? (
+        <Box sx={{ mx: { xs: 2, sm: 2.5 }, mb: 2, p: 1.5, borderRadius: 2.5, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, mb: 0.25 }}>กำหนดการหรือข้อความเปลี่ยน?</Typography>
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 1.25, lineHeight: 1.5 }}>เลือกวิธีที่ต้องการ — ทุกครั้งดูตัวอย่างก่อนยืนยัน</Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
+            {onEdit && (
+              <ButtonBase onClick={onEdit} sx={{ display: "flex", alignItems: "flex-start", gap: 1, textAlign: "left", p: 1.25, borderRadius: 2, fontFamily: "inherit", bgcolor: "#fff", border: `1px solid ${LINE}`, "&:hover": { borderColor: ACCENT, bgcolor: `${ACCENT}08` } }}>
+                <EditNote sx={{ fontSize: 22, color: ACCENT, mt: 0.1 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>แก้ไขใบนี้</Typography>
+                  <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 }}>ใช้เลขที่เดิม {doc.docNumber} · ระบบเก็บฉบับก่อนแก้ไว้ในประวัติ</Typography>
+                </Box>
+              </ButtonBase>
+            )}
+            {onReissue && (
+              <ButtonBase onClick={onReissue} sx={{ display: "flex", alignItems: "flex-start", gap: 1, textAlign: "left", p: 1.25, borderRadius: 2, fontFamily: "inherit", bgcolor: "#fff", border: `1px solid ${LINE}`, "&:hover": { borderColor: ACCENT, bgcolor: `${ACCENT}08` } }}>
+                <FiberNewRounded sx={{ fontSize: 22, color: ACCENT, mt: 0.1 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>ออกใบใหม่แทน</Typography>
+                  <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 }}>ได้เลขที่ใหม่ · ใบเดิม {doc.docNumber} ถูกยกเลิกให้อัตโนมัติ</Typography>
+                </Box>
+              </ButtonBase>
+            )}
+          </Box>
+        </Box>
+      ) : (
+        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mx: { xs: 2, sm: 2.5 }, mb: 2, p: 1.25, borderRadius: 2, bgcolor: SURFACE }}>
+          <InfoRounded sx={{ fontSize: 17, color: MUTED, mt: 0.15 }} />
+          <Typography sx={{ fontSize: "0.78rem", color: INK_2, lineHeight: 1.55 }}>
+            {changeBlockedReason || `หนึ่งงานออก${label}ได้ใบเดียว — ถ้าต้องออกใหม่ ให้เปลี่ยนสถานะใบเดิมเป็น "ยกเลิก" ในทะเบียนเอกสารก่อน`}
+          </Typography>
+        </Stack>
+      )}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.25 }}>
         <Button variant="contained" onClick={onView} disabled={viewing}
           startIcon={viewing ? <CircularProgress size={15} color="inherit" /> : <Visibility sx={{ fontSize: 18 }} />}

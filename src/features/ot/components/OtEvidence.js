@@ -79,6 +79,31 @@ export function EvidencePicker({ files, onChange, existing = [] }) {
   );
 }
 
+/**
+ * หลักฐานของ "รายการ" (ในฟอร์ม) — ✅ (25 พ.ย. 2569 ผู้ใช้: "ให้แต่ละรายการ สามารถแนบไฟล์หลักฐานแยกกันได้")
+ * files = ไฟล์ใหม่ที่ยังไม่อัปโหลด (อัปหลังบันทึกใบ พร้อมรหัสรายการ) · existing = ไฟล์ที่รายการนี้มีอยู่แล้ว (แก้ใบเดิม)
+ */
+export const MAX_ITEM_EVIDENCE = 10;
+export function ItemEvidence({ files = [], onChange, existing = [] }) {
+  const room = MAX_ITEM_EVIDENCE - existing.length - files.length;
+  return (
+    <Box>
+      <Stack direction="row" alignItems="baseline" spacing={0.75} sx={{ mb: 0.75, flexWrap: "wrap" }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "0.8rem", color: TEXT_MAIN }}>หลักฐานของรายการนี้</Typography>
+        <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>ไม่บังคับ · รูป/PDF/Word/Excel ไม่เกิน {MAX_ITEM_EVIDENCE} ไฟล์</Typography>
+      </Stack>
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", rowGap: 1 }}>
+        {existing.map((a) => <Tile key={a._id} size={64} src={isImg(a.type) ? a.url.replace("/upload/", "/upload/c_fill,w_160,h_160,q_auto,f_auto/") : a.url} name={a.name} type={a.type} href={a.url} />)}
+        {files.map((f, i) => (
+          <Tile key={f.preview} size={64} src={f.preview} name={f.name} type={f.type}
+            onRemove={() => { URL.revokeObjectURL(f.preview); onChange(files.filter((_, j) => j !== i)); }} />
+        ))}
+        {room > 0 && <AddTile size={64} onPick={async (picked) => onChange([...files, ...(await prepareEvidence(picked.slice(0, room)))])} />}
+      </Stack>
+    </Box>
+  );
+}
+
 /** หน้ารายละเอียด — attachments จากใบ · canAdd/canRemove ตามสิทธิ์ */
 export function EvidenceGallery({ attachments = [], canAdd, canRemove, busy, onAdd, onRemove }) {
   if (!attachments.length && !canAdd) return null;

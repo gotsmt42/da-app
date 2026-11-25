@@ -113,11 +113,11 @@ import { canEditJobFiles, canDeleteJobFile } from "@/shared/utils/jobDocPermissi
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 import ExportExcelButton, { ExcelIcon } from "@/shared/ui/ExportExcelButton";
 import InvoiceBillingBar from "@/features/finance/components/InvoiceBillingBar";
-/** แถว Grid ของใบเสนอราคาแยกที่อิงงานนี้ — ไม่มีใบ = ไม่วาดแถว (ไม่เหลือช่องว่าง) */
-const RefQuotesGrid = ({ event }) => {
+/** แถวใบเสนอราคาแยกที่อิงงานนี้ (เต็มความกว้างของกริดการ์ดเอกสาร) — ไม่มีใบ = ไม่วาดแถว (ไม่เหลือช่องว่าง) */
+const RefQuotesCell = ({ event }) => {
   const list = useRefQuotes();
   if (!refQuotesOf(list, event).length) return null;
-  return <Grid item xs={12}><RefQuotesBar event={event} /></Grid>;
+  return <Box sx={{ gridColumn: "1 / -1", minWidth: 0 }}><RefQuotesBar event={event} /></Box>;
 };
 
 
@@ -804,6 +804,8 @@ export const FileUploadSection = ({
   permEvent = null,
   // ✅ (11 พ.ย. 2569 ผู้ใช้: "เปิดเอกสารประจำงาน ... ยังดูเล็กๆไปหน้าจอคอม") roomy = การ์ดขนาดใหญ่ (หน้าต่างเอกสารในหน้า Event)
   roomy = false,
+  // ✅ (25 พ.ย. 2569) ป้ายต่อไฟล์เพิ่มเติม (f) => string|null — เช่น "ครั้งที่ N" ที่เข้าหลายช่วง บอกว่าไฟล์มาจากช่วงไหน
+  tagOf = null,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
@@ -831,7 +833,7 @@ export const FileUploadSection = ({
   // 🔁 (10 พ.ย. 2569 ผู้ใช้: "ทำต่อใน เอกสารในหน้าดำเนินงาน" — โมดูลไฟล์ชุดเดียวทั้งแอป) รายการไฟล์ + แถวกำลังอัปโหลด ใช้ AttachmentList
   //    (ภาพย่อ/ป้ายชนิดไฟล์ · ผู้แนบ · เวลา · ⋮ เมนูเดิม) · ⚠️ embedded (หน้า Event) คงหน้าตาเดิมตามที่ผู้ใช้สั่ง
   const sharedList = !embedded;
-  const listFiles = useMemo(() => (sharedList ? fileList.map((f) => ({ ...f, tag: isQuote ? quoteFileTag(f, fileList) : null })) : []), [sharedList, fileList, isQuote]);
+  const listFiles = useMemo(() => (sharedList ? fileList.map((f) => ({ ...f, tag: (isQuote ? quoteFileTag(f, fileList) : null) || tagOf?.(f) || null })) : []), [sharedList, fileList, isQuote, tagOf]);
 
   const handleDrop = e => {
     e.preventDefault();
@@ -932,7 +934,7 @@ export const FileUploadSection = ({
       {!sharedList && hasFiles && (
         <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={isQuote ? quoteFileTag(f, fileList) : null} />
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} tag={(isQuote ? quoteFileTag(f, fileList) : null) || tagOf?.(f) || null} />
           ))}
         </Stack>
       )}
@@ -1024,6 +1026,45 @@ export const FileUploadSection = ({
           </Typography>
         </Stack>
       ) : null}
+    </Box>
+  );
+};
+
+/**
+ * JobDocCards — การ์ดเอกสารประจำงาน 4 ชนิด (+ ใบเสนอราคาแยกที่อิงงานนี้) "ชุดเดียวทั้งแอป"
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "ทำให้มันเป็นรูปแบบหน้าเอกสารงานแบบเดียวกันกับหน้าการดำเนินงาน ให้อัพเดตตรงกันทั้งหมด")
+ *    เดิมการ์ดงานหน้านี้ · หน้าต่างเอกสารในหน้า Event · กล่องเอกสารในหน้าภาพรวมงาน ต่างคนต่างเขียนรายการเอกสารเอง
+ *    (ภาพรวมงานเป็นแบบย่อของตัวเอง: ลบไม่ได้ · ไม่มีสถานะ "ไม่มี/ช่างยังไม่ยืนยัน" · ชื่อเอกสารไม่ตรงกัน)
+ *    → ทุกที่เรียกตัวนี้ตัวเดียว แก้ที่นี่ที่เดียว = เปลี่ยนตรงกันทุกหน้า · ชื่อเอกสารจาก JOB_DOC_TYPES
+ * @param uploadOf (type) => { uploading, progress, size }
+ * @param columns  2 = จอคอมวาง 2 คอลัมน์ (หน้าต่างเอกสารขนาดใหญ่)
+ * @param embedded อยู่ในฟอร์ม Swal (หน้า Event) — ดู FileUploadSection
+ */
+export const JobDocCards = ({
+  event, currentUser, onUpload, onDelete, onPreview, uploadOf,
+  embedded = false, roomy = false, columns = 1, refQuotes = true, tagOf = null,
+}) => {
+  const two = columns === 2;
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: two ? { xs: "minmax(0,1fr)", md: "repeat(2, minmax(0,1fr))" } : "minmax(0,1fr)", gap: two ? { xs: 1.25, md: 1.5 } : 1.25 }}>
+      {/* ✅ (10 พ.ย. 2569) ใบเสนอราคาแยกที่อิงงานนี้ — สถานะ + กดเปิดในหน้าติดตามใบเสนอราคา */}
+      {refQuotes && <RefQuotesCell event={event} />}
+      {JOB_DOC_TYPES.map((t) => {
+        const u = uploadOf?.(t.key) || {};
+        return (
+          <Box key={t.key} sx={{ minWidth: 0 }}>
+            <FileUploadSection
+              card event={event} embedded={embedded} roomy={roomy}
+              eventId={event._id} type={t.key} label={t.label}
+              files={event[t.field]}
+              applicable={t.key === "report" ? undefined : event[`${t.key}Applicable`]}
+              onUpload={onUpload} onDelete={onDelete} onPreview={onPreview}
+              uploading={Boolean(u.uploading)} progress={u.progress || 0} uploading_size={u.size}
+              currentUser={currentUser} tagOf={tagOf}
+            />
+          </Box>
+        );
+      })}
     </Box>
   );
 };
@@ -1303,76 +1344,16 @@ const EventRowCard = ({
    * 🔁 (11 พ.ย. 2569 ผู้ใช้: "หน้าการดำเนินงานให้แสดงเอกสารต่อลงมาเลย แค่ให้ย่อ/ขยายได้ ตั้งต้นให้ขยายเปิดไว้ ให้ดูสวยงาม")
    *    รายการเอกสารอยู่ใต้กล่องสรุปทันที (ไม่ซ้ำไว้ท้ายการ์ด) · ปุ่มในกล่องสรุป = ย่อ/ขยายรายการ
    */
-  const docsSheetContent = (
-    <Grid container spacing={1.25}>
-      {/* หัวข้อ "เอกสารประจำงาน x/4" อยู่ในกล่องสรุปด้านบนแล้ว — ไม่ซ้ำ */}
-
-      {/* ✅ (10 พ.ย. 2569) ใบเสนอราคาแยกที่อิงงานนี้ — สถานะ + กดเปิดในหน้าติดตามใบเสนอราคา */}
-      {(!hideDocuments || showDocsOverride) && <RefQuotesGrid event={event} />}
-      {(!hideDocuments || showDocsOverride) && (
-        <Grid item xs={12}>
-        <FileUploadSection
-          card event={event}
-          eventId={event._id} type="report" label="Service Report"
-          files={event.reportFiles}
-          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-          uploading={isUploadingState.report && uploadingState.report === event._id}
-          progress={uploadProgressState.report}
-          uploading_size={uploadingFileSizeState.report}
-          currentUser={currentUser}
-        />
-      </Grid>
-      )}
-      {(!hideDocuments || showDocsOverride) && (
-      <Grid item xs={12}>
-        <FileUploadSection
-          card event={event}
-          eventId={event._id} type="quotation" label="ใบเสนอราคา"
-          files={event.quotationFiles}
-          applicable={event.quotationApplicable}
-          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-          uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
-          progress={uploadProgressState.quotation}
-          uploading_size={uploadingFileSizeState.quotation}
-          currentUser={currentUser}
-        />
-      </Grid>
-      )}
-
-      {(!hideDocuments || showDocsOverride) && (
-       <Grid item xs={12}>
-        <FileUploadSection
-          card event={event}
-          eventId={event._id} type="invoice" label="เอกสารการเงิน"
-          files={event.invoiceFiles}
-          applicable={event.invoiceApplicable}
-          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-          uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
-          progress={uploadProgressState.invoice}
-          uploading_size={uploadingFileSizeState.invoice}
-          currentUser={currentUser}
-        />
-      </Grid>
-      )}
-
-      {(!hideDocuments || showDocsOverride) && (
-       <Grid item xs={12}>
-        <FileUploadSection
-          card event={event}
-          eventId={event._id} type="completion" label="ใบส่งมอบงาน"
-          files={event.completionFiles}
-          applicable={event.completionApplicable}
-          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-          uploading={isUploadingState.completion && uploadingState.completion === event._id}
-          progress={uploadProgressState.completion}
-          uploading_size={uploadingFileSizeState.completion}
-          currentUser={currentUser}
-        />
-      </Grid>
-      )}
-
-    </Grid>
-  );
+  const docsSheetContent = (!hideDocuments || showDocsOverride) ? (
+    // หัวข้อ "เอกสารประจำงาน x/4" อยู่ในกล่องสรุปด้านบนแล้ว — ไม่ซ้ำ · การ์ดเอกสารชุดเดียวทั้งแอป (JobDocCards)
+    <JobDocCards event={event} currentUser={currentUser}
+      onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+      uploadOf={(type) => ({
+        uploading: isUploadingState[type] && uploadingState[type] === event._id,
+        progress: uploadProgressState[type],
+        size: uploadingFileSizeState[type],
+      })} />
+  ) : null;
 
   const expandedContent = (
     <Grid container spacing={1.25}>

@@ -27,6 +27,15 @@ const IssuedDocumentService = {
     return res.data?.doc || null;
   },
 
+  /**
+   * แก้ไขใบเดิม (เลขที่เดิม) — ✅ (25 พ.ย. 2569) server เก็บฉบับก่อนแก้ไว้ในประวัติเสมอ
+   * @param payload { formSnapshot, issuedAt, subject, site, customerCompany, workLabel, roundLabel, signerName }
+   */
+  async revise(id, payload) {
+    const res = await API.put(`/issued-documents/${id}/revise`, payload);
+    return res.data;
+  },
+
   /** เปลี่ยนสถานะติดตาม / แก้บันทึกเพิ่มเติมของใบนั้น */
   async update(id, payload) {
     const res = await API.patch(`/issued-documents/${id}`, payload);

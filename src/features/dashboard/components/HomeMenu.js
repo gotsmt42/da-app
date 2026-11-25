@@ -20,7 +20,7 @@ import {
 
 // 🔁 (1 พ.ย. 2569) ไอคอนหัวหมวดชุดกลาง Material Rounded — ชุดเดียวกับเมนูทั้งแอป (shared/ui/appIcons.js)
 import { AppIcon } from "@/shared/ui/appIcons";
-import { can, seesOperationBoard } from "@/shared/utils/roles";
+import { can, seesOperationBoard, isServiceCalendarObserver } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
 // แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
@@ -69,7 +69,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
   const canAssign = can(userData, "assignDispatch");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
-  const canPlanWork = canViewOperation || canSell || seeAllSchedules || can(userData, "viewServiceCalendar");
+  const canPlanWork = canViewOperation || canSell || seeAllSchedules || isServiceCalendarObserver(userData);
 
   // ── งาน ──────────────────────────────────────────────────────────────────
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "แก้ไขการจัดลำดับเมนู การจัดวาง หมวดหมู่ และ Icon ให้สอดคล้อง สื่อความหมาย")
@@ -90,7 +90,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
       work.push(dest("eventService"));
       // ⚠️ "ตารางงานเซล" (/event?dept=sales) ตั้งใจไม่ใส่ในเมนูหลักหน้านี้ — ผู้ใช้สั่งให้เอาออกไปก่อน
       // (ยังเข้าได้ตามปกติจากเมนูข้าง "แผนงาน" และ dropdown บนแถบบน ไม่ได้ปิดฟีเจอร์)
-    } else if (can(userData, "viewServiceCalendar")) {
+    } else if (isServiceCalendarObserver(userData)) {
       work.push(dest("eventMine"));
       work.push(dest("eventServiceReadOnly"));
     } else {
