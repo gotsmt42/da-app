@@ -15,17 +15,21 @@ import { alpha } from "@mui/material/styles";
  * @param action   ปุ่ม/ข้อความเล็กชิดขวาของหัวข้อ
  * @param accent   สีหลักของหมวด
  */
-export default function FormSection({ step, icon, title, hint, optional, action, accent = "#dc2626", children, sx }) {
+// 🔁 (25 พ.ย. 2569) สีหลักเปลี่ยนจากแดงเป็นน้ำเงินระบบ — แดงสงวนให้เรื่องผิดปกติ/อันตรายเท่านั้น
+//    done = หมวดนี้กรอกครบแล้ว → วงกลมเขียวพร้อมเครื่องหมายถูก (เห็นความคืบหน้าทั้งฟอร์มแวบเดียว)
+export default function FormSection({ step, icon, title, hint, optional, action, accent = "#2563eb", done = false, id, children, sx }) {
+  const tone = done ? "#16a34a" : accent;
   return (
-    <Box sx={{ border: "1px solid #e6e9ef", borderRadius: 3, bgcolor: "background.paper", overflow: "hidden", ...sx }}>
+    <Box id={id} sx={{ border: "1px solid #e6e9ef", borderRadius: 3, bgcolor: "background.paper", overflow: "hidden", scrollMarginTop: 12, ...sx }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2, py: 1.25, bgcolor: "#f8fafc", borderBottom: "1px solid #eef2f7" }}>
         <Box sx={{
           width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(accent, 0.1), color: accent, fontSize: "0.8rem", fontWeight: 800,
+          bgcolor: done ? tone : alpha(tone, 0.1), color: done ? "#fff" : tone, fontSize: "0.8rem", fontWeight: 800,
+          transition: "background-color .2s, color .2s",
           "& svg": { fontSize: 16 },
         }}>
-          {icon || step}
+          {done ? "✓" : (icon || step)}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", lineHeight: 1.3 }}>

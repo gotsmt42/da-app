@@ -58,6 +58,7 @@ import BillingChip from "@/features/finance/components/BillingChip";
 import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
 import ContractValuePanel from "@/features/contracts/components/ContractValuePanel";
+import ContractDocsPanel, { ContractDocsChip, contractDocSummary } from "@/features/contracts/components/ContractDocsPanel";
 import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, ContactPhoneRounded as ContactPhone, EventAvailableRounded as EventAvailable } from "@mui/icons-material";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
 import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
@@ -228,6 +229,8 @@ const statusKinds = (c) => {
   if (st) kinds.push(st.state);
   else if (contractCompleteness(c).missing.length > 0) kinds.push("incomplete");
   if ((c.statusNote || "").trim()) kinds.push("note");
+  // ✅ (25 พ.ย. 2569) แท็กเสริม — สัญญาที่ยังไม่มีไฟล์สัญญาฉบับเซ็น (ไล่ตามเก็บหลักฐานได้ในคลิกเดียว)
+  if (c.isRealContract && !contractDocSummary(c).hasSigned) kinds.push("nodoc");
   return kinds;
 };
 
@@ -285,6 +288,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "expired", label: "หมดอายุแล้ว" },
   { value: "incomplete", label: "ข้อมูลไม่ครบ" },
   { value: "note", label: "มีหมายเหตุที่พิมพ์เอง" },
+  { value: "nodoc", label: "ยังไม่แนบสัญญาฉบับเซ็น" },
 ];
 
 // ✅ ป้ายแผนก 1 ชิ้น — ใช้ตัวเดียวกันทั้งตารางเดสก์ท็อปและการ์ดมือถือ ไม่ก๊อป JSX ไปวางสองที่
@@ -512,7 +516,7 @@ const ModernDialogTitle = ({ icon, color = "#2563eb", title, sub, onClose }) => 
  */
 const ContractVatTag = ({ c, onOpen, align = "center", variant = "text" }) => {
   const vat = c.jobValueVatIncluded;
-  const n = (c.contractQuotationFiles || []).length;
+  const n = contractDocSummary(c).byType.quotation; // นับเฉพาะใบเสนอราคา — เอกสารอื่นมีป้ายของตัวเอง (ContractDocsChip)
   const unset = vat !== true && vat !== false;
   if (variant === "pill") {
     return (
@@ -1306,6 +1310,38 @@ const EMPTY_CONTRACT_FORM = {
   firstVisitStart: "", firstVisitEnd: "",
 };
 
+/**
+ * ✅ (25 พ.ย. 2569 ผู้ใช้: "จดจำแค่ที่ลงไว้ก่อนบันทึกด้วย กันพลาด") ร่างสัญญาใหม่ที่ยังไม่ได้บันทึก — จำไว้ในเครื่อง
+ *    • กรอกไปแล้วปิดฟอร์ม (กดนอกกล่อง/ปิดพลาด/สลับแท็บ/รีเฟรช) → เปิด "เพิ่มสัญญาใหม่" อีกครั้ง ข้อมูลยังอยู่ครบ
+ *    • บันทึกสำเร็จ หรือกด "ล้างฟอร์ม" → ลบร่างทิ้ง · ร่างเก่ากว่า 30 วันไม่กู้คืน
+ *    • แยกตามผู้ใช้ (เครื่องเดียวใช้หลายบัญชีได้) · ไฟล์แนบไม่ถูกจำ (เก็บในเครื่องไม่ได้)
+ *    • เลขที่สัญญาที่ระบบตั้งให้ (ยังไม่ได้แก้เอง) ไม่จำ — ตอนกู้คืนตั้งเลขถัดไปที่ว่างให้ใหม่ กันชนกับสัญญาที่เพิ่งสร้าง
+ * ⚠️ ต่อสัญญาปีถัดไปไม่ใช้ร่างนี้ — ฟอร์มนั้นเติมข้อมูลจากสัญญาเดิมใหม่ทุกครั้งอยู่แล้ว
+ */
+const CONTRACT_DRAFT_TTL = 30 * 24 * 3600 * 1000;
+const contractDraftKey = (uid) => `tidtam:contract-draft:v1:${uid || "me"}`;
+const contractDraftStore = {
+  load(uid) {
+    try {
+      const d = JSON.parse(localStorage.getItem(contractDraftKey(uid)) || "null");
+      if (!d?.form || Date.now() - (d.savedAt || 0) > CONTRACT_DRAFT_TTL) return null;
+      return d;
+    } catch { return null; }
+  },
+  save(uid, data) {
+    try { localStorage.setItem(contractDraftKey(uid), JSON.stringify({ ...data, savedAt: Date.now() })); } catch { /* เต็ม/ปิดไว้ — ไม่จำ */ }
+  },
+  clear(uid) {
+    try { localStorage.removeItem(contractDraftKey(uid)); } catch { /* ไม่มีที่เก็บ */ }
+  },
+};
+/** มีอะไรที่ผู้ใช้กรอกเองหรือยัง (ค่าเริ่มต้น/เลขที่ระบบตั้งให้ไม่นับ) */
+const contractDraftHasContent = (f, contractNoAuto) => Boolean(f) && (
+  Object.keys(EMPTY_CONTRACT_FORM).some((k) => !["contractNo", "contractYears"].includes(k) && String(f[k] ?? "").trim() !== "")
+  || String(f.contractYears || "1") !== "1"
+  || (!contractNoAuto && String(f.contractNo || "").trim() !== "")
+);
+
 // ✅ ช่องกรอกในแถวร่างใช้ทรง "ขีดเส้นใต้" (variant standard) ไม่ใช่กล่องขอบสี่เหลี่ยม — กล่องมีขอบครบ
 // 4 ด้าน 10 กล่องเรียงกันในแถวเดียวกลายเป็นตารางซ้อนตาราง ตัวหนังสือในกล่องเล็กจนอ่านยากและหน้าตา
 // เหมือนฟอร์มยุคเก่า — แบบขีดเส้นใต้ทำให้ค่าที่กรอกแล้วอ่านเหมือน "ข้อความในตาราง" ปกติ เหลือแค่เส้นประ
@@ -1331,11 +1367,17 @@ const INLINE_FIELD_SX = {
 const InlineAddRow = ({
   showCheckboxes, hideContractOnlyColumns, visitColumns, totalColCount, columns,
   siteOptions, companyOptions, titleOptions, systemOptions, teamOptions,
-  suggestContractNo, isContractNoTaken, saving, formError, onSave, onCancel,
+  suggestContractNo, isContractNoTaken, describeContractNoOwner, onDraftChange, saving, formError, onSave, onCancel,
 }) => {
   // เลขที่สัญญาแนะนำคำนวณ "ครั้งเดียวตอนแถวโผล่" (useState initializer) ไม่ใช่ทุก re-render
   const [draft, setDraft] = useState(() => ({ ...EMPTY_CONTRACT_FORM, contractNo: suggestContractNo() }));
-  const set = (field) => (val) => setDraft((d) => ({ ...d, [field]: val }));
+  const autoNo = useRef(true); // เลขที่สัญญายังเป็นค่าที่ระบบตั้งให้ (ยังไม่ได้แก้เอง)
+  const set = (field) => (val) => { if (field === "contractNo") autoNo.current = false; setDraft((d) => ({ ...d, [field]: val })); };
+  // ✅ (25 พ.ย. 2569) จำค่าที่กรอกในแถวนี้ไว้ด้วย (ร่างเดียวกับฟอร์มเต็ม) — ปิดแถว/สลับแท็บพลาด เปิดฟอร์มอีกครั้งยังอยู่
+  useEffect(() => {
+    const t = setTimeout(() => onDraftChange?.(draft, autoNo.current), 400);
+    return () => clearTimeout(t);
+  }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const badRange = Boolean(draft.contractStart && draft.contractEnd && moment(draft.contractEnd).isBefore(moment(draft.contractStart)));
   const noTaken = isContractNoTaken(draft.contractNo);
@@ -1535,13 +1577,21 @@ const InlineAddRow = ({
               sx={{ flex: 1, minWidth: 0, fontSize: "0.7rem", color: formError ? ACCENT : "text.secondary", fontWeight: formError ? 700 : 400 }}
             >
               {formError
-                || (noTaken ? "เลขที่สัญญานี้ถูกใช้ไปแล้ว" : "")
+                || (noTaken ? (describeContractNoOwner?.(draft.contractNo) || "เลขที่สัญญานี้ถูกใช้ไปแล้ว") : "")
                 || (badRange ? "วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่ม" : "")
                 || (missing.length > 0
                   ? `ยังต้องกรอก: ${missing.join(" · ")}`
                   : 'พร้อมบันทึกแล้ว — วันที่เข้างานแต่ละครั้งมาลงทีหลังได้ที่ช่อง "ครั้งที่ N"')}
             </Typography>
             <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
+              {noTaken && (
+                <Button
+                  size="small" onClick={() => setDraft((d) => ({ ...d, contractNo: suggestContractNo(d.contractNo) }))}
+                  sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", color: ACCENT, minWidth: 0, px: 1.25 }}
+                >
+                  ใช้เลข {suggestContractNo(draft.contractNo)}
+                </Button>
+              )}
               <Button
                 size="small" onClick={onCancel} disabled={saving}
                 sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", minWidth: 0, px: 1.25 }}
@@ -2047,6 +2097,15 @@ export default function ContractOverview() {
   //   เอง (faceted count): เลข "ฝ่ายขาย (7)" ต้องหมายถึง "ถ้ากดฝ่ายขายจะเหลือ 7 แถว" จึงต้องกรองด้วย
   //   ตัวกรองอื่นทุกตัว "ยกเว้นตัวมันเอง" — ถ้ากรองด้วยตัวเองด้วย พอเลือกฝ่ายบริการอยู่ ตัวเลขของ
   //   ฝ่ายขายจะกลายเป็น 0 ทันที ทั้งที่มีของอยู่จริง
+  // ✅ ตัวค้นหาคำ — แยกออกมาให้ "ค้นนอกมุมมอง/ตัวกรอง" (searchElsewhere) ใช้เกณฑ์เดียวกับตารางทุกประการ
+  const matchesKeyword = (c, kw) => {
+    const sd = statusDisplay(c);
+    return [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson,
+      departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, c.remark,
+      c.contactName, c.contactTel, ...(sd.missing || [])]
+      .some((v) => (v || "").toLowerCase().includes(kw)) ||
+      (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw));
+  };
   const applyCommonFilters = (list, { ignoreYear = false, skip } = {}) => {
     let base = list;
     if (provinceFilter !== "all") {
@@ -2161,14 +2220,7 @@ export default function ContractOverview() {
     // พิมพ์เองไว้ ก็เจอทั้งชุด ค้นจาก "ข้อความที่เห็นบนจอ" ตัวเดียวกับที่ตารางแสดง (statusDisplay)
     // ไม่ใช่ค่าดิบภายใน ผู้ใช้จึงพิมพ์ตามที่ตาเห็นได้เลยโดยไม่ต้องรู้ว่าเบื้องหลังเก็บเป็นอะไร
     // ✅ รวมรายชื่อช่องที่ยังไม่ได้กรอกเข้าไปด้วย (เช่นพิมพ์ "มูลค่างาน" เจอทุกแถวที่ยังไม่ใส่มูลค่า)
-    return base.filter((c) => {
-      const sd = statusDisplay(c);
-      return [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson,
-        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, c.remark,
-        c.contactName, c.contactTel, ...(sd.missing || [])]
-        .some((v) => (v || "").toLowerCase().includes(kw)) ||
-        (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw));
-    });
+    return base.filter((c) => matchesKeyword(c, kw));
   };
 
   // ✅ งานที่ไม่มี contractGroupId แบ่งเป็น 2 กลุ่มจริงๆ ไม่ใช่กองเดียวกันอีกต่อไป — ค่าเริ่มต้นคือ
@@ -2929,7 +2981,33 @@ export default function ContractOverview() {
   // ✅ รอบเข้าแบบไม่ลงตัว (เช่น ทุก 5 เดือน) — เปิดช่องกรอกเองเฉพาะตอนต้องใช้ ปกติเลือกจากชิป "ปีละ N ครั้ง"
   const [customRounds, setCustomRounds] = useState(false);
 
-  const setField = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
+  // ✅ (25 พ.ย. 2569) ร่างสัญญาใหม่ที่ยังไม่ได้บันทึก — จำไว้ในเครื่อง (ดู contractDraftStore)
+  const draftUid = userData?._id || userData?.id || userData?.username || "";
+  const contractNoAutoRef = useRef(true); // เลขที่สัญญายังเป็นค่าที่ระบบตั้งให้ (ยังไม่ได้แก้เอง)
+  const [draftRestoredAt, setDraftRestoredAt] = useState(null); // เวลาที่ร่างถูกบันทึกล่าสุด (กู้คืนตอนเปิดฟอร์ม)
+  const [hasStoredDraft, setHasStoredDraft] = useState(false);
+  useEffect(() => { setHasStoredDraft(Boolean(contractDraftStore.load(draftUid))); }, [draftUid]);
+  const persistContractDraft = useCallback((f, contractNoAuto, rounds = false) => {
+    if (contractDraftHasContent(f, contractNoAuto)) {
+      contractDraftStore.save(draftUid, { form: f, contractNoAuto, customRounds: rounds });
+      setHasStoredDraft(true);
+    } else {
+      contractDraftStore.clear(draftUid);
+      setHasStoredDraft(false);
+    }
+  }, [draftUid]);
+  const discardContractDraft = () => {
+    contractDraftStore.clear(draftUid);
+    setHasStoredDraft(false);
+    setDraftRestoredAt(null);
+  };
+  // ✅ ไฟล์เอกสารสัญญาที่เลือกไว้ในฟอร์ม — อัปโหลดหลังสร้างสัญญาสำเร็จ (ต้องมี contractGroupId ก่อน) · ไม่ถูกจำในร่าง
+  const [formFiles, setFormFiles] = useState([]); // [{ id, file, docType }]
+
+  const setField = (field) => (val) => {
+    if (field === "contractNo") contractNoAutoRef.current = false;
+    setForm((f) => ({ ...f, [field]: val }));
+  };
 
   // ✅ ปุ่มลัด "ปีละ N ครั้ง" เซ็ตทั้ง intervalMonths และ visitCount ให้สอดคล้องกันในคลิกเดียว —
   // แยกออกมาเพราะใช้ซ้ำกับฟอร์ม "ย้ายเข้าสัญญาที่มีอยู่" ด้านล่างด้วย (pickMergeInterval)
@@ -3009,7 +3087,42 @@ export default function ContractOverview() {
   // สัญญาจริงที่มีอยู่แล้วในระบบ — ขึ้นปีใหม่เริ่มนับ 01 ใหม่ ยังแก้ไขเองได้เสมอ (แค่ค่าเริ่มต้นในช่อง
   // ไม่ได้บังคับรูปแบบ) ถ้ายังไม่เคยมีสัญญารูปแบบนี้มาก่อนเลย fallback ไปใช้ตัวอักษรนำหน้า "FAPTY"
   const CONTRACT_NO_PATTERN = /^([A-Za-z]+)(\d+)-(\d{4})$/;
-  const suggestNextContractNo = () => {
+
+  // 🐛 (25 พ.ย. 2569 ผู้ใช้: "จะเพิ่มเลขที่สัญญา ทั้งที่ไม่มีในระบบ แต่ขึ้นมีแล้ว")
+  //    สาเหตุที่ผู้ใช้เจอ: เลขนั้นมีอยู่จริงแต่อยู่นอกมุมมองที่เปิดอยู่ (ตัวกรองผู้รับผิดชอบ / หน้าเข้าครบ·หมดอายุ)
+  //    ค้นหาในตารางจึงไม่เจอ ส่วนฟอร์มแจ้งแค่ "ถูกใช้ไปแล้ว" โดยไม่บอกว่าสัญญาไหน → ดูเหมือนระบบผิด
+  //    → หา "เจ้าของเลข" จากสัญญาทั้งหมด (ไม่สนตัวกรอง/มุมมอง) · บอกชื่อโครงการ + อยู่หน้าไหน + ปุ่มเปิดดู/ใช้เลขถัดไป
+  //    → เทียบแบบไม่สนตัวพิมพ์เล็ก/ใหญ่และช่องว่างหัวท้าย — ตรงกับการเช็คฝั่งเซิร์ฟเวอร์ (findDuplicateContractNo)
+  const normContractNo = (v) => String(v || "").trim().toUpperCase();
+  const contractNoOwners = useMemo(() => {
+    const m = new Map();
+    contracts.forEach((c) => {
+      if (!c.isRealContract || !c.contractNo) return;
+      const k = normContractNo(c.contractNo);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(c);
+    });
+    return m;
+  }, [contracts]);
+  /** สัญญาที่ใช้เลขนี้อยู่ (ไม่นับสัญญาที่ยกเว้น) — null = ว่าง ใช้ได้ */
+  const findContractNoOwner = useCallback((contractNo, excludeContractGroupId) => {
+    const k = normContractNo(contractNo);
+    if (!k) return null;
+    return (contractNoOwners.get(k) || []).find((c) => c.key !== excludeContractGroupId) || null;
+  }, [contractNoOwners]);
+  // ✅ เลขที่สัญญาห้ามซ้ำกับสัญญาอื่น (ไม่นับตัวเอง) — เช็คฝั่ง client ก่อนเพื่อ feedback ทันที ไม่ต้องรอ
+  // round-trip ไป backend (ซึ่งเช็คซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง กัน race)
+  const isContractNoTaken = useCallback(
+    (contractNo, excludeContractGroupId) => Boolean(findContractNoOwner(contractNo, excludeContractGroupId)),
+    [findContractNoOwner]
+  );
+
+  // ✅ แนะนำเลขที่สัญญาถัดไปให้อัตโนมัติ (ตัวอักษรนำหน้า + ลำดับ + ปี พ.ศ. เช่น FAPTY02-2569) จากเลขที่
+  // สัญญาจริงที่มีอยู่แล้วในระบบ — ขึ้นปีใหม่เริ่มนับ 01 ใหม่ ยังแก้ไขเองได้เสมอ (แค่ค่าเริ่มต้นในช่อง
+  // ไม่ได้บังคับรูปแบบ) ถ้ายังไม่เคยมีสัญญารูปแบบนี้มาก่อนเลย fallback ไปใช้ตัวอักษรนำหน้า "FAPTY"
+  // ✅ (25 พ.ย. 2569) basis = เลขที่พิมพ์อยู่ (ชนกับสัญญาอื่น) → เลขถัดไปที่ "ว่างจริง" ของชุดตัวอักษร+ปีเดียวกัน
+  //    · ไล่ข้ามเลขที่ถูกใช้แล้วเสมอ (ไม่ใช่แค่ max+1) — การันตีว่าเลขที่แนะนำไม่ชนใคร
+  const suggestNextContractNo = (basis) => {
     const buddhistYear = moment().year() + 543;
     const parsed = contracts
       .filter((c) => c.isRealContract && c.contractNo)
@@ -3018,26 +3131,58 @@ export default function ContractOverview() {
         return m ? { prefix: m[1], seq: Number(m[2]), width: m[2].length, year: Number(m[3]) } : null;
       })
       .filter(Boolean);
-    const thisYear = parsed.filter((p) => p.year === buddhistYear);
-    if (thisYear.length > 0) {
-      const top = thisYear.reduce((a, b) => (b.seq > a.seq ? b : a));
-      return `${top.prefix}${String(top.seq + 1).padStart(top.width, "0")}-${buddhistYear}`;
+    let prefix; let width; let year; let top;
+    const b = basis ? String(basis).trim().match(CONTRACT_NO_PATTERN) : null;
+    if (b) {
+      prefix = b[1]; width = b[2].length; year = Number(b[3]);
+      const same = parsed.filter((p) => p.prefix.toUpperCase() === prefix.toUpperCase() && p.year === year);
+      top = same.length ? Math.max(...same.map((p) => p.seq)) : Number(b[2]);
+    } else {
+      year = buddhistYear;
+      const thisYear = parsed.filter((p) => p.year === buddhistYear);
+      if (thisYear.length > 0) {
+        const t = thisYear.reduce((a, x) => (x.seq > a.seq ? x : a));
+        prefix = t.prefix; width = t.width; top = t.seq;
+      } else {
+        const latest = parsed.slice().sort((a, x) => x.year - a.year || x.seq - a.seq)[0];
+        prefix = latest?.prefix || "FAPTY"; width = latest?.width || 2; top = 0;
+      }
     }
-    const latest = parsed.sort((a, b) => b.year - a.year || b.seq - a.seq)[0];
-    const prefix = latest?.prefix || "FAPTY";
-    const width = latest?.width || 2;
-    return `${prefix}${String(1).padStart(width, "0")}-${buddhistYear}`;
+    let n = top + 1;
+    let candidate = `${prefix}${String(n).padStart(width, "0")}-${year}`;
+    while (isContractNoTaken(candidate) && n < top + 1000) {
+      n += 1;
+      candidate = `${prefix}${String(n).padStart(width, "0")}-${year}`;
+    }
+    return candidate;
   };
 
-  // ✅ เลขที่สัญญาห้ามซ้ำกับสัญญาอื่น (ไม่นับตัวเอง) — เช็คฝั่ง client ก่อนเพื่อ feedback ทันที ไม่ต้องรอ
-  // round-trip ไป backend (ซึ่งเช็คซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง กัน race)
-  const isContractNoTaken = useCallback((contractNo, excludeContractGroupId) => {
-    const trimmed = (contractNo || "").trim();
-    if (!trimmed) return false;
-    return contracts.some((c) =>
-      c.isRealContract && c.contractNo && c.contractNo.trim() === trimmed && c.key !== excludeContractGroupId
-    );
-  }, [contracts]);
+  // ✅ สัญญาหนึ่งอยู่ "หน้าไหน · หมวดไหน" ของหน้าภาพรวมงาน — ใช้บอกที่อยู่ของเลขที่ชน และพาไปเปิดดู
+  const whereOfContract = (c) => {
+    const st = stageRows.expired.some((x) => x.key === c.key) ? "expired"
+      : stageRows.completed.some((x) => x.key === c.key) ? "completed" : "open";
+    const cat = c.isRealContract ? "contracts" : c.isConfirmedGeneral ? "general" : c.isConfirmedProject ? "project" : "ungrouped";
+    const stageLabel = st === "expired" ? "หมดอายุ · รอต่อสัญญา" : st === "completed" ? "เข้าครบ · ประวัติ" : "กำลังดำเนินการ";
+    return { stage: st, category: cat, label: `${CATEGORY_META[cat]?.label || ""} › ${stageLabel}` };
+  };
+  /** ข้อความสั้นบอกว่าเลขนี้ชนกับสัญญาไหน (ใช้ในแถวร่างท้ายตาราง) */
+  const describeContractNoOwner = (contractNo) => {
+    const o = findContractNoOwner(contractNo);
+    if (!o) return "";
+    return `เลขนี้ใช้แล้วกับ ${[o.site, o.company].filter((v) => v && v !== "-").join(" · ") || "สัญญาอื่น"} (${whereOfContract(o).label})`;
+  };
+  // ✅ พาไปดูสัญญานั้นในตาราง — ปิดฟอร์ม (ข้อมูลที่กรอกจำไว้แล้ว) · ล้างตัวกรอง · เปิดหน้า/หมวดที่สัญญาอยู่ · ค้นด้วยเลขที่
+  const revealContract = (c) => {
+    const w = whereOfContract(c);
+    setAddOpen(false);
+    setInlineAddOpen(false);
+    clearAllFilters();
+    setCategory(w.category);
+    setStage(w.stage);
+    setSearch(c.contractNo || c.site || "");
+    setMobileSheetOpen(false);
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ไม่รองรับ smooth */ }
+  };
 
   // ✅ ตรวจความถูกต้องสดๆ ระหว่างพิมพ์ — เตือนตรงช่องที่ผิดเลย และปิดปุ่ม "บันทึกสัญญา" ไว้จนกว่าจะครบ
   // แทนที่จะปล่อยให้กดแล้วค่อยเด้ง error ที่หัวฟอร์ม (ซึ่งบนจอมือถือต้องเลื่อนขึ้นไปอ่านเองว่าพลาดตรงไหน)
@@ -3083,6 +3228,9 @@ export default function ContractOverview() {
       ...(over || {}),
     });
     setRenewFrom(c);
+    setDraftRestoredAt(null);
+    setFormFiles([]);
+    contractNoAutoRef.current = false;
     setCustomRounds(Boolean(c.intervalMonths) && !visitsPerYear(c.intervalMonths));
     setFormError("");
     setInlineAddOpen(false);
@@ -3193,13 +3341,47 @@ export default function ContractOverview() {
   };
   const openAddDialog = () => {
     setRenewFrom(null);
-    setCustomRounds(false);
-    setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
+    // ✅ (25 พ.ย. 2569) มีร่างที่กรอกค้างไว้ → กู้คืนให้กรอกต่อ (เลขที่ระบบตั้งให้ → ตั้งเลขถัดไปที่ว่างให้ใหม่)
+    const d = contractDraftStore.load(draftUid);
+    if (d) {
+      const restored = { ...emptyForm, ...d.form };
+      contractNoAutoRef.current = Boolean(d.contractNoAuto) || !String(restored.contractNo || "").trim();
+      if (contractNoAutoRef.current) restored.contractNo = suggestNextContractNo();
+      setForm(restored);
+      setCustomRounds(Boolean(d.customRounds));
+      setDraftRestoredAt(d.savedAt || Date.now());
+      // ไฟล์ที่เลือกไว้ยังอยู่ในหน่วยความจำของหน้านี้ — คงไว้คู่กับร่าง
+    } else {
+      setFormFiles([]);
+      contractNoAutoRef.current = true;
+      setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
+      setCustomRounds(false);
+      setDraftRestoredAt(null);
+    }
     setInlineAddOpen(false); // ⚠️ ทั้งสองทางใช้ `form` ก้อนเดียวกัน เปิดพร้อมกันไม่ได้ (ดู openInlineAdd)
     setAddOpen(true);
   };
-  const closeAddDialog = () => { if (!saving) setAddOpen(false); };
+  const closeAddDialog = () => {
+    if (saving) return;
+    if (!renewFrom) persistContractDraft(form, contractNoAutoRef.current, customRounds); // จำค่าล่าสุดทันที (ไม่รอหน่วงเวลา)
+    setAddOpen(false);
+  };
+  // จำร่างระหว่างกรอก (หน่วงเล็กน้อย ไม่เขียนทุกตัวอักษร)
+  useEffect(() => {
+    if (!addOpen || renewFrom) return undefined;
+    const t = setTimeout(() => persistContractDraft(form, contractNoAutoRef.current, customRounds), 400);
+    return () => clearTimeout(t);
+  }, [addOpen, renewFrom, form, customRounds, persistContractDraft]);
+  /** ล้างฟอร์มเริ่มใหม่ — ลบร่างที่จำไว้ด้วย */
+  const resetAddForm = () => {
+    discardContractDraft();
+    contractNoAutoRef.current = true;
+    setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
+    setCustomRounds(false);
+    setFormFiles([]);
+    setFormError("");
+  };
 
   // ── แถวร่าง "เพิ่มสัญญาใหม่" ท้ายตาราง ──────────────────────────────────
   // ✅ เดิมทางเดียวที่สร้างสัญญาใหม่ได้คือกดปุ่ม "เพิ่มสัญญาใหม่" มุมขวาบนแล้วกรอกในไดอะล็อกที่มี 12 ช่อง
@@ -3213,6 +3395,9 @@ export default function ContractOverview() {
   // ⚠️ ไม่แตะ state `form` ของหน้านี้เลย — แถวร่างถือค่าที่กำลังพิมพ์ไว้เองทั้งหมด (ดู InlineAddRow)
   // แล้วส่งกลับมาทีเดียวตอนกดบันทึก การเปิดแถวจึงเปลี่ยน state แค่ตัวเดียว เรนเดอร์ใหม่รอบเดียวจบ
   const openInlineAdd = () => {
+    // ✅ (25 พ.ย. 2569) มีร่างที่กรอกค้างไว้ → เปิดฟอร์มเต็มให้กรอกต่อ (แถวในตารางมีช่องไม่ครบทุกช่องของร่าง)
+    if (contractDraftStore.load(draftUid)) { openAddDialog(); return; }
+    setFormFiles([]); // แถวในตารางไม่มีช่องแนบไฟล์ — ไม่พาไฟล์ที่ค้างจากฟอร์มเต็มไปแนบโดยไม่รู้ตัว
     setFormError("");
     setAddOpen(false);
     setInlineAddOpen(true);
@@ -3324,8 +3509,9 @@ export default function ContractOverview() {
       // ⚠️ กรณีฉบับร่าง: ถ้าถูกลบทิ้งตอนยังไม่มีครั้งไหนลงตารางเลย สัญญาทั้งอันจะหายไปจากตาราง
       // "ภาพรวมงาน" ทันที (ไม่เหลือ document ไหนผูก contractGroupId นี้เลย) — เตือนไว้ชัดเจนแยกจาก
       // คำเตือนปกติแล้วที่ handleDeleteDraftClick (EventCalendar/index.js) กันลบพลาดโดยไม่รู้ตัว
+      let created = null;
       if (values.firstVisitStart) {
-        await EventService.AddEvent({
+        created = await EventService.AddEvent({
           ...payload,
           // ✅ ทีมที่เข้างานผูกกับ "ครั้งที่ 1" ที่กำลังสร้างนี้เท่านั้น ไม่ใช่ค่าระดับสัญญา — ครั้งถัดๆ ไป
           // เลือกทีมของตัวเองแยกได้อิสระ (ดู beginRoundTeamEdit ในตาราง / กล่อง "เพิ่มครั้งถัดไป")
@@ -3340,15 +3526,33 @@ export default function ContractOverview() {
         });
       } else {
         // ✅ สัญญาเปล่า — ไม่ส่ง team/resPerson เลย ยังไม่มี "ครั้ง" ไหนให้ผูกทีม (ไปเลือกตอนลงวันที่จริง)
-        await EventService.AddDraftEvent(payload);
+        created = await EventService.AddDraftEvent(payload);
       }
+
+      // ✅ (25 พ.ย. 2569) แนบเอกสารสัญญาที่เลือกไว้ในฟอร์ม — หลังได้ contractGroupId · สัญญาบันทึกแล้วแม้แนบไฟล์ไม่ครบ
+      const newGid = (Array.isArray(created) ? created[0] : created)?.contractGroupId;
+      let fileFails = 0;
+      if (formFiles.length && newGid) {
+        for (const it of formFiles) {
+          try {
+            // eslint-disable-next-line no-await-in-loop -- ทีละไฟล์ (เน็ตมือถือ)
+            await EventService.UploadContractQuotationFile(newGid, it.file, it.docType);
+          } catch { fileFails += 1; }
+        }
+      } else if (formFiles.length) fileFails = formFiles.length;
+      if (!renewFrom) discardContractDraft();
+      setFormFiles([]);
 
       setSaving(false);
       setAddOpen(false);
       setInlineAddOpen(false); // ✅ ปิดแถวร่างท้ายตารางด้วย — ฟังก์ชันนี้ใช้ร่วมกันทั้ง 2 ทางเข้า
       const renewedFromNo = renewFrom?.contractNo;
       setRenewFrom(null);
-      Swal.fire({
+      Swal.fire(fileFails ? {
+        title: "บันทึกสัญญาแล้ว แต่แนบไฟล์ไม่ครบ",
+        text: `แนบไม่สำเร็จ ${fileFails} ไฟล์ — แนบใหม่ได้ที่ป้าย "เอกสาร" ใต้เลขที่สัญญาในตาราง`,
+        icon: "warning",
+      } : {
         title: renewedFromNo ? `ต่อสัญญาจาก ${renewedFromNo} สำเร็จ ✅` : "บันทึกสัญญาใหม่สำเร็จ ✅",
         text: values.firstVisitStart ? undefined : 'ยังไม่ได้ระบุวันที่เข้างาน — สัญญาถูกบันทึกเป็น "สัญญาเปล่า" กดชิป "📌 กดเพื่อลงวันที่" ที่ช่องครั้งที่ 1 ในตารางเมื่อรู้วันที่จริง',
         icon: "success",
@@ -4085,6 +4289,7 @@ export default function ContractOverview() {
   //    ✅ ระหว่างเปิดกล่อง ตารางไม่เข้าโหมดแก้ไขเลย — แก้ได้ที่กล่องที่เดียว
   const [rowEditorKey, setRowEditorKey] = useState(null);
   const [valueDialogKey, setValueDialogKey] = useState(null); // กล่อง "มูลค่าสัญญา · ใบเสนอราคา"
+  const [docsContractKey, setDocsContractKey] = useState(null); // ✅ (25 พ.ย. 2569) กล่อง "เอกสารของสัญญา"
   const tableEditingCell = rowEditorKey ? null : editingCell;
 
   // ✅ (26 ต.ค. 2569 "select ดูข้อมูลหน่วง") วาดแถวในคอมโพเนนต์ย่อยของแต่ละแถว (TableRowShell) แทนการสร้าง JSX
@@ -4108,8 +4313,11 @@ export default function ContractOverview() {
                     transition: "background-color .12s",
                     "&:hover": { bgcolor: alpha(ACCENT, 0.035) },
                     // ✅ ปุ่มจัดการรายครั้ง (เพิ่มวัน · ย้าย · แยก) จางไว้ — ชี้ที่แถวแล้วค่อยเด่น ลดความรกของตาราง
+                    // 🔁 (25 พ.ย. 2569 ผู้ใช้: "หน้าภาพรวมงานให้ดูข้อมูลง่ายกว่านี้") จอที่มีเมาส์: ซ่อนสนิทจนชี้ที่แถว
+                    //    (เดิมจาง 30% ทุกช่องทุกแถว = ไอคอนเล็กๆ เต็มตาราง) · จอสัมผัสยังจางไว้ให้เห็นว่ามีปุ่ม
                     "& .co-visit-actions": { opacity: 0.3, transition: "opacity .15s" },
-                    "&:hover .co-visit-actions": { opacity: 1 },
+                    "@media (hover: hover) and (pointer: fine)": { "& .co-visit-actions": { opacity: 0 } },
+                    "&:hover .co-visit-actions, & .co-visit-actions:focus-within": { opacity: 1 },
                   }}
                 >
                   {showCheckboxes && (
@@ -4185,6 +4393,10 @@ export default function ContractOverview() {
                                 onCommit={(v) => commitEdit(c, v)}
                                 onCancel={cancelEdit}
                               />
+                              {/* ✅ (25 พ.ย. 2569) เอกสาร/หลักฐานของสัญญา — เห็นทันทีว่ามีสัญญาฉบับเซ็นหรือยัง กดแนบ/ดูได้ */}
+                              {c.isRealContract && (
+                                <Box><ContractDocsChip contract={c} canEdit={isAdminOrManager} onOpen={() => setDocsContractKey(c.key)} /></Box>
+                              )}
                             </Stack>
                           </TableCell>
                         )}
@@ -5055,6 +5267,7 @@ export default function ContractOverview() {
   // ⚠️ เก็บแค่ key — อ่านแถวสดจาก contracts ทุกครั้ง ค่าที่เพิ่งแก้ในกล่องจะเห็นทันที ไม่ค้างค่าเก่า
   const rowEditorRow = rowEditorKey ? contracts.find((x) => x.key === rowEditorKey) || null : null;
   const valueDialogRow = valueDialogKey ? contracts.find((x) => x.key === valueDialogKey) || null : null;
+  const docsDialogRow = docsContractKey ? contracts.find((x) => x.key === docsContractKey) || null : null;
   const openRowEditor = (c) => {
     // การ์ดรายละเอียดเต็มจอ (มือถือกด "รายละเอียด" · เดสก์ท็อปเมนู "แก้ไขข้อมูล") — ทุกช่องแก้ได้ในที่เดียว
     setRowEditorKey(c.key);
@@ -5350,6 +5563,9 @@ export default function ContractOverview() {
               <Box sx={{ mt: 0.4 }}>
                 <ContractVatTag c={c} variant="pill" onOpen={sheet ? () => setValueDialogKey(c.key) : undefined} />
               </Box>
+            )}
+            {c.isRealContract && sheet && (
+              <ContractDocsChip contract={c} canEdit={isAdminOrManager} onOpen={() => setDocsContractKey(c.key)} />
             )}
           </Box>
           <Box sx={{ px: 1.25, py: 1, minWidth: 0, borderLeft: "1px solid #eef2f7" }}>
@@ -6124,9 +6340,16 @@ export default function ContractOverview() {
               variant="contained"
               startIcon={<Add />}
               onClick={openAddDialog}
+              title={hasStoredDraft ? "มีข้อมูลสัญญาที่กรอกค้างไว้ — กดเพื่อกรอกต่อ" : undefined}
               sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, flex: { xs: 1, sm: "initial" }, height: { xs: 40, sm: "auto" }, boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
             >
               เพิ่มสัญญาใหม่
+              {/* ✅ (25 พ.ย. 2569) มีร่างค้าง — บอกให้รู้ว่ากดแล้วจะได้ข้อมูลที่กรอกไว้คืน */}
+              {hasStoredDraft && (
+                <Box component="span" sx={{ ml: 0.75, px: 0.75, py: 0.1, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, bgcolor: "rgba(255,255,255,.22)", lineHeight: 1.6 }}>
+                  มีร่างค้าง
+                </Box>
+              )}
             </Button>
           )}
           {/* ✅ ปุ่ม "รีเฟรช" ถูกตัดออกตามที่ผู้ใช้ขอ — หน้านี้ดึงข้อมูลใหม่เองอัตโนมัติอยู่แล้ว (ดู
@@ -6609,6 +6832,38 @@ export default function ContractOverview() {
               ? 'ยังไม่มีสัญญาแบบหลายครั้ง — กดหมวด "ยังไม่จัดหมวด" ด้านบนเพื่อดูงานที่มีอยู่ หรือกด "เพิ่มสัญญาใหม่"'
               : "ยังไม่มีข้อมูลในมุมมองนี้"}
           </Typography>
+          {/* 🐛 (25 พ.ย. 2569 ผู้ใช้: "เลขที่สัญญาไม่มีในระบบ แต่ขึ้นมีแล้ว") ค้นแล้วไม่เจอเพราะรายการอยู่นอกมุมมอง/ตัวกรองที่เปิดอยู่
+              (เช่น เลือกผู้รับผิดชอบไว้ · อยู่หน้าเข้าครบ/หมดอายุ) → ค้นคำเดียวกันในงานทั้งหมด บอกว่าเจอที่ไหน กดไปดูได้ทันที */}
+          {(() => {
+            const kw = search.trim().toLowerCase();
+            if (!kw) return null;
+            const found = contracts.filter((c) => matchesKeyword(c, kw));
+            if (!found.length) return null;
+            return (
+              <Box sx={{ mt: 2, mx: "auto", maxWidth: 520, px: 2, textAlign: "left" }}>
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>
+                  พบ “{search.trim()}” {found.length} รายการ นอกมุมมอง/ตัวกรองนี้
+                </Typography>
+                <Stack spacing={0.75}>
+                  {found.slice(0, 5).map((c) => (
+                    <Box key={c.key} component="button" type="button" onClick={() => revealContract(c)}
+                      sx={{ display: "flex", alignItems: "center", gap: 1.25, width: "100%", p: 1.1, borderRadius: 2, cursor: "pointer", font: "inherit", textAlign: "left",
+                        border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", "&:hover": { borderColor: ACCENT, bgcolor: "#f8fbff" } }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a" }}>
+                          {[c.contractNo, c.site || c.company].filter(Boolean).join(" · ") || "ไม่ระบุ"}
+                        </Typography>
+                        <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>
+                          {whereOfContract(c).label}{c.responsiblePerson ? ` · ผู้รับผิดชอบ ${c.responsiblePerson}` : " · ยังไม่มอบหมาย"}
+                        </Typography>
+                      </Box>
+                      <ChevronRight sx={{ fontSize: 18, color: ACCENT, flexShrink: 0 }} />
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            );
+          })()}
           {hasActiveFilters && (
             <Button
               size="small" variant="outlined" onClick={clearAllFilters}
@@ -6980,6 +7235,8 @@ export default function ContractOverview() {
                   teamOptions={teamOptions}
                   suggestContractNo={suggestNextContractNo}
                   isContractNoTaken={isContractNoTaken}
+                  describeContractNoOwner={describeContractNoOwner}
+                  onDraftChange={(d, auto) => persistContractDraft(d, auto)}
                   saving={saving}
                   formError={formError}
                   onSave={handleAddSubmit}
@@ -7329,54 +7586,125 @@ export default function ContractOverview() {
         const formYears = Number(form.contractYears) || 1;
         const expectedTotal = perYear ? perYear * formYears : 0;
         const countMismatch = Boolean(perYear && form.visitCount && Number(form.visitCount) !== expectedTotal);
-        const missingRequired = [
-          !form.site.trim() && "โครงการ",
-          !form.title.trim() && "ประเภทงาน",
-          !form.system.trim() && "ระบบงาน",
-          !form.visitCount && "เข้าปีละกี่ครั้ง",
-        ].filter(Boolean);
+        // ✅ (25 พ.ย. 2569 ผู้ใช้: "ปรับแก้หน้าเพิ่มสัญญาใหม่ ให้ดูสวยงาม ใช้งานง่ายกว่านี้")
+        //    • ช่องบังคับ 4 ช่องเป็นรายการตรวจ — กดแล้วเลื่อนไปที่หมวดนั้น · หมวดที่ครบขึ้นวงเขียว ✓
+        //    • จอคอม: แผงสรุปด้านขวาเห็นสัญญาที่กำลังจะบันทึกตลอดเวลา · มือถือ: แถบความคืบหน้าใต้หัวกล่อง
+        //    • เลขที่สัญญาซ้ำ: บอกว่าชนกับสัญญาไหน อยู่หน้าไหน + ปุ่มใช้เลขถัดไปที่ว่าง / เปิดดูสัญญานั้น
+        //    • สีน้ำเงินระบบทั้งฟอร์ม (เดิมเลขหมวด/ผู้รับผิดชอบเป็นสีแดง ดูเหมือนกรอกผิด)
+        const required = [
+          { label: "โครงการ", ok: Boolean(form.site.trim()), sec: "co-sec-1" },
+          { label: "ประเภทงาน", ok: Boolean(form.title.trim()), sec: "co-sec-1" },
+          { label: "ระบบงาน", ok: Boolean(form.system.trim()), sec: "co-sec-1" },
+          { label: "เข้าปีละกี่ครั้ง", ok: Boolean(form.visitCount), sec: "co-sec-2" },
+        ];
+        const missingRequired = required.filter((r) => !r.ok).map((r) => r.label);
+        const doneCount = required.length - missingRequired.length;
+        const dupOwner = findContractNoOwner(form.contractNo);
+        const dupWhere = dupOwner ? whereOfContract(dupOwner) : null;
+        const nextFreeNo = dupOwner ? suggestNextContractNo(form.contractNo) : "";
+        const valueNum = Number(form.jobValue);
+        const hasValue = form.jobValue !== "" && Number.isFinite(valueNum) && valueNum > 0;
+        const perVisitValue = hasValue && Number(form.visitCount) > 1 ? Math.round(valueNum / Number(form.visitCount)) : null;
+        const sec1Done = required.slice(0, 3).every((r) => r.ok);
+        const sec2Done = Boolean(form.visitCount) && !countMismatch && !hasInvalidContractRange;
+        const sec3Done = Boolean(form.contractNo.trim()) && !dupOwner && hasValue;
+        const goSection = (id) => { try { document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* เบราว์เซอร์เก่า */ } };
+        const canReset = !renewFrom && (contractDraftHasContent(form, contractNoAutoRef.current) || formFiles.length > 0);
+        const chipSx = (on) => ({
+          height: 34, minWidth: 64, fontWeight: 800, fontSize: "0.82rem", cursor: "pointer", borderRadius: 2,
+          bgcolor: on ? ACCENT : "#fff", color: on ? "#fff" : "#334155", border: `1px solid ${on ? ACCENT : BORDER_MAIN}`,
+          "&:hover": { bgcolor: on ? "#1d4ed8" : alpha(ACCENT, 0.06) },
+        });
+        const labelSx = { fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 };
+        const docTypeOptions = [
+          { key: "contract", label: "สัญญาฉบับเซ็น" },
+          { key: "quotation", label: "ใบเสนอราคา" },
+          { key: "po", label: "ใบสั่งซื้อ (PO)" },
+          { key: "other", label: "เอกสารอื่น" },
+        ];
+        const pickFormFiles = (docType) => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.multiple = true;
+          input.accept = "image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx";
+          input.onchange = () => {
+            const list = [...(input.files || [])];
+            if (list.length) setFormFiles((prev) => [...prev, ...list.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, docType }))]);
+          };
+          input.click();
+        };
+        const summaryRows = [
+          { k: "โครงการ", v: [form.site, form.company].filter((x) => x.trim()).join(" · ") },
+          { k: "งาน", v: [form.title, form.system].filter((x) => x.trim()).join(" · ") },
+          { k: "ระยะสัญญา", v: form.contractStart ? `${thaiDateNumeric(form.contractStart)}${form.contractEnd ? ` – ${thaiDateNumeric(form.contractEnd)}` : ""}` : `${formYears} ปี` },
+          { k: "รอบเข้างาน", v: form.visitCount ? (perYear ? `ปีละ ${perYear} × ${formYears} ปี = ${form.visitCount} ครั้ง` : `${form.visitCount} ครั้ง`) : "" },
+          { k: "มูลค่า", v: hasValue ? `${formatBaht(valueNum)}${perVisitValue ? ` (≈ ${formatBaht(perVisitValue)}/ครั้ง)` : ""}` : "" },
+          { k: "ผู้รับผิดชอบ", v: form.responsiblePerson },
+          { k: "เอกสาร", v: formFiles.length ? `${formFiles.length} ไฟล์` : "" },
+        ];
         return (
         <Dialog
-          open onClose={closeAddDialog} fullWidth maxWidth="md" fullScreen={isMobile}
-          slotProps={{ paper: { sx: { borderRadius: isMobile ? 0 : 3.5, bgcolor: "#f8fafc" } } }}
+          open onClose={closeAddDialog} fullWidth maxWidth="lg" fullScreen={isMobile}
+          slotProps={{ paper: { sx: { borderRadius: isMobile ? 0 : 3.5, bgcolor: "#f8fafc", maxWidth: 1080 } } }}
         >
-        {/* หัวกล่อง: ไอคอน + ชื่อ + คำอธิบายว่าต้องกรอกอะไรบ้าง */}
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}`, py: 1.75 }}>
+        {/* หัวกล่อง: ไอคอน + ชื่อ + คำอธิบาย */}
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}`, py: 1.5 }}>
           <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
-            <Description sx={{ fontSize: 22 }} />
+            {renewFrom ? <Autorenew sx={{ fontSize: 22 }} /> : <Description sx={{ fontSize: 22 }} />}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", lineHeight: 1.3 }}>{renewFrom ? "ต่อสัญญาปีถัดไป" : "เพิ่มสัญญาใหม่"}</Typography>
-            <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>
+            <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }} noWrap={!isMobile}>
               {renewFrom
-                ? `ต่อจาก ${renewFrom.contractNo || "สัญญาเดิม"} · ${renewFrom.site || ""} — เติมข้อมูลเดิมให้แล้ว ตรวจวันที่ มูลค่า และเลขที่ใบเสนอราคา แล้วกดบันทึก`
-                : "กรอกข้อมูลหลักของสัญญา — วันที่เข้างานแต่ละครั้งเพิ่มทีหลังในตารางได้"}
+                ? `ต่อจาก ${renewFrom.contractNo || "สัญญาเดิม"} · ${renewFrom.site || ""} — ตรวจวันที่ มูลค่า และเลขที่ใบเสนอราคา แล้วกดบันทึก`
+                : "กรอกข้อมูลหลักของสัญญา — ข้อมูลที่กรอกจำไว้ให้อัตโนมัติจนกว่าจะบันทึก"}
             </Typography>
           </Box>
           <IconButton size="small" onClick={closeAddDialog} aria-label="ปิด"><Close fontSize="small" /></IconButton>
         </DialogTitle>
+        {/* มือถือ: ความคืบหน้าช่องบังคับ (จอคอมดูที่แผงสรุปด้านขวา) */}
+        {isMobile && (
+          <Box sx={{ px: 2, py: 1, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}` }}>
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: missingRequired.length ? "#334155" : "#15803d" }}>
+                {missingRequired.length ? `ช่องที่ต้องกรอก ${doneCount}/${required.length}` : "✓ กรอกช่องที่ต้องกรอกครบแล้ว"}
+              </Typography>
+              {missingRequired.length > 0 && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }} noWrap>ขาด: {missingRequired.join(" · ")}</Typography>}
+            </Stack>
+            <Box sx={{ height: 4, borderRadius: 99, bgcolor: "#eef2f7", overflow: "hidden" }}>
+              <Box sx={{ height: "100%", width: `${(doneCount / required.length) * 100}%`, bgcolor: missingRequired.length ? ACCENT : "#16a34a", transition: "width .25s ease" }} />
+            </Box>
+          </Box>
+        )}
 
         <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 }, pt: { xs: 1.5, sm: 2.5 } }}>
-          <Stack spacing={2} sx={{ pt: { xs: 1.5, sm: 2.5 } }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 280px" }, gap: 2.5, alignItems: "start", pt: { xs: 1.5, sm: 2.5 } }}>
+          <Stack spacing={2} sx={{ minWidth: 0 }}>
+            {/* ✅ กู้คืนข้อมูลที่กรอกค้างไว้ — บอกให้รู้ตัว พร้อมทางเริ่มใหม่ */}
+            {draftRestoredAt && !renewFrom && (
+              <Stack direction="row" alignItems="center" spacing={1.25}
+                sx={{ px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#eff6ff", border: `1px solid ${alpha(ACCENT, 0.2)}` }}>
+                <History sx={{ fontSize: 20, color: ACCENT, flexShrink: 0 }} />
+                <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", color: "#1e3a8a", fontWeight: 600 }}>
+                  กู้ข้อมูลที่กรอกค้างไว้ ({moment(draftRestoredAt).format("D MMM HH:mm")} น.) — กรอกต่อได้เลย
+                </Typography>
+                <Button size="small" onClick={resetAddForm}
+                  sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.76rem", color: ACCENT, minWidth: 0, flexShrink: 0 }}>
+                  เริ่มใหม่
+                </Button>
+              </Stack>
+            )}
             {formError && <Alert severity="error" sx={{ borderRadius: 2 }}>{formError}</Alert>}
 
-            {/* ✅ (8 ต.ค. 2569 ผู้ใช้: "ปรับจุดวาง ขั้นตอนไหนควรขึ้นก่อนและหลัง ไม่ให้สับสน · กรอกเองน้อยที่สุด")
-                ลำดับตามที่คนคิดจริง: งานอะไร → สัญญากี่ปี เข้าปีละกี่ครั้ง → เลขที่/มูลค่า → ใครดูแล → ครั้งแรกเมื่อไร
+            {/* ลำดับตามที่คนคิดจริง: งานอะไร → สัญญากี่ปี เข้าปีละกี่ครั้ง → เลขที่/มูลค่า → ใครดูแล → ครั้งแรกเมื่อไร → เอกสาร
                 ช่องที่คำนวณได้ (วันสิ้นสุด · จำนวนครั้งทั้งหมด · ระยะห่าง · เลขที่สัญญา) ระบบเติมให้ แก้เองได้ */}
-            <FormSection step={1} title="งานและลูกค้า" hint="สัญญานี้เป็นงานอะไร ของโครงการไหน">
+            <FormSection id="co-sec-1" step={1} done={sec1Done} title="งานและลูกค้า" hint="สัญญานี้เป็นงานอะไร ของโครงการไหน">
               <FieldGrid>
-                <Autocomplete
-                  fullWidth options={THAILAND_PROVINCES} value={form.province || null}
-                  onChange={(_, value) => setField("province")(value || "")}
-                  renderInput={(params) => <TextField {...params} label="จังหวัด" size="small" placeholder="เลือกจังหวัด" />}
-                />
-                <TextField fullWidth size="small" label="เมือง" value={form.city}
-                  onChange={(e) => setField("city")(e.target.value)} placeholder="เช่น เขตวัฒนา" />
                 <Autocomplete
                   freeSolo fullWidth options={siteOptions}
                   inputValue={form.site}
                   onInputChange={(_, v) => setField("site")(v)}
-                  renderInput={(params) => <TextField {...params} label="โครงการ / สถานที่ *" size="small" autoFocus />}
+                  renderInput={(params) => <TextField {...params} label="โครงการ / สถานที่ *" size="small" autoFocus={!form.site} />}
                 />
                 <Autocomplete
                   freeSolo fullWidth options={companyOptions}
@@ -7396,12 +7724,18 @@ export default function ContractOverview() {
                   onInputChange={(_, v) => setField("system")(v)}
                   renderInput={(params) => <TextField {...params} label="ระบบงาน *" size="small" placeholder="เช่น Fire Alarm" />}
                 />
+                <Autocomplete
+                  fullWidth options={THAILAND_PROVINCES} value={form.province || null}
+                  onChange={(_, value) => setField("province")(value || "")}
+                  renderInput={(params) => <TextField {...params} label="จังหวัด" size="small" placeholder="เลือกจังหวัด" />}
+                />
+                <TextField fullWidth size="small" label="เมือง / เขต" value={form.city}
+                  onChange={(e) => setField("city")(e.target.value)} placeholder="เช่น เขตวัฒนา" />
               </FieldGrid>
             </FormSection>
 
-            <FormSection step={2} title="ระยะสัญญาและรอบเข้างาน" hint="เลือกวันเริ่ม · กี่ปี · เข้าปีละกี่ครั้ง — ที่เหลือระบบคำนวณให้">
+            <FormSection id="co-sec-2" step={2} done={sec2Done} title="ระยะสัญญาและรอบเข้างาน" hint="เลือกวันเริ่ม · กี่ปี · เข้าปีละกี่ครั้ง — ที่เหลือระบบคำนวณให้">
               <Stack spacing={1.75}>
-                {/* ① วันเริ่ม + กี่ปี → วันสิ้นสุด */}
                 <FieldGrid>
                   <ThaiDatePicker label="วันที่เริ่มสัญญา" value={form.contractStart} onChange={setContractStart} />
                   <ThaiDatePicker
@@ -7410,40 +7744,30 @@ export default function ContractOverview() {
                     helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : form.contractStart ? "ตั้งให้จากจำนวนปี · แก้ได้" : "เลือกวันเริ่มก่อน ระบบตั้งให้"}
                   />
                 </FieldGrid>
-                <Box>
-                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>สัญญากี่ปี</Typography>
-                  <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
-                    {Array.from({ length: MAX_CONTRACT_YEARS }, (_, i) => i + 1).map((y) => {
-                      const on = formYears === y;
-                      return (
-                        <Chip key={y} label={`${y} ปี`} onClick={() => pickYears(y)} onMouseDown={(e) => e.preventDefault()}
-                          sx={{ height: 32, minWidth: 64, fontWeight: 800, fontSize: "0.82rem", cursor: "pointer", borderRadius: 2,
-                            bgcolor: on ? "#2563eb" : "#fff", color: on ? "#fff" : "#334155", border: `1px solid ${on ? "#2563eb" : BORDER_MAIN}`,
-                            "&:hover": { bgcolor: on ? "#1d4ed8" : alpha("#2563eb", 0.06) } }} />
-                      );
-                    })}
-                  </Stack>
-                </Box>
-
-                {/* ② เข้าปีละกี่ครั้ง → ระยะห่าง + จำนวนครั้งทั้งหมด */}
-                <Box>
-                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>เข้าปีละกี่ครั้ง *</Typography>
-                  <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
-                    {INTERVAL_MONTHS_PRESETS.slice().reverse().map((p) => {
-                      const on = !customRounds && String(form.intervalMonths) === String(p.months);
-                      return (
-                        <Chip key={p.months} label={`${p.perYear} ครั้ง`} onClick={() => { setCustomRounds(false); pickInterval(String(p.months)); }}
-                          onMouseDown={(e) => e.preventDefault()} title={p.label}
-                          sx={{ height: 32, minWidth: 64, fontWeight: 800, fontSize: "0.82rem", cursor: "pointer", borderRadius: 2,
-                            bgcolor: on ? "#2563eb" : "#fff", color: on ? "#fff" : "#334155", border: `1px solid ${on ? "#2563eb" : BORDER_MAIN}`,
-                            "&:hover": { bgcolor: on ? "#1d4ed8" : alpha("#2563eb", 0.06) } }} />
-                      );
-                    })}
-                    <Chip label="กำหนดเอง" onClick={() => setCustomRounds(true)} onMouseDown={(e) => e.preventDefault()}
-                      sx={{ height: 32, fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", borderRadius: 2,
-                        bgcolor: customRounds ? alpha("#2563eb", 0.08) : "#fff", color: customRounds ? "#2563eb" : TEXT_SUB,
-                        border: `1px dashed ${customRounds ? "#2563eb" : BORDER_MAIN}` }} />
-                  </Stack>
+                <Box sx={{ display: "grid", gap: 1.75, gridTemplateColumns: { xs: "1fr", sm: "auto minmax(0, 1fr)" } }}>
+                  <Box>
+                    <Typography sx={labelSx}>สัญญากี่ปี</Typography>
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+                      {Array.from({ length: MAX_CONTRACT_YEARS }, (_, i) => i + 1).map((y) => (
+                        <Chip key={y} label={`${y} ปี`} onClick={() => pickYears(y)} onMouseDown={(e) => e.preventDefault()} sx={chipSx(formYears === y)} />
+                      ))}
+                    </Stack>
+                  </Box>
+                  <Box>
+                    <Typography sx={labelSx}>เข้าปีละกี่ครั้ง *</Typography>
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+                      {INTERVAL_MONTHS_PRESETS.slice().reverse().map((p) => (
+                        <Chip key={p.months} label={`${p.perYear} ครั้ง`} title={p.label}
+                          onClick={() => { setCustomRounds(false); pickInterval(String(p.months)); }}
+                          onMouseDown={(e) => e.preventDefault()}
+                          sx={chipSx(!customRounds && String(form.intervalMonths) === String(p.months))} />
+                      ))}
+                      <Chip label="กำหนดเอง" onClick={() => setCustomRounds(true)} onMouseDown={(e) => e.preventDefault()}
+                        sx={{ height: 34, fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", borderRadius: 2,
+                          bgcolor: customRounds ? alpha(ACCENT, 0.08) : "#fff", color: customRounds ? ACCENT : TEXT_SUB,
+                          border: `1px dashed ${customRounds ? ACCENT : BORDER_MAIN}` }} />
+                    </Stack>
+                  </Box>
                 </Box>
                 {customRounds && (
                   <FieldGrid>
@@ -7472,14 +7796,9 @@ export default function ContractOverview() {
                   </Alert>
                 )}
 
-                <TextField fullWidth size="small" type="number" label="ประมาณการวันเข้างานต่อครั้ง" value={form.estimatedDaysPerVisit}
-                  onChange={(e) => setField("estimatedDaysPerVisit")(e.target.value)} inputProps={{ min: 1, max: 365, step: 1 }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">วัน / รอบ</InputAdornment> }}
-                  helperText="กรอกจำนวนวันเอง ระบบใช้คำนวณยอดรายเดือนและรายปีตามจำนวนครั้งและอายุสัญญา" />
-
-                {/* ③ สรุปให้เห็นผลก่อนบันทึก */}
+                {/* สรุปให้เห็นผลก่อนบันทึก */}
                 {form.visitCount ? (
-                  <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#eff6ff", border: `1px solid ${alpha("#2563eb", 0.2)}` }}>
+                  <Box sx={{ px: 1.5, py: 1.25, borderRadius: 2.5, bgcolor: "#eff6ff", border: `1px solid ${alpha(ACCENT, 0.2)}` }}>
                     <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#1e3a8a" }}>
                       {perYear
                         ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${form.visitCount} ครั้ง · เข้าทุก ${form.intervalMonths} เดือน`
@@ -7499,28 +7818,68 @@ export default function ContractOverview() {
                     )}
                   </Box>
                 ) : (
-                  <Typography sx={{ fontSize: "0.76rem", color: "#b45309" }}>เลือก “เข้าปีละกี่ครั้ง” ระบบจะคำนวณระยะห่างและจำนวนครั้งทั้งหมดให้</Typography>
+                  <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>เลือก “เข้าปีละกี่ครั้ง” ระบบจะคำนวณระยะห่างและจำนวนครั้งทั้งหมดให้</Typography>
                 )}
+
+                <TextField fullWidth size="small" type="number" label="ประมาณการวันเข้างานต่อครั้ง (ไม่บังคับ)" value={form.estimatedDaysPerVisit}
+                  onChange={(e) => setField("estimatedDaysPerVisit")(e.target.value)} inputProps={{ min: 1, max: 365, step: 1 }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">วัน / รอบ</InputAdornment> }}
+                  helperText="ใช้คำนวณยอดรายเดือน/รายปี" sx={{ maxWidth: { sm: 360 } }} />
               </Stack>
             </FormSection>
 
-            <FormSection step={3} title="เลขที่เอกสารและมูลค่า" hint="เลขที่สัญญาระบบตั้งให้ · ใบเสนอราคาและมูลค่าใส่ภายหลังได้">
-              <FieldGrid>
-                <TextField
-                  fullWidth size="small" label="เลขที่สัญญา" value={form.contractNo}
-                  onChange={(e) => setField("contractNo")(e.target.value)}
-                  error={isContractNoTaken(form.contractNo)}
-                  helperText={isContractNoTaken(form.contractNo) ? "เลขที่นี้ถูกใช้ไปแล้ว" : "ระบบตั้งให้อัตโนมัติ แก้ไขได้"}
-                />
-                <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={form.quotationNo}
-                  onChange={(e) => setField("quotationNo")(e.target.value)} />
-                <TextField fullWidth size="small" type="number" label="มูลค่างานทั้งสัญญา" value={form.jobValue}
-                  onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment>, endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
-              </FieldGrid>
+            <FormSection id="co-sec-3" step={3} done={sec3Done} title="เลขที่เอกสารและมูลค่า" hint="เลขที่สัญญาระบบตั้งเลขถัดไปที่ว่างให้ · ใบเสนอราคาและมูลค่าใส่ภายหลังได้">
+              <Stack spacing={1.5}>
+                <FieldGrid>
+                  <TextField
+                    fullWidth size="small" label="เลขที่สัญญา" value={form.contractNo}
+                    onChange={(e) => setField("contractNo")(e.target.value)}
+                    error={Boolean(dupOwner)}
+                    helperText={dupOwner ? "เลขนี้ถูกใช้แล้ว — ดูรายละเอียดด้านล่าง" : contractNoAutoRef.current ? "ระบบตั้งเลขถัดไปที่ว่างให้ · แก้ได้" : "ตรวจแล้ว ไม่ซ้ำกับสัญญาอื่น"}
+                  />
+                  <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={form.quotationNo}
+                    onChange={(e) => setField("quotationNo")(e.target.value)} />
+                </FieldGrid>
+                {/* 🐛 เลขซ้ำ — บอกว่าชนกับสัญญาไหน อยู่หน้าไหน (ค้นในตารางไม่เจอเพราะอยู่นอกตัวกรอง/มุมมอง) + ทางแก้ 2 ทาง */}
+                {dupOwner && (
+                  <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+                    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                      <WarningAmber sx={{ fontSize: 20, color: "#d97706", mt: 0.1, flexShrink: 0 }} />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#92400e" }}>
+                          {dupOwner.contractNo} ถูกใช้แล้วกับสัญญานี้
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.8rem", color: "#0f172a", fontWeight: 700, mt: 0.25 }}>
+                          {[dupOwner.site, dupOwner.company].filter((v) => v && v !== "-").join(" · ") || "ไม่ระบุโครงการ"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, mt: 0.15 }}>
+                          {[[dupOwner.title, dupOwner.system].filter(Boolean).join(" · "), dupOwner.responsiblePerson ? `ผู้รับผิดชอบ ${dupOwner.responsiblePerson}` : "ยังไม่มอบหมายผู้รับผิดชอบ"].filter(Boolean).join(" · ")}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>อยู่ที่: {dupWhere.label}</Typography>
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.1 }}>
+                          <Button size="small" variant="contained" disableElevation onClick={() => setField("contractNo")(nextFreeNo)}
+                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8" } }}>
+                            ใช้เลขที่ว่าง {nextFreeNo}
+                          </Button>
+                          <Button size="small" variant="outlined" onClick={() => revealContract(dupOwner)} endIcon={<ChevronRight />}
+                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: "#e2e8f0", color: "#334155", bgcolor: "#fff" }}>
+                            เปิดดูสัญญานั้น (ข้อมูลที่กรอกยังจำไว้)
+                          </Button>
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  </Box>
+                )}
+                <TextField fullWidth size="small" label="มูลค่างานทั้งสัญญา" value={form.jobValue}
+                  onChange={(e) => setField("jobValue")(e.target.value.replace(/[^\d.]/g, ""))}
+                  inputProps={{ inputMode: "decimal" }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment>, endAdornment: <InputAdornment position="end">บาท</InputAdornment> }}
+                  helperText={hasValue ? `${formatBaht(valueNum)}${perVisitValue ? ` · เฉลี่ย ≈ ${formatBaht(perVisitValue)} ต่อครั้ง` : ""} · ระบุ VAT/แนบใบเสนอราคาได้ในตารางหลังบันทึก` : "ไม่บังคับ — ใส่ภายหลังได้"}
+                  sx={{ maxWidth: { sm: 360 } }} />
+              </Stack>
             </FormSection>
 
-            <FormSection step={4} title="ผู้รับผิดชอบ" hint="คนที่ติดตามสัญญานี้ทั้งฉบับ">
+            <FormSection id="co-sec-4" step={4} done={Boolean(form.responsiblePerson)} title="ผู้รับผิดชอบ" hint="คนที่ติดตามสัญญานี้ทั้งฉบับ">
               {/* ✅ "ผู้รับผิดชอบงาน" ≠ "ทีมที่เข้างาน" — ผู้รับผิดชอบติดตามสัญญาทั้งฉบับ ทีมเลือกแยกรายครั้ง */}
               <ResponsiblePicker
                 value={form.responsiblePerson}
@@ -7532,7 +7891,7 @@ export default function ContractOverview() {
             </FormSection>
 
             <FormSection
-              step={5} optional title="วันที่เข้างานครั้งที่ 1"
+              id="co-sec-5" step={5} optional done={Boolean(form.firstVisitStart)} title="วันที่เข้างานครั้งที่ 1"
               hint={form.firstVisitStart ? "จะลงตารางเป็นครั้งที่ 1 ทันทีที่บันทึก" : "ยังไม่รู้วันที่ก็เว้นไว้ได้ — เพิ่มทีหลังที่ปุ่ม + ในตาราง"}
             >
               <FieldGrid>
@@ -7556,19 +7915,116 @@ export default function ContractOverview() {
                 )}
               </FieldGrid>
             </FormSection>
+
+            {/* ✅ (25 พ.ย. 2569) เอกสาร/หลักฐานของสัญญา — เลือกไว้ก่อน อัปโหลดให้หลังบันทึกสัญญาสำเร็จ */}
+            <FormSection
+              id="co-sec-6" step={6} optional done={formFiles.some((f) => f.docType === "contract")} title="เอกสารของสัญญา"
+              hint="สัญญาฉบับเซ็น · ใบเสนอราคา · PO — แนบตอนนี้ หรือแนบทีหลังที่ป้าย “เอกสาร” ในตารางก็ได้"
+            >
+              <Stack spacing={1.25}>
+                <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, minmax(0, 1fr))" } }}>
+                  {docTypeOptions.map((t) => (
+                    <Button key={t.key} variant="outlined" onClick={() => pickFormFiles(t.key)}
+                      startIcon={<AttachFileIcon sx={{ transform: "rotate(45deg)" }} />}
+                      sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.78rem", borderRadius: 2, justifyContent: "flex-start", minWidth: 0,
+                        borderColor: t.key === "contract" ? alpha(ACCENT, 0.45) : "#e2e8f0", color: t.key === "contract" ? ACCENT : "#334155", bgcolor: "#fff",
+                        "& .MuiButton-startIcon": { mr: 0.5 }, whiteSpace: "nowrap", overflow: "hidden" }}>
+                      {t.label}
+                    </Button>
+                  ))}
+                </Box>
+                {formFiles.length > 0 && (
+                  <Stack spacing={0.75}>
+                    {formFiles.map((it) => (
+                      <Stack key={it.id} direction="row" alignItems="center" spacing={1}
+                        sx={{ px: 1.25, py: 0.75, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
+                        <AttachFileIcon sx={{ fontSize: 16, color: TEXT_SUB, transform: "rotate(45deg)", flexShrink: 0 }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#0f172a" }}>{it.file.name}</Typography>
+                          <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB }}>
+                            {docTypeOptions.find((t) => t.key === it.docType)?.label} · {(it.file.size / 1024 / 1024).toFixed(it.file.size > 1024 * 1024 ? 1 : 2)} MB
+                          </Typography>
+                        </Box>
+                        <IconButton size="small" aria-label="เอาไฟล์ออก" onClick={() => setFormFiles((prev) => prev.filter((x) => x.id !== it.id))}>
+                          <Close sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Stack>
+                    ))}
+                    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>อัปโหลดหลังกด “บันทึกสัญญา” · ไฟล์ที่เลือกจำไว้จนกว่าจะออกจากหน้านี้ (ข้อความที่กรอกจำไว้ถาวรจนกว่าจะบันทึก)</Typography>
+                  </Stack>
+                )}
+              </Stack>
+            </FormSection>
           </Stack>
+
+          {/* ── จอคอม: แผงสรุปสัญญา (ติดอยู่ขณะเลื่อน) ── */}
+          {!isMobile && (
+            <Box sx={{ position: "sticky", top: 0, display: { xs: "none", md: "block" } }}>
+              <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, bgcolor: "background.paper", overflow: "hidden" }}>
+                <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #eef2f7" }}>
+                  <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: TEXT_SUB }}>เลขที่สัญญา</Typography>
+                  <Typography sx={{ fontSize: "1.05rem", fontWeight: 800, color: dupOwner ? "#b45309" : "#0f172a", letterSpacing: "0.01em" }} noWrap>
+                    {form.contractNo.trim() || "—"}
+                  </Typography>
+                </Box>
+                <Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid #eef2f7" }}>
+                  <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>
+                    ช่องที่ต้องกรอก {doneCount}/{required.length}
+                  </Typography>
+                  <Box sx={{ height: 4, borderRadius: 99, bgcolor: "#eef2f7", overflow: "hidden", mb: 1 }}>
+                    <Box sx={{ height: "100%", width: `${(doneCount / required.length) * 100}%`, bgcolor: missingRequired.length ? ACCENT : "#16a34a", transition: "width .25s ease" }} />
+                  </Box>
+                  <Stack spacing={0.25}>
+                    {required.map((r) => (
+                      <Box key={r.label} component="button" type="button" onClick={() => goSection(r.sec)}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.9, border: 0, bgcolor: "transparent", p: 0.4, borderRadius: 1.5, cursor: "pointer", font: "inherit", textAlign: "left",
+                          "&:hover": { bgcolor: "#f8fafc" } }}>
+                        <Box sx={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.62rem", fontWeight: 900,
+                          bgcolor: r.ok ? "#16a34a" : "transparent", color: "#fff", border: r.ok ? 0 : "1.5px solid #cbd5e1" }}>
+                          {r.ok ? "✓" : ""}
+                        </Box>
+                        <Typography sx={{ fontSize: "0.78rem", fontWeight: r.ok ? 500 : 700, color: r.ok ? TEXT_SUB : "#0f172a" }}>{r.label}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+                <Stack spacing={0.9} sx={{ px: 2, py: 1.25 }}>
+                  {summaryRows.map((r) => (
+                    <Box key={r.k}>
+                      <Typography sx={{ fontSize: "0.66rem", fontWeight: 700, color: TEXT_SUB }}>{r.k}</Typography>
+                      <Typography sx={{ fontSize: "0.8rem", fontWeight: r.v ? 700 : 500, color: r.v ? "#0f172a" : "#cbd5e1", lineHeight: 1.4, overflowWrap: "anywhere" }}>
+                        {r.v || "—"}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+                {!renewFrom && (
+                  <Typography sx={{ px: 2, py: 1, fontSize: "0.68rem", color: TEXT_SUB, bgcolor: "#f8fafc", borderTop: "1px solid #eef2f7" }}>
+                    ข้อมูลที่กรอกจำไว้อัตโนมัติ — ปิดฟอร์มแล้วเปิดใหม่ยังอยู่ จนกว่าจะบันทึก
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
+          </Box>
         </DialogContent>
 
-        {/* ท้ายกล่อง: บอกว่ายังขาดอะไร (แทนการปล่อยปุ่มเทาโดยไม่รู้สาเหตุ) + ปุ่ม */}
-        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
-          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: missingRequired.length || hasInvalidContractRange || isContractNoTaken(form.contractNo) ? "#b45309" : "#15803d", fontWeight: 600 }}>
+        {/* ท้ายกล่อง: บอกว่ายังขาดอะไร + ปุ่ม */}
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.25, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
+          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: missingRequired.length || hasInvalidContractRange || dupOwner ? "#b45309" : "#15803d", fontWeight: 600 }}>
             {missingRequired.length
-              ? (isMobile ? `ยังขาด ${missingRequired.length} ช่องที่ต้องกรอก` : `ยังต้องกรอก: ${missingRequired.join(" · ")}`)
+              ? (isMobile ? `ยังขาด ${missingRequired.length} ช่อง` : `ยังต้องกรอก: ${missingRequired.join(" · ")}`)
               : hasInvalidContractRange ? "วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่ม"
-                : isContractNoTaken(form.contractNo) ? "เลขที่สัญญาซ้ำกับที่มีอยู่"
+                : dupOwner ? "เลขที่สัญญาซ้ำกับที่มีอยู่"
                   : "✓ พร้อมบันทึก"}
           </Typography>
-          <Button onClick={closeAddDialog} disabled={saving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}>ยกเลิก</Button>
+          {canReset && (
+            <Button onClick={resetAddForm} disabled={saving} startIcon={!isMobile ? <DeleteOutline sx={{ fontSize: 17 }} /> : undefined}
+              sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary", minWidth: 0 }}>
+              ล้างฟอร์ม
+            </Button>
+          )}
+          <Button onClick={closeAddDialog} disabled={saving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary", minWidth: 0 }}>ปิด</Button>
           <Button
             variant="contained" onClick={() => handleAddSubmit()} disabled={saving || isAddFormInvalid}
             startIcon={saving ? <CircularProgress size={14} sx={{ color: "inherit" }} /> : <Check sx={{ fontSize: 18 }} />}
@@ -7927,6 +8383,26 @@ export default function ContractOverview() {
           <Button onClick={() => setHistoryContract(null)} sx={{ textTransform: "none" }}>ปิด</Button>
         </DialogActions>
       </Dialog>
+      )}
+
+      {/* ✅ (25 พ.ย. 2569) กล่อง "เอกสารของสัญญา" — สัญญาฉบับเซ็น · ใบเสนอราคา · PO · อื่นๆ (เปิดจากป้ายเอกสารในตาราง/การ์ด) */}
+      {docsDialogRow && (
+        <Dialog open onClose={() => setDocsContractKey(null)} fullWidth maxWidth="sm" fullScreen={isMobile} slotProps={{ paper: MODERN_PAPER(isMobile) }}>
+          <ModernDialogTitle icon={<AttachFileIcon sx={{ transform: "rotate(45deg)" }} />} title="เอกสารของสัญญา"
+            sub={[docsDialogRow.contractNo, docsDialogRow.site || docsDialogRow.company].filter(Boolean).join(" · ")}
+            onClose={() => setDocsContractKey(null)} />
+          <DialogContent sx={{ p: 2, bgcolor: "#f8fafc" }}>
+            <Box sx={{ pt: 2 }}>
+              <ContractDocsPanel contract={docsDialogRow} canEdit={isAdminOrManager} onPatch={(f) => patchContractRows(docsDialogRow.key, f)} />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}` }}>
+            <Button onClick={() => setDocsContractKey(null)} variant="contained" disableElevation
+              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, "&:hover": { bgcolor: "#1d4ed8" } }}>
+              เสร็จสิ้น
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {/* ✅ (10 พ.ย. 2569) กล่อง "มูลค่าสัญญา · ใบเสนอราคา" — เปิดจากป้าย VAT ใต้มูลค่าในตาราง/การ์ด */}

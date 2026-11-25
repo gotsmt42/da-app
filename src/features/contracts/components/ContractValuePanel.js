@@ -42,7 +42,10 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
   const jobValue = Number(c?.jobValue);
   const hasValue = c?.jobValue !== null && c?.jobValue !== undefined && c?.jobValue !== "" && Number.isFinite(jobValue);
   const vat = c?.jobValueVatIncluded; // true | false | null (ยังไม่ระบุ)
-  const files = c?.contractQuotationFiles || [];
+  // ✅ (25 พ.ย. 2569) เอกสารทุกประเภทของสัญญาอยู่ในชุดเดียวกัน (ดู ContractDocsPanel) — กล่องนี้แสดงเฉพาะใบเสนอราคา
+  //    ⚠️ แก้รายการต้องอิงชุดเต็ม (allFiles) เสมอ ไม่งั้นสัญญา/PO ที่แนบไว้จะหายจากหน้าจอหลังแนบใบเสนอราคา
+  const allFiles = c?.contractQuotationFiles || [];
+  const files = allFiles.filter((f) => !f.docType || f.docType === "quotation");
   const rounds = Number(c?.visitCount) || 0;
   const parts = hasValue && jobValue > 0 ? vatParts(jobValue, vat === true) : null;
   const perRound = hasValue && rounds > 1 ? perRoundAmount(jobValue, rounds, 1) : null;
@@ -92,12 +95,12 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
     setBusy("upload");
     const added = [];
     try {
-      for (const f of list) added.push(await EventService.UploadContractQuotationFile(gid, f));
+      for (const f of list) added.push(await EventService.UploadContractQuotationFile(gid, f, "quotation"));
     } catch (err) {
       Swal.fire({ icon: "error", title: "แนบไฟล์ไม่สำเร็จ", text: errMsg(err, "ลองใหม่อีกครั้ง") });
     } finally {
       const ok = added.filter(Boolean);
-      if (ok.length) onPatch?.({ contractQuotationFiles: [...files, ...ok] });
+      if (ok.length) onPatch?.({ contractQuotationFiles: [...allFiles, ...ok] });
       setBusy("");
     }
   };
@@ -107,7 +110,7 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
     setBusy(`del:${f._id}`);
     try {
       await EventService.DeleteContractQuotationFile(gid, f._id);
-      onPatch?.({ contractQuotationFiles: files.filter((x) => String(x._id) !== String(f._id)) });
+      onPatch?.({ contractQuotationFiles: allFiles.filter((x) => String(x._id) !== String(f._id)) });
     } catch (err) {
       Swal.fire({ icon: "error", title: "ลบไม่สำเร็จ", text: errMsg(err, "ลองใหม่อีกครั้ง") });
     } finally { setBusy(""); }
@@ -131,7 +134,7 @@ export default function ContractValuePanel({ contract: c, canEdit = false, onPat
     if (await save({ jobValue: amount, jobValueVatIncluded: useGross }, "apply")) setAi((s) => ({ ...s, result: null }));
   };
 
-  const canScan = canEdit && ai.enabled && files.some((f) => isPdf(f) || isImg(f));
+  const canScan = canEdit && ai.enabled && allFiles.some((f) => f.docType !== "other" && (isPdf(f) || isImg(f)));
   const aiSrc = ai.result?.found ? [KIND[ai.result.docType] || "เอกสาร", ai.result.docNo].filter(Boolean).join(" ") : "";
   const vatSet = vat === true || vat === false;
   const pickFile = () => fileRef.current?.click();

@@ -490,10 +490,12 @@ const EventService = {
   },
 
   // ✅ (10 พ.ย. 2569) ใบเสนอราคาของทั้งสัญญา (หน้าภาพรวมงาน) — แนบ/ลบ · ให้ AI อ่านมูลค่าสัญญา (ไม่บันทึกเอง)
-  async UploadContractQuotationFile(contractGroupId, file) {
+  // ✅ (25 พ.ย. 2569) docType = ประเภทเอกสารของสัญญา (contract · quotation · po · other) — ไม่ส่ง = ใบเสนอราคา
+  async UploadContractQuotationFile(contractGroupId, file, docType) {
     const prepared = await prepareUploadFile(file);
     if (!prepared.ok) throw new Error(prepared.message);
     const formData = new FormData();
+    if (docType) formData.append("docType", docType);
     formData.append("file", prepared.file);
     const res = await API.post(`/events/contract/${contractGroupId}/quotation-file`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
