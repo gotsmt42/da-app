@@ -250,6 +250,9 @@ export const resolveJobFields = (job) => {
     start: get("start"), end: get("end"), date: get("date"), allDay: get("allDay"),
     // ✅ ข้อมูลสัญญาสำหรับป้ายครั้งที่รายปี "1/4 - 2569-70" (ดู formatRoundLabel)
     contractStart: get("contractStart"), contractEnd: get("contractEnd"), contractYears: get("contractYears"), intervalMonths: get("intervalMonths"),
+    planFirstMonth: get("planFirstMonth"), // ✅ (26 พ.ย. 2569) เดือนเข้าครั้งที่ 1 ตามแผนงานทั้งปี
+    planMonths: get("planMonths"),         // เดือนที่แก้เองรายครั้ง
+    contractGroupId: get("contractGroupId"), // ✅ ใบแจ้งแบบระบุแค่เดือน → server บันทึกเป็น "แผนที่ส่งลูกค้าแล้ว" ของสัญญานี้
     // ✅ (17 ต.ค. 2569 "ให้สอดคล้องกับระบบปัจจุบัน") ข้อมูลจากขั้นรับงาน — เลข Job · เอกสารที่ได้รับ (PO/ใบเสนอราคา) · ผู้ติดต่อหน้างาน
     jobNo: get("jobNo"), intakeDocType: get("intakeDocType"), intakeDocNo: get("intakeDocNo"),
     contactName: get("contactName"), contactTel: get("contactTel"),

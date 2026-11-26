@@ -109,6 +109,17 @@ export function useIssuedDoc({ open, eventId, docType }) {
   return { ...state, setDoc: (doc) => setState({ loading: false, doc }) };
 }
 
+/**
+ * ใบที่กำลังจัดการ — ✅ (26 พ.ย. 2569) เปิดจากหน้าทะเบียนเอกสาร (เมนู ⋮ → แก้ไข/ออกใหม่แทน) ส่งใบนั้นมาตรง ๆ (docOverride)
+ * ไม่ส่ง = หาใบที่ใช้อยู่ของงานนี้เหมือนเดิม (useIssuedDoc) · คืนรูปเดียวกัน { doc, loading, setDoc }
+ */
+export function useIssuedTarget({ open, eventId, docType, docOverride }) {
+  const byEvent = useIssuedDoc({ open, eventId: docOverride ? "" : eventId, docType });
+  const [doc, setDoc] = useState(docOverride || null);
+  useEffect(() => { if (open) setDoc(docOverride || null); }, [open, docOverride]);
+  return docOverride ? { doc, loading: false, setDoc } : byEvent;
+}
+
 /** หัวกล่อง — ไอคอน + ชื่อ + บรรทัดสถานะ (เลขที่/ร่าง) บรรทัดเดียว ไม่ตัดคำมั่วบนมือถือ */
 export function DocDialogHeader({ icon, accent, title, subtitle, savedLabel, onClose, busy }) {
   return (
@@ -179,7 +190,8 @@ export function FoldSection({ icon, step, title, summary, alert = false, default
           {open ? "ซ่อน" : "แก้ไข"}
         </Typography>
       </Stack>
-      {open && <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: 2, pt: 0.5, borderTop: `1px solid ${LINE}` }}>{children}</Box>}
+      {/* 🔁 (26 พ.ย. 2569 ผู้ใช้: "ติดชิดกันเกินไป") เว้นบนให้ป้ายของช่องแรกไม่ทับเส้นคั่นหัวข้อ */}
+      {open && <Box sx={{ px: { xs: 1.5, sm: 2.25 }, pb: 2.5, pt: 2.5, borderTop: `1px solid ${LINE}` }}>{children}</Box>}
     </Box>
   );
 }

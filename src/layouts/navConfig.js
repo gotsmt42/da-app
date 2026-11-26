@@ -75,7 +75,7 @@ export const DEST = {
   expenseReport: { title: "รายงานเบิก-เคลม", short: "รายงาน", sub: "ค่าใช้จ่ายจริง · ค้างเคลม · สำรองจ่าย", href: "/expenses/report", icon: AppIcon.Report },
 
   // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ชื่อเมนูให้สื่อความหมาย สอดคล้อง · เอกสารไม่ควรรวมกับใบเสนอราคา · ใบเสนอราคาแก้เป็นติดตามใบเสนอราคา")
-  documents: { title: "เอกสาร", sub: "เอกสารประจำงาน · เอกสารที่ออก · คลังไฟล์", href: "/documents", icon: AppIcon.Documents },
+  documents: { title: "เอกสาร", sub: "ใบแจ้งเข้างาน · ใบส่งมอบงาน — ออก ดู พิมพ์ ส่งอีเมล", href: "/documents", icon: AppIcon.Documents },
   finance: { title: "ติดตามใบเสนอราคา", bar: "ใบเสนอราคา", sub: "ผลเสนอราคา · วางบิล", href: "/finance", icon: AppIcon.Quotation, badgeKey: "quotations" },
 
   // ⚠️ /customers และ /staff คือพาธจริง ส่วน /customer และ /employee เป็นแค่ตัว redirect ของเก่า

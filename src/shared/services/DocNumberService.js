@@ -15,8 +15,9 @@ const DocNumberService = {
    * ✅ eventId — ต้องส่งไปด้วยเสมอถ้ามี เพราะผู้ใช้ที่ไม่ใช่ admin/manager จะออกเลขได้เฉพาะงานที่ตัวเอง
    * เกี่ยวข้องเท่านั้น backend ใช้ค่านี้ตรวจสิทธิ์ (ดู POST /doc-number/next)
    */
-  async next(docType = "delivery", eventId) {
-    const res = await API.post(`/doc-number/next`, { docType, eventId });
+  /** @param replaceId ✅ (26 พ.ย. 2569) ออกใบใหม่แทนใบที่ใช้อยู่ของงานนี้ — server ยอมออกเลขใหม่ให้ */
+  async next(docType = "delivery", eventId, replaceId) {
+    const res = await API.post(`/doc-number/next`, { docType, eventId, ...(replaceId ? { replaceId } : {}) });
     return res.data;
   },
 };

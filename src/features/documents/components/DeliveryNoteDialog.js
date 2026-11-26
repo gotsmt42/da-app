@@ -11,6 +11,7 @@
  * เปิดดูแล้วปิดไปเฉยๆ ต้องไม่ทำให้เลขกระโดดหายไปหนึ่งใบ
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Stack, Typography,
   TextField, Button, IconButton, Alert, useMediaQuery, CircularProgress, Autocomplete,
@@ -33,8 +34,9 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
+import usePermissions from "@/shared/hooks/usePermissions";
 import {
-  DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedTarget,
   OUTLINE_BTN_SX,
 } from "./docFormKit";
 import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
@@ -51,7 +53,11 @@ const findCustomer = (list, job) => {
     || (p.company ? list.find((c) => norm(c.cCompany) === norm(p.company)) : null);
 };
 
-const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
+/**
+ * ✅ (26 พ.ย. 2569 ผู้ใช้: "หน้าเอกสาร ... มีฟังก์ชั่นแก้ไขในตรงนี้ได้ด้วย") แก้ไขใบนี้ (เลขเดิม) / ออกใบใหม่แทน (เลขใหม่)
+ *    แบบเดียวกับใบแจ้งเข้างาน · docOverride/initialMode = เปิดจากเมนู ⋮ ของหน้าทะเบียนเอกสาร · job = {} = ใบที่ไม่ผูกงาน
+ */
+const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued, docOverride = null, initialMode = null }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
   // ✅ (17 ต.ค. 2569) ผู้ลงนามตั้งต้น = คนที่กำลังออกเอกสาร (ใช้ลายเซ็นอิเล็กทรอนิกส์ของตัวเองได้ทันที) · ไม่มีค่อยใช้ผู้รับผิดชอบงาน
   const { userData: me } = useAuth();
@@ -72,6 +78,9 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   const [preview, setPreview] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [issued, setIssued] = useState(false);
+  /** null = ออกใบใหม่ปกติ · "edit" = แก้ไขใบที่ออกแล้ว (เลขเดิม) · "reissue" = ออกใบใหม่แทนใบเดิม (เลขใหม่) */
+  const [mode, setMode] = useState(null);
+  useEffect(() => { if (!open) setMode(null); }, [open]);
 
   // ✅ ตั้งค่าเริ่มต้นใหม่ทุกครั้งที่เปิดกล่อง — ไม่ค้างค่าของงานก่อนหน้าไว้ (กล่องนี้ถูกใช้ซ้ำกับทุกงาน
   // ในหน้าเดียวกัน ถ้าไม่รีเซ็ตจะเปิดงาน B แล้วเห็นข้อมูลงาน A ค้างอยู่)
@@ -128,8 +137,32 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
 
   // ✅ ร่างอัตโนมัติ + กันออกซ้ำ (ผู้ใช้สั่ง 3 ต.ค. 2569) — ⚠️ ต้องอยู่หลัง effect ตั้งค่าเริ่มต้นด้านบน
   const eventId = String(job?.id || job?._id || "");
-  const draft = useDocDraft({ open, draftKey: eventId ? `delivery:${eventId}` : "", form, setFormState, dirtyRef, omit: ["docNumber"] });
-  const existing = useIssuedDoc({ open, eventId, docType: "delivery" });
+  const draft = useDocDraft({ open, draftKey: eventId && !mode ? `delivery:${eventId}` : "", form, setFormState, dirtyRef, omit: ["docNumber"] });
+  const existing = useIssuedTarget({ open, eventId, docType: "delivery", docOverride });
+  const { can } = usePermissions();
+  const canChangeIssued = Boolean(existing.doc) && existing.doc.status !== "cancelled"
+    && (can("editDocuments") || (existing.doc.issuedBy && String(existing.doc.issuedBy) === String(me?.userId || "")));
+  /** เริ่มแก้ไข/ออกใหม่แทน — ตั้งต้นจากข้อความของใบเดิม (snapshot) */
+  const startChange = (next) => {
+    const snap = existing.doc?.formSnapshot || {};
+    const base = buildDeliveryNoteDefaults(job || {}, customer);
+    dirtyRef.current = false;
+    setFormState({
+      ...base, body: buildDeliveryNoteBody(base), ...snap,
+      docNumber: next === "edit" ? existing.doc.docNumber : (previewNumber || snap.docNumber || base.docNumber),
+      ...(next === "reissue" ? { issuedAt: moment().format("YYYY-MM-DD") } : {}),
+    });
+    setError("");
+    setMode(next);
+  };
+  const initModeRef = useRef(false);
+  useEffect(() => { if (!open) initModeRef.current = false; }, [open]);
+  useEffect(() => {
+    if (!open || !initialMode || initModeRef.current || !form || !existing.doc) return;
+    initModeRef.current = true;
+    startChange(initialMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- เข้าโหมดครั้งเดียวเมื่อพร้อม
+  }, [open, initialMode, form, existing.doc]);
 
   /** ทิ้งร่าง แล้วเริ่มใหม่จากข้อมูลงาน */
   const discardDraft = () => {
@@ -272,7 +305,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
 
   /** ขั้นที่ 1 — สร้างไฟล์ตัวอย่างด้วย "เลขที่ที่จะได้" โดยยังไม่กินเลขจริง */
   const handlePreview = async () => {
-    if (existing.doc) return;
+    if (existing.doc && !mode) return;
     if (missing.length > 0) {
       setError(`กรุณากรอก: ${missing.join(" · ")}`);
       return;
@@ -280,7 +313,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
     setBusy(true);
     setError("");
     try {
-      const { url, blob, fileName } = await buildPdf(previewNumber || form.docNumber);
+      const { url, blob, fileName } = await buildPdf(mode === "edit" ? existing.doc.docNumber : (previewNumber || form.docNumber));
       replacePreview({ url, blob, fileName });
       setIssued(false);
       setViewingExisting(false);
@@ -302,7 +335,22 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
       // ⚠️ ส่ง id ของงานไปด้วยเสมอ — ผู้ใช้ที่ไม่ใช่ admin/manager จะออกเลขได้เฉพาะงานที่ตัวเอง
       // เกี่ยวข้อง backend ใช้ค่านี้ตรวจสิทธิ์ (FullCalendar ใช้ .id ส่วน object ดิบจาก API ใช้ ._id)
       // ✅ server ปฏิเสธ (409) ถ้างานนี้มีใบส่งมอบที่ยังใช้อยู่แล้ว — ตรวจก่อนกินเลข (routes/docNumber.js)
-      const { docNumber } = await DocNumberService.next("delivery", job?.id || job?._id);
+      // ✅ แก้ไขใบเดิม — เลขที่เดิม ไม่กินเลขใหม่ · บันทึกก่อนแล้วค่อยสร้างไฟล์ (ทะเบียนต้องตรงกับไฟล์ที่ส่ง)
+      if (mode === "edit") {
+        const saved = await IssuedDocumentService.revise(existing.doc._id, {
+          issuedAt: form.issuedAt, subject: form.subject, site: form.site, customerCompany: form.customerCompany,
+          workLabel: form.workLabel, roundLabel: form.roundLabel, signerName: form.signerName,
+          formSnapshot: { ...form, docNumber: existing.doc.docNumber },
+        });
+        const { url, blob, fileName } = await buildPdf(saved.docNumber);
+        replacePreview({ url, blob, fileName });
+        setIssued(true);
+        existing.setDoc(saved);
+        setMode(null);
+        return;
+      }
+      const replaceId = mode === "reissue" ? existing.doc?._id : undefined;
+      const { docNumber } = await DocNumberService.next("delivery", job?.id || job?._id, replaceId);
       const { url, blob, fileName } = await buildPdf(docNumber);
       const finalForm = { ...form, docNumber };
       setForm(finalForm);
@@ -314,6 +362,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
       // "ออกเอกสารไม่สำเร็จ" ทั้งที่เลขถูกกินและไฟล์ออกเรียบร้อยไปแล้ว
       draft.clear();
       IssuedDocumentService.create({
+        ...(replaceId ? { replaceId } : {}),
         docType: "delivery",
         docNumber,
         issuedAt: finalForm.issuedAt,
@@ -326,7 +375,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
         eventId: job?.id || job?._id || null,
         contractNo: resolveJobFields(job).contractNo || "",
         formSnapshot: finalForm,
-      }).then((doc) => existing.setDoc(doc)).catch(() => {});
+      }).then((doc) => { existing.setDoc(doc); setMode(null); }).catch((e) => setError(e?.response?.data?.message || "บันทึกทะเบียนเอกสารไม่สำเร็จ"));
     } catch (err) {
       if (err?.response?.status === 409 && err.response.data?.doc) {
         existing.setDoc(err.response.data.doc);
@@ -367,7 +416,8 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   if (!form) return null;
 
   const fieldSx = { bgcolor: "#fff" };
-  const locked = Boolean(existing.doc);
+  const locked = Boolean(existing.doc) && !mode;
+  const modeLabel = mode === "edit" ? `แก้ไขใบเลขที่ ${existing.doc?.docNumber} (เลขเดิม)` : mode === "reissue" ? `ออกใบใหม่แทนเลขที่ ${existing.doc?.docNumber}` : "";
 
   return (
     <Dialog
@@ -386,6 +436,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
           icon={<Description />} accent={ACCENT} title="ออกใบส่งมอบงาน"
           subtitle={locked
             ? `ออกแล้ว · เลขที่ ${existing.doc.docNumber}`
+            : modeLabel ? modeLabel
             : loadingNumber ? "กำลังตรวจเลขที่..." : previewNumber ? `เลขที่ถัดไป ${previewNumber}` : "ออกเลขที่อัตโนมัติ"}
           savedLabel={locked ? "" : draft.savedLabel}
           onClose={closeAll} busy={busy}
@@ -394,7 +445,28 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
 
       <DialogContent sx={{ px: { xs: 1.5, sm: 3 }, py: { xs: 1.75, sm: 2.5 }, bgcolor: SURFACE, overflowX: "hidden", ...docFormSx(ACCENT) }}>
         {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 1.75, borderRadius: 2 }}>{error}</Alert>}
-        {locked && <IssuedSummary doc={existing.doc} label="ใบส่งมอบงาน" onView={viewExisting} viewing={busy} onNavigate={closeAll} />}
+        {locked && (
+          <IssuedSummary doc={existing.doc} label="ใบส่งมอบงาน" onView={viewExisting} viewing={busy} onNavigate={closeAll}
+            onEdit={canChangeIssued ? () => startChange("edit") : undefined}
+            onReissue={canChangeIssued ? () => startChange("reissue") : undefined}
+            changeBlockedReason={existing.doc && !canChangeIssued ? "แก้ไข/ออกใหม่แทนได้เฉพาะผู้ออกใบนี้ หรือผู้มีสิทธิ์แก้เอกสาร" : ""} />
+        )}
+        {mode && (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}
+            sx={{ mb: 1.75, p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: `4px solid ${ACCENT}` }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: INK_2 }}>
+                {mode === "edit" ? `กำลังแก้ไขใบเลขที่ ${existing.doc?.docNumber}` : `กำลังออกใบใหม่แทนเลขที่ ${existing.doc?.docNumber}`}
+              </Typography>
+              <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.5 }}>
+                {mode === "edit"
+                  ? "ใช้เลขที่เดิม · กดดูตัวอย่าง แล้ว “บันทึกการแก้ไข” — ระบบเก็บฉบับก่อนแก้ไว้ในประวัติ"
+                  : "ได้เลขที่ใหม่ตอนยืนยัน · ใบเดิมถูกยกเลิกในทะเบียนให้อัตโนมัติ (ยังเปิดดูย้อนหลังได้)"}
+              </Typography>
+            </Box>
+            <Button size="small" onClick={() => { setMode(null); setError(""); }} sx={{ ...OUTLINE_BTN_SX, flexShrink: 0 }}>ยกเลิกการแก้</Button>
+          </Stack>
+        )}
         {!locked && draft.restoredLabel && <DraftBanner when={draft.restoredLabel} onDiscard={discardDraft} />}
 
         {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
@@ -607,7 +679,9 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
         accent={ACCENT}
         preview={preview}
         issued={issued}
-        docNumber={viewingExisting ? existing.doc?.docNumber : issued ? form.docNumber : (previewNumber || form.docNumber)}
+        docNumber={viewingExisting ? existing.doc?.docNumber : mode === "edit" ? existing.doc?.docNumber : issued ? form.docNumber : (previewNumber || form.docNumber)}
+        confirmLabel={mode === "edit" ? "บันทึกการแก้ไข" : mode === "reissue" ? "ออกใบใหม่แทนใบเดิม" : undefined}
+        headerSub={!issued && mode === "edit" ? `ใช้เลขที่เดิม ${existing.doc?.docNumber} · ยังไม่บันทึกจนกว่าจะยืนยัน` : undefined}
         busy={busy} error={previewOpen ? error : ""}
         onBack={() => setPreviewOpen(false)}
         onConfirm={handleConfirm}

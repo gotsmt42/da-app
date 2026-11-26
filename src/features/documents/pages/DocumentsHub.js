@@ -14,15 +14,18 @@
  * อยู่ในใบแจ้งงานที่เขาส่งเอง (features/dispatch)
  */
 
+import { Suspense } from "react";
 import { Navigate } from "react-router-dom";
-import { FolderOpenRounded as FolderOpen, DescriptionRounded as Description, OutboxRounded as Outbox } from "@mui/icons-material";
-import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
+import PageLoader from "@/shared/ui/PageLoader";
 
-const JobDocuments = lazyWithRetry(() => import("./JobDocuments"));
-const Files = lazyWithRetry(() => import("./Files"));
+/**
+ * 🔁 (26 พ.ย. 2569 ผู้ใช้: "2 แถบนี้ตัดออกไปก่อน ไม่ได้ใช้งาน") ตัดแท็บ "เอกสารประจำงาน" กับ "คลังไฟล์" ออก
+ *    เหลือ "เอกสารที่ออกจากระบบ" หน้าเดียว (ไม่มีแถบแท็บ) · ลิงก์เก่า ?tab=job / ?tab=files มาที่หน้านี้แทน
+ *    ⚠️ ไฟล์ JobDocuments.js / Files.js ยังเก็บไว้ — เปิดกลับได้โดยใส่แท็บคืน (TabbedPage) ตามโค้ดเดิมใน git
+ */
 const IssuedDocuments = lazyWithRetry(() => import("./IssuedDocuments"));
 
 const DocumentsHub = () => {
@@ -31,30 +34,9 @@ const DocumentsHub = () => {
   if (!can(userData, "viewDocuments")) return <Navigate to="/dashboard" replace />;
 
   return (
-  <TabbedPage
-    // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารปรับ UX/UI ใหม่ จัดวาง ดูง่าย ชื่อเมนูสื่อความหมาย")
-    //    3 แท็บชั้นเดียว (เดิมแท็บแรกมีสวิตช์ซ้อนอีกชั้น) — เรียงตามที่ใช้บ่อย
-    tabs={[
-      {
-        key: "job",
-        label: "เอกสารประจำงาน",
-        icon: <Description sx={{ fontSize: 18 }} />,
-        render: () => <JobDocuments />,
-      },
-      {
-        key: "issued",
-        label: "เอกสารที่ออกจากระบบ",
-        icon: <Outbox sx={{ fontSize: 18 }} />,
-        render: () => <IssuedDocuments />,
-      },
-      {
-        key: "files",
-        label: "คลังไฟล์",
-        icon: <FolderOpen sx={{ fontSize: 18 }} />,
-        render: () => <Files />,
-      },
-    ]}
-  />
+    <Suspense fallback={<PageLoader />}>
+      <IssuedDocuments />
+    </Suspense>
   );
 };
 

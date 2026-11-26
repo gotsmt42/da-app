@@ -59,7 +59,7 @@ import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import ContractValuePanel from "@/features/contracts/components/ContractValuePanel";
 import ContractDocsPanel, { ContractDocsChip, contractDocSummary } from "@/features/contracts/components/ContractDocsPanel";
-import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, ContactPhoneRounded as ContactPhone, EventAvailableRounded as EventAvailable } from "@mui/icons-material";
+import { AttachFileRounded as AttachFileIcon, RequestQuoteRounded as RequestQuote, ReceiptLongRounded as ReceiptLong, ContactPhoneRounded as ContactPhone, EventAvailableRounded as EventAvailable, LockRounded as LockIcon, EventNoteRounded as EventNote, CalendarViewMonthRounded as CalendarViewMonth } from "@mui/icons-material";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
 import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
 import ColumnSettings from "@/features/contracts/components/ColumnSettings";
@@ -94,6 +94,9 @@ import { personValuesOf } from "@/shared/utils/workValue";
 
 // 🔁 (25 พ.ย. 2569) กล่องเอกสารประจำงานใช้ชิ้นส่วนชุดเดียวกับหน้าการดำเนินงาน (ไฟล์ใหญ่) — โหลดตอนเปิดครั้งแรก ไม่ถ่วงการเปิดหน้านี้
 const JobDocsDialog = lazyWithRetry(() => import("@/features/documents/components/JobDocsDialog"));
+// ✅ (26 พ.ย. 2569) แผนงานทั้งปี — รายสัญญา (เมนู ⋮) และทุกสัญญา (ปุ่มหัวหน้า)
+const AnnualPlanDialog = lazyWithRetry(() => import("../components/AnnualPlanDialog"));
+const YearPlanDialog = lazyWithRetry(() => import("../components/YearPlanDialog"));
 
 // ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
 //    แดงเหลือไว้เฉพาะเรื่องที่อันตราย/เร่งด่วนจริง (ลบ · เลยกำหนด · หมดอายุ) — DANGER
@@ -630,7 +633,7 @@ const mergeCells = (k, parts, { header = false, hideContractOnly = false } = {})
   return (
     <TableCell data-col-key={widthKey} align={align}
       sx={{
-        width: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, maxWidth: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, verticalAlign: "middle",
+        width: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, maxWidth: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, verticalAlign: "top",
         ...(left ? { textAlign: "left", "& .MuiStack-root": { alignItems: "flex-start !important", justifyContent: "flex-start !important" } } : {}),
       }}>
       {blocks}
@@ -1808,6 +1811,37 @@ export default function ContractOverview() {
    *    ใช้แยก "หมดอายุ · รอต่อสัญญา" (ยังต้องตาม) ออกจาก "ต่อสัญญาแล้ว" (เป็นประวัติ)
    */
   const renewalOf = useMemo(() => renewalMap(contracts), [contracts]); // เกณฑ์กลาง — ตรงกับแจ้งเตือนฝั่ง server
+  // ✅ (26 พ.ย. 2569) กลับทิศ: สัญญาฉบับนี้ต่อมาจากฉบับไหน — แผนงานทั้งปีใช้ "ต่อแผนข้ามปี" (ครั้งที่ 1 ต่อจากรอบสุดท้ายของฉบับเดิม)
+  const prevOf = useMemo(() => {
+    const m = new Map();
+    renewalOf.forEach((next, key) => { const prev = contracts.find((x) => x.key === key); if (prev && !m.has(next.key)) m.set(next.key, prev); });
+    return m;
+  }, [renewalOf, contracts]);
+  // ── แผนงานทั้งปี ──
+  const [planKey, setPlanKey] = useState(null);        // สัญญาที่เปิดแผนอยู่ (อ่านสดจาก contracts ทุก render)
+  const [planEverOpened, setPlanEverOpened] = useState(false);
+  const [yearPlanOpen, setYearPlanOpen] = useState(false);
+  const planContract = planKey ? contracts.find((x) => x.key === planKey) || null : null;
+  const openPlan = (c) => { setPlanKey(c.key); setPlanEverOpened(true); };
+  // ✅ (26 พ.ย. 2569 ผู้ใช้: "ปุ่มดำเนินการให้กดไปหน้านั้นหัวข้อแสดงนั้นจริงๆ") ลิงก์จากหน้าแรก
+  //    ?plan=year[&month=now] = เปิดแผนงานทั้งปี (เลือกเดือนปัจจุบัน) · ?plan=<contractGroupId> = แผนของสัญญานั้น
+  const [yearPlanMonth, setYearPlanMonth] = useState(undefined);
+  const planParam = searchParams.get("plan");
+  useEffect(() => {
+    if (!planParam || loading) return;
+    if (planParam === "year") {
+      setYearPlanMonth(searchParams.get("month") === "now" ? new Date().getMonth() : undefined);
+      setYearPlanOpen(true);
+    } else {
+      const row = contracts.find((x) => x.key === planParam);
+      if (row) openPlan(row);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("plan");
+    next.delete("month");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ เมื่อข้อมูลพร้อม
+  }, [planParam, loading, contracts]);
 
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
@@ -3189,6 +3223,48 @@ export default function ContractOverview() {
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ไม่รองรับ smooth */ }
   };
 
+  /**
+   * ✅ (26 พ.ย. 2569 ผู้ใช้: "ตรงนี้ตอนกดเข้าไปไม่ต้องเด้งหน้าต่างมา ให้เป็นการค้นหาข้อมูลในตารางแสดงแทน ให้สมบูรณ์")
+   *    ลิงก์ /contracts?find=<contractGroupId> (ชิป "ต้องระวัง" บนหน้าแรก) → ล้างตัวกรอง · ไปแท็บที่สัญญาอยู่ ·
+   *    ค้นหาเลขที่สัญญา (ไม่มีเลข = ชื่อโครงการ) แล้วเลื่อนไปที่แถวนั้นพร้อมไฮไลต์ชั่วครู่ — ไม่เปิดหน้าต่างใดๆ
+   */
+  const findParam = searchParams.get("find");
+  const [flashKey, setFlashKey] = useState(null);
+  useEffect(() => {
+    if (!findParam || loading) return;
+    const row = contracts.find((x) => x.key === findParam);
+    if (row) {
+      revealContract(row);
+      setFlashKey(row.key);
+    } else {
+      Swal.fire({ icon: "info", title: "ไม่พบสัญญานี้ในรายการของคุณ", timer: 2500, showConfirmButton: false });
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("find");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ เมื่อข้อมูลพร้อม
+  }, [findParam, loading, contracts]);
+  useEffect(() => {
+    if (!flashKey) return undefined;
+    let tries = 0;
+    const tick = setInterval(() => {
+      tries += 1;
+      const el = document.querySelector(`[data-row-key="${CSS.escape(flashKey)}"]`);
+      if (el || tries > 20) {
+        clearInterval(tick);
+        setFlashKey(null);
+        if (!el) return;
+        try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { el.scrollIntoView(); }
+        const targets = el.tagName === "TR" ? [...el.querySelectorAll("td")] : [el];
+        targets.forEach((t) => t.animate?.(
+          [{ backgroundColor: "rgba(37,99,235,.18)" }, { backgroundColor: "rgba(37,99,235,.18)", offset: 0.35 }, { backgroundColor: "rgba(37,99,235,0)" }],
+          { duration: 2600, easing: "ease-out" },
+        ));
+      }
+    }, 150);
+    return () => clearInterval(tick);
+  }, [flashKey]);
+
   // ✅ ตรวจความถูกต้องสดๆ ระหว่างพิมพ์ — เตือนตรงช่องที่ผิดเลย และปิดปุ่ม "บันทึกสัญญา" ไว้จนกว่าจะครบ
   // แทนที่จะปล่อยให้กดแล้วค่อยเด้ง error ที่หัวฟอร์ม (ซึ่งบนจอมือถือต้องเลื่อนขึ้นไปอ่านเองว่าพลาดตรงไหน)
   const hasInvalidContractRange = Boolean(
@@ -4136,12 +4212,56 @@ export default function ContractOverview() {
   // groupEventsByContract) ต้องลบทุก document ในกลุ่มพร้อมกัน ไม่ใช่แค่ document แรก ไม่งั้นวันอื่นๆ
   // ของงานเดียวกันจะค้างอยู่ในระบบทั้งที่ตั้งใจลบทั้งงาน — ทั้งคู่ยืนยันก่อนลบเสมอ เพราะลบแล้วกู้คืนไม่ได้
   // และเตือนเป็นพิเศษถ้ามีครั้งที่ "ดำเนินการเสร็จสิ้น" แล้วปนอยู่ (ประวัติงานจริงจะหายไปด้วย)
+  /**
+   * ✅ (26 พ.ย. 2569 ผู้ใช้: "การลบสัญญา ถ้ามันมีงานอิงสัญญานี้อยู่ทำให้ไม่สามารถลบได้ด้วย ป้องกันผิดพลาด")
+   *    สัญญาที่มีงานลงตารางแล้ว → ลบไม่ได้ · บอกว่าติดงานไหน แล้วให้ลบงาน/แยกออกจากสัญญาทีละครั้งก่อน
+   *    server ตรวจซ้ำอีกชั้น (รวมเอกสารที่ผูกกับงาน) — ตอบ 409 CONTRACT_IN_USE
+   */
+  const showContractInUse = useCallback((c, jobs, refs = [], serverMessage = "") => {
+    const rows = jobs.slice(0, 8).map((v) => `
+      <div style="display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+        <b style="min-width:92px;color:#0f172a;">${escapeHtml(v.time ? `ครั้งที่ ${formatRoundLabel(v.time, c.visitCount, c)}` : "งาน")}</b>
+        <span style="color:#475569;">${escapeHtml(formatEventDateRange(v) || "-")}</span>
+        ${v.status ? `<span style="margin-left:auto;color:#64748b;font-size:12px;white-space:nowrap;">${escapeHtml(v.status)}</span>` : ""}
+      </div>`).join("");
+    const more = jobs.length > 8 ? `<div style="color:#64748b;font-size:12px;padding-top:4px;">และอีก ${jobs.length - 8} รายการ</div>` : "";
+    const refRows = refs.map((r) => `<li>${escapeHtml(r.label)} ${r.count} ใบ</li>`).join("");
+    return Swal.fire({
+      icon: "info",
+      title: "ลบสัญญานี้ไม่ได้",
+      html: `
+        <div style="text-align:left;font-size:13px;line-height:1.55;">
+          <b>${escapeHtml(c.contractNo || "")}${c.contractNo ? " · " : ""}${escapeHtml(c.company) || "-"}</b>
+          <div style="color:#475569;margin:2px 0 10px;">${jobs.length ? `ยังมีงานที่อิงสัญญานี้อยู่ ${jobs.length} รายการ — กันลบพลาดทั้งก้อน` : escapeHtml(serverMessage || "มีเอกสารที่ผูกกับงานของสัญญานี้อยู่")}</div>
+          ${rows}${more}
+          ${refRows ? `<div style="margin-top:10px;color:#0f172a;font-weight:600;">เอกสารที่ผูกอยู่</div><ul style="margin:4px 0 0 18px;padding:0;color:#475569;">${refRows}</ul>` : ""}
+          <div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#eff6ff;color:#1e3a8a;">
+            ถ้าต้องการลบจริง: ลบงานแต่ละครั้งในหน้าตารางงาน หรือกด <b>"แยกออกจากสัญญา"</b> ที่ช่องครั้งนั้นให้หมดก่อน แล้วค่อยลบสัญญา
+          </div>
+        </div>
+      `,
+      confirmButtonText: "เข้าใจแล้ว",
+      confirmButtonColor: "#2563eb",
+    });
+  }, []);
+
   const handleDeleteContract = useCallback(async (c) => {
+    if (c.isRealContract) {
+      const jobs = c.visits.filter((v) => !v.unscheduled)
+        .sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0) || new Date(a.start) - new Date(b.start));
+      if (jobs.length) { await showContractInUse(c, jobs); return; }
+    }
     const doneCount = c.visits.filter((v) => v.status === "ดำเนินการเสร็จสิ้น").length;
     const result = await Swal.fire({
       icon: "warning",
-      title: c.isRealContract ? "ลบสัญญานี้ทั้งหมด?" : "ลบงานนี้?",
-      html: `
+      title: c.isRealContract ? "ลบสัญญานี้?" : "ลบงานนี้?",
+      html: c.isRealContract ? `
+        <div style="text-align:left;font-size:13px;">
+          <b>${escapeHtml(c.contractNo || "")}${c.contractNo ? " · " : ""}${escapeHtml(c.company) || "-"} · ${escapeHtml(c.site) || "-"}</b><br/>
+          ${escapeHtml(c.title)} · ${escapeHtml(c.system)}<br/>
+          สัญญานี้ยังไม่มีงานลงตาราง — จะลบข้อมูลสัญญา แผนงาน และเอกสารแนบของสัญญาทั้งหมด (กู้คืนไม่ได้)
+        </div>
+      ` : `
         <div style="text-align:left;font-size:13px;">
           <b>${escapeHtml(c.company) || "-"} · ${escapeHtml(c.site) || "-"}</b><br/>
           ${escapeHtml(c.title)} · ${escapeHtml(c.system)}<br/>
@@ -4165,13 +4285,19 @@ export default function ContractOverview() {
       Swal.fire({ title: "ลบสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
       await fetchData(true);
     } catch (err) {
+      const data = err?.response?.data;
+      if (err?.response?.status === 409 && data?.code === "CONTRACT_IN_USE") {
+        await showContractInUse(c, data.jobs || [], data.refs || [], data.message);
+        fetchData(true);
+        return;
+      }
       Swal.fire({
         title: "ลบไม่สำเร็จ",
-        text: err?.response?.data?.message || err.message,
+        text: data?.message || err.message,
         icon: "error",
       });
     }
-  }, [selectedIds]);
+  }, [selectedIds, showContractInUse]);
 
   // ── ย้ายงานเข้า/ออกจากสัญญา (แก้ไขกรณีจัดกลุ่มผิด) ──────────────────────────
   // ✅ ทิศทาง "เข้า": เลือกงานทั่วไป (isRealContract=false) แล้วเลือกสัญญาที่มีอยู่แล้ว + ครั้งที่ว่าง
@@ -4309,6 +4435,7 @@ export default function ContractOverview() {
                 return (
                 <TableRow
                   key={c.key}
+                  data-row-key={c.key}
                   sx={{
                     bgcolor: idx % 2 ? SURFACE_STRIPE : "#fff",
                     transition: "background-color .12s",
@@ -4379,25 +4506,28 @@ export default function ContractOverview() {
                                 onCommit={(v) => commitEdit(c, v)}
                                 onCancel={cancelEdit}
                               />
-                              <EditableCell
-                                Wrapper={Box}
-                                editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
-                                editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "quotationNo"}
-                                value={c.quotationNo} editValue={editValue} saving={editSaving}
-                                title={c.quotationNo}
-                                formatDisplay={(v) => (
-                                  <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                                    {v ? `ใบเสนอราคา ${v}` : "ใบเสนอราคา —"}
-                                  </span>
+                              {/* 🔁 (26 พ.ย. 2569) ใบเสนอราคา + ป้ายเอกสารสัญญา บรรทัดเดียวกัน (ล้นค่อยขึ้นบรรทัด) — แถวเตี้ยลง อ่านง่ายขึ้น */}
+                              <Stack direction="row" alignItems="center" sx={{ flexWrap: "wrap", columnGap: 0.75, rowGap: 0.4, minWidth: 0 }}>
+                                <EditableCell
+                                  Wrapper={Box}
+                                  editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
+                                  editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "quotationNo"}
+                                  value={c.quotationNo} editValue={editValue} saving={editSaving}
+                                  title={c.quotationNo}
+                                  formatDisplay={(v) => (
+                                    <span style={{ fontSize: "0.72rem", color: v ? "#64748b" : "#94a3b8" }}>
+                                      {v ? `ใบเสนอราคา ${v}` : "ใบเสนอราคา —"}
+                                    </span>
+                                  )}
+                                  onStartEdit={() => beginEdit(c, "quotationNo")}
+                                  onCommit={(v) => commitEdit(c, v)}
+                                  onCancel={cancelEdit}
+                                />
+                                {/* ✅ (25 พ.ย. 2569) เอกสาร/หลักฐานของสัญญา — เห็นทันทีว่ามีสัญญาฉบับเซ็นหรือยัง กดแนบ/ดูได้ */}
+                                {c.isRealContract && (
+                                  <Box sx={{ flexShrink: 0 }}><ContractDocsChip contract={c} canEdit={isAdminOrManager} onOpen={() => setDocsContractKey(c.key)} /></Box>
                                 )}
-                                onStartEdit={() => beginEdit(c, "quotationNo")}
-                                onCommit={(v) => commitEdit(c, v)}
-                                onCancel={cancelEdit}
-                              />
-                              {/* ✅ (25 พ.ย. 2569) เอกสาร/หลักฐานของสัญญา — เห็นทันทีว่ามีสัญญาฉบับเซ็นหรือยัง กดแนบ/ดูได้ */}
-                              {c.isRealContract && (
-                                <Box><ContractDocsChip contract={c} canEdit={isAdminOrManager} onOpen={() => setDocsContractKey(c.key)} /></Box>
-                              )}
+                              </Stack>
                             </Stack>
                           </TableCell>
                         )}
@@ -4438,29 +4568,42 @@ export default function ContractOverview() {
                               onCommit={(v) => commitEdit(c, v)}
                               onCancel={cancelEdit}
                             />
-                            <EditableCell
-                              Wrapper={Box}
-                              editable={isAdminOrManager && canEditField(c, "province")} columnKey="province"
-                              editType="select" editOptions={provinceOptionsFor(c.province)}
-                              editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "province"}
-                              value={c.province} editValue={editValue} saving={editSaving}
-                              title={c.province || "เพิ่มจังหวัด"}
-                              formatDisplay={(v) => <span style={{ fontSize: "0.7rem", color: v ? "#64748b" : "#2563eb" }}>{v ? `จังหวัด${v}` : "+ เพิ่มจังหวัด"}</span>}
-                              onStartEdit={() => beginEdit(c, "province")}
-                              onCommit={(v) => commitEdit(c, v)}
-                              onCancel={cancelEdit}
-                            />
-                            <EditableCell
-                              Wrapper={Box}
-                              editable={isAdminOrManager && canEditField(c, "city")} columnKey="city"
-                              editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "city"}
-                              value={c.city} editValue={editValue} saving={editSaving}
-                              title={c.city || "เพิ่มเมือง"}
-                              formatDisplay={(v) => <span style={{ fontSize: "0.7rem", color: v ? "#64748b" : "#2563eb" }}>{v ? `เมือง${v}` : "+ เพิ่มเมือง"}</span>}
-                              onStartEdit={() => beginEdit(c, "city")}
-                              onCommit={(v) => commitEdit(c, v)}
-                              onCancel={cancelEdit}
-                            />
+                            {/* 🔁 (26 พ.ย. 2569 ผู้ใช้: "ตารางนี้สามารถจัดวางจุดต่างๆ ให้ดูง่าย สวยงามกว่านี้ไหม")
+                                ที่ตั้งรวมบรรทัดเดียว: หมุดแผนที่ (กดนำทาง) · จังหวัด · เมือง — เดิม 2 บรรทัด + หมุดลอยอยู่กลางช่อง
+                                กำลังแก้จังหวัด/เมือง = แยกบรรทัดให้ช่องกรอกกว้างพอ */}
+                            {(() => {
+                              const editingLoc = tableEditingCell?.key === c.key && ["province", "city"].includes(tableEditingCell?.field);
+                              const locSx = { fontSize: "0.72rem", color: "#64748b" };
+                              return (
+                                <Stack direction={editingLoc ? "column" : "row"} alignItems={editingLoc ? "stretch" : "center"} spacing={0.4} sx={{ minWidth: 0, mt: 0.15 }}>
+                                  {!editingLoc && <Box sx={{ flexShrink: 0, display: "flex", ml: -0.25 }}><SiteMapLink compact company={c.company} site={c.site} canEdit={isAdminOrManager} /></Box>}
+                                  <EditableCell
+                                    Wrapper={Box}
+                                    editable={isAdminOrManager && canEditField(c, "province")} columnKey="province"
+                                    editType="select" editOptions={provinceOptionsFor(c.province)}
+                                    editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "province"}
+                                    value={c.province} editValue={editValue} saving={editSaving}
+                                    title={c.province ? `จังหวัด${c.province}` : "เพิ่มจังหวัด"}
+                                    formatDisplay={(v) => <span style={{ ...locSx, color: v ? locSx.color : "#2563eb" }}>{v || "+ จังหวัด"}</span>}
+                                    onStartEdit={() => beginEdit(c, "province")}
+                                    onCommit={(v) => commitEdit(c, v)}
+                                    onCancel={cancelEdit}
+                                  />
+                                  {!editingLoc && <Box component="span" sx={{ color: "#cbd5e1", fontSize: "0.7rem", flexShrink: 0 }}>·</Box>}
+                                  <EditableCell
+                                    Wrapper={Box}
+                                    editable={isAdminOrManager && canEditField(c, "city")} columnKey="city"
+                                    editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "city"}
+                                    value={c.city} editValue={editValue} saving={editSaving}
+                                    title={c.city ? `เมือง${c.city}` : "เพิ่มเมือง"}
+                                    formatDisplay={(v) => <span style={{ ...locSx, color: v ? locSx.color : "#2563eb" }}>{v || "+ เมือง"}</span>}
+                                    onStartEdit={() => beginEdit(c, "city")}
+                                    onCommit={(v) => commitEdit(c, v)}
+                                    onCancel={cancelEdit}
+                                  />
+                                </Stack>
+                              );
+                            })()}
                             {/* ✅ ป้ายเตือนรอบเข้างาน — ใต้ชื่อโครงการ เห็นทันทีไม่ต้องเลื่อนตารางไปขวา · กดเพื่อลงครั้งถัดไป */}
                             {overdueInfo && (
                               <Box component={isAdminOrManager ? "button" : "span"} type={isAdminOrManager ? "button" : undefined}
@@ -4475,26 +4618,21 @@ export default function ContractOverview() {
                                 แบบหน้าอื่นจะดันความกว้างจนตารางเสียทรง · เหลือหมุดเล็กๆ: เขียว = มีพิกัดแล้ว
                                 กดเปิดนำทางทันที · เทา = ยังไม่มี กดแล้วไปค้นหาใน Maps ให้เลย
                                 ⚠️ สิทธิ์แก้ = editContracts ของหน้านี้เอง ไม่ตั้งเกณฑ์ใหม่ */}
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                              <Box sx={{ minWidth: 0, flex: 1 }}>
-                                <EditableCell
-                                  Wrapper={Box}
-                                  editable={canEditBasicField(c, "company")} columnKey="company"
-                                  editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "company"}
-                                  value={c.company} editValue={editValue} saving={editSaving}
-                                  title={c.company}
-                                  formatDisplay={(v) => (
-                                    <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                                      🏢 {v || "ไม่ระบุบริษัท"}
-                                    </span>
-                                  )}
-                                  onStartEdit={() => beginEdit(c, "company")}
-                                  onCommit={(v) => commitEdit(c, v)}
-                                  onCancel={cancelEdit}
-                                />
-                              </Box>
-                              <SiteMapLink compact company={c.company} site={c.site} canEdit={isAdminOrManager} />
-                            </Stack>
+                            <EditableCell
+                              Wrapper={Box}
+                              editable={canEditBasicField(c, "company")} columnKey="company"
+                              editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "company"}
+                              value={c.company} editValue={editValue} saving={editSaving}
+                              title={c.company}
+                              formatDisplay={(v) => (
+                                <span style={{ fontSize: "0.72rem", color: v ? "#64748b" : "#94a3b8" }}>
+                                  🏢 {v || "ไม่ระบุบริษัท"}
+                                </span>
+                              )}
+                              onStartEdit={() => beginEdit(c, "company")}
+                              onCommit={(v) => commitEdit(c, v)}
+                              onCancel={cancelEdit}
+                            />
                             {/* ✅ ผู้ติดต่อหน้างานในช่องโครงการ — ชื่อบรรทัดหนึ่ง เบอร์อีกบรรทัด สีเทาเรียบ ไอคอนชุดเดียว (ผู้ใช้ขอ)
                                 🐛 เดิมเป็นชิปที่แก้ในตัว: บรรทัดเบอร์มีไอคอนโทรศัพท์ซ้อน 2 อัน (ของเรา + ของลิงก์โทร) สีไม่เข้ากัน
                                 และพอกดแก้ ช่องกรอกถูกบีบในชิปแคบๆ จนทับกัน
@@ -4764,7 +4902,8 @@ export default function ContractOverview() {
                             ⚠️ แถบงานทั่วไป/โปรเจคไม่มี "สถานะสัญญา" (hideContractOnlyColumns) — ซ่อนเฉพาะ
                             บรรทัดบน ไม่ซ่อนทั้งช่อง เพราะบรรทัดคืบหน้าใช้ได้กับทุกแถว */}
                         <TableCell data-col-key="statusProgress" align="center" sx={{ width: colVar("statusProgress") }}>
-                          <Stack spacing={0.35} alignItems="center">
+                          {/* 🔁 (26 พ.ย. 2569) สถานะ + คืบหน้า เรียงบรรทัดเดียวกัน (ล้นค่อยขึ้นบรรทัด) */}
+                          <Stack direction="row" alignItems="center" justifyContent="center" sx={{ flexWrap: "wrap", columnGap: 0.6, rowGap: 0.4 }}>
                             {/* ── บรรทัดบน: สถานะสัญญา — ระบบเติมข้อความให้อัตโนมัติ (หมดอายุ/ใกล้หมดอายุ/
                                 มีผลบังคับใช้ หรือ "ข้อมูลไม่ครบ" พร้อมบอกว่าขาดช่องไหน) และ "คลิกพิมพ์ทับได้"
                                 ตามที่ผู้ใช้ขอ — บางสถานะจริงในการทำงาน เช่น "รอลูกค้าเซ็นกลับ" ระบบไม่มีทาง
@@ -4775,7 +4914,7 @@ export default function ContractOverview() {
                               return (
                                 <>
                                 <EditableCell
-                                  Wrapper={Box} align="center" width="100%"
+                                  Wrapper={Box} align="center"
                                   editable={isAdminOrManager} columnKey="statusNote"
                                   editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "statusNote"}
                                   value={c.statusNote || ""} editValue={editValue} saving={editSaving}
@@ -5489,7 +5628,7 @@ export default function ContractOverview() {
     const respFp = fp("responsiblePerson");
     const statLabelSx = { fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB };
     const summaryCard = (
-      <Paper key={c.key} variant="outlined" onClick={sheet ? undefined : openSheet}
+      <Paper key={c.key} data-row-key={sheet ? undefined : c.key} variant="outlined" onClick={sheet ? undefined : openSheet}
         sx={{ position: "relative", overflow: "hidden", borderRadius: 3, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)",
           ...(sheet ? {} : { cursor: "pointer", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 12px rgba(15,23,42,.08)" }, "&:active": { borderColor: "#93c5fd" } }) }}>
         <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: edge }} />
@@ -5965,15 +6104,27 @@ export default function ContractOverview() {
               </Button>
             )}
             {c.isRealContract && (
+              <Button size="small" variant="outlined" onClick={() => openPlan(c)} startIcon={<EventNote />} sx={SHEET_ACTION_SX}>
+                แผนงานทั้งปี
+              </Button>
+            )}
+            {c.isRealContract && (
               <Button size="small" variant="outlined" onClick={() => setHistoryContract(c)} disabled={contractEditHistory(c).length === 0}
                 startIcon={<History />} sx={SHEET_ACTION_SX}>
                 ประวัติการแก้ไข
               </Button>
             )}
-            <Button size="small" variant="outlined" onClick={() => handleDeleteContract(c)} startIcon={<DeleteOutline />}
-              sx={{ ...SHEET_ACTION_SX, ml: "auto", color: "#dc2626", borderColor: "#fecaca", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>
-              {c.isRealContract ? "ลบสัญญา" : "ลบงาน"}
-            </Button>
+            {(() => {
+              const inUse = c.isRealContract && c.visits.some((v) => !v.unscheduled);
+              return (
+                <Button size="small" variant="outlined" onClick={() => handleDeleteContract(c)} startIcon={inUse ? <LockIcon /> : <DeleteOutline />}
+                  sx={{ ...SHEET_ACTION_SX, ml: "auto", ...(inUse
+                    ? { color: "#64748b", borderColor: "#e2e8f0", "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" } }
+                    : { color: "#dc2626", borderColor: "#fecaca", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }) }}>
+                  {c.isRealContract ? (inUse ? "ลบสัญญาไม่ได้ (มีงาน)" : "ลบสัญญา") : "ลบงาน"}
+                </Button>
+              );
+            })()}
           </Stack>
         )}
         </Box>
@@ -6361,6 +6512,16 @@ export default function ContractOverview() {
           {/* ✅ เปลี่ยนจากปุ่มไอคอนกลมสีแดง (ไอคอนลูกศรดาวน์โหลดทั่วไป) เป็นปุ่มมีข้อความ "Excel" สีเขียว
               ตามสีแบรนด์ Excel (#217346) — เดิมเป็นวงกลมสีเดียวกับปุ่มรีเฟรชข้างๆ ดูไม่ออกว่าปุ่มไหนคือ
               ส่งออก ต้องเอาเมาส์ไปชี้อ่าน tooltip ทุกครั้ง (บนมือถือไม่มี hover ยิ่งเดาไม่ได้เลย) */}
+          {/* ✅ (26 พ.ย. 2569) แผนงานทั้งปีของทุกสัญญา — ตาราง 12 เดือน + รวมงานต่อเดือน
+              🔁 (26 พ.ย. 2569 ผู้ใช้: "ปุ่มแผนงานทั้งปีให้สี text อธิบายด้วย") ปุ่มมีข้อความทุกจอ · พื้นฟ้าอ่อนให้เด่นจากปุ่มเครื่องมืออื่น */}
+          <Button onClick={() => setYearPlanOpen(true)} startIcon={<CalendarViewMonth />}
+            sx={{
+              flexShrink: 0, height: { xs: 40, sm: "auto" }, px: { xs: 1.25, sm: 1.75 }, textTransform: "none", fontWeight: 800, borderRadius: 2.5, whiteSpace: "nowrap",
+              color: ACCENT, bgcolor: alpha(ACCENT, 0.08), border: `1px solid ${alpha(ACCENT, 0.28)}`,
+              "& .MuiButton-startIcon": { mr: { xs: 0.5, sm: 0.75 } }, "&:hover": { bgcolor: alpha(ACCENT, 0.14), borderColor: ACCENT },
+            }}>
+            {isMobile ? "แผนทั้งปี" : "แผนงานทั้งปี"}
+          </Button>
           <ExportExcelButton onClick={handleExportExcel} loading={exporting} disabled={filtered.length === 0} count={filtered.length} compact={isMobile} />
           {/* ✅ มือถือ: ปุ่มมุมมอง/ค้นหา/ตัวกรอง ข้างปุ่มเพิ่ม — เปิดแผ่นล่าง */}
           {isMobile && (
@@ -6383,7 +6544,7 @@ export default function ContractOverview() {
           "ข้อมูลสัญญา" แบบดูอย่างเดียวใน EditEvent.js ให้โทน/คำพูดตรงกันทั้งแอป */}
       {!isAdminOrManager && (
         <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-          มุมมองสำหรับดูงานของคุณ — แก้ไขข้อมูลได้ที่หน้า "แผนงาน" หรือ "การดำเนินงาน"
+          มุมมองสำหรับดูงานของคุณ — แก้ไขข้อมูลได้ที่หน้า "ตารางงาน" หรือ "การดำเนินงาน"
         </Alert>
       )}
 
@@ -7063,7 +7224,10 @@ export default function ContractOverview() {
               // มองไม่เห็น (เหลือไว้แค่พอเป็นแนวสายตาให้ตัวเลขในคอลัมน์แคบๆ อย่าง "ครั้งที่ N" ไม่ไหลปนกัน)
               "& th, & td": { border: "none", borderBottom: `1px solid ${BORDER_SOFT}`, borderRight: `1px solid ${BORDER_HAIR}` },
               "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
-              "& td": { py: 0.85 },
+              // 🔁 (26 พ.ย. 2569 ผู้ใช้: "จัดวางจุดต่างๆ ให้ดูง่าย สวยงามกว่านี้") ชิดบนทุกช่อง — บรรทัดแรกของทุกคอลัมน์
+              //    (ชื่อโครงการ · งาน · วันเริ่ม · มูลค่า · ครั้งที่) อยู่ระดับเดียวกัน อ่านแถวเดียวกันได้ตรงแนว
+              //    (เดิมกึ่งกลาง: ช่องสั้นลอยกลางแถวสูง สายตาต้องกระโดดขึ้นลง)
+              "& td": { py: 1.1, verticalAlign: "top" },
               // ✅ แถวสุดท้ายก่อนถึงแถวสรุปไม่ต้องมีเส้นใต้ซ้ำกับเส้นคั่นของแถวสรุปเอง
               "& tbody tr:last-of-type td": { borderBottom: "none" },
               // ⚠️ ต้องอยู่ล่างสุด — ทับค่าด้านบนบางส่วนตอนดูตารางบนมือถือ (ดู mobileTableSx)
@@ -7530,16 +7694,36 @@ export default function ContractOverview() {
               </MenuItem>
             ),
             c.isRealContract && (
+              <MenuItem key="plan" onClick={() => { close(); openPlan(c); }}>
+                <ListItemIcon><EventNote fontSize="small" sx={{ color: "#2563eb" }} /></ListItemIcon>
+                <ListItemText primary="แผนงานทั้งปี" secondary="เดือนครั้งที่ 1 + ทุก N เดือน · PDF / Excel" secondaryTypographyProps={{ fontSize: "0.7rem" }} />
+              </MenuItem>
+            ),
+            c.isRealContract && (
               <MenuItem key="history" disabled={historyCount === 0} onClick={() => { close(); setHistoryContract(c); }}>
                 <ListItemIcon><History fontSize="small" /></ListItemIcon>
                 <ListItemText primary="ประวัติการแก้ไข" secondary={historyCount ? `${historyCount} ครั้ง` : "ยังไม่เคยแก้ไข"} secondaryTypographyProps={{ fontSize: "0.7rem" }} />
               </MenuItem>
             ),
             <Divider key="d" sx={{ my: 0.5 }} />,
-            <MenuItem key="delete" onClick={() => { close(); handleDeleteContract(c); }} sx={{ color: DANGER, "&:hover": { bgcolor: alpha(DANGER, 0.06) } }}>
-              <ListItemIcon><DeleteOutline fontSize="small" sx={{ color: DANGER }} /></ListItemIcon>
-              <ListItemText primary={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"} />
-            </MenuItem>,
+            (() => {
+              // ✅ (26 พ.ย. 2569) สัญญาที่มีงานลงตารางแล้ว ลบไม่ได้ — แสดงเป็นสีเทา + บอกเหตุผล (กดดูว่าติดงานไหน)
+              const jobCount = c.isRealContract ? c.visits.filter((v) => !v.unscheduled).length : 0;
+              if (jobCount) {
+                return (
+                  <MenuItem key="delete" onClick={() => { close(); handleDeleteContract(c); }} sx={{ color: "text.secondary" }}>
+                    <ListItemIcon><LockIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText primary="ลบสัญญาไม่ได้" secondary={`มีงานอิงสัญญานี้ ${jobCount} รายการ · กดดูรายละเอียด`} secondaryTypographyProps={{ fontSize: "0.7rem" }} />
+                  </MenuItem>
+                );
+              }
+              return (
+                <MenuItem key="delete" onClick={() => { close(); handleDeleteContract(c); }} sx={{ color: DANGER, "&:hover": { bgcolor: alpha(DANGER, 0.06) } }}>
+                  <ListItemIcon><DeleteOutline fontSize="small" sx={{ color: DANGER }} /></ListItemIcon>
+                  <ListItemText primary={c.isRealContract ? "ลบสัญญานี้" : "ลบงานนี้"} secondary={c.isRealContract ? "ยังไม่มีงานลงตาราง" : undefined} secondaryTypographyProps={{ fontSize: "0.7rem" }} />
+                </MenuItem>
+              );
+            })(),
           ].filter(Boolean);
         })()}
       </Menu>
@@ -8439,6 +8623,20 @@ export default function ContractOverview() {
           🔁 (25 พ.ย. 2569 ผู้ใช้: "...แบบเดียวกันกับหน้าการดำเนินงาน ให้อัพเดตตรงกันทั้งหมด") รูปแบบ/สิทธิ์/การแนบ-ลบ
           ชุดเดียวกับการ์ดงานหน้าการดำเนินงาน · แก้แล้วดึงข้อมูลหน้านี้ใหม่ ป้ายเอกสารในตารางเปลี่ยนตามทันที
           ⚠️ วาดค้างไว้หลังเปิดครั้งแรก — ปิดแล้วแผ่นได้เลื่อนลงจนสุด (ไม่หายวาบ) */}
+      {(planEverOpened || yearPlanOpen) && (
+        <Suspense fallback={null}>
+          {yearPlanOpen && (
+            <YearPlanDialog open onClose={() => { setYearPlanOpen(false); setYearPlanMonth(undefined); }} initialMonth={yearPlanMonth} renewalOf={renewalOf} prevOf={prevOf} onOpenContract={openPlan}
+              contracts={applyCommonFilters(contracts, { ignoreYear: true, skip: "status" }).filter((x) => x.isRealContract)} />
+          )}
+          {planEverOpened && (
+            <AnnualPlanDialog open={Boolean(planContract)} onClose={() => setPlanKey(null)} contract={planContract}
+              prevContract={planContract ? prevOf.get(planContract.key) || null : null}
+              nextContract={planContract ? renewalOf.get(planContract.key) || null : null}
+              canEdit={isAdminOrManager} onSaved={() => fetchData(true)} onOpenContract={openPlan} />
+          )}
+        </Suspense>
+      )}
       {docsEverOpened && (
         <Suspense fallback={null}>
           <JobDocsDialog

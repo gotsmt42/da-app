@@ -18,6 +18,10 @@
  *      • mode "edit"    แก้ไขใบนี้ — เลขที่เดิม · server เก็บฉบับก่อนแก้ไว้ในประวัติ (PUT /issued-documents/:id/revise)
  *      • mode "reissue" ออกใบใหม่แทน — เลขที่ใหม่ · ใบเดิมถูกยกเลิกให้อัตโนมัติ (POST พร้อม replaceId)
  *    ทั้งสองทางเริ่มจากข้อความของใบเดิม + บอกถ้าวันในตารางงานเปลี่ยนไปแล้ว (กดปุ่มเดียวใช้วันล่าสุด)
+ *
+ * ✅ (26 พ.ย. 2569 ผู้ใช้: "ใบแจ้งเข้างานให้มีตัวเลือกแบบแค่เดือนด้วย เพราะบางทีจะแจ้งแผนงานทั้งปีไปก่อน")
+ *    กำหนดการเลือกได้ "ระบุวันที่" (รายวัน แบบเดิม) หรือ "ระบุแค่เดือน" (ครั้งที่ · ช่วงเดือน · รายละเอียด)
+ *    งานสัญญาเติมทุกครั้งของปีสัญญาให้ตามแผนงานทั้งปี · planPreset = เปิดมาจากหน้าแผนงานทั้งปีของสัญญา
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -25,7 +29,7 @@ import {
   TextField, Button, IconButton, Alert, useMediaQuery, CircularProgress, Autocomplete,
   Switch, FormControlLabel, Menu, MenuItem, ListItemIcon,
 } from "@mui/material";
-import { VisibilityRounded as Visibility, EventAvailableRounded as EventAvailable, RefreshRounded as Refresh, SearchRounded as Search, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, ContentPasteRounded as ContentPaste, AutoFixHighRounded as AutoFixHigh } from "@mui/icons-material";
+import { VisibilityRounded as Visibility, EventAvailableRounded as EventAvailable, RefreshRounded as Refresh, SearchRounded as Search, AddRounded as Add, DeleteOutlineRounded as DeleteOutline, ContentPasteRounded as ContentPaste, AutoFixHighRounded as AutoFixHigh, CalendarMonthRounded as CalendarMonth, TodayRounded as Today } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import DocNumberService from "@/shared/services/DocNumberService";
@@ -34,6 +38,7 @@ import {
   buildWorkNoticeDefaults, buildWorkNoticeBody, buildWorkNoticeCooperation,
   generateWorkNoticePdf, noticeSubjectPresetsFor, buildDayRows, dayRowText,
   TIME_PRESETS, SUPPORT_REQUEST_PRESETS, workVerbFor,
+  SCHEDULE_MODES, buildMonthRows, monthRowText,
   SIGNER_POSITION_PRESETS, thaiFullDate, ISSUER,
 } from "../utils/workNoticePdf";
 import moment from "moment";
@@ -42,12 +47,14 @@ import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import MailService from "@/shared/services/MailService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import ThaiMonthSelect from "@/shared/ui/ThaiMonthSelect";
+import { addMonthsKey, isMonthKey, monthDiff } from "@/shared/utils/contractPlan";
 import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import {
-  DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedTarget,
   OUTLINE_BTN_SX,
 } from "./docFormKit";
 import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
@@ -67,7 +74,13 @@ const findCustomer = (list, job) => {
     || (p.company ? list.find((c) => norm(c.cCompany) === norm(p.company)) : null);
 };
 
-const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningNumber = false }) => {
+/**
+ * @param docOverride ✅ (26 พ.ย. 2569) ใบที่ออกแล้ว (จากหน้าทะเบียนเอกสาร) — จัดการใบนี้ตรง ๆ ไม่ต้องหาจากงาน
+ * @param initialMode "edit" | "reissue" — เปิดมาแล้วเข้าโหมดแก้ไข/ออกใหม่แทนเลย (เมนู ⋮ ในทะเบียนเอกสาร)
+ * ⚠️ job = {} ได้ (ออกใบที่ไม่ผูกงาน — เฉพาะผู้มีสิทธิ์แก้เอกสาร · server ตรวจตอนขอเลข)
+ * @param planPreset ✅ (26 พ.ย. 2569) { monthRows, planYearLabel } — เปิดมาเป็นแบบ "ระบุแค่เดือน" พร้อมแผนทั้งปี (หน้าแผนงานทั้งปีของสัญญา)
+ */
+const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningNumber = false, docOverride = null, initialMode = null, planPreset = null }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [form, setFormState] = useState(null);
   // ✅ แยก "ผู้ใช้แก้เอง" (setForm → นับเป็นร่าง) ออกจาก "ระบบเติมให้" (setFormState) — ดู useDocDraft
@@ -92,11 +105,15 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   // ในหน้าเดียวกัน ถ้าไม่รีเซ็ตจะเปิดงาน B แล้วเห็นข้อมูลงาน A ค้างอยู่)
   useEffect(() => {
     if (!open || !job) return;
-    const base = buildWorkNoticeDefaults(job, customer, issuer);
+    const base0 = buildWorkNoticeDefaults(job, customer, issuer);
+    const base = planPreset?.monthRows?.length
+      ? { ...base0, scheduleMode: "months", monthRows: planPreset.monthRows, planYearLabel: planPreset.planYearLabel || "" }
+      : base0;
+    if (base !== base0) base.subject = noticeSubjectPresetsFor(base.workLabel, base.roundLabel, base)[0];
     setFormState({
       ...base,
       body: buildWorkNoticeBody(base),
-      cooperationNote: buildWorkNoticeCooperation(),
+      cooperationNote: buildWorkNoticeCooperation(base.scheduleMode),
     });
     setError("");
 
@@ -140,6 +157,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       .catch(() => {});
 
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- planPreset อ่านครั้งเดียวตอนเปิด
   }, [open, job, customer, issuer, canUseRunningNumber]);
 
   // ✅ ร่างอัตโนมัติ + กันออกซ้ำ (ผู้ใช้สั่ง 3 ต.ค. 2569) — ⚠️ ต้องอยู่หลัง effect ตั้งค่าเริ่มต้นด้านบน
@@ -149,7 +167,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     // เลขที่เดินหน้าออกให้ใหม่ทุกครั้ง — ไม่กู้คืนเลขเก่าจากร่าง
     omit: canUseRunningNumber ? ["docNumber"] : [],
   });
-  const existing = useIssuedDoc({ open, eventId, docType: "notice" });
+  const existing = useIssuedTarget({ open, eventId, docType: "notice", docOverride });
 
   /**
    * เริ่มแก้ไข/ออกใหม่แทน — ตั้งต้นจากข้อความของใบเดิม (snapshot) แต่ "วันในตารางงาน" ใช้ของงานตอนนี้
@@ -166,7 +184,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     setFormState({
       ...base,
       body: buildWorkNoticeBody(base),
-      cooperationNote: buildWorkNoticeCooperation(),
+      cooperationNote: buildWorkNoticeCooperation(snap.scheduleMode),
       ...snap,
       jobStartDate: base.jobStartDate, jobEndDate: base.jobEndDate, jobDateText: base.jobDateText,
       docNumber: next === "edit" ? existing.doc.docNumber : (canUseRunningNumber ? (previewNumber || snap.docNumber || base.docNumber) : (snap.docNumber || base.docNumber)),
@@ -180,7 +198,17 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     startAt: form.jobStartDate, endAt: form.jobEndDate, title: form.workLabel, system: "", defaultTime: TIME_PRESETS[0],
   }).map((r) => r.date) : []), [form, mode]);
   const docDays = (form?.dayRows || []).map((r) => r.date).filter(Boolean);
-  const scheduleChanged = Boolean(mode) && jobDays.length > 0 && jobDays.join(",") !== docDays.join(",");
+  // ใบที่ไม่ผูกงาน (เปิดจากทะเบียนเอกสาร) ไม่มีตารางงานให้เทียบ
+  const scheduleChanged = Boolean(mode) && Boolean(eventId) && (form?.scheduleMode || "days") === "days" && jobDays.length > 0 && jobDays.join(",") !== docDays.join(",");
+  // เปิดมาจากเมนู ⋮ ของทะเบียนเอกสาร → เข้าโหมดที่สั่งทันทีที่ข้อมูลพร้อม (ครั้งเดียวต่อการเปิด)
+  const initModeRef = useRef(false);
+  useEffect(() => { if (!open) initModeRef.current = false; }, [open]);
+  useEffect(() => {
+    if (!open || !initialMode || initModeRef.current || !form || !existing.doc) return;
+    initModeRef.current = true;
+    startChange(initialMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- เข้าโหมดครั้งเดียวเมื่อพร้อม
+  }, [open, initialMode, form, existing.doc]);
 
   /** ทิ้งร่าง แล้วเริ่มใหม่จากข้อมูลงาน */
   const discardDraft = () => {
@@ -218,8 +246,8 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   const resetBody = () => setForm((f) => ({ ...f, bodyManual: false, body: buildWorkNoticeBody(f) }));
 
   const subjectOptions = useMemo(
-    () => noticeSubjectPresetsFor(form?.workLabel, form?.roundLabel),
-    [form?.workLabel, form?.roundLabel],
+    () => noticeSubjectPresetsFor(form?.workLabel, form?.roundLabel, { scheduleMode: form?.scheduleMode, planYearLabel: form?.planYearLabel }),
+    [form?.workLabel, form?.roundLabel, form?.scheduleMode, form?.planYearLabel],
   );
   const referenceOptions = useMemo(() => referencePresetsFor(job), [job]);
   const attentionOptions = useMemo(() => attentionPresetsFor(job), [job]);
@@ -268,13 +296,64 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   // บรรทัดที่จะถูกพิมพ์จริง (บรรทัดที่ไม่มีข้อมูลอะไรเลยจะถูกข้าม)
   const printedDays = (form?.dayRows || []).filter((r) => dayRowText(r));
 
+  // ── ✅ (26 พ.ย. 2569) แบบ "ระบุแค่เดือน" — แผนล่วงหน้า (มักทั้งปี) ยังไม่ลงวันที่ ─────────────────
+  const byMonth = form?.scheduleMode === "months";
+  const printedMonths = (form?.monthRows || []).filter((r) => monthRowText(r));
+  /** สลับแบบกำหนดการ — ถ้อยคำที่ระบบตั้งให้ (เรื่อง · ย่อหน้าปิด) เปลี่ยนตามแบบ · ที่พิมพ์แก้เองแล้วไม่แตะ */
+  const switchScheduleMode = (next) => setForm((f) => {
+    const cur = f.scheduleMode || "days";
+    if (cur === next) return f;
+    const out = { ...f, scheduleMode: next };
+    if (next === "months" && !(f.monthRows || []).some((r) => isMonthKey(r.month))) {
+      const built = buildMonthRows(job, { startDate: f.jobStartDate });
+      out.monthRows = built.rows.map((r) => ({ ...r, detail: r.detail || workVerbFor(f.workLabel) }));
+      out.planYearLabel = f.planYearLabel || built.yearLabel;
+    }
+    const oldSubjects = noticeSubjectPresetsFor(f.workLabel, f.roundLabel, { scheduleMode: cur, planYearLabel: f.planYearLabel });
+    if (!f.subject?.trim() || oldSubjects.includes(f.subject)) out.subject = noticeSubjectPresetsFor(out.workLabel, out.roundLabel, out)[0];
+    if (!f.cooperationNote?.trim() || f.cooperationNote === buildWorkNoticeCooperation(cur)) out.cooperationNote = buildWorkNoticeCooperation(next);
+    return out;
+  });
+  const updateMonth = (i, k, v) =>
+    setForm((f) => ({ ...f, monthRows: f.monthRows.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)) }));
+  const removeMonth = (i) => setForm((f) => ({ ...f, monthRows: f.monthRows.filter((_, idx) => idx !== i) }));
+  /** เพิ่มแถวถัดไป — เดือนห่างเท่าระยะของ 2 แถวสุดท้าย (ไม่มี = เดือนถัดไป) · ครั้งที่ "2/4" → "3/4" */
+  const addMonth = () => setForm((f) => {
+    const rows = f.monthRows || [];
+    const last = rows[rows.length - 1];
+    const prev = rows[rows.length - 2];
+    const step = last?.month && prev?.month && isMonthKey(last.month) && isMonthKey(prev.month) ? Math.max(1, monthDiff(prev.month, last.month)) : 1;
+    const m = String(last?.round || "").match(/^(\d+)\/(\d+)$/);
+    return {
+      ...f,
+      monthRows: [...rows, {
+        ...(Number(last?.time) >= 1 ? { time: Number(last.time) + 1 } : {}),
+        month: isMonthKey(last?.month) ? addMonthsKey(last.month, step) : (f.jobStartDate || "").slice(0, 7),
+        monthTo: "",
+        round: m ? `${Number(m[1]) + 1}/${m[2]}` : "",
+        detail: last?.detail || workVerbFor(f.workLabel),
+      }],
+    };
+  });
+  /** เติมใหม่ทั้งชุดตามแผนงานทั้งปีของสัญญา (งานทั่วไป = เดือนของงานนี้) */
+  const regenerateMonths = () => setForm((f) => {
+    const built = buildMonthRows(job, { startDate: f.jobStartDate });
+    return { ...f, monthRows: built.rows, planYearLabel: built.yearLabel || f.planYearLabel };
+  });
+  const applyFirstMonthDetail = () => setForm((f) => {
+    const first = f.monthRows?.[0]?.detail;
+    return first ? { ...f, monthRows: f.monthRows.map((r) => ({ ...r, detail: first })) } : f;
+  });
+
   const missing = useMemo(() => {
     if (!form) return [];
     const m = [];
     if (!form.subject?.trim()) m.push("เรื่อง");
     if (!form.site?.trim()) m.push("ชื่อโครงการ");
     // ⚠️ ต้องมีกำหนดการอย่างน้อย 1 บรรทัด ไม่งั้นใบแจ้งเข้างานจะไม่ได้แจ้งอะไรเลย
-    if (!(form.dayRows || []).some((r) => dayRowText(r))) m.push("กำหนดการรายวัน");
+    if (form.scheduleMode === "months") {
+      if (!(form.monthRows || []).some((r) => monthRowText(r))) m.push("แผนรายเดือน (เลือกเดือนอย่างน้อย 1 แถว)");
+    } else if (!(form.dayRows || []).some((r) => dayRowText(r))) m.push("กำหนดการรายวัน");
     if (!form.signerName?.trim()) m.push("ชื่อผู้ออกเอกสาร");
     return m;
   }, [form]);
@@ -406,7 +485,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       let finalNumber = form.docNumber;
       if (canUseRunningNumber) {
         // ⚠️ ส่ง id ของงานไปด้วย — backend ใช้ตรวจว่าผู้ขอเลขเกี่ยวข้องกับงานนี้จริง (ดู /doc-number/next)
-        const res = await DocNumberService.next("notice", job?.id || job?._id);
+        const res = await DocNumberService.next("notice", job?.id || job?._id, mode === "reissue" ? existing.doc?._id : undefined);
         finalNumber = res.docNumber;
       }
       const { url, blob, fileName } = await buildPdf(finalNumber);
@@ -550,7 +629,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
           <FoldSection step={1} title="ถึงลูกค้า"
             summary={[form.site, form.customerCompany, form.attention && `เรียน ${form.attention}`].filter(Boolean).join(" · ") || "ยังไม่ระบุโครงการ"}
             alert={!form.site?.trim()}>
-            <Stack spacing={1.75}>
+            <Stack spacing={2.25}>
               <Autocomplete
                 size="small" fullWidth
                 options={customerList}
@@ -578,13 +657,13 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                     InputProps={{ ...params.InputProps, startAdornment: <Search sx={{ fontSize: 18, color: FAINT, ml: 0.5, mr: 0.5 }} /> }} />
                 )}
               />
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField size="small" fullWidth label="ชื่อโครงการ" value={form.site} onChange={setField("site")} required sx={fieldSx} />
                 <TextField size="small" fullWidth label="บริษัทลูกค้า" value={form.customerCompany} onChange={setField("customerCompany")} sx={fieldSx} />
               </Stack>
               <TextField size="small" fullWidth multiline minRows={2} label="ที่อยู่ลูกค้า (ไม่บังคับ)"
                 value={form.customerAddress} onChange={setField("customerAddress")} sx={fieldSx} />
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Autocomplete
                   freeSolo fullWidth size="small" options={attentionOptions}
                   inputValue={form.attention} onInputChange={(_, v) => set("attention")(v)}
@@ -603,21 +682,21 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
           <FoldSection step={2} title="หัวเรื่อง"
             summary={[form.subject || "ยังไม่ระบุเรื่อง", `วันที่ ${thaiFullDate(form.issuedAt)}`].filter(Boolean).join(" · ")}
             alert={!form.subject?.trim()}>
-            <Stack spacing={1.75}>
+            <Stack spacing={2.25}>
               <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
                 <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
                   value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
                 <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
                   onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
               </Stack>
-              <Stack spacing={1.75}>
+              <Stack spacing={2.25}>
                 <Autocomplete
                   freeSolo fullWidth size="small" options={subjectOptions}
                   inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
                   renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
                 />
                 {/* ✅ grid: มือถือเรียงเต็มกว้าง · จอใหญ่ 2 คอลัมน์ — เดิม flex บีบช่องวันที่จนล้นขอบจอมือถือ */}
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 2 }}>
                   <TextField
                     size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
                     onChange={setField("docNumber")} disabled={canUseRunningNumber || mode === "edit"} sx={fieldSx}
@@ -634,39 +713,133 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                 หรือกรอกส่วนที่จำเป็นที่ปรับเปลี่ยนตลอด")
               ① ส่วนที่เปลี่ยนทุกใบ (กำหนดการเข้างาน) เปิดไว้บนสุด
               ② ส่วนที่ระบบเติมให้ครบแล้ว (แจ้งถึง · เรื่องและเนื้อความ · ผู้ออกเอกสาร) พับไว้ หัวพับโชว์ค่าที่จะพิมพ์จริง กดแก้เฉพาะที่ต้องเปลี่ยน */}
-          <DocSection step={3} highlight={ACCENT} title={`กำหนดการเข้างาน · ${printedDays.length} วัน`}
-            hint={`วันในตารางงาน: ${form.jobDateText} — แก้วัน เวลา และงานที่เข้าทำ ให้ตรงกับที่นัดลูกค้าไว้`}
+          <DocSection step={3} highlight={ACCENT}
+            title={byMonth ? `แผนเข้างานรายเดือน · ${printedMonths.length} ครั้ง` : `กำหนดการเข้างาน · ${printedDays.length} วัน`}
+            hint={byMonth
+              ? "ระบุแค่ช่วงเดือน — ในเอกสารจะแจ้งว่าวันและเวลาที่แน่นอนจะแจ้งให้ทราบล่วงหน้าอีกครั้ง"
+              : `วันในตารางงาน: ${form.jobDateText} — แก้วัน เวลา และงานที่เข้าทำ ให้ตรงกับที่นัดลูกค้าไว้`}
             action={(
               <Stack direction="row" spacing={0.75}>
                 <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
                   ตัวช่วย
                 </Button>
-                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
+                <Button size="small" onClick={byMonth ? addMonth : addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
+                  {byMonth ? "เพิ่มเดือน" : "เพิ่มวัน"}
+                </Button>
               </Stack>
             )}>
+            {/* ✅ (26 พ.ย. 2569) เลือกแบบกำหนดการ — ระบุวันที่ (เดิม) / ระบุแค่เดือน (แจ้งแผนล่วงหน้า) */}
+            <Box role="radiogroup" aria-label="แบบกำหนดการ"
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75, p: 0.5, mb: 1.5, borderRadius: 2.5, bgcolor: "#eef2f7" }}>
+              {SCHEDULE_MODES.map((o) => {
+                const on = (form.scheduleMode || "days") === o.value;
+                return (
+                  <Box key={o.value} component="button" type="button" role="radio" aria-checked={on} onClick={() => switchScheduleMode(o.value)}
+                    sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.25, py: 0.9, border: 0, borderRadius: 2, cursor: "pointer", font: "inherit", textAlign: "left",
+                      bgcolor: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 3px rgba(15,23,42,.12)" : "none", color: on ? ACCENT : MUTED, transition: "background-color .15s" }}>
+                    {o.value === "days" ? <Today sx={{ fontSize: 20 }} /> : <CalendarMonth sx={{ fontSize: 20 }} />}
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: on ? INK_2 : MUTED, lineHeight: 1.3 }}>{o.label}</Typography>
+                      <Typography sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }} noWrap>{o.hint}</Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
             <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
               anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
-              {[
+              {(byMonth ? [
+                [regenerateMonths, <CalendarMonth key="i" fontSize="small" />, "เติมทุกครั้งตามแผนงานทั้งปีของสัญญา"],
+                [applyFirstMonthDetail, <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของแถวแรกกับทุกแถว"],
+              ] : [
                 [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
                 [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
                 [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
-              ].map(([fn, icon, label]) => (
+              ]).map(([fn, icon, label]) => (
                 <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
                   <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
                 </MenuItem>
               ))}
             </Menu>
+            {/* 🔁 (26 พ.ย. 2569 ผู้ใช้: "ข้อมูลยังดูงงๆ ลายตา และติดชิดกันเกินไป") แผนรายเดือนแบบตาราง:
+                หัวคอลัมน์ครั้งเดียว (ไม่มีป้ายซ้ำทุกแถว) · งานที่เข้าทำกรอกครั้งเดียวใช้กับทุกครั้ง (แยกเฉพาะครั้งได้) · ระยะห่างโปร่งขึ้น */}
+            {byMonth && (() => {
+              const rows = form.monthRows || [];
+              const shared = rows[0]?.detail || "";
+              const setShared = (v) => setForm((f) => {
+                const old = f.monthRows?.[0]?.detail || "";
+                return { ...f, monthRows: (f.monthRows || []).map((r, idx) => (idx === 0 || (!r.customDetail && (r.detail || "") === old) ? { ...r, detail: v } : r)) };
+              });
+              // ครั้งที่แบบหลายปี ("1/4 - 2569-70") ยาว → คอลัมน์กว้างขึ้นให้อ่านครบ
+              const roundW = rows.some((r) => String(r.round || "").length > 5) ? 132 : 84;
+              const cols = { xs: `${roundW === 84 ? 64 : 110}px minmax(0,1fr) 34px`, sm: `${roundW}px minmax(0,1fr) minmax(0,1fr) 34px` };
+              return (
+                <>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "170px minmax(0,1fr)" }, gap: 2, mt: 0.75, mb: 2.25 }}>
+                    <TextField size="small" fullWidth label="ประจำปี (ไม่บังคับ)" placeholder="เช่น 2569-70" value={form.planYearLabel || ""} onChange={setField("planYearLabel")}
+                      helperText="ต่อท้ายเรื่องและเนื้อความ" sx={fieldSx} />
+                    <TextField size="small" fullWidth multiline label="งานที่เข้าทำ (ใช้กับทุกครั้ง)" value={shared} onChange={(e) => setShared(e.target.value)}
+                      placeholder="เช่น เข้าทำการตรวจเช็คและบำรุงรักษา ระบบ Fire Alarm" helperText="พิมพ์ครั้งเดียว ใช้กับทุกแถวในตาราง" sx={fieldSx} />
+                  </Box>
+                  <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden", bgcolor: "#fff" }}>
+                    <Box sx={{ display: { xs: "none", sm: "grid" }, gridTemplateColumns: cols, columnGap: 1.5, px: 1.75, py: 0.9, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
+                      {["ครั้งที่", "เดือนที่จะเข้า", "ถึงเดือน (ถ้าเข้าหลายเดือน)", ""].map((h, k) => (
+                        <Typography key={k} sx={{ fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>{h}</Typography>
+                      ))}
+                    </Box>
+                    {rows.map((r, i) => {
+                      const custom = i > 0 && (r.customDetail || (r.detail || "") !== shared);
+                      return (
+                        <Box key={i} sx={{ px: { xs: 1.25, sm: 1.75 }, py: 1.4, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                          <Box sx={{ display: "grid", gridTemplateColumns: cols, columnGap: 1.5, rowGap: 1.25, alignItems: "center" }}>
+                            <TextField size="small" placeholder="1/4" value={r.round || ""} onChange={(e) => updateMonth(i, "round", e.target.value)}
+                              inputProps={{ "aria-label": `ครั้งที่ แถว ${i + 1}`, style: { textAlign: "center", fontWeight: 800 } }} sx={fieldSx} />
+                            <ThaiMonthSelect value={r.month} onChange={(v) => updateMonth(i, "month", v)} around={r.month || form.jobStartDate?.slice(0, 7)}
+                              sx={{ ...fieldSx, "& .MuiSelect-select": { fontWeight: 700 } }} />
+                            <Box sx={{ gridColumn: { xs: "2 / 3", sm: "auto" }, gridRow: { xs: 2, sm: "auto" }, minWidth: 0 }}>
+                              <ThaiMonthSelect value={r.monthTo} emptyLabel={isMobile ? "ถึงเดือน (ถ้ามี)" : "— เดือนเดียว —"} around={r.month}
+                                min={isMonthKey(r.month) ? addMonthsKey(r.month, 1) : undefined} max={isMonthKey(r.month) ? addMonthsKey(r.month, 24) : undefined} disabled={!isMonthKey(r.month)}
+                                onChange={(v) => updateMonth(i, "monthTo", v && isMonthKey(r.month) && monthDiff(r.month, v) <= 0 ? "" : v)} sx={fieldSx} />
+                            </Box>
+                            <IconButton size="small" onClick={() => removeMonth(i)} aria-label={`ลบแถวที่ ${i + 1}`} sx={{ color: FAINT, justifySelf: "center", gridColumn: { xs: 3, sm: "auto" }, gridRow: { xs: 1, sm: "auto" } }}>
+                              <DeleteOutline sx={{ fontSize: 19 }} />
+                            </IconButton>
+                          </Box>
+                          {custom ? (
+                            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mt: 1.5 }}>
+                              <TextField size="small" fullWidth multiline label="งานเฉพาะครั้งนี้" value={r.detail || ""} onChange={(e) => updateMonth(i, "detail", e.target.value)} sx={fieldSx} />
+                              <Button size="small" onClick={() => setForm((f) => ({ ...f, monthRows: f.monthRows.map((x, idx) => (idx === i ? { ...x, detail: shared, customDetail: false } : x)) }))}
+                                sx={{ ...OUTLINE_BTN_SX, flexShrink: 0, mt: 0.25 }}>ใช้แบบทุกครั้ง</Button>
+                            </Stack>
+                          ) : i > 0 && (
+                            <Button size="small" onClick={() => updateMonth(i, "customDetail", true)}
+                              sx={{ mt: 0.5, ml: { sm: `calc(${roundW}px + 12px)` }, p: 0, px: 0.5, minWidth: 0, textTransform: "none", fontSize: "0.72rem", fontWeight: 700, color: MUTED, "&:hover": { color: ACCENT, bgcolor: "transparent" } }}>
+                              + แยกงานเฉพาะครั้งนี้
+                            </Button>
+                          )}
+                        </Box>
+                      );
+                    })}
+                    {rows.length === 0 && (
+                      <Box sx={{ py: 3, textAlign: "center" }}>
+                        <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีแผน — กด "เพิ่มเดือน" หรือ "ตัวช่วย"</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              );
+            })()}
             {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
-            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+            {!byMonth && <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
               {(form.dayRows || []).map((r, i) => (
-                <Box key={i} sx={{ px: { xs: 1.1, sm: 1.5 }, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
-                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+                <Box key={i} sx={{ px: { xs: 1.25, sm: 1.75 }, pt: 1.25, pb: 1.75, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                  <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
                     <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
                     <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
                       <DeleteOutline sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Stack>
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr) minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr) minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1.5 }}>
                     <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
                     {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
                     <Autocomplete
@@ -676,7 +849,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                     />
                   </Box>
                   <TextField
-                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
+                    size="small" fullWidth multiline sx={{ mt: 2, ...fieldSx }}
                     label="เข้าทำอะไร / บริเวณไหน"
                     value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
                     placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
@@ -688,7 +861,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                   <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
                 </Box>
               )}
-            </Box>
+            </Box>}
 
             {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "หมายเหตุให้ระบุว่าถ้าจำเป็นด้วย ดูว่าเอาไว้ไหนถึงจะเหมาะสม")
                 พิมพ์ใต้ตารางกำหนดการในเอกสาร (สิ่งที่ขอจากลูกค้าเผื่อจำเป็น) · เลือกข้อความสำเร็จรูปได้ · ไม่ต้องการ = ลบให้ว่าง */}
@@ -722,7 +895,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
           <FoldSection step={4} title="ข้อความในจดหมาย"
             summary={form.bodyManual ? "แก้ข้อความเองแล้ว (ไม่อัปเดตอัตโนมัติ)" : "ย่อหน้าเปิด (ก่อนกำหนดการ) และย่อหน้าปิด (ขอความร่วมมือ)"}>
             <AutoTextBar manual={Boolean(form.bodyManual)} onReset={resetBody} />
-              <Stack spacing={1.75}>
+              <Stack spacing={2.25}>
                 <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้าเปิด (อยู่ก่อนกำหนดการ)"
                   value={form.body} onChange={editBody} sx={fieldSx} />
                 <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้าปิด (อยู่หลังกำหนดการ)"
@@ -734,8 +907,8 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
           <FoldSection step={5} title="ผู้ลงชื่อท้ายจดหมาย"
             summary={[form.signerName || "ยังไม่ระบุชื่อ", form.signerPosition, form.signerTel && `โทร ${form.signerTel}`, signatureImage ? "ลายเซ็นอิเล็กทรอนิกส์" : "เว้นช่องเซ็นมือ"].filter(Boolean).join(" · ")}
             alert={!form.signerName?.trim()}>
-            <Stack spacing={1.75}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+            <Stack spacing={2.25}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <Autocomplete
                   freeSolo fullWidth size="small"
                   options={staffOptions}

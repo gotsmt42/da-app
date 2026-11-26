@@ -33,7 +33,7 @@ const KINDS = [
   { re: /^\/ot/, icon: AccessTime, color: "#0891b2", label: "OT" },
   { re: /^\/dispatch/, icon: AssignmentInd, color: "#7c3aed", label: "คำขอลงงาน" },
   { re: /^\/website/, icon: MarkEmailUnread, color: "#0f172a", label: "เว็บไซต์" },
-  { re: /^\/(event|calendar)/, icon: CalendarMonth, color: "#dc2626", label: "แผนงาน" },
+  { re: /^\/(event|calendar)/, icon: CalendarMonth, color: "#dc2626", label: "ตารางงาน" },
   { re: /^\/contracts/, icon: Description, color: "#ea580c", label: "สัญญา · ภาพรวมงาน" },
   { re: /^\/(operation|technician|contracts|jobs)/, icon: Build, color: "#dc2626", label: "งาน" },
 ];

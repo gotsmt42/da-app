@@ -48,7 +48,6 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // (ข้อมูลถูกกรองด้วย department ที่ server แล้ว จึงไม่มีทางเห็นงานของอีกฝ่าย)
   const canPlanWork = canViewOperation || canSell || seeAllSchedules || isServiceCalendarObserver(userData);
   // มีอะไรอยู่ในหมวด "งาน" บ้างไหม — ใช้ตัดสินว่าจะโชว์หัวข้อหมวดหรือไม่
-  const hasWorkMenu = canPlanWork || canAssign || canViewContracts || can(userData, "receiveDispatch");
 
   const { badges } = useAppBadges(userData);
 
@@ -104,9 +103,10 @@ const side = (key, extra) => {
   return { ...d, icon: <Icon /> };
 };
 
+  // 🔁 (26 พ.ย. 2569 ผู้ใช้: "เปลี่ยนเป็นตารางงาน") เมนูแม่ของปฏิทินชื่อ "ตารางงาน" (เดิม "แผนงาน") — ตรงกับหัวเมนูด้านบน
   const workMenu = seeAllSchedules
     ? [{
-        title: "แผนงาน",
+        title: "ตารางงาน",
         href: "/event",
         icon: <AppIcon.Calendar />,
         items: [
@@ -120,7 +120,7 @@ const side = (key, extra) => {
           // เหตุผล: ต้องเช็คว่าช่างว่างวันไหนก่อนไปรับปากลูกค้าเรื่องวันเข้างาน
           // ⚠️ ตารางงานช่างเป็นมุมมองอ่านอย่างเดียวล้วนๆ — กดเข้าไปดูรายละเอียดได้ แต่แก้ไม่ได้เลย
           // (ดู isServiceObserver ที่ CalendarBoard และ readOnly ที่ EditEvent)
-          title: "แผนงาน",
+          title: "ตารางงาน",
           href: "/event",
           icon: <AppIcon.Calendar />,
           items: [
@@ -307,7 +307,7 @@ const side = (key, extra) => {
     </NavItem>
   );
 
-  // ✅ เมนูแม่ที่มีลูก (ตอนนี้มีแค่ "แผนงาน") — ตอนย่อแถบไม่มีที่พอให้กาง submenu ใน rail แคบๆ
+  // ✅ เมนูแม่ที่มีลูก (ตอนนี้มีแค่ "ตารางงาน") — ตอนย่อแถบไม่มีที่พอให้กาง submenu ใน rail แคบๆ
   // ได้เลย กดแล้วพาไปหน้า default (href ของแม่) ตรงๆ แทน ต้องขยายแถบก่อนถึงจะเข้าเมนูลูกอื่นได้
   const renderParentWithItems = (navi, index) => {
     const childTotal = (navi.items || []).reduce((sum, it) => sum + (it.badgeKey ? Number(badges[it.badgeKey]) || 0 : 0), 0);
@@ -390,11 +390,14 @@ const side = (key, extra) => {
       <div className="sidebar-content">
         <Nav vertical className="sidebarNav">
           {navigation.map((item, idx) => renderLink(item, `nav-${idx}`))}
+          {/* ✅ (26 พ.ย. 2569 ผู้ใช้: "เมนูภาพรวมงานให้เอาไว้ลำดับ 2 จาก dashboard") — ถัดจากหน้าแรกทันที (ก่อนหมวด "งาน") */}
+          {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
 
           {/* หมวด "งาน" — แผนงาน/ปฏิทิน + ภาพรวมสัญญา + งานของฉัน (งานที่มอบหมายให้ผู้ใช้)
               ⚠️ หัวข้อหมวดต้องหายไปพร้อมกับเมนูข้างใต้ — ไม่งั้นเซล (ซึ่งไม่มีเมนูในหมวดนี้เลย)
               จะเห็นคำว่า "งาน" ลอยอยู่เฉยๆ โดยไม่มีอะไรอยู่ใต้มัน */}
-          {(hasWorkMenu || canViewFinance) && <div className="admin-divider-label">งาน</div>}
+          {/* ⚠️ หัวข้อ "งาน" โผล่เมื่อมีเมนูข้างใต้จริง (ภาพรวมงานย้ายขึ้นไปถัดจากหน้าแรกแล้ว ไม่นับ) */}
+          {(canPlanWork || canAssign || can(userData, "receiveDispatch") || seesOperationBoard(userData) || canViewAttendance || canMyJobs || canViewFinance) && <div className="admin-divider-label">งาน</div>}
           {/* ⚠️ เมนูที่ไม่มีลูก (เซล — เหลือแค่ปฏิทิน) ต้อง render เป็นลิงก์ธรรมดา
               🐛 renderParentWithItems เรียก navi.items.map() ตรงๆ ถ้าไม่มี items จะพังทั้งแอป
               (จอขาว) เพราะ Sidebar อยู่ในทุกหน้า */}
@@ -412,7 +415,6 @@ const side = (key, extra) => {
           {seesOperationBoard(userData) && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
           {canViewAttendance && !seesOperationBoard(userData) && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
-          {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
           {/* 🔁 (21 ต.ค. 2569) ติดตามใบเสนอราคาย้ายมาหมวดงาน (ไม่รวมกับเอกสาร) */}
           {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}

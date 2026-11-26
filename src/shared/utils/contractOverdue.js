@@ -131,6 +131,11 @@ export const groupEventsByContract = (events) => {
       storedVisitCount: head.contractGroupId ? head.visitCount : undefined,
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       contractYears: head.contractGroupId ? head.contractYears : undefined,
+      // ✅ (26 พ.ย. 2569) เดือนเข้าครั้งที่ 1 ของแผนงานทั้งปี ("YYYY-MM") — ครั้งที่สร้างก่อนตั้งค่าอาจไม่มี จึงหาจากทุกครั้ง
+      planFirstMonth: head.contractGroupId ? (head.planFirstMonth || sorted.find((v) => v.planFirstMonth)?.planFirstMonth || "") : undefined,
+      planMonths: head.contractGroupId ? (head.planMonths?.length ? head.planMonths : sorted.find((v) => v.planMonths?.length)?.planMonths || []) : undefined,
+      // ✅ แผนที่ส่งลูกค้าแล้ว (ใบแจ้งแบบระบุแค่เดือน) — ใช้ติดตามว่าลงงานตามที่แจ้งไหม
+      planSentDocs: head.contractGroupId ? (head.planSentDocs?.length ? head.planSentDocs : sorted.find((v) => v.planSentDocs?.length)?.planSentDocs || []) : undefined,
       estimatedDaysPerVisit: head.contractGroupId ? head.estimatedDaysPerVisit : undefined,
       jobValue: head.jobValue,
       // ✅ (10 พ.ย. 2569) มูลค่าสัญญารวม VAT หรือไม่ (null = ยังไม่ระบุ) + ใบเสนอราคาของทั้งสัญญา — ระบุ/แนบที่หน้าภาพรวมงาน

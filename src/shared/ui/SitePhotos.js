@@ -66,9 +66,12 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
     setErr("");
     setUploading(picked.length);
     let failed = 0;
+    const dups = [];
     for (const f of picked) {
       try {
         const saved = await EventService.Upload(event._id, f, "sitePhoto");
+        // 🔒 (26 พ.ย. 2569 ผู้ใช้: "บันทึกซ้ำๆไหม มีวิธีป้องกันไหม") server เจอไฟล์เดิมที่แนบไว้แล้ว = ไม่แนบซ้ำ
+        if (saved?.duplicate) { dups.push(saved.fileName || f.name); setUploading((n) => n - 1); continue; }
         setFiles((prev) => [...prev, { _id: saved.fileId, fileName: saved.fileName, fileUrl: saved.fileUrl, fileType: saved.fileType, uploadedAt: new Date().toISOString() }]);
         onChange?.();
       } catch {
@@ -76,7 +79,10 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
       }
       setUploading((n) => n - 1);
     }
-    if (failed) setErr(`อัปโหลดไม่สำเร็จ ${failed} ไฟล์ — ลองใหม่อีกครั้ง`);
+    setErr([
+      failed ? `อัปโหลดไม่สำเร็จ ${failed} ไฟล์ — ลองใหม่อีกครั้ง` : "",
+      dups.length ? `${dups.length === 1 ? "ไฟล์นี้" : `${dups.length} ไฟล์`}แนบไว้แล้ว ไม่ได้แนบซ้ำ${dups.length === 1 ? ` (${dups[0]})` : ""}` : "",
+    ].filter(Boolean).join(" · "));
   };
 
   const remove = async (f) => {
@@ -206,7 +212,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
           )}
         </>
       )}
-      {err && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: "#dc2626", fontWeight: 700 }}>{err}</Typography>}
+      {err && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: /ไม่สำเร็จ/.test(err) ? "#dc2626" : "#b45309", fontWeight: 700 }}>{err}</Typography>}
     </Box>
   );
 }

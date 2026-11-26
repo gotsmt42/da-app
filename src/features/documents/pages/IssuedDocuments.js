@@ -10,14 +10,19 @@
  * หรือเป็น "คนที่ออกใบนั้นเอง" (ช่างออกใบแจ้งเข้างานได้ จึงต้องตามสถานะใบของตัวเองได้ด้วย ไม่ต้องรบกวน
  * แอดมินทุกใบ) — server บังคับกฎเดียวกันอีกชั้นเสมอ ไม่เชื่อการซ่อนปุ่มฝั่งจอ (routes/issuedDocument.js)
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import {
   Box, Stack, Typography, IconButton, Tooltip, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Skeleton,
-  Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert,
+  Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert, CircularProgress,
 } from "@mui/material";
-import { RefreshRounded as Refresh, TuneRounded as Tune, DescriptionRounded as Description, EventAvailableRounded as EventAvailable, MoreVertRounded as MoreVert, EditNoteRounded as EditNote, OpenInNewRounded as OpenInNew, Inventory2Rounded as Inventory2, VisibilityRounded as Visibility } from "@mui/icons-material";
+import { RefreshRounded as Refresh, TuneRounded as Tune, DescriptionRounded as Description, EventAvailableRounded as EventAvailable, MoreVertRounded as MoreVert, EditNoteRounded as EditNote, OpenInNewRounded as OpenInNew, Inventory2Rounded as Inventory2, VisibilityRounded as Visibility, EditRounded as EditIcon, FiberNewRounded } from "@mui/icons-material";
+import EventService from "@/shared/services/EventService";
+import JobCalendarPicker from "@/shared/ui/JobCalendarPicker";
+import { useHolidays } from "@/features/ot/components/OtDayInfo";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
+
 import SelectField from "@/shared/ui/SelectField";
 import MobileFilterSheet, { FilterSheetButton, ActiveFilterChips, SheetOptions, SheetSearch, SheetLabel } from "@/shared/ui/MobileFilterSheet";
 import {
@@ -38,6 +43,10 @@ import { generateWorkNoticePdf } from "../utils/workNoticePdf";
 import { generateDeliveryNotePdf } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "../components/DocumentPreviewDialog";
 import { can } from "@/shared/utils/roles";
+
+// กล่องออกเอกสารโหลดเมื่อกดใช้เท่านั้น (ฟอร์มยาว + ตัวสร้าง PDF)
+const WorkNoticeDialog = lazyWithRetry(() => import("../components/WorkNoticeDialog"));
+const DeliveryNoteDialog = lazyWithRetry(() => import("../components/DeliveryNoteDialog"));
 
 const ACCENT = "#2563eb";
 const OUTLINE_SX = { textTransform: "none", fontWeight: 700, borderRadius: 2, height: 40, px: 1.75, color: INK_2, border: `1px solid ${LINE}`, bgcolor: "#fff", whiteSpace: "nowrap" };
@@ -108,7 +117,18 @@ const IssuedDocuments = () => {
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [menu, setMenu] = useState(null); // { anchor, row }
+  // 🐛 (26 พ.ย. 2569 ผู้ใช้: "more กดแล้วไปขึ้นมุมจอ") เดิมยึดปุ่มที่กด (anchorEl) — แถวถูกวาดใหม่ตอนเปิดเมนู ปุ่มเดิมหลุดจากหน้า
+  //    เมนูจึงเด้งไปมุมซ้ายบน → จำ "ตำแหน่งบนจอ" ของปุ่มแทน (anchorPosition) ไม่ขึ้นกับการวาดใหม่
+  const [menu, setMenu] = useState(null); // { pos: {top,left}, row }
+  /**
+   * ✅ (26 พ.ย. 2569 ผู้ใช้: "ขอเพิ่มเมนูสำหรับออกใบแจ้งงาน ใบส่งมอบงานแยกออกมา ไม่ใช่ออกได้แค่ใน event ของงาน")
+   * ออกเอกสารจากหน้านี้ได้เลย: เลือกงานจากปฏิทิน (หรือไม่ผูกงาน — ผู้มีสิทธิ์แก้เอกสาร) → กล่องออกเอกสารตัวเดิม
+   * เมนู ⋮ → แก้ไขเอกสาร (เลขเดิม) / ออกใบใหม่แทน (เลขใหม่) ใช้กล่องเดียวกัน
+   * issue = { type: "notice"|"delivery", step: "pick"|"form", job, docOverride, initialMode }
+   */
+  const [issue, setIssue] = useState(null);
+  const [issueBusy, setIssueBusy] = useState(false);
+  const holidays = useHolidays(null);
 
   // ✅ จอคอม 10 แถว / มือถือ 5 แถว ต่อหน้า — จอแคบแสดงเป็นการ์ดแนวตั้งซึ่งสูงกว่าแถวตารางหลายเท่า
   // ถ้าใส่จำนวนเท่ากันจะต้องเลื่อนยาวมากกว่าจะถึงปุ่มเปลี่ยนหน้า
@@ -221,6 +241,32 @@ const IssuedDocuments = () => {
     }
   };
 
+  /** งานเต็ม ๆ ของเอกสาร (กล่องออกเอกสารใช้ข้อมูลงานเติมฟอร์ม) — ไม่ได้/ไม่มีงาน = {} (ใบที่ไม่ผูกงาน) */
+  const loadJob = async (id, fallback = {}) => {
+    if (!id) return {};
+    try { return (await EventService.GetEventById(id)) || fallback; } catch { return fallback; }
+  };
+  const startIssue = (type) => { setMenu(null); setIssue({ type, step: "pick" }); };
+  const onPickJob = async ({ jobs: picked }) => {
+    const j = picked[0];
+    if (!j && !canEdit) {
+      Swal.fire({ title: "ต้องเลือกงาน", text: "ออกเอกสารได้เฉพาะงานที่คุณเกี่ยวข้อง — เลือกงานจากปฏิทินก่อน", icon: "info", confirmButtonColor: ACCENT });
+      return;
+    }
+    setIssueBusy(true);
+    const job = j ? await loadJob(j._id, j) : {};
+    setIssueBusy(false);
+    setIssue((cur) => (cur ? { ...cur, step: "form", job } : cur));
+  };
+  const startChangeDoc = async (row, initialMode) => {
+    setMenu(null);
+    setIssueBusy(true);
+    const job = await loadJob(row.eventId);
+    setIssueBusy(false);
+    setIssue({ type: row.docType, step: "form", job, docOverride: row, initialMode });
+  };
+  const closeIssue = () => { setIssue(null); fetchRows(); };
+
   const editNote = async (row) => {
     setMenu(null);
     const { value, isConfirmed } = await Swal.fire({
@@ -266,7 +312,11 @@ const IssuedDocuments = () => {
         <IconButton size="small" onClick={(e) => { e.stopPropagation(); openPreview(r); }} sx={{ color: INK_2 }}><Visibility sx={{ fontSize: 19 }} /></IconButton>
       </Tooltip>
       {canEditRow(r) && (
-        <IconButton size="small" aria-label="จัดการ" onClick={(e) => { e.stopPropagation(); setMenu({ anchor: e.currentTarget, row: r }); }} sx={{ color: MUTED }}>
+        <IconButton size="small" aria-label="จัดการ" onClick={(e) => {
+          e.stopPropagation();
+          const rc = e.currentTarget.getBoundingClientRect();
+          setMenu({ pos: { top: rc.bottom + 4, left: rc.right }, row: r });
+        }} sx={{ color: MUTED }}>
           <MoreVert sx={{ fontSize: 19 }} />
         </IconButton>
       )}
@@ -281,9 +331,24 @@ const IssuedDocuments = () => {
         icon={<Description />}
         title="เอกสารที่ออกจากระบบ"
         subtitle="ใบแจ้งเข้างาน · ใบส่งมอบงาน ที่ระบบออกให้ — ดู พิมพ์ ส่งอีเมล และติดตามสถานะการเซ็นรับ"
-        actions={isMobile
-          ? <FilterSheetButton count={(appliedSearch ? 1 : 0) + (status !== "all" ? 1 : 0) + filterCount} onClick={() => setSheetOpen(true)} />
-          : <Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
+        actions={(
+          <Stack direction="row" spacing={1} alignItems="center">
+            {/* ✅ (26 พ.ย. 2569 ผู้ใช้: "ให้ปุ่มออกใบงาน มาเพิ่มตรงนี้") ออกเอกสารได้จากหน้านี้ ไม่ต้องเข้าไปในงาน */}
+            <Button variant="contained" disableElevation onClick={() => startIssue("notice")} startIcon={<EventAvailable sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 40, px: { xs: 1.25, sm: 1.75 }, whiteSpace: "nowrap", bgcolor: DOC_TYPE_META.notice.color, "&:hover": { bgcolor: "#0369a1" } }}>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>ออกใบแจ้งเข้างาน</Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>แจ้งเข้างาน</Box>
+            </Button>
+            <Button variant="contained" disableElevation onClick={() => startIssue("delivery")} startIcon={<Description sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 40, px: { xs: 1.25, sm: 1.75 }, whiteSpace: "nowrap", bgcolor: DOC_TYPE_META.delivery.color, "&:hover": { bgcolor: "#b91c1c" } }}>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>ออกใบส่งมอบงาน</Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>ส่งมอบงาน</Box>
+            </Button>
+            {isMobile
+              ? <FilterSheetButton count={(appliedSearch ? 1 : 0) + (status !== "all" ? 1 : 0) + filterCount} onClick={() => setSheetOpen(true)} />
+              : <Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
+          </Stack>
+        )}
       />
 
       {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรอง อยู่ในแผ่นล่าง (แบบหน้าใบเบิก) — เหลือแค่ชิปตัวกรองที่ใช้อยู่เหนือรายการ */}
@@ -437,7 +502,25 @@ const IssuedDocuments = () => {
       )}
 
       {/* ── เมนูจัดการแต่ละแถว ── */}
-      <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)} PaperProps={{ sx: { borderRadius: 2.5, minWidth: 230 } }}>
+      <Menu open={Boolean(menu)} onClose={() => setMenu(null)} anchorReference="anchorPosition" anchorPosition={menu?.pos}
+        transformOrigin={{ vertical: "top", horizontal: "right" }} PaperProps={{ sx: { borderRadius: 2.5, minWidth: 240 } }}>
+        {menu?.row && menu.row.status !== "cancelled" && [
+          <MenuItem key="edit" onClick={() => startChangeDoc(menu.row, "edit")} sx={{ fontSize: "0.86rem", py: 1 }}>
+            <EditIcon sx={{ fontSize: 18, mr: 1.25, color: ACCENT }} />
+            <Box>
+              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }}>แก้ไขเอกสาร</Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>เลขที่เดิม · เก็บฉบับก่อนแก้ไว้</Typography>
+            </Box>
+          </MenuItem>,
+          <MenuItem key="reissue" onClick={() => startChangeDoc(menu.row, "reissue")} sx={{ fontSize: "0.86rem", py: 1 }}>
+            <FiberNewRounded sx={{ fontSize: 18, mr: 1.25, color: ACCENT }} />
+            <Box>
+              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }}>ออกใบใหม่แทน</Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>เลขที่ใหม่ · ยกเลิกใบนี้ให้อัตโนมัติ</Typography>
+            </Box>
+          </MenuItem>,
+          <Divider key="d0" sx={{ my: 0.5 }} />,
+        ]}
         <Typography sx={{ px: 2, pt: 1, pb: 0.5, display: "block", fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>เปลี่ยนสถานะเป็น</Typography>
         {STATUS_ORDER.map((s) => {
           const meta = STATUS_META[s];
@@ -459,6 +542,28 @@ const IssuedDocuments = () => {
           </MenuItem>
         )}
       </Menu>
+
+      {/* ── ออกเอกสารจากหน้านี้: เลือกงาน → กล่องออกเอกสาร ── */}
+      <JobCalendarPicker open={issue?.step === "pick"} onClose={() => setIssue(null)} mode="jobs" max={1} onlyMine="auto" holidays={holidays}
+        title={issue?.type === "delivery" ? "เลือกงานที่จะออกใบส่งมอบงาน" : "เลือกงานที่จะออกใบแจ้งเข้างาน"}
+        subtitle={canEdit ? "แตะวันในปฏิทิน → แตะงาน → ตกลง · ไม่เลือกงาน = ออกใบที่ไม่ผูกงาน (กรอกเอง)" : "แตะวันในปฏิทิน → แตะงานที่คุณเกี่ยวข้อง → ตกลง"}
+        accent={DOC_TYPE_META[issue?.type]?.color || ACCENT} accentDark={issue?.type === "delivery" ? "#b91c1c" : "#0369a1"}
+        onPick={onPickJob} />
+      {issueBusy && (
+        <Box sx={{ position: "fixed", inset: 0, zIndex: 1500, display: "grid", placeItems: "center", bgcolor: "rgba(15,23,42,.18)" }}>
+          <CircularProgress />
+        </Box>
+      )}
+      {issue?.step === "form" && (
+        <Suspense fallback={null}>
+          {issue.type === "delivery" ? (
+            <DeliveryNoteDialog open onClose={closeIssue} job={issue.job || {}} docOverride={issue.docOverride || null} initialMode={issue.initialMode || null} />
+          ) : (
+            <WorkNoticeDialog open onClose={closeIssue} job={issue.job || {}} canUseRunningNumber={canEdit}
+              docOverride={issue.docOverride || null} initialMode={issue.initialMode || null} />
+          )}
+        </Suspense>
+      )}
 
       {/* ✅ กล่องดูเอกสารย้อนหลัง — ตัวเดียวกับตอนออกเอกสาร (ดู/พิมพ์/แชร์/ส่งอีเมล) */}
       {previewRow && (

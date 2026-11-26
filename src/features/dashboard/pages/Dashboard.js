@@ -39,6 +39,7 @@ import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isParticip
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
+import ContractSummaryWidget from "../components/ContractSummaryWidget";
 import TodayCheckInCard from "@/features/attendance/components/TodayCheckInCard";
 import MobileHome from "../components/MobileHome";
 import DesktopOverview from "../components/DesktopOverview";
@@ -420,20 +421,24 @@ const Dashboard = () => {
   // เพราะ getEventOp() กรอง unscheduled ทิ้งเสมอ ไม่งั้นสัญญาที่จองรอบถัดไปไว้ล่วงหน้าแล้วจะถูกนับผิดว่า
   // ยังเลยกำหนดอยู่ — events/drafts ถูกกรองตาม role มาจาก backend แล้ว (แอดมิน/manager เห็นทั้งหมด
   // ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
-  const overdueContracts = useMemo(() => {
+  // ✅ สัญญาของผู้ใช้ (ใช้ทั้ง "รอบเข้างานที่ต้องนัด" และสรุป "ภาพรวมงานสัญญา")
+  const myContracts = useMemo(() => {
     if (!canViewContracts) return [];
     // ✅ (11 ต.ค. 2569 ผู้ใช้: "แก้ไขให้แสดงแค่ของผู้รับผิดชอบ ไม่ใช่แสดงหมด") — ที่ไม่ใช่แอดมิน/ผู้จัดการ
     //    เห็นเฉพาะสัญญาที่ตัวเองเป็นผู้รับผิดชอบ (ไม่นับงานที่แค่เป็นหัวหน้าทีม/ลูกทีม) ตรงกับหน้าภาพรวมงาน
     const mineOnly = (e) => isAdminOrManager || isResponsibleOf(e, userData?.userId, userData?.fname);
-    return groupEventsByContract([...events, ...drafts].filter(mineOnly))
-      .filter((c) => c.isRealContract)
+    return groupEventsByContract([...events, ...drafts].filter(mineOnly)).filter((c) => c.isRealContract);
+  }, [canViewContracts, events, drafts, isAdminOrManager, userData?.userId, userData?.fname]);
+  const overdueContracts = useMemo(() => {
+    if (!canViewContracts) return [];
+    return myContracts
       .map((c) => {
         const info = nextVisitOverdueInfo(c);
         return info ? { ...c, overdueInfo: info } : null;
       })
       .filter(Boolean)
       .sort((a, b) => a.overdueInfo.monthsUntilDue - b.overdueInfo.monthsUntilDue);
-  }, [canViewContracts, events, drafts, isAdminOrManager, userData?.userId, userData?.fname]);
+  }, [canViewContracts, myContracts]);
   const roundCounts = overdueContracts.reduce((m, c) => ({ ...m, [c.overdueInfo.state]: (m[c.overdueInfo.state] || 0) + 1 }), {});
 
   // ✅ ดึง JSX ของบล็อก "สัญญาที่เลยกำหนด/คงค้าง" ออกมาเป็นตัวแปรเดียว ใช้ซ้ำได้ 2 จุด — จอกว้าง
@@ -442,8 +447,13 @@ const Dashboard = () => {
   // "งานวางแผนล่วงหน้า" ในแถบข้างแทน (ดู sidebarContent) ตามที่ผู้ใช้ขอ — ไม่ใช้ตัวแปรเดียวกันซ้ำ
   // ตำแหน่งเดิมเพราะ sidebarContent ถูกใช้ render ทั้งจอมือถือ/จอกว้าง (คนละคอลัมน์กัน) ถ้าใส่ตรงๆ
   // ในนั้นจะไปโผล่ซ้ำที่แถบข้างฝั่งขวาของจอกว้างด้วย ทั้งที่ต้องการให้จอกว้างอยู่ฝั่งซ้ายเท่านั้น
+  const contractSummary = canViewContracts && myContracts.length > 0
+    ? <ContractSummaryWidget contracts={myContracts} overdue={overdueContracts} loading={loading} />
+    : null;
+
+  // 🔁 (26 พ.ย. 2569) มีสรุป "ภาพรวมงานสัญญา" แล้ว (รวมเลยกำหนด/ใกล้ถึงกำหนดไว้ในกลุ่ม "ต้องระวัง") — ไม่แสดงรายการซ้ำอีกกล่อง
   const overdueContractsBlock =
-    canViewContracts && overdueContracts.length > 0 ? (
+    canViewContracts && overdueContracts.length > 0 && !contractSummary ? (
       <Widget
         title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length} icon={EventRepeatRounded}
         tone={roundCounts.overdue || roundCounts.due_now ? DANGER : "#d97706"}
@@ -740,9 +750,13 @@ const Dashboard = () => {
           ✅ ตัวเลขใบเสนอราคาที่ต้องติดตามยังเห็นอยู่ เป็นป้ายแดงบนช่อง "ใบเสนอราคา" แทนแบนเนอร์ ─── */}
             {/* 🔁 (27 ต.ค. 2569) หัว "เมนูหลัก" ย้ายเข้าไปอยู่ใน HomeMenu เอง (ต้องดำเนินการ · เมนูทั้งหมด) */}
             {isLargeScreen ? (
+              <>
+              {/* จอคอม: สรุปงานสัญญาอยู่บนสุดของเนื้อหา (ภาพรวมงานเป็นเมนูอันดับต้น) แล้วจึงภาพรวมผลงาน */}
+              {contractSummary}
               <DesktopOverview events={events} users={users} loading={loading}
                 teamView={isAdminOrManager} myName={userData?.fname || ""}
                 showValue={can(userData, "approveJobs") || can(userData, "viewAllJobs")} />
+              </>
             ) : (
             <HomeMenu
               userData={userData}
@@ -778,6 +792,9 @@ const Dashboard = () => {
           เลยต้องซ่อนสำเนานี้บนจอมือถือด้วย .dashboard-desktop-only กันโชว์ซ้ำ 2 ที่ — ส่วนช่าง (ไม่มี
           sidebarContent ให้แทรกด้วย เพราะทั้งก้อนนั้นเฉพาะแอดมิน/manager) ยังคงเห็นสำเนานี้ตามปกติ
           ทั้งจอมือถือ/จอกว้างเหมือนเดิม ไม่ต้องซ่อน ─── */}
+            {/* ✅ (26 พ.ย. 2569 ผู้ใช้: "ทำหน้า dashboard ให้แสดงข้อมูลในส่วนของภาพรวมงานด้วยที่จำเป็น ชัดเจนและดูง่าย")
+                สรุปงานสัญญา 4 ตัวเลข + งานที่ต้องเข้าเดือนนี้แต่ยังไม่ลงตาราง — อยู่ก่อนรายการรอบที่ต้องนัด */}
+            {!isLargeScreen && contractSummary}
             {isAdminOrManager ? (
               <div className="dashboard-desktop-only">{overdueContractsBlock}</div>
             ) : (

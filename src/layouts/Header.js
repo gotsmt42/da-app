@@ -233,7 +233,19 @@ const Header = ({ toggleMobileSidebar }) => {
             ออกไปก่อนหน้านี้ — ตอนนี้เพิ่มกลับมาเฉพาะ 3 เมนูที่ใช้บ่อยและไม่มีใน sidebar เห็นง่ายๆ ระหว่าง
             ทำงาน (การดำเนินงาน/ภาพรวมสัญญา/ติดตามใบเสนอราคา) แทน ให้กระชับ ไม่รกเหมือนของเดิมที่มี 4 เมนู */}
         <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
-          {/* ✅ ตารางงานอยู่ซ้ายสุด (ผู้ใช้ขอ) — หน้าที่เปิดบ่อยที่สุด */}
+          {/* 🔁 (26 พ.ย. 2569 ผู้ใช้: "Header อันนี้ไว้หน้าสุด") ภาพรวมงานอยู่ซ้ายสุด แล้วจึงตารางงาน */}
+          {canViewContracts && (
+            <NavItem>
+              <Link
+                to="/contracts"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
+              >
+                <AppIcon.Contract size={13} /> ภาพรวมงาน
+                <HeaderCount n={overdueContractCount} />
+              </Link>
+            </NavItem>
+          )}
+          {/* ✅ ตารางงานถัดจากภาพรวมงาน — หน้าที่เปิดบ่อยที่สุด */}
           {/* ✅ ทางลัดตารางงาน — สลับดูได้จากปุ่มเดียว ไม่ต้องเปิด sidebar ก่อน (ของเดิมเป็นลิงก์
               ตายตัวไปทางเดียว ผู้ใช้ขอให้ทำเป็นตัวเลือกแทน) ตัวเลือกต่างกันตาม role — ดู scheduleOptionsFor
               ✅ แอดมิน/manager เห็นด้วย (canViewService ครอบคลุมทั้ง 2 role นี้อยู่แล้ว) เดิมมีแค่ลิงก์
@@ -271,17 +283,6 @@ const Header = ({ toggleMobileSidebar }) => {
               <HeaderCount n={badges.closeRequests} />
             </Link>
           </NavItem>
-          )}
-          {canViewContracts && (
-            <NavItem>
-              <Link
-                to="/contracts"
-                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
-              >
-                <AppIcon.Contract size={13} /> ภาพรวมงาน
-                <HeaderCount n={overdueContractCount} />
-              </Link>
-            </NavItem>
           )}
           {canViewQuotations && (
           <NavItem>
@@ -321,6 +322,17 @@ const Header = ({ toggleMobileSidebar }) => {
               >
                 <AppIcon.Ot size={13} /> ขอ OT
                 <HeaderCount n={badges.ot} />
+              </Link>
+            </NavItem>
+          )}
+          {/* ✅ (26 พ.ย. 2569 ผู้ใช้: "เอกสารเอามาไว้ตรง header ด้วย จอคอม") — ออก/ดูใบแจ้งเข้างาน · ใบส่งมอบงาน */}
+          {can(userData, "viewDocuments") && (
+            <NavItem>
+              <Link
+                to="/documents"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/documents") ? "active" : ""}`}
+              >
+                <AppIcon.Documents size={13} /> เอกสาร
               </Link>
             </NavItem>
           )}
