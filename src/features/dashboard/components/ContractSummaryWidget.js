@@ -2,7 +2,7 @@
  * ContractSummaryWidget — สรุป "ภาพรวมงาน" (สัญญา) บนหน้าแรก
  *
  * ✅ (26 พ.ย. 2569 ผู้ใช้: "ทำหน้า dashboard ให้แสดงข้อมูลในส่วนของภาพรวมงานด้วยที่จำเป็น ชัดเจนและดูง่าย")
- *    4 ตัวเลขที่ต้องรู้ทุกวัน (กดแล้วเปิดหน้า/มุมมองนั้นตรงๆ) + รายการ "ต้องระวัง" (เลยกำหนด · ใกล้ถึงกำหนด · ใกล้หมดสัญญา)
+ *    4 ตัวเลขที่ต้องรู้ทุกวัน (กดแล้วเปิดหน้า/มุมมองนั้นตรงๆ) + รายการ "ต้องระวัง" (เลยกำหนด · ใกล้ถึงกำหนด · ยังไม่ลงแผนงาน · ใกล้หมดสัญญา)
  *      ① ต้องเข้าเดือนนี้ (ตามแผนงานทั้งปี) — ลงตารางแล้ว / ยังไม่ลง
  *      ② ต้องนัดรอบถัดไป (เลยกำหนด/ถึงรอบ — ตัวเดียวกับป้ายเตือนในหน้าภาพรวมงาน)
  *      ③ ใกล้หมดอายุ  ④ รอต่อสัญญา (หมดอายุแล้วยังไม่ต่อ)
@@ -15,7 +15,7 @@ import { Box, Stack, Typography } from "@mui/material";
 import { ChevronRightRounded as ChevronRight } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 import { contractStatusInfo, renewalMap } from "@/shared/utils/contractOverdue";
-import { buildContractPlan, suggestFirstMonth, monthKeyOf, sentPlanOf, adherenceOf, thaiMonthLabel, isMonthKey } from "@/shared/utils/contractPlan";
+import { buildContractPlan, suggestFirstMonth, monthKeyOf, monthDiff, sentPlanOf, adherenceOf, thaiMonthLabel, isMonthKey } from "@/shared/utils/contractPlan";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE } from "@/shared/ui/PageKit";
 import { Loading } from "./DashWidgets";
 
@@ -87,10 +87,28 @@ export default function ContractSummaryWidget({ contracts = [], overdue = [], lo
       (r.state === "overdue" ? late : soon).push({ c, tail: `${r.inYear}/${plan.per} · ${thaiMonthLabel(r.month)}`, tip: `ครั้งที่ ${r.label} ตามแผน ยังไม่ลงตาราง` });
       seen.add(c.key);
     });
+    /**
+     * ✅ (27 พ.ย. 2569 ผู้ใช้: "เพิ่มสัญญาที่ยังไม่ลงแผนงานด้วยให้สมบูรณ์") สัญญาที่ยังไม่มีครั้งไหนลงตารางเลย
+     *    ป้ายเตือนรอบเข้างานของระบบนับจากครั้งล่าสุดที่เข้า — สัญญาที่ยังไม่เคยลงสักครั้งจึงไม่เคยถูกเตือน (หลุดได้)
+     *    เริ่มสัญญาแล้ว = จุดส้ม "ยังไม่ลงวันเข้างาน" · ยังไม่ถึงวันเริ่ม = จุดเทา "เริ่ม <เดือน>" · เรียงจากวันเริ่มเก่าสุด
+     */
+    const unplanned = live
+      .filter((c) => !seen.has(c.key) && !(c.visits || []).some((v) => !v.unscheduled && v.start))
+      .map((c) => {
+        const startKey = monthKeyOf(c.contractStart);
+        const started = !startKey || monthDiff(startKey, nowKey) >= 0;
+        return {
+          c, startKey,
+          dot: started ? "#f59e0b" : "#94a3b8",
+          tail: started ? "ยังไม่ลงวันเข้างาน" : `เริ่ม ${thaiMonthLabel(startKey)}`,
+          tip: "สัญญานี้ยังไม่มีครั้งไหนลงตารางเลย",
+        };
+      })
+      .sort((x, y) => String(x.startKey || "").localeCompare(String(y.startKey || "")));
     const ending = expiring.map((c) => ({ c, tail: `เหลือ ${status(c)?.daysLeft ?? "-"} วัน`, tip: "ใกล้หมดสัญญา — ควรเสนอราคาต่อสัญญา" }))
       .sort((x, y) => (status(x.c)?.daysLeft ?? 0) - (status(y.c)?.daysLeft ?? 0));
     const booked = thisMonth.filter((r) => r.visits.length > 0).length;
-    return { nowKey, live, expiring, awaiting, late, soon, ending, thisMonth: thisMonth.length, booked, planProblems };
+    return { nowKey, live, expiring, awaiting, late, soon, unplanned, ending, thisMonth: thisMonth.length, booked, planProblems };
   }, [contracts, overdue]);
 
   const overdueNow = overdue.filter((c) => c.overdueInfo.state === "overdue").length;
@@ -98,6 +116,7 @@ export default function ContractSummaryWidget({ contracts = [], overdue = [], lo
   const groups = [
     { key: "late", label: "เลยกำหนดเข้า", list: data.late, dot: "#ef4444" },
     { key: "soon", label: "ใกล้ถึงกำหนด", list: data.soon, dot: "#f59e0b" },
+    { key: "unplanned", label: "ยังไม่ลงแผนงาน", list: data.unplanned, dot: "#f59e0b" },
     { key: "ending", label: "ใกล้หมดสัญญา", list: data.ending, dot: "#f59e0b" },
   ].filter((g) => g.list.length);
   const notBooked = data.thisMonth - data.booked;
@@ -151,12 +170,12 @@ export default function ContractSummaryWidget({ contracts = [], overdue = [], lo
                       {g.label} <Box component="span" sx={{ color: INK, fontWeight: 800 }}>{g.list.length}</Box>
                     </Typography>,
                     <Box key={`${g.key}-c`} sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, minWidth: 0, mb: { xs: 1, sm: 0 } }}>
-                      {shown.map(({ c, tail, tip }) => (
+                      {shown.map(({ c, tail, tip, dot }) => (
                         <Box key={`${g.key}-${c.key}`} component={Link} to={`/contracts?find=${encodeURIComponent(c.key)}`}
                           title={[c.contractNo, c.company, tip].filter(Boolean).join(" · ")}
                           sx={{ display: "inline-flex", alignItems: "center", gap: 0.75, maxWidth: 260, height: 28, pl: 1, pr: 1.1, borderRadius: 1.5, textDecoration: "none",
                             fontSize: "0.76rem", fontWeight: 600, color: INK_2, bgcolor: "#fff", border: `1px solid ${LINE}`, "&:hover": { borderColor: "#cbd5e1", bgcolor: SURFACE } }}>
-                          <Box component="span" sx={{ width: 7, height: 7, borderRadius: 99, bgcolor: g.dot, flexShrink: 0 }} />
+                          <Box component="span" sx={{ width: 7, height: 7, borderRadius: 99, bgcolor: dot || g.dot, flexShrink: 0 }} />
                           <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.site || c.company || c.contractNo || "สัญญา"}</Box>
                           <Box component="span" sx={{ flexShrink: 0, color: FAINT, fontWeight: 700, whiteSpace: "nowrap" }}>{tail}</Box>
                         </Box>
@@ -172,7 +191,7 @@ export default function ContractSummaryWidget({ contracts = [], overdue = [], lo
               </Box>
             </Box>
           ) : (
-            <Typography sx={{ px: 2, py: 1.5, fontSize: "0.8rem", fontWeight: 700, color: "#15803d" }}>✓ ไม่มีงานสัญญาที่เลยกำหนด ใกล้ถึงกำหนด หรือใกล้หมดสัญญา</Typography>
+            <Typography sx={{ px: 2, py: 1.5, fontSize: "0.8rem", fontWeight: 700, color: "#15803d" }}>✓ ไม่มีงานสัญญาที่เลยกำหนด ใกล้ถึงกำหนด ยังไม่ลงแผนงาน หรือใกล้หมดสัญญา</Typography>
           )}
           </Box>
         </>
