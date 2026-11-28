@@ -27,15 +27,15 @@ const DOW = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 const ymd = (d) => moment(d).format("YYYY-MM-DD");
 
 /** วันที่ทุกวันของงาน (allDay: end = วันถัดไป) */
-const daysOfEvent = (ev) => {
-  const s = moment(ev.start).startOf("day");
-  let e = ev.end ? moment(ev.end).startOf("day") : s.clone();
-  if (ev.allDay !== false && e.isAfter(s)) e = e.subtract(1, "day");
-  if (e.isBefore(s)) e = s.clone();
-  const out = [];
-  for (let d = s.clone(); !d.isAfter(e) && out.length < 62; d.add(1, "day")) out.push(d.format("YYYY-MM-DD"));
-  return out;
-};
+// const daysOfEvent = (ev) => {
+//   const s = moment(ev.start).startOf("day");
+//   let e = ev.end ? moment(ev.end).startOf("day") : s.clone();
+//   if (ev.allDay !== false && e.isAfter(s)) e = e.subtract(1, "day");
+//   if (e.isBefore(s)) e = s.clone();
+//   const out = [];
+//   for (let d = s.clone(); !d.isAfter(e) && out.length < 62; d.add(1, "day")) out.push(d.format("YYYY-MM-DD"));
+//   return out;
+// };
 const titleOf = (ev) => [ev.title, ev.system, ev.site].filter(Boolean).join(" · ");
 
 export default function OtCalendarView({ doc, holidays, cfg, isMobile }) {
