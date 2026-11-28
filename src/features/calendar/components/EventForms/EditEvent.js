@@ -11,6 +11,7 @@ import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { normTime } from "./timeFormat";
 import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
 import { WORK_VALUE_CSS, workValueInitial, workValueCardHtml, bindWorkValueCard, workerValuesSummaryHtml } from "./workValueCard";
@@ -494,6 +495,8 @@ function injectStyles() {
       padding: 3px 9px; font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.4;
     }
     .ee-range-more:hover { background: #f8fafc; }
+    .ee-range-locknote { flex-shrink: 0; margin-left: auto; font-size: 11.5px; font-weight: 600; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+    .ee-range-locknote[hidden], .ee-range-actions[hidden] { display: none !important; }
     .ee-range-menu {
       position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 208px;
       background: #fff; border: 1px solid #e6e9ef; border-radius: 10px; padding: 5px;
@@ -589,30 +592,30 @@ function injectStyles() {
     .ee-row-confirm-actions .ee-btn { padding: 5px 12px; font-size: 12px; height: auto; }
 
     /* ── กลุ่มข้อมูลหลัก (2 พ.ย. 2569) — ผู้ปฏิบัติงาน · มูลค่างาน · รายละเอียดงานที่ทำ · ไฟล์แนบ ── */
-    #ee-keyGroup { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
-    #ee-keyGroup .ee-key-card { margin: 0; border: 1px solid #dbe4f0; box-shadow: none; }
-    #ee-keyGroup .ee-key-card .ee-card-head { background: #fff; border-bottom: 0; padding: 12px 14px 4px; }
+    .ee-kg { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+    .ee-kg .ee-key-card { margin: 0; border: 1px solid #dbe4f0; box-shadow: none; }
+    .ee-kg .ee-key-card .ee-card-head { background: #fff; border-bottom: 0; padding: 12px 14px 4px; }
     /* 🔁 (2 พ.ย. 2569 ผู้ใช้: "หัวข้อยังดูเล็กๆไม่ชัดเจน") หัวข้อใหญ่ขึ้น หนาขึ้น + ไอคอนใหญ่ขึ้น */
-    #ee-keyGroup .ee-key-card .ee-card-head { padding: 14px 16px 6px !important; gap: 12px !important; align-items: center; }
-    #ee-keyGroup .ee-key-card .ee-card-ico { width: 36px !important; height: 36px !important; border-radius: 10px !important; font-size: 19px !important; background: #eff6ff; border: 0; }
-    #ee-keyGroup .ee-key-card .ee-card-titles h4 { font-size: 16.5px !important; font-weight: 800 !important; color: #0f172a !important; letter-spacing: 0; line-height: 1.3; margin: 0; }
-    #ee-keyGroup .ee-key-card .ee-card-titles p { display: block !important; font-size: 12.5px !important; color: #64748b !important; margin: 2px 0 0; line-height: 1.4; }
-    #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 16px 14px !important; }
-    #ee-keyGroup .ee-key-card .ee-card-body { padding: 8px 14px 12px; }
-    #ee-keyGroup .ee-key-files .ee-card-body { padding: 4px; }
+    .ee-kg .ee-key-card .ee-card-head { padding: 14px 16px 6px !important; gap: 12px !important; align-items: center; }
+    .ee-kg .ee-key-card .ee-card-ico { width: 36px !important; height: 36px !important; border-radius: 10px !important; font-size: 19px !important; background: #eff6ff; border: 0; }
+    .ee-kg .ee-key-card .ee-card-titles h4 { font-size: 16.5px !important; font-weight: 800 !important; color: #0f172a !important; letter-spacing: 0; line-height: 1.3; margin: 0; }
+    .ee-kg .ee-key-card .ee-card-titles p { display: block !important; font-size: 12.5px !important; color: #64748b !important; margin: 2px 0 0; line-height: 1.4; }
+    .ee-kg .ee-key-card .ee-card-body { padding: 8px 16px 14px !important; }
+    .ee-kg .ee-key-card .ee-card-body { padding: 8px 14px 12px; }
+    .ee-kg .ee-key-files .ee-card-body { padding: 4px; }
     /* 🔁 (18 พ.ย. 2569 ผู้ใช้: "ช่องรายละเอียดงานที่ทำ ให้ขยายกว้างขึ้นอีก ให้ดูดี") สูงขึ้น · ขยายตามข้อความ · ตัวอักษรอ่านง่าย */
-    #ee-keyGroup .ee-desc-input { min-height: 150px; font-size: 15px; line-height: 1.65; padding: 12px 14px; border-radius: 12px; resize: none; overflow: hidden;
+    .ee-kg .ee-desc-input { min-height: 150px; font-size: 15px; line-height: 1.65; padding: 12px 14px; border-radius: 12px; resize: none; overflow: hidden;
       transition: height .18s ease-out, border-color .15s ease, box-shadow .15s ease; }
     @media (max-width: 600px) {
-      #ee-keyGroup .ee-key-card .ee-card-head { padding: 12px 12px 4px !important; }
-      #ee-keyGroup .ee-key-card .ee-card-body { padding: 6px 10px 12px !important; }
-      #ee-keyGroup .ee-desc-input { min-height: 170px; }
+      .ee-kg .ee-key-card .ee-card-head { padding: 12px 12px 4px !important; }
+      .ee-kg .ee-key-card .ee-card-body { padding: 6px 10px 12px !important; }
+      .ee-kg .ee-desc-input { min-height: 170px; }
     }
     /* ✅ (20 พ.ย. 2569) อุปกรณ์/อะไหล่ที่ต้องเตรียม — อยู่ใต้รายละเอียดงานในการ์ดเดียวกัน · ยืดตามรายการ (autoGrow.js) */
-    #ee-keyGroup .ee-equip { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
-    #ee-keyGroup .ee-equip > label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #334155; margin: 0 0 6px; }
-    #ee-keyGroup .ee-equip > label .ee-opt { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
-    #ee-keyGroup .ee-equip-input { width: 100%; box-sizing: border-box; min-height: 76px; font-size: 14.5px; line-height: 1.6; padding: 10px 14px; border-radius: 12px; resize: none; overflow: hidden;
+    .ee-kg .ee-equip { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+    .ee-kg .ee-equip > label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #334155; margin: 0 0 6px; }
+    .ee-kg .ee-equip > label .ee-opt { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
+    .ee-kg .ee-equip-input { width: 100%; box-sizing: border-box; min-height: 76px; font-size: 14.5px; line-height: 1.6; padding: 10px 14px; border-radius: 12px; resize: none; overflow: hidden;
       transition: height .18s ease-out, border-color .15s ease, box-shadow .15s ease; }
     .ee-worker-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .ee-worker-row .ee-worker-field { flex: 1 1 auto; min-width: 0; margin: 0; }
@@ -635,8 +638,8 @@ function injectStyles() {
     .ee-value-box input:disabled { background: #f8fafc; color: #475569; }
     .ee-value-unit { font-size: 13px; font-weight: 700; color: #64748b; }
     ${WORK_VALUE_CSS}
-    #ee-keyGroup .ee-note-field { margin-top: 10px; }
-    #ee-keyGroup .ee-note-field label { font-size: 12.5px; font-weight: 700; color: #475569; }
+    .ee-kg .ee-note-field { margin-top: 10px; }
+    .ee-kg .ee-note-field label { font-size: 12.5px; font-weight: 700; color: #475569; }
     .ee-ts-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .ee-ts-person > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: #0f172a; }
     .ee-ts-person--muted { color: #94a3b8; }
@@ -2173,7 +2176,7 @@ export const getEditEvent = async ({
           : `<span class="ee-hm-value${eventTeam ? "" : " ee-hm-value--empty"}">${eventTeam ? attrHtml(eventTeam) : "ยังไม่ระบุ"}</span>`}
       </div>
       ${eventJobClassMeta ? `<div class="ee-hm-item">
-        <span class="ee-hm-label"><i aria-hidden="true">${eventJobClassMeta.emoji}</i>ประเภทงาน</span>
+        <span class="ee-hm-label"><i aria-hidden="true">${eventJobClassMeta.emoji}</i>รูปแบบงาน</span>
         <span class="ee-hm-value">${attrHtml(eventJobClassMeta.label)}</span>
       </div>` : ""}
       ${/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้ช่องเลือกวันที่ขึ้นมาด้านบน เปลี่ยนง่าย ไว้ข้างล่างประเภทงาน · ข้างล่างก็ยังคงไว้ · เวลาแก้ให้ซิงค์กัน")
@@ -2215,23 +2218,6 @@ export const getEditEvent = async ({
     ${/* ✅ (26 ต.ค. 2569 ผู้ใช้: "อยากให้การแสดงแบบนี้ไปอยู่ใน editEvent ด้วย") กล่องสรุปเอกสารประจำงาน ตัวเดียวกับการ์ดหน้าการดำเนินงาน */""}
     ${ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled ? "" : `<div id="ee-docsMount" data-no-draft></div>`}
 
-    <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
-         (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
-    ${canViewOperation ? `
-    <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่าง = งานของฉัน · แอดมิน = การดำเนินงาน · ปุ่มเล็กลง ไม่กินพื้นที่ แต่ชัดเจนสวยงาม") -->
-    <button type="button" id="btnGoOperation" class="ee-link-card">
-      <span class="ee-link-ico">
-        ${showBoard
-          ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h2v2H3V5Zm4 0h14v2H7V5Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Z"/></svg>'
-          : '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.8-3.6 2.1-4.7-1.8-.2-3.6-.3-6.1-.3Zm11.7 1.3-1.4-1.4-3.3 3.3-1.6-1.6-1.4 1.4 3 3 4.7-4.7Z"/></svg>'}
-      </span>
-      <span class="ee-link-text">
-        <b>${showBoard ? "เปิดหน้าการดำเนินงาน" : "เปิดหน้างานของฉัน"}</b>
-        <small>${showBoard ? "ตรวจเอกสาร · อนุมัติปิดงาน" : "บันทึกเข้างาน · แนบเอกสาร · ขอปิดงาน"}</small>
-      </span>
-      <span class="ee-link-arrow" aria-hidden="true">›</span>
-    </button>` : ""}
-
     <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
          งานนี้ตอนยังไม่ approved (งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager ต้องรอการอนุมัติก่อน) -->
     ${/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ให้กดอนุมัติผ่านตรงนี้ได้") งานบริการกดอนุมัติ/ไม่อนุมัติได้ที่แถบขั้นตอนบนสุด (#ee-checkinMount)
@@ -2263,208 +2249,96 @@ export const getEditEvent = async ({
     </div>
     ` : ""}
 
-    <!-- ── แผนที่หน้างาน (บนสุดของฟอร์ม) ────────────────────────────────────
-         ✅ ผู้ใช้สั่ง (28 ก.ย. 2569): "ตำแหน่งหน้างานแสดงเป็นแผนที่ google map เลย ไว้แถวบนสุด"
-         • มีพิกัดที่บันทึกไว้ → server แปลงลิงก์ย่อเป็นตำแหน่ง (GET /customer/map/embed) แล้วฝังแผนที่
-         • ยังไม่มี → แสดงแผนที่ค้นหาจากชื่อโครงการ พร้อมบอกชัดว่าเป็นตำแหน่งโดยประมาณ
-         ⚠️ iframe ใส่ src ทีหลังใน didOpen (ต้องรอแปลงลิงก์ก่อน) — ช่วงนั้นแสดง "กำลังโหลดแผนที่" -->
-    ${eventSite || savedMapUrl ? `
-    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ให้ map กดพับปิดได้ ไม่กินพื้นที่") — แถบชื่อหน้างานอยู่บน กดลูกศรเพื่อกาง/พับแผนที่
-         ค่าเริ่มต้นพับไว้ · จำค่าที่เลือกล่าสุดในเครื่อง · แผนที่โหลดตอนกางครั้งแรก (ไม่เปลืองเน็ตตอนพับ) */""}
-    <div class="ee-map-card" id="ee-mapCard">
-      <div class="ee-map-bar">
-        <span class="ee-map-ico" aria-hidden="true">${googleMapsPinSvg(18)}</span>
-        <div class="ee-map-info">
-          <div class="ee-map-title">ตำแหน่งหน้างาน</div>
-          <div class="ee-map-name"><span>${attrHtml(eventSite) || "—"}</span></div>
-          <div class="ee-map-note${savedMapUrl ? "" : " ee-map-note--warn"}" id="ee-mapNote">
-            ${savedMapUrl ? "ตำแหน่งที่บันทึกไว้ของโครงการนี้" : "ตำแหน่งโดยประมาณจากชื่อโครงการ — ยังไม่ได้บันทึกพิกัด"}
-          </div>
-        </div>
-        ${isAdminOrManagerUser ? `<button type="button" class="ee-map-edit" id="ee-mapEdit">${savedMapUrl ? "✏️ แก้พิกัด" : "📍 บันทึกพิกัด"}</button>` : ""}
-        <a class="ee-map-go" id="ee-mapGo" href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
-          ${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}
-        </a>
-        <button type="button" class="ee-map-toggle" id="ee-mapToggle" aria-expanded="false" title="แสดง/ซ่อนแผนที่">
-          <span id="ee-mapToggleText">แผนที่</span>
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-      <div class="ee-map-frame" id="ee-mapFrameWrap" hidden>
-        <div class="ee-map-wait" id="ee-mapWait">กำลังโหลดแผนที่…</div>
-        <iframe id="ee-mapFrame" title="แผนที่หน้างาน ${attrHtml(eventSite)}" loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade" allowfullscreen style="display:none;"></iframe>
-      </div>
-      ${isAdminOrManagerUser ? `
-      <div id="ee-mapEditor" style="display:none;">
-        <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
-          <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;min-width:180px;">เปิด Google Maps → ค้นหาหน้างาน → แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
-          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e6e9ef;cursor:pointer;">ยกเลิก</button>
-          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#2563eb;border:none;cursor:pointer;">บันทึก</button>
-        </div>
-      </div>` : ""}
-    </div>
-    ` : ""}
-
     ${/* 🧹 (11 ต.ค. 2569) สายสถานะงานย้ายไปอยู่ในกล่องบนสุด (#ee-checkinMount · CheckInOutPanel statusSteps) แล้ว
          — คงไว้เฉพาะงานที่กล่องนั้นไม่แสดง (นัดฝ่ายขาย / งานยังไม่ลงวัน) */""}
     ${ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled ? stepperHtml : ""}
 
 
 
-    <!-- ✅ (2 พ.ย. 2569 ผู้ใช้: "หน้า event ทำให้ข้อมูลสอดคล้อง ดูง่าย ไม่ตาลาย ไม่รก เน้น 1 ผู้เข้าปฏิบัติงาน
-         2 ผู้รับผิดชอบงาน 3 มูลค่างาน 4 รายละเอียดงานที่ทำ พร้อมไฟล์แนบ")
-         กลุ่ม "ข้อมูลหลัก" ขึ้นก่อนทุกอย่าง (ผู้รับผิดชอบอยู่หัวกล่องเป็นช่องแรกอยู่แล้ว) · ข้อมูลงาน/ผู้ติดต่อ/วันที่/สี อยู่ถัดลงไป
-         ผู้ปฏิบัติงานเรียงเลข 1, 2, 3 … ตรงกับ Excel — ข้อมูลเก็บแบบเดิม: team = คนที่ 1 · teamMembers = คนที่ 2 ขึ้นไป -->
-    <div id="ee-keyGroup">
-    <section class="ee-card ee-key-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">👷</span>
-        <div class="ee-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
-        ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span class="ee-card-badge">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-        <div class="ee-worker-row ee-worker-row--lead">
-          <span class="ee-worker-no" aria-hidden="true">1</span>
-          <div class="ee-field ee-worker-field">
-            <select id="editTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ชื่อ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
-          </div>
-          <span class="ee-worker-tag">หัวหน้าทีม</span>
-        </div>
-        <div id="ee-teamMembersList"></div>
-        ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost ee-worker-add" id="ee-addTeamMemberBtn">➕ เพิ่มผู้ปฏิบัติงาน</button>` : ""}
-      </div>
-    </section>
-
-    <section class="ee-card ee-key-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">📝</span>
-        <div class="ee-card-titles"><h4>รายละเอียดงานที่ทำ <span style="color:#dc2626">*</span></h4><p>ทำอะไร ที่ไหน อุปกรณ์/จุดไหน — ช่องเดียวใช้ทั้งตอนลงงานและหลังเข้างาน (อย่างน้อย 10 ตัวอักษร)</p></div>
-        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-        <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
-        <div class="ee-field">
-          <textarea id="editDescription" class="ee-desc-input" rows="5" aria-label="รายละเอียดงานที่ทำ" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
-          <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
-        </div>
-        ${/* ✅ (20 พ.ย. 2569 ผู้ใช้: "สิ่งที่ต้องเตรียมเพิ่มรายละเอียดไป ทำไมไม่มีจุดที่แสดง")
-             ช่องนี้กรอกได้ตอนลงงาน/รับงาน (การ์ดข้อมูล Job) แต่ฟอร์มแก้ไขงานตัดการ์ดนั้นออกไป (10 ต.ค.) ค่าเลยมองไม่เห็นเลย
-             → แสดง + แก้ได้ใต้รายละเอียดงานที่ทำ (ทีมเห็นก่อนออกหน้างาน) · บันทึกแล้วใช้ร่วมทุกวันของงานหลายวัน (server: pickJobInfo) */""}
-        ${ev.extendedProps?.department === "sales" ? "" : `
-        <div class="ee-field ee-equip">
-          <label for="ee-equipment">🧰 อุปกรณ์ / อะไหล่ที่ต้องเตรียม <span class="ee-opt">ไม่บังคับ · บรรทัดละรายการ</span></label>
-          <textarea id="ee-equipment" class="ee-equip-input" rows="2" aria-label="อุปกรณ์ / อะไหล่ที่ต้องเตรียม" placeholder="เช่น บันไดอลูมิเนียม 3 ม.&#10;Smoke detector × 2" ${canEditDocFields ? "" : "disabled"}>${attrHtml(eventEquipment)}</textarea>
-        </div>`}
-        ${/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") บันทึกเก่าของช่าง (workNote) ก่อนรวมเป็นช่องเดียว — แสดงอ่านอย่างเดียว ไม่หาย */""}
-        ${eventWorkNote ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px dashed #dbe3ef;font-size:12.5px;color:#334155;white-space:pre-line;"><b style="display:block;font-size:11.5px;color:#64748b;margin-bottom:2px;">บันทึกเดิมจากช่าง</b>${attrHtml(eventWorkNote)}</div>` : ""}
-      </div>
-    </section>
-
-    ${ev.extendedProps?.department === "sales" ? "" : `
-    <section class="ee-card ee-key-card">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">💰</span>
-        <div class="ee-card-titles"><h4>มูลค่าครั้งนี้</h4><p>1 ค่าต่องาน · แอดมิน/ผู้รับผิดชอบระบุ · ${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "เลือกก่อน/รวม VAT · เว้นว่างได้"}</p></div>
-      </div>
-      <div class="ee-card-body">
-        ${workValueCardHtml(wvInit, { disabled: isViewOnly || !canEditJobValueSingle })}
-        ${workerValuesSummaryHtml(ev.extendedProps || {})}
-      </div>
-    </section>`}
-
-    ${ev.extendedProps?.department === "sales" ? "" : `<section class="ee-card ee-key-card ee-key-files"><div class="ee-card-body"><div id="ee-sitePhotosMount" data-no-draft></div></div></section>`}
-    </div>
-
-    <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
-         "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
-         ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
-    ${eventContractGroupId ? `
-    ${/* ✅ ที่แก้ (ผู้ใช้แจ้ง: "ข้อมูลสัญญาให้ย่อขยายได้ ดูรก ปกติไม่ค่อยได้เปิดดู ทำให้ปิด default"):
-         เดิมกล่องนี้กางอยู่เสมอและอยู่บนสุด กินเต็มหน้าจอแรกบนมือถือ (7 ช่องกรอก) ทั้งที่คนเปิดฟอร์มนี้
-         ส่วนใหญ่มาแก้ "วันที่/สถานะ/ทีม" ของครั้งนี้ ไม่ได้มาแก้ข้อมูลระดับสัญญาซึ่งนานๆ แก้ที
-         ✅ ใช้ <details> ของเบราว์เซอร์ตรงๆ — พับได้โดยไม่ต้องเขียน JS เพิ่มสักบรรทัด และยังทำงาน
-         ได้แม้ JS ส่วนอื่นพัง · หัวข้อสรุปเลขที่สัญญา/จำนวนครั้งให้เห็นเลยโดยไม่ต้องกาง
-         ⚠️ ไม่ใส่ open — ปิดเป็นค่าเริ่มต้นตามที่ผู้ใช้สั่ง */""}
-    <details class="ee-contract-box ee-form">
-      <summary class="ee-contract-box-label">
-        <span class="ee-card-ico" aria-hidden="true">📑</span>
-        <span class="ee-card-titles">
-          <h4>ข้อมูลสัญญา</h4>
-          <span class="ee-contract-peek">${[
-            eventContractNo ? attrHtml(eventContractNo) : null,
-            eventVisitCount ? `${attrHtml(String(eventVisitCount))} ครั้ง` : null,
-          ].filter(Boolean).join(" · ") || (isAdminOrManagerUser ? "แตะเพื่อดู/แก้" : "แตะเพื่อดู")}</span>
-        </span>
-      </summary>
-      <div class="ee-card-body">
-      <div class="ee-lock-note"><span aria-hidden="true">${isAdminOrManagerUser ? "ℹ️" : "🔒"}</span><span>${isAdminOrManagerUser ? `แก้ที่นี่ = อัปเดต <b>ทุกครั้งในสัญญานี้</b> พร้อมกัน` : `<b>ดูได้อย่างเดียว</b> — แก้ไขได้เฉพาะแอดมิน/manager`}</span></div>
-      ${/* เรียงเป็นคู่ที่อ่านด้วยกัน: เลขที่เอกสาร · ช่วงสัญญา · รอบการเข้า · มูลค่า */""}
-      <div class="ee-info-grid">
-        <div class="ee-field">
-          <label>เลขที่สัญญา</label>
-          <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-        <div class="ee-field">
-          <label>เลขที่ใบเสนอราคา</label>
-          <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-      </div>
-      <div class="ee-info-grid ee-info-grid--pair">
-        <div class="ee-field">
-          <label>วันที่เริ่มสัญญา</label>
-          <input id="editContractStart" type="date" value="${eventContractStart}" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-        <div class="ee-field">
-          <label>วันที่สิ้นสุดสัญญา</label>
-          <input id="editContractEnd" type="date" value="${eventContractEnd}" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-      </div>
-      <div class="ee-info-grid ee-info-grid--pair">
-        <div class="ee-field">
-          <label>จำนวนครั้งทั้งหมด</label>
-          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-        <div class="ee-field">
-          <label>เข้าทุกกี่เดือน</label>
-          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3" ${isAdminOrManagerUser ? "" : "disabled"}>
-        </div>
-      </div>
-      <div class="ee-info-grid">
-        <div class="ee-field">
-          <label>มูลค่างานทั้งสัญญา (บาท)</label>
-          <div class="ee-money-input">
-            <span class="ee-money-symbol">฿</span>
-            <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${isAdminOrManagerUser ? "" : "disabled"}>
-          </div>
-        </div>
-      </div>
-      <!-- ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — เดิมลิงก์ระหว่างสองหน้านี้เป็นทางเดียวล้วนๆ (ภาพรวมงาน
-           กดเข้ามาดูงาน/ปฏิทินได้ แต่จากปฏิทินไม่มีทางกลับไปดู "ทั้งสัญญา" เลย ต้องออกไปเปิดหน้านั้นเอง
-           แล้วค้นหาสัญญาซ้ำอีกรอบ) — กล่องนี้บอกอยู่แล้วว่าเป็นข้อมูล "ทั้งสัญญา" จึงเป็นที่ที่เหมาะที่สุด
-           ⚠️ ต้องส่ง year=all ไปด้วยเสมอ ไม่งั้นตัวกรองปีของหน้าปลายทาง (ค่าเริ่มต้น = ปีปัจจุบัน) จะซ่อน
-           สัญญาของปีอื่นทิ้ง เปิดไปแล้วเจอตารางว่างทั้งที่สัญญามีอยู่จริง (ดู ?year= ใน ContractOverview.js)
-           ค้นด้วยเลขที่สัญญาก่อน ถ้ายังไม่มีเลขที่ค่อย fallback ไปใช้ชื่อบริษัท/โครงการแทน -->
-      <a class="ee-contract-link"
-         href="/contracts?year=all&q=${encodeURIComponent(eventContractNo || eventCompany || eventSite || "")}"
-         title="เปิดหน้าภาพรวมงาน พร้อมค้นหาสัญญานี้ให้อัตโนมัติ">
-        📊 ดูสัญญานี้ในภาพรวมงาน
-      </a>
-      </div>
-    </details>
-    ` : ""}
-
-    <!-- Status bar -->
-    ${/* ✅ ตัวเลือกสถานะย้ายขึ้นไปอยู่บนหัวกล่องแล้ว (ผู้ใช้สั่ง 3 ต.ค. 2569) — ดู #ee-head-status */""}
-
-    ${/* ✅ (8 ต.ค. 2569 "ดูยาวและเยอะเกินไป ควรให้กดข้อมูลแก้ไขได้เลย") เลิกใช้กล่องสรุป + แผงพับ
-          แสดงช่องข้อมูลให้แก้ได้ทันทีในแผงเดียวกะทัดรัด (หัวข้อย่อยบาง คั่นด้วยเส้น) */""}
-    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ข้อมูลงานส่วนนี้จัดรูปแบบใหม่ให้ดูง่าย") — การ์ดแยกทีละหมวด หัวข้อใหญ่ชัด แบบเดียวกับกลุ่มข้อมูลหลักด้านบน */""}
     <style>
-      #ee-editGroup { display:flex; flex-direction:column; gap:12px; margin:0 0 12px; }
-      #ee-editGroup > .ee-eg-head { display:none; }
-      #ee-editGroup .ee-card { margin:0; }
+      /* 🔁 (28 พ.ย. 2569) หมวดของฟอร์ม — หัวข้อเทาเล็ก + เส้นยาว · การ์ดในหมวดห่างกันเท่ากันทุกหมวด */
+      .ee-kg { display:flex; flex-direction:column; gap:12px; margin:0 0 6px; }
+      .ee-kg > .ee-card, .ee-kg > .ee-map-card, .ee-kg > .ee-contract-box { margin:0 !important; }
+      .ee-zone-title { display:flex; align-items:baseline; gap:8px; margin:20px 2px 10px; font-size:13.5px; font-weight:800; color:#334155; }
+      .ee-zone-title small { font-size:12px; font-weight:500; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .ee-zone-title::after { content:""; flex:1; min-width:24px; height:1px; background:#e6e9ef; align-self:center; }
+      /* ข้อมูลสัญญา — การ์ดขาวแบบเดียวกับการ์ดอื่น (เดิมพื้นม่วงไล่สี ดูแปลกแยก) */
+      .ee-kg > .ee-contract-box { background:#fff; border:1px solid #e6e9ef; border-radius:14px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+      @media (max-width: 600px) { .ee-zone-title { margin:16px 2px 8px; } .ee-zone-title small { display:none; } }
+      /* ── 🔁 (28 พ.ย. 2569 ผู้ใช้: "ดูเลื่อนแปลกๆ ไม่ลงตัว รวมถึงความเข้ม สีสัน…ดูรก ไม่สบายตา" · "วิเคราะห์ว่าการจัดวางแบบไหนทำงานง่าย ดูข้อมูลครบ")
+         เลิกแบบ 2 คอลัมน์อิสระ (คอลัมน์ขวาสั้นกว่า → ที่ว่างโหว่ / sticky แล้วเลื่อนคนละจังหวะ)
+         → เลื่อนทางเดียวทั้งฟอร์ม เรียงหมวดตามลำดับงานจริง และ "จับคู่การ์ดเป็นแถว" เฉพาะคู่ที่เป็นเรื่องเดียวกัน สูงใกล้กัน
+            หน้างาน: ตำแหน่ง | ผู้ติดต่อ · ทีมและวันเวลา: ผู้ปฏิบัติงาน | วันที่และเวลา — การ์ดในแถวสูงเท่ากัน ขอบตรงกันทุกแถว
+            การ์ดเนื้อหายาว (รายละเอียด · ไฟล์ · มูลค่า · ข้อมูลงาน · สัญญา) เต็มแถว
+         ความเข้ม/สี: ตัดไอคอนอีโมจิหัวการ์ด · หัวข้อหนา 700 · ป้ายช่อง 600 · เส้นขอบ 1px · สีน้ำเงินเหลือแค่ปุ่มหลัก */
+      .ee-cols-grid { display:flex; flex-direction:column; }
+      .ee-col { display:contents; }
+      .ee-zone--nav { order:0; } .ee-zone--site { order:1; } .ee-zone--team { order:2; } .ee-zone--work { order:3; } .ee-zone--info { order:4; } .ee-zone--other { order:5; }
+      .ee-zone--nav > .ee-link-card { width:100%; margin:4px 0 0; }
+      .ee-zone-title { font-size:14px; font-weight:700; color:#334155; }
+      .ee-zone-title small { font-weight:400; }
+      .ee-cols { container-type:inline-size; container-name:eecols; }
+      @container eecols (min-width: 860px) {
+        .ee-zone--site > .ee-kg { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px; align-items:stretch; }
+        .ee-kg > :only-child { grid-column:1 / -1; }
+        .ee-zone--site #ee-mapCard { height:100%; box-sizing:border-box; }
+        /* แผนที่ครึ่งแถว: บรรทัดบน ไอคอน+ชื่อหน้างาน · บรรทัดล่าง ปุ่ม 3 ปุ่มเท่ากัน */
+        .ee-zone--site #ee-mapCard .ee-map-bar { padding:14px 16px; display:grid !important; grid-template-columns:40px repeat(3, minmax(0, 1fr)); gap:12px 8px; align-items:center; }
+        .ee-zone--site #ee-mapCard .ee-map-ico { grid-column:1; grid-row:1; }
+        .ee-zone--site #ee-mapCard .ee-map-info { grid-column:2 / -1; grid-row:1; flex:none !important; min-width:0; }
+        .ee-zone--site #ee-mapCard .ee-map-edit { grid-column:1 / 3; grid-row:2; margin-left:0 !important; }
+        .ee-zone--site #ee-mapCard .ee-map-go, .ee-zone--site #ee-mapCard .ee-map-toggle { grid-row:2; }
+        .ee-zone--site #ee-mapCard .ee-map-bar:not(:has(.ee-map-edit)) .ee-map-go { grid-column:1 / 3; }
+        .ee-zone--site #ee-mapCard .ee-map-go, .ee-zone--site #ee-mapCard .ee-map-edit, .ee-zone--site #ee-mapCard .ee-map-toggle { justify-content:center; white-space:nowrap; padding:0 8px; min-width:0; }
+        /* 🔁 (28 พ.ย. 2569 ผู้ใช้: "ถ้างานมันยืนตรงนี้ก็ดูแหว่งๆ โล่งๆ") ผู้ปฏิบัติงาน / วันที่และเวลา ไม่จับคู่กันแล้ว
+           (ช่วงวันที่หลายช่วงทำให้การ์ดวันที่สูงกว่ามาก การ์ดคนโล่งครึ่งใบ) → เต็มแถวทั้งคู่ แต่จัดในการ์ดให้กะทัดรัด:
+           วันที่เริ่ม–สิ้นสุด | เวลาเริ่ม–สิ้นสุด แถวเดียว 4 ช่อง (หลายช่วงวัน = รายการเต็มแถว) */
+        .ee-zone--team .ee-card-body:has(> #ee-singleDateSection) { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); column-gap:16px; }
+        .ee-zone--team .ee-card-body:has(> #ee-singleDateSection) > * { grid-column:1 / -1; }
+        .ee-zone--team .ee-card-body:has(> #ee-singleDateSection) > #ee-singleDateSection { grid-column:1; }
+        .ee-zone--team .ee-card-body:has(> #ee-singleDateSection) > #ee-singleDateSection ~ .ee-info-grid { grid-column:2; }
+        .ee-zone--team .ee-card-body:has(> #ee-multiDateSection:not([style*="none"])) > #ee-singleDateSection ~ .ee-info-grid { grid-column:1 / -1; }
+      }
+      /* 🔁 (28 พ.ย. 2569 ผู้ใช้: "ติ๊กช่องลงเลือกหลายช่วงแล้วช่องมันดูเล็กๆ ดูยาก ไม่สวย" · "สีสัน และการแสดงผล ให้สมบูรณ์")
+         การ์ดช่วงวันที่ = ขนาดเดียวกับช่องอื่นของฟอร์ม: ป้าย "วันที่เริ่ม/วันที่สิ้นสุด" เหนือช่อง · ช่องสูง 44px ตัว 15px · การ์ดพื้นขาว
+         (ปฏิทิน พ.ศ. อ่านขนาด/ขอบจากช่องเดิมตอนสร้าง — จึงตั้งที่ input[type=date] ของแถว) */
+      .swal-edit-event .ee-multi-date-row { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px 14px; margin-bottom:12px; box-shadow:0 1px 2px rgba(15,23,42,.03); }
+      .swal-edit-event .ee-range-head { gap:10px; margin-bottom:10px; min-height:30px; }
+      .swal-edit-event .ee-range-no { font-size:12.5px; font-weight:700; color:#1d4ed8; background:#eff6ff; border:1px solid #dbeafe; padding:3px 12px; }
+      .swal-edit-event .ee-range-preview { font-size:14px; font-weight:600; color:#334155; }
+      .swal-edit-event .ee-range-preview--empty { color:#94a3b8; font-weight:500; }
+      .swal-edit-event .ee-range-body { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:14px; align-items:end; }
+      .swal-edit-event .ee-range-field { flex-direction:column; align-items:stretch; gap:6px; }
+      .swal-edit-event .ee-range-cap { width:auto; font-size:13.5px; font-weight:600; color:#475569; }
+      .swal-edit-event .ee-range-sep { display:none; }
+      .swal-edit-event .ee-multi-date-row input[type=date] { min-height:44px; padding:10px 12px; font-size:15px; border:1px solid #e2e8f0; border-radius:10px; color:#0f172a; }
+      .swal-edit-event .ee-range-team { margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9; }
+      .swal-edit-event .ee-range-same { font-size:13.5px; color:#334155; gap:8px; }
+      .swal-edit-event .ee-range-same input { width:17px; height:17px; }
+      .swal-edit-event .ee-multi-date-remove { flex:0 0 32px !important; width:32px; height:32px; border-radius:8px; }
+      @media (max-width: 640px) { .swal-edit-event .ee-range-body { grid-template-columns:1fr; gap:10px; } }
+      .swal-edit-event .ee-range-people { font-size:12.5px; margin-top:8px; }
+      .swal-edit-event .ee-range-locknote { font-size:12px; color:#475569; background:#f1f5f9; border-color:#e2e8f0; padding:3px 12px; }
+      .swal-edit-event .ee-range-more { height:32px; padding:0 12px; font-size:13px; border-radius:8px; }
+      .swal-edit-event .ee-range-listhead { padding:8px 12px; }
+      /* ── โทนสงบ อ่านสบาย ── */
+      .ee-kg .ee-card-head > .ee-card-ico, .ee-kg .ee-contract-box-label > .ee-card-ico { display:none !important; }
+      .ee-kg .ee-card-head { padding:14px 18px 4px !important; }
+      .ee-kg .ee-card-titles h4 { font-size:15.5px !important; font-weight:700 !important; color:#0f172a !important; }
+      .ee-kg .ee-card-titles p { font-size:12.5px !important; color:#64748b !important; }
+      .ee-kg .ee-card-body { padding-left:18px !important; padding-right:18px !important; }
+      .swal-edit-event .ee-kg .ee-form .ee-field > label { font-weight:600; color:#475569; }
+      .swal-edit-event .ee-kg .ee-form .ts-wrapper .ts-control,
+      .swal-edit-event .ee-kg .ee-form .ee-field > select,
+      .swal-edit-event .ee-kg .ee-form .ee-field > input,
+      .swal-edit-event .ee-kg .ee-form .ee-money-input > input,
+      .swal-edit-event .ee-kg .ee-desc-input, .swal-edit-event .ee-kg .ee-equip-input { border-width:1px !important; }
+      .swal-edit-event .ee-kg .ee-form .ts-wrapper .ts-control > .item { font-weight:500; }
+      .ee-kg #ee-mapCard .ee-map-go { background:#fff !important; color:#2563eb !important; border:1px solid #bfdbfe !important; }
+      .ee-kg #ee-mapCard .ee-map-go:hover { background:#eff6ff !important; }
+      .ee-kg #ee-mapCard .ee-map-edit, .ee-kg #ee-mapCard .ee-map-toggle { border-width:1px !important; }
+      .ee-kg .ee-contract-box { padding:0 18px; }
+      .ee-kg .ee-contract-box > summary { padding:14px 0; }
       /* 🔁 (11 พ.ย. 2569 ผู้ใช้: "ข้อมูลตรงนี้ยังจัดวางดูไม่ค่อยสวย ดูยาก เล็กไป" → "ให้รูปแบบฟอร์มเหมือนกันด้วย
          เน้นให้ดูง่าย จัดการง่าย ไม่สับสน") รูปแบบฟอร์มกลาง .ee-form — ใช้กับทุกการ์ดข้อมูล
          (ข้อมูลสัญญา · ข้อมูลงาน · ผู้ติดต่อ · วันที่และเวลา · การแสดงผลบนปฏิทิน)
@@ -2542,16 +2416,18 @@ export const getEditEvent = async ({
          · ไม่มีที่ว่างค้างท้ายการ์ด (กล่องข้อความว่างซ่อน) · ช่องยอดเต็มความกว้าง ตัวเลขใหญ่ · ปุ่ม VAT แบ่งครึ่งเต็มแถว
          · ไฟล์แนบไม่มีกรอบซ้อนสองชั้น */
       .swal-edit-event .ee-wv-break:empty, .swal-edit-event .ee-wv-ai:empty { display: none; }
-      .swal-edit-event #ee-keyGroup .ee-value-box { max-width: none; }
-      .swal-edit-event #ee-keyGroup .ee-value-box input { min-height: 48px; font-size: 18px !important; font-weight: 800; font-variant-numeric: tabular-nums; border-radius: 10px; }
-      .swal-edit-event #ee-keyGroup .ee-vat-seg { display: flex; width: 100%; box-sizing: border-box; }
-      .swal-edit-event #ee-keyGroup .ee-vat-seg label { flex: 1 1 0; }
-      .swal-edit-event #ee-keyGroup .ee-vat-seg label span { display: flex; justify-content: center; }
+      .swal-edit-event .ee-kg .ee-value-box { max-width: none; }
+      .swal-edit-event .ee-kg .ee-value-box input { min-height: 48px; font-size: 18px !important; font-weight: 800; font-variant-numeric: tabular-nums; border-radius: 10px; }
+      .swal-edit-event .ee-kg .ee-vat-seg { display: flex; width: 100%; box-sizing: border-box; }
+      .swal-edit-event .ee-kg .ee-vat-seg label { flex: 1 1 0; }
+      .swal-edit-event .ee-kg .ee-vat-seg label span { display: flex; justify-content: center; }
       /* มูลค่างานรวม (ข้อมูลงาน) — เด่นแต่ไม่รก: เต็มแถว · พื้นฟ้าอ่อน · ตัวเลขใหญ่หนา */
-      .swal-edit-event .ee-form .ee-field--money { grid-column: 1 / -1; }
+      /* 🔁 (28 พ.ย. 2569 "ไม่ลงตัว") ครั้งที่ | มูลค่างานรวม อยู่แถวเดียวกัน (เดิมครั้งที่ค้างครึ่งแถว มูลค่าขึ้นแถวใหม่เต็มแถว) */
+      .swal-edit-event .ee-form .ee-field--money { grid-column: auto; }
+      .swal-edit-event .ee-form .ee-field--money .ee-money-input > input { min-height: 46px !important; font-size: 16px !important; font-weight: 700 !important; background: #fff !important; border-color: #e2e8f0 !important; }
       .swal-edit-event .ee-form .ee-field--money .ee-money-input > input { min-height: 52px; font-size: 19px !important; font-weight: 800; color: #0f172a; background: #f8fbff; border-color: #bfdbfe !important; }
       .swal-edit-event .ee-form .ee-field--money .ee-money-input .ee-money-symbol { font-size: 18px; color: #2563eb; }
-      .swal-edit-event .ee-form .ee-field--money > label { color: #1d4ed8; }
+      /* (28 พ.ย. 2569) ป้าย "มูลค่างานรวม" สีเดียวกับป้ายช่องอื่น — เดิมสีน้ำเงินดูเหมือนลิงก์ */
       .swal-edit-event .ee-money-input > input::placeholder, .swal-edit-event .ee-value-box input::placeholder { font-size: 15px; font-weight: 500; color: #94a3b8; }
 
       /* กล่องถามก่อนปิด (ยังไม่บันทึก) */
@@ -2638,8 +2514,270 @@ export const getEditEvent = async ({
         #ee-mapCard .ee-map-go, #ee-mapCard .ee-map-edit, #ee-mapCard .ee-map-toggle { justify-content: center; white-space: nowrap; padding: 0 8px; font-size: 13px; min-width: 0; }
       }
     </style>
-    <div id="ee-editGroup">
-      <div class="ee-eg-head"><b>รายละเอียดงาน</b><small>${isViewOnly ? "ดูได้อย่างเดียว" : "กดที่ช่องเพื่อแก้ไขได้ทันที"}</small></div>
+    ${/* 🔁 (28 พ.ย. 2569 ผู้ใช้: "อยากแก้ไขรูปแบบ และการจัดวางของ event ให้สามารถจัดการ และดูข้อมูลได้ง่ายกว่านี้
+         ตอนนี้ข้อมูลดูวางมั่ว สะเปะสะปะ ไม่เป็นระบบ") จัดเป็นหมวดมีหัวข้อกำกับ เรียงตามลำดับที่ใช้จริง:
+         ความคืบหน้า (ขั้นตอน/เอกสาร — ด้านบน) → หน้างาน (ที่ตั้ง · ผู้ติดต่อ) → ทีมและวันเวลา → งานที่ทำ (รายละเอียด · ไฟล์ · มูลค่า)
+         → ข้อมูลงานและสัญญา → อื่นๆ (สีบนปฏิทิน · ประวัติ)
+         ⚠️ ย้ายเฉพาะตำแหน่งในหน้า — id ของทุกช่องคงเดิม โค้ดอ่านค่า/บันทึก/สิทธิ์ทำงานเหมือนเดิมทุกอย่าง
+         หัวข้อหมวดเดียวกันกับฟอร์มลงงานใหม่ (AddEvent) — สองหน้านี้ใช้ชื่อหมวด/ลำดับชุดเดียวกัน */""}
+    ${/* 🔁 (28 พ.ย. 2569 ผู้ใช้: "หน้าตา การจัดวาง ไม่เห็นเปลี่ยนเลย") จอกว้าง = 2 คอลัมน์แบบหน้ารายละเอียดงานทั่วไป
+         ซ้าย (หลัก) = สิ่งที่ทำ/แก้บ่อย: ทีมและวันเวลา · งานที่ทำ (รายละเอียด อุปกรณ์ ไฟล์ มูลค่า)
+         ขวา (ข้อมูลประกอบ) = หน้างาน (แผนที่ ผู้ติดต่อ) · ข้อมูลงานและสัญญา · อื่นๆ (สี ประวัติ) — การ์ดกะทัดรัดกว่า
+         จอแคบ/มือถือ = คอลัมน์เดียว เรียง หน้างาน → ทีมและวันเวลา → งานที่ทำ → ข้อมูลงาน → อื่นๆ (CSS order)
+         ⚠️ วัดจากความกว้างกล่องเอง (container query) ไม่ใช่ความกว้างจอ */""}
+    <div class="ee-cols"><div class="ee-cols-grid">
+    <div class="ee-col ee-col-main">
+      <div class="ee-zone ee-zone--team">
+    <div class="ee-zone-title"><span>ทีมและวันเวลา</span><small>ใครเข้างาน · วันไหน กี่โมง</small></div>
+    <div class="ee-kg">
+    <!-- ✅ (2 พ.ย. 2569 ผู้ใช้: "หน้า event ทำให้ข้อมูลสอดคล้อง ดูง่าย ไม่ตาลาย ไม่รก เน้น 1 ผู้เข้าปฏิบัติงาน
+         2 ผู้รับผิดชอบงาน 3 มูลค่างาน 4 รายละเอียดงานที่ทำ พร้อมไฟล์แนบ")
+         กลุ่ม "ข้อมูลหลัก" ขึ้นก่อนทุกอย่าง (ผู้รับผิดชอบอยู่หัวกล่องเป็นช่องแรกอยู่แล้ว) · ข้อมูลงาน/ผู้ติดต่อ/วันที่/สี อยู่ถัดลงไป
+         ผู้ปฏิบัติงานเรียงเลข 1, 2, 3 … ตรงกับ Excel — ข้อมูลเก็บแบบเดิม: team = คนที่ 1 · teamMembers = คนที่ 2 ขึ้นไป -->
+        <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">👷</span>
+        <div class="ee-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
+        ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span class="ee-card-badge">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+        <div class="ee-worker-row ee-worker-row--lead">
+          <span class="ee-worker-no" aria-hidden="true">1</span>
+          <div class="ee-field ee-worker-field">
+            <select id="editTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ชื่อ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
+          </div>
+          <span class="ee-worker-tag">หัวหน้าทีม</span>
+        </div>
+        <div id="ee-teamMembersList"></div>
+        ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost ee-worker-add" id="ee-addTeamMemberBtn">+ เพิ่มผู้ปฏิบัติงาน</button>` : ""}
+      </div>
+    </section>
+
+    <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
+    <section class="ee-card ee-form">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📅</span>
+        <div class="ee-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
+        ${!isAdminOrManagerUser && !isViewOnly ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+    ${readOnly ? `
+    <div class="ee-lock-note"><span aria-hidden="true">👁️</span><span>
+      คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
+      (ถ้าต้องการให้ช่างเข้างาน ให้เปิด <b>ใบแจ้งงาน</b>)
+    </span></div>
+    ` : isPendingForTech ? `
+    <div class="ee-lock-note"><span aria-hidden="true">🔒</span><span>
+      งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
+    </span></div>
+    ` : isClosedForTech ? `
+    <div class="ee-lock-note"><span aria-hidden="true">✅</span><span>
+      งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
+    </span></div>
+    ` : isTeamMemberViewer ? `
+    <div class="ee-lock-note"><span aria-hidden="true">👥</span><span>
+      คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
+      ${canEditDocFields
+        ? `และแก้ได้เฉพาะ <b>สีบนปฏิทิน · เลขที่อ้างอิงเอกสาร · รายละเอียดงาน</b>
+           ส่วนวันที่/ทีม/ข้อมูลโครงการ ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้`
+        : `แต่แก้ไขไม่ได้ (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)`}
+    </span></div>
+    ` : ""}
+
+    <label class="ee-checkbox-row">
+      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isViewOnly ? "disabled" : ""}>
+      งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
+      ${/* ✅ ตัวเลขนี้คือจำนวน "ช่วงวันที่" (แต่ละแถวในรายการด้านล่าง) ไม่ใช่จำนวนวันรวม — 1 ช่วงกินได้
+            หลายวัน (เช่น 31 ส.ค. – 4 ก.ย. = 1 ช่วง แต่ 5 วัน) เดิมเขียนว่า "วัน" ทำให้เข้าใจผิดว่า
+            งานนี้เข้าแค่ 4 วันทั้งที่จริงอาจเป็น 20 กว่าวัน */""}
+      ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} ช่วงวัน)</span>` : ""}
+    </label>
+
+    <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
+      <div class="ee-info-grid ee-info-grid--pair">
+        <div class="ee-field">
+          <label>วันที่เริ่ม</label>
+          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
+        </div>
+        <div class="ee-field">
+          <label>วันที่สิ้นสุด</label>
+          <input id="editEnd" type="date" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}>
+        </div>
+      </div>
+    </div>
+
+    <div id="ee-multiDateSection" style="${hasSiblings ? "" : "display:none;"}">
+      <div class="ee-range-listhead">
+        <button type="button" class="ee-range-toggle" id="ee-rangeToggle" aria-expanded="true" title="ย่อ/ขยายรายการช่วงวันที่">
+          <span class="ee-range-caret" id="ee-rangeToggleIcon">▾</span>
+          <span id="ee-rangeToggleText">ช่วงวันที่</span>
+          <span class="ee-range-count" id="ee-rangeCount"></span>
+        </button>
+        <span class="ee-range-listsum" id="ee-rangeSummary"></span>
+      </div>
+      <div id="ee-multiDateList"></div>
+      ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">+ เพิ่มช่วงวันที่</button>`}
+    </div>
+
+    <div class="ee-info-grid ee-info-grid--pair">
+      <div class="ee-field">
+        <label>เวลาเริ่ม</label>
+        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(normTime(eventStartTime))}" ${isViewOnly ? "disabled" : ""}>
+      </div>
+      <div class="ee-field">
+        <label>เวลาสิ้นสุด</label>
+        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(normTime(eventEndTime))}" ${isViewOnly ? "disabled" : ""}>
+      </div>
+    </div>
+
+      </div>
+    </section>
+
+    </div>
+
+      </div>
+      <div class="ee-zone ee-zone--work">
+    <div class="ee-zone-title"><span>งานที่ทำ</span><small>รายละเอียด · อุปกรณ์ · ไฟล์ · มูลค่า</small></div>
+    <div class="ee-kg">
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📝</span>
+        <div class="ee-card-titles"><h4>รายละเอียดงานที่ทำ <span style="color:#dc2626">*</span></h4><p>ทำอะไร ที่ไหน อุปกรณ์/จุดไหน — ช่องเดียวใช้ทั้งตอนลงงานและหลังเข้างาน (อย่างน้อย 10 ตัวอักษร)</p></div>
+        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
+        <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
+        <div class="ee-field">
+          <textarea id="editDescription" class="ee-desc-input" rows="5" aria-label="รายละเอียดงานที่ทำ" placeholder="เช่น ตรวจเช็คระบบ Fire Alarm ประจำไตรมาส ชั้น 1–5 · เปลี่ยน Smoke Detector 2 จุด" ${canEditDocFields ? "" : "disabled"}></textarea>
+          <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
+        </div>
+        ${/* ✅ (20 พ.ย. 2569 ผู้ใช้: "สิ่งที่ต้องเตรียมเพิ่มรายละเอียดไป ทำไมไม่มีจุดที่แสดง")
+             ช่องนี้กรอกได้ตอนลงงาน/รับงาน (การ์ดข้อมูล Job) แต่ฟอร์มแก้ไขงานตัดการ์ดนั้นออกไป (10 ต.ค.) ค่าเลยมองไม่เห็นเลย
+             → แสดง + แก้ได้ใต้รายละเอียดงานที่ทำ (ทีมเห็นก่อนออกหน้างาน) · บันทึกแล้วใช้ร่วมทุกวันของงานหลายวัน (server: pickJobInfo) */""}
+        ${ev.extendedProps?.department === "sales" ? "" : `
+        <div class="ee-field ee-equip">
+          <label for="ee-equipment">อุปกรณ์ / อะไหล่ที่ต้องเตรียม <span class="ee-opt">ไม่บังคับ · บรรทัดละรายการ</span></label>
+          <textarea id="ee-equipment" class="ee-equip-input" rows="2" aria-label="อุปกรณ์ / อะไหล่ที่ต้องเตรียม" placeholder="เช่น บันไดอลูมิเนียม 3 ม.&#10;Smoke detector × 2" ${canEditDocFields ? "" : "disabled"}>${attrHtml(eventEquipment)}</textarea>
+        </div>`}
+        ${/* ✅ (4 พ.ย. 2569 ผู้ใช้: "ให้เหลือรายละเอียดงานที่ทำช่องเดียว และดูง่าย") บันทึกเก่าของช่าง (workNote) ก่อนรวมเป็นช่องเดียว — แสดงอ่านอย่างเดียว ไม่หาย */""}
+        ${eventWorkNote ? `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px dashed #dbe3ef;font-size:12.5px;color:#334155;white-space:pre-line;"><b style="display:block;font-size:11.5px;color:#64748b;margin-bottom:2px;">บันทึกเดิมจากช่าง</b>${attrHtml(eventWorkNote)}</div>` : ""}
+      </div>
+    </section>
+
+    ${ev.extendedProps?.department === "sales" ? "" : `<section class="ee-card ee-key-card ee-key-files"><div class="ee-card-body"><div id="ee-sitePhotosMount" data-no-draft></div></div></section>`}
+    ${ev.extendedProps?.department === "sales" ? "" : `
+    <section class="ee-card ee-key-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">💰</span>
+        <div class="ee-card-titles"><h4>มูลค่าครั้งนี้</h4><p>1 ค่าต่องาน · แอดมิน/ผู้รับผิดชอบระบุ · ${eventContractGroupId ? "คิดจากมูลค่าสัญญาให้อัตโนมัติ" : "เลือกก่อน/รวม VAT · เว้นว่างได้"}</p></div>
+      </div>
+      <div class="ee-card-body">
+        ${workValueCardHtml(wvInit, { disabled: isViewOnly || !canEditJobValueSingle })}
+        ${workerValuesSummaryHtml(ev.extendedProps || {})}
+      </div>
+    </section>`}
+
+    </div>
+
+      </div>
+    </div>
+    <div class="ee-col ee-col-side">
+      ${/* 🔁 (28 พ.ย. 2569) ทางลัดไปหน้าการดำเนินงาน/งานของฉัน — หัวคอลัมน์ขวา (จอแคบ = ต่อจากขั้นตอนงานเหมือนเดิม) */""}
+      <div class="ee-zone ee-zone--nav">
+    <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
+         (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
+    ${canViewOperation ? `
+    <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่าง = งานของฉัน · แอดมิน = การดำเนินงาน · ปุ่มเล็กลง ไม่กินพื้นที่ แต่ชัดเจนสวยงาม") -->
+    <button type="button" id="btnGoOperation" class="ee-link-card">
+      <span class="ee-link-ico">
+        ${showBoard
+          ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h2v2H3V5Zm4 0h14v2H7V5Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Z"/></svg>'
+          : '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.8-3.6 2.1-4.7-1.8-.2-3.6-.3-6.1-.3Zm11.7 1.3-1.4-1.4-3.3 3.3-1.6-1.6-1.4 1.4 3 3 4.7-4.7Z"/></svg>'}
+      </span>
+      <span class="ee-link-text">
+        <b>${showBoard ? "เปิดหน้าการดำเนินงาน" : "เปิดหน้างานของฉัน"}</b>
+        <small>${showBoard ? "ตรวจเอกสาร · อนุมัติปิดงาน" : "บันทึกเข้างาน · แนบเอกสาร · ขอปิดงาน"}</small>
+      </span>
+      <span class="ee-link-arrow" aria-hidden="true">›</span>
+    </button>` : ""}
+      </div>
+      <div class="ee-zone ee-zone--site">
+    <div class="ee-zone-title"><span>หน้างาน</span><small>ที่ตั้ง · ผู้ติดต่อ</small></div>
+    <div class="ee-kg">
+    <!-- ── แผนที่หน้างาน (บนสุดของฟอร์ม) ────────────────────────────────────
+         ✅ ผู้ใช้สั่ง (28 ก.ย. 2569): "ตำแหน่งหน้างานแสดงเป็นแผนที่ google map เลย ไว้แถวบนสุด"
+         • มีพิกัดที่บันทึกไว้ → server แปลงลิงก์ย่อเป็นตำแหน่ง (GET /customer/map/embed) แล้วฝังแผนที่
+         • ยังไม่มี → แสดงแผนที่ค้นหาจากชื่อโครงการ พร้อมบอกชัดว่าเป็นตำแหน่งโดยประมาณ
+         ⚠️ iframe ใส่ src ทีหลังใน didOpen (ต้องรอแปลงลิงก์ก่อน) — ช่วงนั้นแสดง "กำลังโหลดแผนที่" -->
+    ${eventSite || savedMapUrl ? `
+    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ให้ map กดพับปิดได้ ไม่กินพื้นที่") — แถบชื่อหน้างานอยู่บน กดลูกศรเพื่อกาง/พับแผนที่
+         ค่าเริ่มต้นพับไว้ · จำค่าที่เลือกล่าสุดในเครื่อง · แผนที่โหลดตอนกางครั้งแรก (ไม่เปลืองเน็ตตอนพับ) */""}
+    <div class="ee-map-card" id="ee-mapCard">
+      <div class="ee-map-bar">
+        <span class="ee-map-ico" aria-hidden="true">${googleMapsPinSvg(18)}</span>
+        <div class="ee-map-info">
+          <div class="ee-map-title">ตำแหน่งหน้างาน</div>
+          <div class="ee-map-name"><span>${attrHtml(eventSite) || "—"}</span></div>
+          <div class="ee-map-note${savedMapUrl ? "" : " ee-map-note--warn"}" id="ee-mapNote">
+            ${savedMapUrl ? "ตำแหน่งที่บันทึกไว้ของโครงการนี้" : "ตำแหน่งโดยประมาณจากชื่อโครงการ — ยังไม่ได้บันทึกพิกัด"}
+          </div>
+        </div>
+        ${isAdminOrManagerUser ? `<button type="button" class="ee-map-edit" id="ee-mapEdit">${savedMapUrl ? "✏️ แก้พิกัด" : "📍 บันทึกพิกัด"}</button>` : ""}
+        <a class="ee-map-go" id="ee-mapGo" href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
+          ${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}
+        </a>
+        <button type="button" class="ee-map-toggle" id="ee-mapToggle" aria-expanded="false" title="แสดง/ซ่อนแผนที่">
+          <span id="ee-mapToggleText">แผนที่</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="ee-map-frame" id="ee-mapFrameWrap" hidden>
+        <div class="ee-map-wait" id="ee-mapWait">กำลังโหลดแผนที่…</div>
+        <iframe id="ee-mapFrame" title="แผนที่หน้างาน ${attrHtml(eventSite)}" loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade" allowfullscreen style="display:none;"></iframe>
+      </div>
+      ${isAdminOrManagerUser ? `
+      <div id="ee-mapEditor" style="display:none;">
+        <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+          <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;min-width:180px;">เปิด Google Maps → ค้นหาหน้างาน → แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
+          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e6e9ef;cursor:pointer;">ยกเลิก</button>
+          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#2563eb;border:none;cursor:pointer;">บันทึก</button>
+        </div>
+      </div>` : ""}
+    </div>
+    ` : ""}
+
+    <section class="ee-card ee-form">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📞</span>
+        <div class="ee-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div>
+      </div>
+      <div class="ee-card-body">
+      <div class="ee-info-grid">
+        <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
+             แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
+             ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
+             ข้อมูลติดต่อล้วนๆ ไม่กระทบข้อมูลงาน/ยอดเงิน/รายงาน (ฝั่ง server เปิดให้เหมือนกัน — ดู
+             CLOSED_JOB_TECH_FIELDS ใน routes/calendarEvent/core.js) -->
+        <div class="ee-field">
+          <label>ชื่อผู้ติดต่อ</label>
+          <input id="editContactName" type="text" value="${attrHtml(evenContactName)}" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง" ${canEditContact ? "" : "disabled"}>
+        </div>
+        <div class="ee-field">
+          <label>เบอร์โทร</label>
+          <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    </div>
+
+      </div>
+      <div class="ee-zone ee-zone--info">
+    <div class="ee-zone-title"><span>ข้อมูลงานและสัญญา</span><small>ลูกค้า · โครงการ · ประเภท/ระบบงาน</small></div>
+    <div class="ee-kg">
     <!-- section: โครงการ -->
     <section class="ee-card ee-form">
       <div class="ee-card-head">
@@ -2714,112 +2852,90 @@ export const getEditEvent = async ({
       </div>
     </section>
 
-    <section class="ee-card ee-form">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">📞</span>
-        <div class="ee-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div>
-      </div>
+    <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
+         "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
+         ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
+    ${eventContractGroupId ? `
+    ${/* ✅ ที่แก้ (ผู้ใช้แจ้ง: "ข้อมูลสัญญาให้ย่อขยายได้ ดูรก ปกติไม่ค่อยได้เปิดดู ทำให้ปิด default"):
+         เดิมกล่องนี้กางอยู่เสมอและอยู่บนสุด กินเต็มหน้าจอแรกบนมือถือ (7 ช่องกรอก) ทั้งที่คนเปิดฟอร์มนี้
+         ส่วนใหญ่มาแก้ "วันที่/สถานะ/ทีม" ของครั้งนี้ ไม่ได้มาแก้ข้อมูลระดับสัญญาซึ่งนานๆ แก้ที
+         ✅ ใช้ <details> ของเบราว์เซอร์ตรงๆ — พับได้โดยไม่ต้องเขียน JS เพิ่มสักบรรทัด และยังทำงาน
+         ได้แม้ JS ส่วนอื่นพัง · หัวข้อสรุปเลขที่สัญญา/จำนวนครั้งให้เห็นเลยโดยไม่ต้องกาง
+         ⚠️ ไม่ใส่ open — ปิดเป็นค่าเริ่มต้นตามที่ผู้ใช้สั่ง */""}
+    <details class="ee-contract-box ee-form">
+      <summary class="ee-contract-box-label">
+        <span class="ee-card-ico" aria-hidden="true">📑</span>
+        <span class="ee-card-titles">
+          <h4>ข้อมูลสัญญา</h4>
+          <span class="ee-contract-peek">${[
+            eventContractNo ? attrHtml(eventContractNo) : null,
+            eventVisitCount ? `${attrHtml(String(eventVisitCount))} ครั้ง` : null,
+          ].filter(Boolean).join(" · ") || (isAdminOrManagerUser ? "แตะเพื่อดู/แก้" : "แตะเพื่อดู")}</span>
+        </span>
+      </summary>
       <div class="ee-card-body">
+      <div class="ee-lock-note"><span aria-hidden="true">${isAdminOrManagerUser ? "ℹ️" : "🔒"}</span><span>${isAdminOrManagerUser ? `แก้ที่นี่ = อัปเดต <b>ทุกครั้งในสัญญานี้</b> พร้อมกัน` : `<b>ดูได้อย่างเดียว</b> — แก้ไขได้เฉพาะแอดมิน/manager`}</span></div>
+      ${/* เรียงเป็นคู่ที่อ่านด้วยกัน: เลขที่เอกสาร · ช่วงสัญญา · รอบการเข้า · มูลค่า */""}
       <div class="ee-info-grid">
-        <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
-             แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
-             ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
-             ข้อมูลติดต่อล้วนๆ ไม่กระทบข้อมูลงาน/ยอดเงิน/รายงาน (ฝั่ง server เปิดให้เหมือนกัน — ดู
-             CLOSED_JOB_TECH_FIELDS ใน routes/calendarEvent/core.js) -->
         <div class="ee-field">
-          <label>ชื่อผู้ติดต่อ</label>
-          <input id="editContactName" type="text" value="${attrHtml(evenContactName)}" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง" ${canEditContact ? "" : "disabled"}>
+          <label>เลขที่สัญญา</label>
+          <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>เบอร์โทร</label>
-          <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
+          <label>เลขที่ใบเสนอราคา</label>
+          <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
       </div>
-      </div>
-    </section>
-
-    <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <section class="ee-card ee-form">
-      <div class="ee-card-head">
-        <span class="ee-card-ico" aria-hidden="true">📅</span>
-        <div class="ee-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
-        ${!isAdminOrManagerUser && !isViewOnly ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
-      </div>
-      <div class="ee-card-body">
-    ${readOnly ? `
-    <div class="ee-lock-note"><span aria-hidden="true">👁️</span><span>
-      คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
-      (ถ้าต้องการให้ช่างเข้างาน ให้เปิด <b>ใบแจ้งงาน</b>)
-    </span></div>
-    ` : isPendingForTech ? `
-    <div class="ee-lock-note"><span aria-hidden="true">🔒</span><span>
-      งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
-    </span></div>
-    ` : isClosedForTech ? `
-    <div class="ee-lock-note"><span aria-hidden="true">✅</span><span>
-      งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
-    </span></div>
-    ` : isTeamMemberViewer ? `
-    <div class="ee-lock-note"><span aria-hidden="true">👥</span><span>
-      คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
-      ${canEditDocFields
-        ? `และแก้ได้เฉพาะ <b>สีบนปฏิทิน · เลขที่อ้างอิงเอกสาร · รายละเอียดงาน</b>
-           ส่วนวันที่/ทีม/ข้อมูลโครงการ ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้`
-        : `แต่แก้ไขไม่ได้ (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)`}
-    </span></div>
-    ` : ""}
-
-    <label class="ee-checkbox-row">
-      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isViewOnly ? "disabled" : ""}>
-      🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
-      ${/* ✅ ตัวเลขนี้คือจำนวน "ช่วงวันที่" (แต่ละแถวในรายการด้านล่าง) ไม่ใช่จำนวนวันรวม — 1 ช่วงกินได้
-            หลายวัน (เช่น 31 ส.ค. – 4 ก.ย. = 1 ช่วง แต่ 5 วัน) เดิมเขียนว่า "วัน" ทำให้เข้าใจผิดว่า
-            งานนี้เข้าแค่ 4 วันทั้งที่จริงอาจเป็น 20 กว่าวัน */""}
-      ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} ช่วงวัน)</span>` : ""}
-    </label>
-
-    <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
       <div class="ee-info-grid ee-info-grid--pair">
         <div class="ee-field">
-          <label>วันที่เริ่ม</label>
-          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
+          <label>วันที่เริ่มสัญญา</label>
+          <input id="editContractStart" type="date" value="${eventContractStart}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>วันที่สิ้นสุด</label>
-          <input id="editEnd" type="date" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}>
+          <label>วันที่สิ้นสุดสัญญา</label>
+          <input id="editContractEnd" type="date" value="${eventContractEnd}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
       </div>
+      <div class="ee-info-grid ee-info-grid--pair">
+        <div class="ee-field">
+          <label>จำนวนครั้งทั้งหมด</label>
+          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
+        </div>
+        <div class="ee-field">
+          <label>เข้าทุกกี่เดือน</label>
+          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3" ${isAdminOrManagerUser ? "" : "disabled"}>
+        </div>
+      </div>
+      <div class="ee-info-grid">
+        <div class="ee-field">
+          <label>มูลค่างานทั้งสัญญา (บาท)</label>
+          <div class="ee-money-input">
+            <span class="ee-money-symbol">฿</span>
+            <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="ยังไม่ระบุ — แตะเพื่อใส่ยอด" ${isAdminOrManagerUser ? "" : "disabled"}>
+          </div>
+        </div>
+      </div>
+      <!-- ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — เดิมลิงก์ระหว่างสองหน้านี้เป็นทางเดียวล้วนๆ (ภาพรวมงาน
+           กดเข้ามาดูงาน/ปฏิทินได้ แต่จากปฏิทินไม่มีทางกลับไปดู "ทั้งสัญญา" เลย ต้องออกไปเปิดหน้านั้นเอง
+           แล้วค้นหาสัญญาซ้ำอีกรอบ) — กล่องนี้บอกอยู่แล้วว่าเป็นข้อมูล "ทั้งสัญญา" จึงเป็นที่ที่เหมาะที่สุด
+           ⚠️ ต้องส่ง year=all ไปด้วยเสมอ ไม่งั้นตัวกรองปีของหน้าปลายทาง (ค่าเริ่มต้น = ปีปัจจุบัน) จะซ่อน
+           สัญญาของปีอื่นทิ้ง เปิดไปแล้วเจอตารางว่างทั้งที่สัญญามีอยู่จริง (ดู ?year= ใน ContractOverview.js)
+           ค้นด้วยเลขที่สัญญาก่อน ถ้ายังไม่มีเลขที่ค่อย fallback ไปใช้ชื่อบริษัท/โครงการแทน -->
+      <a class="ee-contract-link"
+         href="/contracts?year=all&q=${encodeURIComponent(eventContractNo || eventCompany || eventSite || "")}"
+         title="เปิดหน้าภาพรวมงาน พร้อมค้นหาสัญญานี้ให้อัตโนมัติ">
+        📊 ดูสัญญานี้ในภาพรวมงาน
+      </a>
+      </div>
+    </details>
+    ` : ""}
+
     </div>
 
-    <div id="ee-multiDateSection" style="${hasSiblings ? "" : "display:none;"}">
-      <div class="ee-range-listhead">
-        <button type="button" class="ee-range-toggle" id="ee-rangeToggle" aria-expanded="true" title="ย่อ/ขยายรายการช่วงวันที่">
-          <span class="ee-range-caret" id="ee-rangeToggleIcon">▾</span>
-          <span id="ee-rangeToggleText">ช่วงวันที่</span>
-          <span class="ee-range-count" id="ee-rangeCount"></span>
-        </button>
-        <span class="ee-range-listsum" id="ee-rangeSummary"></span>
       </div>
-      <div id="ee-multiDateList"></div>
-      ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
-    </div>
-
-    <div class="ee-info-grid ee-info-grid--pair">
-      <div class="ee-field">
-        <label>เวลาเริ่ม</label>
-        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isViewOnly ? "disabled" : ""}>
-      </div>
-      <div class="ee-field">
-        <label>เวลาสิ้นสุด</label>
-        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}" ${isViewOnly ? "disabled" : ""}>
-      </div>
-    </div>
-
-      </div>
-    </section>
-
-    </div>
-
+      <div class="ee-zone ee-zone--other">
+    <div class="ee-zone-title"><span>อื่นๆ</span></div>
+    <div class="ee-kg">
     <!-- ✅ เพิ่มหัวข้อกำกับให้กลุ่มสี — เดิมเป็นบล็อกลอยไม่มีหัวข้อ อยู่คั่นระหว่าง "วันที่ & เวลา" กับ
          "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
          และเป็นหมวดเดียวในฟอร์มที่ไม่มีหัวข้อ ทำให้จังหวะการอ่านสะดุด -->
@@ -2840,12 +2956,7 @@ export const getEditEvent = async ({
       </div>
     </section>
 
-    ${/* 🧹 (10 ต.ค. 2569 ผู้ใช้: "ข้อมูล Job ตัดออก") — ไม่แสดงการ์ด "ข้อมูล Job" (ความเร่งด่วน/วันครบกำหนด/อุปกรณ์/รอข้อมูล)
-         ในฟอร์มแก้ไขงานแล้ว · ค่าเดิมในงานไม่ถูกลบ (ตอนบันทึกอ่านค่าเฉพาะเมื่อมีช่อง #ji-dueDate — ดู Save ด้านล่าง) */""}
-
-    ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "อัพไฟล์รูปให้ทำใน editEvent ด้วย แล้วให้ข้อมูลเชื่อมต่อกัน")
-         รูปและไฟล์หน้างาน — ชุดเดียวกับการ์ดในหน้าการดำเนินงาน/งานของฉัน (Events.sitePhotoFiles) อัปจากที่ไหนก็เห็นทุกที่
-         ⚠️ data-no-draft: ช่องเลือกไฟล์ไม่ต้องเข้าระบบกู้คืนข้อมูลฟอร์ม */""}
+    </div>
 
     ${eventActivityLog.length > 0 ? `
     <hr class="ee-divider">
@@ -2856,6 +2967,23 @@ export const getEditEvent = async ({
       ${activityLogHtml}
     </div>
     ` : ""}
+      </div>
+    </div>
+    </div></div>
+
+    <!-- Status bar -->
+    ${/* ✅ ตัวเลือกสถานะย้ายขึ้นไปอยู่บนหัวกล่องแล้ว (ผู้ใช้สั่ง 3 ต.ค. 2569) — ดู #ee-head-status */""}
+
+    ${/* ✅ (8 ต.ค. 2569 "ดูยาวและเยอะเกินไป ควรให้กดข้อมูลแก้ไขได้เลย") เลิกใช้กล่องสรุป + แผงพับ
+          แสดงช่องข้อมูลให้แก้ได้ทันทีในแผงเดียวกะทัดรัด (หัวข้อย่อยบาง คั่นด้วยเส้น) */""}
+    ${/* 🔁 (2 พ.ย. 2569 ผู้ใช้: "ข้อมูลงานส่วนนี้จัดรูปแบบใหม่ให้ดูง่าย") — การ์ดแยกทีละหมวด หัวข้อใหญ่ชัด แบบเดียวกับกลุ่มข้อมูลหลักด้านบน */""}
+    ${/* 🧹 (10 ต.ค. 2569 ผู้ใช้: "ข้อมูล Job ตัดออก") — ไม่แสดงการ์ด "ข้อมูล Job" (ความเร่งด่วน/วันครบกำหนด/อุปกรณ์/รอข้อมูล)
+         ในฟอร์มแก้ไขงานแล้ว · ค่าเดิมในงานไม่ถูกลบ (ตอนบันทึกอ่านค่าเฉพาะเมื่อมีช่อง #ji-dueDate — ดู Save ด้านล่าง) */""}
+
+    ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "อัพไฟล์รูปให้ทำใน editEvent ด้วย แล้วให้ข้อมูลเชื่อมต่อกัน")
+         รูปและไฟล์หน้างาน — ชุดเดียวกับการ์ดในหน้าการดำเนินงาน/งานของฉัน (Events.sitePhotoFiles) อัปจากที่ไหนก็เห็นทุกที่
+         ⚠️ data-no-draft: ช่องเลือกไฟล์ไม่ต้องเข้าระบบกู้คืนข้อมูลฟอร์ม */""}
+
 
   </div>
   </div>
@@ -3536,6 +3664,15 @@ export const getEditEvent = async ({
             teamMsg.className = changed ? "ee-hm-msg pending" : "ee-hm-msg";
           }
         });
+        // 🐛 (28 พ.ย. 2569 "ข้อมูลไม่สอดคล้อง") เดิมซิงค์ทางเดียว — เปลี่ยนหัวหน้าทีมในหมวด "ทีมและวันเวลา" แล้วหัวกล่องยังโชว์ชื่อเดิม
+        //    → เปลี่ยนที่ไหนก็ตรงกันทั้งสองที่ (หัวกล่องตั้งค่าฟอร์มแบบเงียบ จึงไม่วนกลับ)
+        document.getElementById("editTeam")?.addEventListener("change", (e) => {
+          const name = e.target.tomselect ? String(e.target.tomselect.getValue() || "") : e.target.value;
+          if (!teamSel || teamSel.value === name) return;
+          if (name && !Array.from(teamSel.options).some((o) => o.value === name)) teamSel.add(new Option(name, name));
+          teamSel.value = name;
+          teamSel.dispatchEvent(new Event("change", { bubbles: true }));
+        });
       }
 
       /* ✅ มอบหมายผู้รับผิดชอบจากหัวกล่อง — (9 ต.ค. 2569) เลือกแล้วรอกด "บันทึก" เหมือนช่องอื่นในฟอร์ม
@@ -3768,12 +3905,12 @@ export const getEditEvent = async ({
           </div>
           <div class="ee-range-body">
             <div class="ee-range-field">
-              <span class="ee-range-cap">เริ่ม</span>
+              <span class="ee-range-cap">วันที่เริ่ม</span>
               <input type="date" class="ee-range-start" value="${startValue}" ${isViewOnly ? "disabled" : ""}>
             </div>
             <span class="ee-range-sep" aria-hidden="true">→</span>
             <div class="ee-range-field">
-              <span class="ee-range-cap">ถึง</span>
+              <span class="ee-range-cap">วันที่สิ้นสุด</span>
               <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
             </div>
           </div>
@@ -4125,6 +4262,49 @@ export const getEditEvent = async ({
         multiSection.style.display  = isMulti ? "" : "none";
       });
 
+      /**
+       * ✅ (28 พ.ย. 2569 ผู้ใช้: "ถ้ายังไม่บันทึกการลงวันแบบนี้ ไม่ให้มีปุ่มเพิ่มเติมการดำเนินการได้ กันผิดพลาดของข้อมูลงาน")
+       *    คำสั่งของแต่ละช่วง (เบิก Advance · การดำเนินงาน · ใบแจ้งเข้างาน · ใบส่งมอบงาน · ลบช่วง) อ้างอิงช่วงวันที่ "ที่บันทึกแล้ว"
+       *    → การลงวันยังแก้ค้าง (เปิด/ปิดหลายวัน · เพิ่ม/ลบช่วง · เปลี่ยนวันของช่วง/วันที่เริ่ม-สิ้นสุด) = ซ่อน "⋯ เพิ่มเติม" ทุกช่วง
+       *      แสดง "บันทึกการลงวันก่อน" แทน · กดบันทึกแล้ว (หรือยกเลิกการแก้ไขกลับเป็นค่าเดิม) ปุ่มกลับมาเอง
+       */
+      {
+        const dateSig = () => [
+          multiToggle?.checked ? "multi" : "single",
+          getVal("editStart"), getVal("editEnd"),
+          ...[...multiDateList.querySelectorAll(".ee-multi-date-row")].map((r) =>
+            `${r.dataset.eventId || "new"}:${r.querySelector(".ee-range-start")?.value || ""}:${r.querySelector(".ee-range-end")?.value || ""}`).sort(),
+        ].join("|");
+        const savedSig = dateSig();
+        const syncRangeActions = () => {
+          const unsaved = dateSig() !== savedSig;
+          multiDateList.querySelectorAll(".ee-multi-date-row").forEach((r) => {
+            const actions = r.querySelector(".ee-range-actions");
+            if (!actions) return;
+            actions.hidden = unsaved;
+            if (unsaved) {
+              actions.querySelector(".ee-range-menu")?.setAttribute("hidden", "");
+              actions.querySelector(".ee-range-more")?.setAttribute("aria-expanded", "false");
+            }
+            let note = r.querySelector(".ee-range-locknote");
+            if (unsaved && !note) {
+              note = document.createElement("span");
+              note.className = "ee-range-locknote";
+              note.textContent = "บันทึกการลงวันก่อน จึงใช้คำสั่งของช่วงนี้ได้";
+              actions.before(note);
+            }
+            if (note) note.hidden = !unsaved;
+          });
+        };
+        multiToggle?.addEventListener("change", syncRangeActions);
+        multiDateList.addEventListener("change", syncRangeActions);
+        multiDateList.addEventListener("tt-sync", syncRangeActions, true);
+        ["editStart", "editEnd"].forEach((id) => document.getElementById(id)?.addEventListener("change", syncRangeActions));
+        if (typeof MutationObserver !== "undefined") new MutationObserver(syncRangeActions).observe(multiDateList, { childList: true });
+        document.getElementById("ee-dirty-revert")?.addEventListener("click", () => setTimeout(syncRangeActions, 0));
+        syncRangeActions();
+      }
+
       // ✅ ฟิลด์ร่วมของงาน (ไม่รวมวันที่) — ใช้ทั้งโหมดวันเดียวและโหมดหลายวัน
       // เวลาแก้ข้อมูลงาน (บริษัท/ไซต์/ทีม/สถานะ ฯลฯ) ในโหมดหลายวัน จะ apply กับทุกช่วงวันที่ในกลุ่มเดียวกัน
       // ✅ ลูกทีมเพิ่มเติม — เก็บทั้งชื่อ+userId (แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) กันซ้ำชื่อ
@@ -4180,8 +4360,8 @@ export const getEditEvent = async ({
         description: getVal("editDescription"),
         // อุปกรณ์/อะไหล่ที่ต้องเตรียม — ส่งเฉพาะเมื่อมีช่อง (นัดฝ่ายขายไม่มี) · ไม่เปลี่ยน = ไม่ส่ง (ไม่ไปทับค่าของวันอื่นในงาน)
         ...(document.getElementById("ee-equipment") && getVal("ee-equipment") !== eventEquipment.trim() ? { equipment: getVal("ee-equipment") } : {}),
-        startTime: getVal("editStartTime"),
-        endTime: getVal("editEndTime"),
+        startTime: normTime(getVal("editStartTime")),
+        endTime: normTime(getVal("editEndTime")),
       });
 
       // ✅ ข้อมูลสัญญา — คืนค่า null ถ้างานนี้ไม่ได้อยู่ในสัญญาแบบหลายครั้ง (ไม่มี input พวกนี้ให้อ่าน)

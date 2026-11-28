@@ -8,6 +8,7 @@ import { personTsRender, PERSON_TS_CSS } from "@/shared/utils/personTsRender";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { normTime } from "./timeFormat";
 import { domFormDraft } from "@/shared/utils/formDraft";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
@@ -334,23 +335,24 @@ function injectAddStyles() {
       margin-bottom: 14px; cursor: pointer;
     }
     .ae-checkbox-row input { width: auto !important; cursor: pointer; }
-    .ae-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .ae-multi-date-row input {
-      flex: 1; box-sizing: border-box;
-      border: 1.5px solid #e6e9ef; border-radius: 8px;
-      padding: 9px 12px; font-size: 14px; color: #1e293b;
-      background: #fff; font-family: inherit;
-    }
-    .ae-multi-date-row input:focus {
-      outline: none; border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
-    }
-    .ae-multi-date-row .ae-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
+    /* การ์ดช่วงวันที่ — ชุดเดียวกับหน้าแก้ไขงาน (.ee-multi-date-row) */
+    .ae-multi-date-row { border: 1px solid #e6e9f2; border-radius: 10px; background: #fbfcff; padding: 8px 10px 10px; margin-bottom: 10px; }
+    .ae-range-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .ae-range-no { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #1d4ed8; background: #eff6ff; border: 1px solid #dbeafe; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+    .ae-range-preview { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 600; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    .ae-range-preview--empty { color: #b6c0cf; font-weight: 500; }
+    .ae-range-body { display: flex; align-items: center; gap: 8px; }
+    .ae-range-field { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+    .ae-range-cap { flex-shrink: 0; width: 26px; font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .ae-multi-date-row input[type=date] { flex: 1 1 auto; min-width: 0; box-sizing: border-box; border: 1px solid #e6e9ef; border-radius: 7px; padding: 7px 10px; font-size: 13px; color: #1e293b; background: #fff; font-family: inherit; }
+    .ae-multi-date-row input[type=date]:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.10); }
+    .ae-range-sep { flex-shrink: 0; color: #cbd5e1; font-weight: 700; font-size: 13px; }
+    .ae-multi-date-remove { flex: 0 0 28px !important; width: 28px; height: 28px; padding: 0 !important; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center; margin-left: auto; }
+    @media (max-width: 640px) { .ae-range-body { flex-direction: column; align-items: stretch; gap: 6px; } .ae-range-sep { display: none; } }
     /* ✅ ทีมของแต่ละช่วง (ผู้ใช้สั่ง: บางช่วงคนเข้าไม่ตรงกัน) — ซ่อนไว้จนกว่าจะเอาออกจากงานหลัก */
-    .ae-multi-date-row { flex-wrap: wrap; }
-    .ae-range-team { flex: 1 1 100%; border-top: 1px dashed #e6e9ef; margin-top: 6px; padding-top: 6px; }
+    .ae-range-team { margin-top: 8px; border-top: 1px dashed #e6e9ef; padding-top: 8px; }
     .ae-range-same { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; font-weight: 600; cursor: pointer; }
-    .ae-range-same input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
+    .ae-range-same input { flex: 0 0 auto; width: 15px; height: 15px; margin: 0; padding: 0; border: 0; accent-color: #2563eb; cursor: pointer; }
     .ae-range-team-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
     .ae-range-team-fields > div > span { display: block; width: 100%; min-width: 0; white-space: nowrap; font-size: 12px; color: #64748b; font-weight: 700; margin-bottom: 5px; }
     @media (max-width: 640px) { .ae-range-team-fields { grid-template-columns: 1fr; } }
@@ -553,13 +555,64 @@ function injectAddStyles() {
     .swal-add-event #ae-body { display: flex; flex-direction: column; }
     .swal-add-event #ae-body > *, .swal-add-event #ae-body section { flex-shrink: 0; }
     .swal-add-event #ae-generalSection, .swal-add-event #ae-contractPickSection { display: contents; }
+    /* 🔁 (28 พ.ย. 2569) หัวข้อหมวด — ชุดเดียวกับหน้าแก้ไขงาน (ข้อมูลงาน · หน้างาน · ทีมและวันเวลา · งานที่ทำ · อื่นๆ) */
+    .swal-add-event .ae-zone-title { display: flex; align-items: baseline; gap: 8px; margin: 8px 2px 10px; font-size: 13.5px; font-weight: 800; color: #334155; }
+    .swal-add-event .ae-zone-title small { font-size: 12px; font-weight: 500; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .swal-add-event .ae-zone-title::after { content: ""; flex: 1; min-width: 24px; height: 1px; background: #e6e9ef; align-self: center; }
+    .swal-add-event .ae-equip { margin-top: 2px; padding-top: 12px; border-top: 1px dashed #e2e8f0; }
+    .swal-add-event .ae-equip .ae-opt { font-size: 11.5px; font-weight: 500; color: #94a3b8; margin-left: 4px; }
+    @media (max-width: 600px) { .swal-add-event .ae-zone-title small { display: none; } }
+    /* 🔁 (28 พ.ย. 2569 ผู้ใช้: "ดูเลื่อนแปลกๆ ไม่ลงตัว…สีสันดูรก ไม่สบายตา") ชุดเดียวกับหน้าแก้ไขงาน:
+       เลื่อนทางเดียว · จับคู่การ์ดเป็นแถวเฉพาะคู่ที่สูงใกล้กัน (ผู้ปฏิบัติงาน | วันที่และเวลา · ผู้ติดต่อ | สีบนปฏิทิน) · ที่เหลือเต็มแถว
+       โทน: ไม่มีไอคอนอีโมจิหัวการ์ด · หัวข้อหนา 700 · ป้ายช่อง 600 · เส้นขอบ 1px */
+    .swal-add-event .ae-zone-title { font-size: 14px; font-weight: 700; color: #334155; margin-top: 12px; }
+    .swal-add-event .ae-zone-title small { font-weight: 400; }
+    .swal-add-event .ae-col { display: contents; }
+    .swal-add-event .ae-mode-general, .swal-add-event .ae-mode-contract { display: contents; }
+    .swal-add-event .ae-cols { container-type: inline-size; container-name: aecols; }
+    @container aecols (min-width: 860px) {
+      .swal-add-event .ae-zone--extra { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; align-items: stretch; }
+      .swal-add-event .ae-zone--extra > .ae-zone-title { grid-column: 1 / -1; }
+      .swal-add-event .ae-zone--extra .ae-card { grid-column: span 1; }
+      /* ผู้ปฏิบัติงาน / วันที่และเวลา เต็มแถว (ชุดเดียวกับหน้าแก้ไขงาน): วันที่ | เวลา แถวเดียว 4 ช่อง */
+      .swal-add-event .ae-card-body:has(> #ae-singleDateSection) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; }
+      .swal-add-event .ae-card-body:has(> #ae-singleDateSection) > * { grid-column: 1 / -1; }
+      .swal-add-event .ae-card-body:has(> #ae-singleDateSection) > #ae-singleDateSection { grid-column: 1; }
+      .swal-add-event .ae-card-body:has(> #ae-singleDateSection) > #ae-singleDateSection ~ .ae-grid { grid-column: 2; }
+      .swal-add-event .ae-card-body:has(> #ae-multiDateSection:not([style*="none"])) > #ae-singleDateSection ~ .ae-grid { grid-column: 1 / -1; }
+      .swal-add-event .ae-zone--extra section.ae-card:has(#ji-dueDate) { grid-column: 1 / -1; }
+      .swal-add-event.ae-is-contract .ae-zone--extra .ae-card { grid-column: 1 / -1; }
+    }
+    /* 🔁 (28 พ.ย. 2569 ผู้ใช้: "ติ๊กช่องลงเลือกหลายช่วงแล้วช่องมันดูเล็กๆ ดูยาก ไม่สวย" · "สีสัน และการแสดงผล ให้สมบูรณ์")
+         การ์ดช่วงวันที่ = ขนาดเดียวกับช่องอื่นของฟอร์ม: ป้าย "วันที่เริ่ม/วันที่สิ้นสุด" เหนือช่อง · ช่องสูง 44px ตัว 15px · การ์ดพื้นขาว
+         (ปฏิทิน พ.ศ. อ่านขนาด/ขอบจากช่องเดิมตอนสร้าง — จึงตั้งที่ input[type=date] ของแถว) */
+      .swal-add-event .ae-multi-date-row { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 16px 14px; margin-bottom:12px; box-shadow:0 1px 2px rgba(15,23,42,.03); }
+      .swal-add-event .ae-range-head { gap:10px; margin-bottom:10px; min-height:30px; }
+      .swal-add-event .ae-range-no { font-size:12.5px; font-weight:700; color:#1d4ed8; background:#eff6ff; border:1px solid #dbeafe; padding:3px 12px; }
+      .swal-add-event .ae-range-preview { font-size:14px; font-weight:600; color:#334155; }
+      .swal-add-event .ae-range-preview--empty { color:#94a3b8; font-weight:500; }
+      .swal-add-event .ae-range-body { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:14px; align-items:end; }
+      .swal-add-event .ae-range-field { flex-direction:column; align-items:stretch; gap:6px; }
+      .swal-add-event .ae-range-cap { width:auto; font-size:13.5px; font-weight:600; color:#475569; }
+      .swal-add-event .ae-range-sep { display:none; }
+      .swal-add-event .ae-multi-date-row input[type=date] { min-height:44px; padding:10px 12px; font-size:15px; border:1px solid #e2e8f0; border-radius:10px; color:#0f172a; }
+      .swal-add-event .ae-range-team { margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9; }
+      .swal-add-event .ae-range-same { font-size:13.5px; color:#334155; gap:8px; }
+      .swal-add-event .ae-range-same input { width:17px; height:17px; }
+      .swal-add-event .ae-multi-date-remove { flex:0 0 32px !important; width:32px; height:32px; border-radius:8px; }
+      @media (max-width: 640px) { .swal-add-event .ae-range-body { grid-template-columns:1fr; gap:10px; } }
+    .swal-add-event #ae-body .ae-card-head > .ae-card-ico { display: none; }
+    .swal-add-event #ae-body .ae-card-head { padding: 14px 18px 4px; }
+    .swal-add-event #ae-body .ae-card-titles h4 { font-size: 15.5px; font-weight: 700; }
+    .swal-add-event #ae-body .ae-card-body { padding-left: 18px; padding-right: 18px; }
+    .swal-add-event #ae-body .ae-field > label { font-weight: 600; color: #475569; }
+    .swal-add-event #ae-body .ae-field input, .swal-add-event #ae-body .ae-field textarea, .swal-add-event #ae-body .ts-wrapper .ts-control { border-width: 1px !important; }
 
     /* ── มูลค่างานรวม (ชุดเดียวกับหน้าแก้ไขงาน) ── */
     .swal-add-event .ae-money-input { position: relative; }
     .swal-add-event .ae-money-symbol { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 700; color: #2563eb; pointer-events: none; }
     .swal-add-event .ae-card .ae-field--money .ae-money-input > input { width: 100%; box-sizing: border-box; min-height: 52px; padding: 11px 14px 11px 34px !important; font-size: 19px !important; font-weight: 800; font-variant-numeric: tabular-nums; color: #0f172a; background: #f8fbff; border: 1.5px solid #bfdbfe !important; border-radius: 10px; font-family: inherit; }
     .swal-add-event .ae-card .ae-field--money .ae-money-input > input:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
-    .swal-add-event .ae-card .ae-field--money > label { color: #1d4ed8; }
     /* (12 พ.ย. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าเช่น — ดูสับสนว่ามีมูลค่าแล้ว") ข้อความในช่องว่าง = ตัวบาง สีจาง */
     .swal-add-event .ae-field--money .ae-money-input > input::placeholder { font-size: 15px; font-weight: 500; color: #94a3b8; }
     .swal-add-event .ae-money-hint { font-size: 12px; color: #64748b; }
@@ -815,7 +868,6 @@ export const getAddEvent = async ({
   // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
   const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
 
-  const displayDate = formatThai(moment(arg.dateStr), "DD MMMM YYYY");
 
   /* ── options ── */
   const companyOpts = customers.userCustomers
@@ -861,8 +913,7 @@ export const getAddEvent = async ({
   <!-- Body -->
   <div id="ae-body">
 
-    <!-- date badge -->
-    <div class="ae-date-badge">📅 วันที่เลือก: ${displayDate}</div>
+    ${/* 🧹 (28 พ.ย. 2569 "ข้อมูลไม่สอดคล้อง") ตัดป้าย "วันที่เลือก" — ซ้ำกับช่องวันที่ และค้างวันเดิมเมื่อแก้วันที่ในฟอร์ม */""}
 
     ${sourceEvent ? `<div class="ae-copy-note">📋 วางจากงานที่คัดลอกไว้ — ปรับข้อมูลได้ตามต้องการก่อนบันทึก</div>` : ""}
 
@@ -872,7 +923,7 @@ export const getAddEvent = async ({
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">🗂️</span>
-        <div class="ae-card-titles"><h4>ประเภทงาน</h4><p>งานครั้งเดียว · งานโปรเจค · หรือครั้งถัดไปของสัญญา</p></div>
+        <div class="ae-card-titles"><h4>รูปแบบงาน</h4><p>งานครั้งเดียว · งานโปรเจค · หรือครั้งถัดไปของสัญญา</p></div>
       </div>
       <div class="ae-card-body">
     <div class="ae-jobtype-toggle">
@@ -921,8 +972,14 @@ export const getAddEvent = async ({
     </div>
     </section>
 
-    <!-- โหมด "งานทั่วไป" -->
-    <div id="ae-generalSection">
+    ${/* 🔁 (28 พ.ย. 2569 ผู้ใช้: "หน้าตา การจัดวาง ไม่เห็นเปลี่ยนเลย") จอกว้าง = 2 คอลัมน์ ชุดเดียวกับหน้าแก้ไขงาน
+         ซ้าย = ต้องกรอก (ข้อมูลงาน · ทีมและวันเวลา · งานที่ทำ) · ขวา = เสริม/ไม่บังคับ (หน้างาน · อื่นๆ)
+         กล่องของแต่ละโหมด: .ae-mode-general / .ae-mode-contract (สลับโหมดซ่อน/แสดงทั้งชุด) · id เดิมอยู่ที่กล่องแรกของแต่ละโหมด */""}
+    <div class="ae-cols"><div class="ae-cols-grid">
+    <div class="ae-col ae-col-main">
+      <div class="ae-zone ae-zone--info">
+      <div class="ae-zone-title"><span>ข้อมูลงาน</span><small>ลูกค้า · โครงการ · ประเภท/ระบบงาน</small></div>
+      <div id="ae-generalSection" class="ae-mode-general">
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">🏗️</span>
@@ -963,109 +1020,8 @@ export const getAddEvent = async ({
       </div>` : ""}
       </div>
     </section>
-
-      <section class="ae-card">
-      <div class="ae-card-head">
-        <span class="ae-card-ico" aria-hidden="true">📞</span>
-        <div class="ae-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
       </div>
-      <div class="ae-card-body">
-      <div class="ae-grid ae-grid-2">
-        <div class="ae-field">
-          <label>ชื่อผู้ติดต่อ</label>
-          <input id="contactName" type="text" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง">
-        </div>
-        <div class="ae-field">
-          <label>เบอร์โทร</label>
-          <input id="contactTel" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678">
-        </div>
-      </div>
-      </div>
-    </section>
-
-      <section class="ae-card">
-      <div class="ae-card-head">
-        <span class="ae-card-ico" aria-hidden="true">👷</span>
-        <div class="ae-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
-      </div>
-      <div class="ae-card-body">
-        <div class="ae-worker-row ae-worker-row--lead">
-          <span class="ae-worker-no" aria-hidden="true">1</span>
-          <div class="ae-field ae-worker-field">
-            <select id="eventTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)"><option selected disabled value="">— เลือกหรือพิมพ์ชื่อ —</option>${teamOpts}</select>
-          </div>
-          <span class="ae-worker-tag">หัวหน้าทีม</span>
-        </div>
-        <!-- ✅ ผู้ปฏิบัติงานคนที่ 2, 3, … — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
-        <div id="ae-teamMembersList"></div>
-        <button type="button" class="ae-btn ae-btn-ghost ae-worker-add" id="ae-addTeamMemberBtn">➕ เพิ่มผู้ปฏิบัติงาน</button>
-      </div>
-    </section>
-
-      <section class="ae-card">
-      <div class="ae-card-head">
-        <span class="ae-card-ico" aria-hidden="true">📅</span>
-        <div class="ae-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
-      </div>
-      <div class="ae-card-body">
-      <label class="ae-checkbox-row">
-        <input type="checkbox" id="ae-multiDateToggle">
-        🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
-      </label>
-
-      <div id="ae-singleDateSection">
-        <div class="ae-grid ae-grid-datetime">
-          <div class="ae-field">
-            <label>วันที่เริ่ม</label>
-            <input id="start" type="date" value="${arg.dateStr}">
-          </div>
-          <div class="ae-field">
-            <label>วันที่สิ้นสุด</label>
-            <input id="end" type="date" value="${arg.dateStr}">
-          </div>
-        </div>
-      </div>
-
-      <div id="ae-multiDateSection" style="display:none;">
-        <div id="ae-multiDateList"></div>
-        <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">➕ เพิ่มช่วงวันที่</button>
-      </div>
-
-      <div class="ae-grid ae-grid-datetime">
-        <div class="ae-field">
-          <label>เวลาเริ่ม</label>
-          <input id="startTime" type="text" placeholder="เช่น 08:30">
-        </div>
-        <div class="ae-field">
-          <label>เวลาสิ้นสุด</label>
-          <input id="endTime" type="text" placeholder="เช่น 17:00">
-        </div>
-      </div>
-
-      <!-- ── สีการ์ดงานบนปฏิทิน ──
-           ⚠️ id ของ input ทั้งสอง (backgroundColorPicker / textColorPicker) ยังเป็นตัวเดิม
-           โค้ดตอนกดบันทึกด้านล่างอ่านค่าจาก id เหล่านี้โดยตรง ห้ามเปลี่ยนชื่อ -->
-      </div>
-    </section>
-
-      <section class="ae-card">
-      <div class="ae-card-head">
-        <span class="ae-card-ico" aria-hidden="true">🎨</span>
-        <div class="ae-card-titles"><h4>การแสดงผลบนปฏิทิน</h4><p>สีของการ์ดงานบนปฏิทิน</p></div>
-      </div>
-      <div class="ae-card-body">
-      ${colorPickerHtml({
-        bgId: "backgroundColorPicker",
-        textId: "textColorPicker",
-        bg: sourceEvent?.backgroundColor || defaultBackgroundColor,
-        text: sourceEvent?.textColor || defaultTextColor,
-      })}
-      </div>
-    </section>
-    </div>
-
-    <!-- โหมด "งานตามสัญญา" -->
-    <div id="ae-contractPickSection" style="display:none;">
+      <div id="ae-contractPickSection" class="ae-mode-contract" style="display:none;">
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
@@ -1084,7 +1040,6 @@ export const getAddEvent = async ({
 
       </div>
     </section>
-
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">🔄</span>
@@ -1097,7 +1052,76 @@ export const getAddEvent = async ({
 
       </div>
     </section>
+      </div>
+      </div>
+      <div class="ae-zone ae-zone--team">
+      <div class="ae-zone-title"><span>ทีมและวันเวลา</span><small>ใครเข้างาน · วันไหน กี่โมง</small></div>
+      <div class="ae-mode-general">
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">👷</span>
+        <div class="ae-card-titles"><h4>ผู้ปฏิบัติงาน</h4><p>คนที่เข้าไปทำงานนี้ — คนที่ 1 คือหัวหน้าทีม</p></div>
+      </div>
+      <div class="ae-card-body">
+        <div class="ae-worker-row ae-worker-row--lead">
+          <span class="ae-worker-no" aria-hidden="true">1</span>
+          <div class="ae-field ae-worker-field">
+            <select id="eventTeam" aria-label="ผู้ปฏิบัติงาน 1 (หัวหน้าทีม)"><option selected disabled value="">— เลือกหรือพิมพ์ชื่อ —</option>${teamOpts}</select>
+          </div>
+          <span class="ae-worker-tag">หัวหน้าทีม</span>
+        </div>
+        <!-- ✅ ผู้ปฏิบัติงานคนที่ 2, 3, … — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
+        <div id="ae-teamMembersList"></div>
+        <button type="button" class="ae-btn ae-btn-ghost ae-worker-add" id="ae-addTeamMemberBtn">+ เพิ่มผู้ปฏิบัติงาน</button>
+      </div>
+    </section>
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📅</span>
+        <div class="ae-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
+      </div>
+      <div class="ae-card-body">
+      <label class="ae-checkbox-row">
+        <input type="checkbox" id="ae-multiDateToggle">
+        งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
+      </label>
 
+      <div id="ae-singleDateSection">
+        <div class="ae-grid ae-grid-datetime">
+          <div class="ae-field">
+            <label>วันที่เริ่ม</label>
+            <input id="start" type="date" value="${arg.dateStr}">
+          </div>
+          <div class="ae-field">
+            <label>วันที่สิ้นสุด</label>
+            <input id="end" type="date" value="${arg.dateStr}">
+          </div>
+        </div>
+      </div>
+
+      <div id="ae-multiDateSection" style="display:none;">
+        <div id="ae-multiDateList"></div>
+        <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">+ เพิ่มช่วงวันที่</button>
+      </div>
+
+      <div class="ae-grid ae-grid-datetime">
+        <div class="ae-field">
+          <label>เวลาเริ่ม</label>
+          <input id="startTime" type="text" placeholder="เช่น 08:30">
+        </div>
+        <div class="ae-field">
+          <label>เวลาสิ้นสุด</label>
+          <input id="endTime" type="text" placeholder="เช่น 17:00">
+        </div>
+      </div>
+
+      <!-- ── สีการ์ดงานบนปฏิทิน ──
+           ⚠️ id ของ input ทั้งสอง (backgroundColorPicker / textColorPicker) ยังเป็นตัวเดิม
+           โค้ดตอนกดบันทึกด้านล่างอ่านค่าจาก id เหล่านี้โดยตรง ห้ามเปลี่ยนชื่อ -->
+      </div>
+    </section>
+      </div>
+      <div class="ae-mode-contract" style="display:none;">
       <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📅</span>
@@ -1121,8 +1145,10 @@ export const getAddEvent = async ({
       </div>
       </div>
     </section>
-    </div>
-
+      </div>
+      </div>
+      <div class="ae-zone ae-zone--work">
+      <div class="ae-zone-title"><span>งานที่ทำ</span><small>รายละเอียด · อุปกรณ์ · ไฟล์</small></div>
     ${/* ── เอกสาร ────────────────────────────────────────────────────────────────────────
           ให้ตรงกับฟอร์มแก้ไขงาน ซึ่งมีสองช่องนี้มาตลอด — เดิมกรอกได้เฉพาะตอน "แก้ไข" เท่านั้น คนที่มี
           เลขที่เอกสาร/รายละเอียดอยู่ในมือตั้งแต่ตอนสร้างจึงต้องกดบันทึกแล้วเปิดงานเดิมขึ้นมาแก้ซ้ำอีกรอบ
@@ -1132,7 +1158,7 @@ export const getAddEvent = async ({
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
-        <div class="ae-card-titles"><h4>รายละเอียดงานที่ทำ <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div><span class="ae-card-badge" style="color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;">บังคับ</span>
+        <div class="ae-card-titles"><h4>รายละเอียดงานที่ทำ <span class="req">*</span></h4><p>จะไปทำอะไร ที่ไหน อุปกรณ์/จุดที่ต้องดู — แอดมินและช่างใช้ตรวจสอบงานนี้</p></div>
       </div>
       <div class="ae-card-body">
     ${/* 🧹 (12 พ.ย. 2569 ผู้ใช้: "เลขที่อ้างอิงตัดออกไป") — ตัดช่อง Doc No. · ป้ายชื่อซ้ำกับหัวการ์ด เหลือคำแนะนำสั้นๆ */""}
@@ -1147,12 +1173,52 @@ export const getAddEvent = async ({
     ${/* ✅ (12 พ.ย. 2569 ผู้ใช้: "หน้าเพิ่มข้อมูลให้เพิ่มเลือกไฟล์แนบหลักฐาน แบบหน้าแก้ไขด้วย")
          ชุดเดียวกับ "รูปและไฟล์หน้างาน" ในหน้าแก้ไขงาน (Events.sitePhotoFiles) — เลือกไว้ก่อน อัปโหลดหลังลงงานสำเร็จ
          ⚠️ data-no-draft: ไฟล์ไม่เข้าระบบกู้คืนข้อมูลฟอร์ม */""}
-    <section class="ae-card" data-no-draft style="order:8;">
+    <section class="ae-card" data-no-draft>
       <div class="ae-card-body" style="padding:12px;"><div id="ae-sitePhotosMount"></div></div>
     </section>
 
+      </div>
+      <div class="ae-zone ae-zone--extra">
+      <div class="ae-zone-title"><span>ข้อมูลเพิ่มเติม</span><small>ไม่บังคับ · ผู้ติดต่อหน้างาน · สีบนปฏิทิน · ความเร่งด่วน</small></div>
+      <div class="ae-mode-general">
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📞</span>
+        <div class="ae-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
+      </div>
+      <div class="ae-card-body">
+      <div class="ae-grid ae-grid-2">
+        <div class="ae-field">
+          <label>ชื่อผู้ติดต่อ</label>
+          <input id="contactName" type="text" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง">
+        </div>
+        <div class="ae-field">
+          <label>เบอร์โทร</label>
+          <input id="contactTel" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678">
+        </div>
+      </div>
+      </div>
+    </section>
+      </div>
+      ${/* ✅ (28 พ.ย. 2569 ผู้ใช้: "งานสัญญาไม่เห็นมีให้เลือกสีได้ ทำให้มีด้วย") สีบนปฏิทินเลือกได้ทั้งงานทั่วไป/โปรเจค และงานตามสัญญา */""}
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">🎨</span>
+        <div class="ae-card-titles"><h4>การแสดงผลบนปฏิทิน</h4><p>สีของการ์ดงานบนปฏิทิน</p></div>
+      </div>
+      <div class="ae-card-body">
+      ${colorPickerHtml({
+        bgId: "backgroundColorPicker",
+        textId: "textColorPicker",
+        bg: sourceEvent?.backgroundColor || defaultBackgroundColor,
+        text: sourceEvent?.textColor || defaultTextColor,
+      })}
+    </section>
+      </div>
     ${/* 🔁 (12 พ.ย. 2569 ผู้ใช้: "สลับตำแหน่งวางกับข้อมูล Job") รายละเอียดงาน (บังคับ) + ไฟล์ขึ้นก่อน · ข้อมูล Job (ไม่บังคับ) ไว้ท้าย */""}
     ${jobInfoSectionHtml()}
+      </div>
+    </div></div>
 
     <!-- hidden fontSize -->
     <input id="fontSize" type="hidden" value="8">
@@ -1358,11 +1424,19 @@ export const getAddEvent = async ({
       const addDateRow = (startValue = "", endValue = "") => {
         const row = document.createElement("div");
         row.className = "ae-multi-date-row";
+        // 🔁 (28 พ.ย. 2569 ผู้ใช้: "การแสดงก็เพี้ยนๆ" · "ทำให้รูปแบบสอดคล้องกัน") การ์ดช่วงวันที่หน้าตาเดียวกับหน้าแก้ไขงาน
+        //    เดิมช่องติ๊ก "ใช้ทีมเดียวกับงานหลัก" โดนสไตล์ช่องวันที่ (flex:1 + กรอบ) ยืดเป็นกล่องยาวกลางแถว
         row.innerHTML = `
-          <input type="date" class="ae-range-start" value="${startValue}">
-          <span class="ae-range-sep">–</span>
-          <input type="date" class="ae-range-end" value="${endValue || startValue}">
-          <button type="button" class="ae-btn ae-btn-ghost ae-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
+          <div class="ae-range-head">
+            <span class="ae-range-no"></span>
+            <span class="ae-range-preview"></span>
+            <button type="button" class="ae-btn ae-btn-ghost ae-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
+          </div>
+          <div class="ae-range-body">
+            <div class="ae-range-field"><span class="ae-range-cap">วันที่เริ่ม</span><input type="date" class="ae-range-start" value="${startValue}"></div>
+            <span class="ae-range-sep" aria-hidden="true">→</span>
+            <div class="ae-range-field"><span class="ae-range-cap">วันที่สิ้นสุด</span><input type="date" class="ae-range-end" value="${endValue || startValue}"></div>
+          </div>
           <!-- ✅ ผู้ใช้สั่ง: "กำหนดหัวหน้างาน และลูกทีมของแต่ละช่วงงานแยกกันได้"
                ⚠️ ผู้รับผิดชอบหลักของงานยังเป็นคนเดิมทั้งงาน — ตรงนี้คือ "คนที่เข้าหน้างานช่วงนี้" เท่านั้น -->
           <div class="ae-range-team">
@@ -1372,11 +1446,11 @@ export const getAddEvent = async ({
             </label>
             <div class="ae-range-team-fields" style="display:none;">
               <div>
-                <span>👷 หัวหน้างานช่วงนี้</span>
+                <span>หัวหน้างานช่วงนี้</span>
                 <select class="ae-range-lead"><option value="">— เลือก —</option>${teamOpts}</select>
               </div>
               <div>
-                <span>👥 ลูกทีมช่วงนี้</span>
+                <span>ลูกทีมช่วงนี้</span>
                 <select class="ae-range-members" multiple>${teamOpts}</select>
               </div>
             </div>
@@ -1388,6 +1462,7 @@ export const getAddEvent = async ({
             row._leadTs?.destroy();
             row._membersTs?.destroy();
             row.remove();
+            [...multiDateList.children].forEach((r, i) => { const b = r.querySelector(".ae-range-no"); if (b) b.textContent = `ช่วงที่ ${i + 1}`; });
           }
         });
         multiDateList.appendChild(row);
@@ -1398,6 +1473,20 @@ export const getAddEvent = async ({
         row._leadTs = mkRangePersonTs(row.querySelector(".ae-range-lead"), "เลือกหัวหน้างานของช่วงนี้");
         row._membersTs = mkRangePersonTs(row.querySelector(".ae-range-members"), "เลือกลูกทีมของช่วงนี้");
         sameEl.addEventListener("change", () => { fieldsEl.style.display = sameEl.checked ? "none" : ""; });
+        // ป้ายวันที่ภาษาไทยบนหัวการ์ด (ช่องวันที่ของเบราว์เซอร์อาจเป็น ดด/วว — อ่านสลับได้) · เลขช่วงเรียงใหม่ทุกครั้ง
+        const previewEl = row.querySelector(".ae-range-preview");
+        const refreshPreview = () => {
+          const st = row.querySelector(".ae-range-start")?.value;
+          const en = row.querySelector(".ae-range-end")?.value || st;
+          if (!st) { previewEl.textContent = "ยังไม่ได้เลือกวันที่"; previewEl.classList.add("ae-range-preview--empty"); return; }
+          previewEl.classList.remove("ae-range-preview--empty");
+          const ms = moment(st); const me = moment(en);
+          const days = Math.max(1, me.diff(ms, "days") + 1);
+          previewEl.textContent = ms.isSame(me, "day") ? `${formatThai(ms, "D MMM YYYY")} · 1 วัน` : `${formatThai(ms, "D MMM")} – ${formatThai(me, "D MMM YYYY")} · ${days} วัน`;
+        };
+        row.querySelectorAll(".ae-range-start, .ae-range-end").forEach((el) => { el.addEventListener("change", refreshPreview); el.addEventListener("tt-sync", refreshPreview); });
+        refreshPreview();
+        [...multiDateList.children].forEach((r, i) => { const b = r.querySelector(".ae-range-no"); if (b) b.textContent = `ช่วงที่ ${i + 1}`; });
       };
       addDateRow(arg.dateStr, arg.dateStr); // แถวแรก prefill ด้วยวันที่ที่คลิกบนปฏิทินมา
 
@@ -1410,15 +1499,16 @@ export const getAddEvent = async ({
       });
 
       /* ── ขั้นตอนที่ 1: งานทั่วไป vs งานตามสัญญา — สลับ section ทั้งก้อน ไม่ใช่แค่ box ย่อยแบบเดิม ── */
-      const generalSection     = document.getElementById("ae-generalSection");
-      const contractPickSection = document.getElementById("ae-contractPickSection");
       const jobTypeRadios = [...document.querySelectorAll('input[name="ae-jobType"]')];
       jobTypeRadios.forEach((radio) => {
         radio.addEventListener("change", () => {
           const isContract = radio.value === "contract" && radio.checked;
           if (!radio.checked) return;
-          generalSection.style.display = isContract ? "none" : "";
-          contractPickSection.style.display = isContract ? "" : "none";
+          // 🔁 (28 พ.ย. 2569) แต่ละโหมดมีหลายกล่อง (กระจายอยู่ในหมวดต่างๆ) — สลับทั้งชุด
+          document.querySelectorAll(".ae-mode-general").forEach((el) => { el.style.display = isContract ? "none" : ""; });
+          document.querySelectorAll(".ae-mode-contract").forEach((el) => { el.style.display = isContract ? "" : "none"; });
+          Swal.getPopup()?.classList.toggle("ae-is-contract", isContract);
+          window.dispatchEvent(new Event("ae-mode-change"));
         });
       });
 
@@ -1591,6 +1681,19 @@ export const getAddEvent = async ({
         `;
         contractPickInfo.style.display = "block";
         renderRoundGrid(c);
+        // ✅ สีเริ่มต้น = สีของครั้งล่าสุดในสัญญานี้ (ครั้งใหม่สีเดียวกับครั้งก่อนบนปฏิทิน) — เปลี่ยนเองได้ที่ "การแสดงผลบนปฏิทิน"
+        {
+          const last = [...c.visits].filter((v) => v.backgroundColor && !v.unscheduled)
+            .sort((a, b) => String(b.start || "").localeCompare(String(a.start || "")))[0];
+          const bgIn = document.getElementById("backgroundColorPicker");
+          const txIn = document.getElementById("textColorPicker");
+          if (last && bgIn && txIn) {
+            bgIn.value = last.backgroundColor;
+            txIn.value = last.textColor || txIn.value;
+            bgIn.dispatchEvent(new Event("input", { bubbles: true }));
+            txIn.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        }
         // ✅ ตั้งหัวหน้าทีมเข้างานเริ่มต้นตามของสัญญาเดิมไว้ก่อน แก้เป็นคนอื่นได้ถ้าครั้งนี้เปลี่ยนคนทำ —
         // ถ้าสัญญานี้ไม่เคยระบุทีมไว้เลย (c.team ว่าง) fallback ไปใช้ "ผู้รับผิดชอบ" ของสัญญาแทน ตามที่ขอ
         if (cpTeamSelect) {
@@ -1619,14 +1722,30 @@ export const getAddEvent = async ({
        *    ⚠️ เรียงด้วย CSS order (ไม่ย้าย DOM) — โค้ดอ่านค่า/สลับโหมดเดิมทำงานเหมือนเดิมทุกอย่าง
        */
       {
-        // 🔁 (12 พ.ย. 2569 ผู้ใช้: "หน้าเพิ่มให้ข้อมูลงานขึ้นก่อนรายละเอียด ไฟล์") ข้อมูลงานขึ้นก่อน → คน → รายละเอียด → ไฟล์
-        // ⚠️ "รูปและไฟล์หน้างาน" (ลำดับที่ 8) ตั้ง order ไว้ที่การ์ดเอง (การ์ดนั้นไม่มีหัวข้อ h4)
-        const ORDER = ["ประเภทงาน", "ข้อมูลงาน", "ผู้ปฏิบัติงาน", "เลือกสัญญา", "เลือกครั้งที่", "วันที่และผู้ปฏิบัติงาน", "รายละเอียดงานที่ทำ", "รูปและไฟล์หน้างาน", "ผู้ติดต่อหน้างาน", "วันที่และเวลา", "การแสดงผลบนปฏิทิน", "ข้อมูล Job"];
-        Swal.getPopup()?.querySelectorAll("#ae-body section").forEach((sec) => {
-          const t = (sec.querySelector("h4")?.firstChild?.textContent || "").trim();
-          const i = ORDER.indexOf(t);
-          if (i >= 0) sec.style.order = String(i + 1);
+        /**
+         * 🔁 (28 พ.ย. 2569 ผู้ใช้: "การจัดวาง…ไม่เป็นระบบ ทำให้การดำเนินการต่างๆ มันดูยาก") จัดเป็นหมวดมีหัวข้อ ชื่อ/ลำดับเดียวกับหน้าแก้ไขงาน:
+         *    รูปแบบงาน → ข้อมูลงาน (ลูกค้า/โครงการ หรือ สัญญา+ครั้งที่) → หน้างาน (ผู้ติดต่อ) → ทีมและวันเวลา → งานที่ทำ (รายละเอียด+อุปกรณ์ · ไฟล์) → อื่นๆ
+         *    ⚠️ หมวด/คอลัมน์อยู่ในแม่แบบ HTML แล้ว — ที่นี่เหลือย้ายช่อง "อุปกรณ์" ไปใต้รายละเอียดงาน (อ่านค่าด้วย id เหมือนเดิม)
+         *    หัวหมวดที่ไม่มีการ์ดให้เห็นในโหมดนั้น (เช่น "หน้างาน" ตอนเลือกงานตามสัญญา) ซ่อนเอง
+         */
+        const popupEl = Swal.getPopup();
+        // หัวหมวดที่ไม่มีการ์ดให้เห็นในโหมดนั้น (เช่น "หน้างาน" ตอนเลือกงานตามสัญญา) ซ่อนทั้งหมวด
+        const refreshZones = () => popupEl?.querySelectorAll(".ae-zone").forEach((z) => {
+          z.style.display = [...z.querySelectorAll(".ae-card")].some((card) => card.getClientRects().length > 0) ? "" : "none";
         });
+        refreshZones();
+        window.addEventListener("ae-mode-change", refreshZones);
+        popupEl?.querySelectorAll('input[name="ae-jobType"]').forEach((r) => r.addEventListener("change", () => setTimeout(refreshZones, 0)));
+        // อุปกรณ์ / อะไหล่ที่ต้องเตรียม → ใต้รายละเอียดงาน (ตำแหน่งเดียวกับหน้าแก้ไขงาน · ทีมเห็นคู่กับงานที่ต้องทำ)
+        const equip = popupEl?.querySelector("#ji-equipment")?.closest(".ae-field");
+        const descBody = popupEl?.querySelector("#description")?.closest(".ae-card-body");
+        if (equip && descBody) {
+          equip.classList.add("ae-equip");
+          equip.style.marginBottom = "16px";
+          const lbl = equip.querySelector("label");
+          if (lbl && !lbl.querySelector(".ae-opt")) lbl.insertAdjacentHTML("beforeend", '<span class="ae-opt">ไม่บังคับ · บรรทัดละรายการ</span>');
+          descBody.appendChild(equip);
+        }
       }
 
       // ── ไฟล์แนบหน้างาน: เก็บไว้ในหน่วยความจำ แล้วอัปโหลดหลังลงงานสำเร็จ (ยังไม่มีงานให้แนบตอนกรอก) ──
@@ -1809,7 +1928,9 @@ export const getAddEvent = async ({
               time: String(nextIndex),
               team: cpTeam, resPerson: teamToId.get(cpTeam) || "",
               teamMembers: [],
-              backgroundColor: defaultBackgroundColor, textColor: defaultTextColor, fontSize: "8",
+              backgroundColor: document.getElementById("backgroundColorPicker")?.value || defaultBackgroundColor,
+              textColor: document.getElementById("textColorPicker")?.value || defaultTextColor,
+              fontSize: "8",
               startTime: "", endTime: "",
               isContractBatch: true,
               contractGroupId: c.key,
@@ -1924,8 +2045,8 @@ export const getAddEvent = async ({
             backgroundColor: document.getElementById("backgroundColorPicker")?.value,
             textColor:       document.getElementById("textColorPicker")?.value,
             fontSize:        getVal("fontSize") || "8",
-            startTime:       getVal("startTime"),
-            endTime:         getVal("endTime"),
+            startTime:       normTime(getVal("startTime")),
+            endTime:         normTime(getVal("endTime")),
             // ✅ ตั้งหมวดหมู่ "งานทั่วไป"/"งานโปรเจค" ให้เลยตั้งแต่ตอนสร้าง (ตามที่เลือกไว้ในขั้นตอนที่ 1)
             // แทนที่จะปล่อยว่างไว้แล้วต้องไปกดจัดหมวดหมู่ย้อนหลังทีหลังในหน้า "ภาพรวมงาน" เสมอ
             jobClassification: jobType === "project" ? "project" : "general",

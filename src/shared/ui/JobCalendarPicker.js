@@ -57,6 +57,7 @@ import {
 import EventService from "@/shared/services/EventService";
 import { thaiDate } from "@/shared/utils/thaiDate";
 import JobTypeChip from "@/shared/ui/JobTypeChip";
+import JobQuickView from "@/shared/ui/JobQuickView";
 import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -151,6 +152,10 @@ export default function JobCalendarPicker({
   const [q, setQ] = useState("");
   const [sel, setSel] = useState([]); // งานที่เลือกไว้ (หลายงานได้)
   const [sheet, setSheet] = useState(false); // มือถือ: แผ่นรายการงานของวันที่เลือก (เด้งทับปฏิทิน)
+  // ✅ (28 พ.ย. 2569 ผู้ใช้: "อยากให้มีคลิกขวาเพื่อดูข้อมูลงาน การ์ดงาน เพิ่มเติมของงานนั้นๆ ได้" · "แต่รูปแบบการกำหนดสิทธิ์แบบเดิม")
+  //    คลิกขวา (มือถือ: กดค้าง) ที่การ์ดงาน = กล่องรายละเอียดงานตัวเดียวกับหน้ารายงาน/ลูกค้า (JobQuickView) — ไม่เลือก/ไม่ยกเลิกงาน
+  //    เปิดได้เฉพาะงานในรายการนี้ (มาจาก server ตามสิทธิ์อยู่แล้ว) · ไม่แสดงมูลค่างาน
+  const [peekId, setPeekId] = useState(null);
   // canPick(job, เลือกอยู่) → ข้อความเหตุผล (เช่น ใบผู้รับเหมาเลือกได้เฉพาะช่วงของงานเดียวกัน)
   const blockOf = (j, d) => blocked.get(`${j._id}|${d}`) || (d === day ? dayLocks.get(String(j._id)) : "") || (canPick ? canPick(j, sel) : "") || "";
   const isLocked = (j) => lockedIds.some((id) => String(id) === String(j._id));
@@ -345,7 +350,7 @@ export default function JobCalendarPicker({
               วัน{DAY_TH[moment(day).day()]}ที่ {thaiDate(day)}
             </Typography>
             <Typography sx={{ fontSize: "0.76rem", color: selKind ? selKind.color : TEXT_SUB, fontWeight: selKind ? 700 : 400 }}>
-              {selKind ? `${selKind.label} · ` : ""}{events === null ? "กำลังโหลดงาน…" : dayJobs.length ? `มี ${dayJobs.length} งาน${techOnly ? "ที่คุณมีชื่อ" : ""} — แตะเพื่อเลือก (เลือกได้หลายงาน)` : techOnly ? "ไม่มีงานที่คุณมีชื่อในวันนี้" : "ไม่มีงานในวันนี้"}
+              {selKind ? `${selKind.label} · ` : ""}{events === null ? "กำลังโหลดงาน…" : dayJobs.length ? `มี ${dayJobs.length} งาน${techOnly ? "ที่คุณมีชื่อ" : ""} — แตะเพื่อเลือก · ${isMobile ? "กดค้าง" : "คลิกขวา"} = ดูรายละเอียดงาน` : techOnly ? "ไม่มีงานที่คุณมีชื่อในวันนี้" : "ไม่มีงานในวันนี้"}
             </Typography>
           </>
         )}
@@ -371,7 +376,8 @@ export default function JobCalendarPicker({
               const workers = workersOf(j);
               const mine = isMine(j);
               return (
-                <ButtonBase key={j._id} onClick={() => toggle(j)} aria-pressed={on} aria-disabled={Boolean(lock)} sx={{
+                <ButtonBase key={j._id} onClick={() => toggle(j)} onContextMenu={(ev) => { ev.preventDefault(); setPeekId(j._id); }}
+                  title="คลิกขวา = ดูรายละเอียดงาน" aria-pressed={on} aria-disabled={Boolean(lock)} sx={{
                   display: "flex", alignItems: "stretch", textAlign: "left", width: "100%", borderRadius: 2.5, overflow: "hidden", fontFamily: "inherit",
                   bgcolor: lock ? "#f8fafc" : "#fff", border: `1.5px solid ${on ? OT_ACCENT : BORDER_MAIN}`, boxShadow: on ? `0 0 0 3px ${alpha(OT_ACCENT, 0.15)}` : "0 1px 2px rgba(15,23,42,.04)",
                   cursor: lock ? "not-allowed" : "pointer", transition: "border-color .12s, box-shadow .12s",
@@ -493,6 +499,7 @@ export default function JobCalendarPicker({
           </Button>
         </Stack>
       </Stack>
+      {peekId && <JobQuickView eventId={peekId} onClose={() => setPeekId(null)} zIndex={1400} />}
     </Dialog>
   );
 }

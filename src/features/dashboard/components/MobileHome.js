@@ -33,8 +33,17 @@ const iconOf = (it) => it.icon;
 const LABEL = {
   expenseReport: "รายงานเบิก", purchaseReport: "รายงานซื้อ", jobReport: "สรุปงาน",
   // ⚠️ "ติดตามใบเสนอราคา" ห้ามย่อเป็น "ใบเสนอราคา" — ผู้ใช้ยืนยันชื่อเต็ม (เป็นหน้าติดตามผล ไม่ใช่ตัวเอกสาร)
-  contractorPay: "ผู้รับเหมา",
+  // 🔁 (28 พ.ย. 2569 ผู้ใช้: "ชื่อหัวข้อให้มันดูสอดคล้อง เข้าใจง่าย") ชื่อปุ่มบอกว่ากดแล้วเจออะไร รูปแบบเดียวกันทั้งหน้า:
+  //    เอกสารที่ยื่น = "ใบ…" (ใบ Advance · ใบเคลม · ใบ OT · ใบขอซื้อ) · คิว/รายงาน/ประวัติ บอกว่าของอะไร
+  contractorPay: "ค่าผู้รับเหมา",
+  expenseInbox: "รออนุมัติเบิก",
+  ot: "ใบ OT",
+  purchase: "ใบขอซื้อ",
+  stockHistory: "ประวัติเบิกของ",
+  documents: "เอกสารที่ออก",
 };
+/** ชื่อหมวดบนหน้าแรกมือถือ — คำนามบอกเรื่องของหมวด (เดิม "บุคคล" มีแค่ OT · "คลังแผนก" ไม่บอกว่าคลังอะไร) */
+const CAT_TITLE = { people: "ทำงานล่วงเวลา", stock: "คลังของแผนก" };
 const labelOf = (it) => LABEL[it.key] || it.short || it.title;
 
 /**
@@ -88,7 +97,17 @@ export default function MobileHome({ userData, rankText, dateText, summary = [],
   const countOf = (it) => (it.badgeKey ? Number(counts[it.badgeKey]) || 0 : 0);
 
   // ⚠️ (1 พ.ย. 2569 ผู้ใช้: "เมนูจากเว็บให้ซ่อนไว้ก่อน ยังไม่ต้องแสดงหน้าแรก") — ยังเข้าได้จากเมนูข้าง
-  const cats = buildHomeMenu(userData).filter((c) => !HOME_HIDDEN_CATS.includes(c.key));
+  // 🔁 (28 พ.ย. 2569 ผู้ใช้: "หน้ามือถือให้สลับ 2 หมวดบน กับ 2 หมวดล่าง สลับที่กัน") บุคคล · เอกสาร ขึ้นก่อน จัดซื้อ · คลังแผนก
+  const MOBILE_ORDER = { people: 1, docs: 2, purchase: 3, stock: 4 };
+  const cats = buildHomeMenu(userData).filter((c) => !HOME_HIDDEN_CATS.includes(c.key))
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => {
+      const ka = MOBILE_ORDER[a.c.key]; const kb = MOBILE_ORDER[b.c.key];
+      // เรียงใหม่เฉพาะ 4 หมวดนี้ (ช่องของ 4 หมวดเดิม) — หมวดอื่นอยู่ที่เดิม
+      if (ka && kb) return ka - kb;
+      return a.i - b.i;
+    })
+    .map(({ c }) => (CAT_TITLE[c.key] ? { ...c, title: CAT_TITLE[c.key] } : c));
   const flat = cats.flatMap((c) => c.items.map((it) => ({ ...it, tone: it.tone || c.tone, cat: c.key })));
 
   // 🔁 (1 พ.ย. 2569 ผู้ใช้: "ปรับให้เป็นปุ่มเล็กแบบเดิม แต่ icon โมเดิร์นที่ทำมา") — เลิกปุ่มใหญ่ 4 ใบ

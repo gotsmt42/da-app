@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } fr
 import { Snackbar, Alert, Button as MuiButton } from "@mui/material";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import SelectField from "@/shared/ui/SelectField";
+import useQuietRefresh from "@/shared/hooks/useQuietRefresh";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -553,61 +554,49 @@ function EventCalendar() {
   // ⚠️ deps: [searchParams] เหมือน ?draft= ด้านบน — กดลิงก์ซ้ำงานเดิมต้องทำงานซ้ำได้ (React Router
   // ไม่ remount หน้าเดิม) จึงต้องมี nonce ใน state ด้วย ไม่งั้นค่าเดิมทำให้ไม่มีอะไรเกิดขึ้น
   const [highlightEventId, setHighlightEventId] = useState(null);
+  /**
+   * 🐛 (28 พ.ย. 2569 ผู้ใช้: "ปุ่มนี้เวลากดไปแล้วยังไม่เลื่อนไปงานนั้นๆ ไปแต่หน้า event")
+   *    เดิม gotoDate ตอนเพิ่งเปิดหน้า — ปฏิทินยังไม่พร้อม/งานยังโหลดไม่เสร็จ (server ตื่นช้า) จึงไม่ย้ายเดือน และหาการ์ดแค่ 3 วิแล้วเลิก
+   *    → วนเช็คทุก 150ms สูงสุด ~15 วิ: ปฏิทินพร้อมเมื่อไหร่ย้ายไปวันนั้น · เจอการ์ดเมื่อไหร่เลื่อนไปกลางจอ แล้วค้างไฮไลต์ไว้ 6 วิ
+   */
   useEffect(() => {
     const eventParam = searchParams.get("event");
     if (!eventParam) return undefined;
     const dateParam = searchParams.get("date");
-    if (dateParam && moment(dateParam, "YYYY-MM-DD", true).isValid()) {
-      calendarRef.current?.getApi()?.gotoDate(dateParam);
-    }
+    const validDate = dateParam && moment(dateParam, "YYYY-MM-DD", true).isValid();
     setHighlightEventId(eventParam);
-    // ✅ ถอดไฮไลต์เองหลัง 6 วิ — เป็นแค่ตัวช่วย "สะกิดตา" ตอนเพิ่งกดมา ไม่ใช่สถานะถาวรที่ต้องค้างไว้
-    const t = setTimeout(() => setHighlightEventId(null), 6000);
-    return () => clearTimeout(t);
-  }, [searchParams]);
-
-  /**
-   * ✅ เลื่อนหน้าจอไปหางานที่ถูกลิงก์มาให้เอง
-   * 🐛 ที่แก้: เดิมกด "ดูในปฏิทิน" แล้วปฏิทินเปลี่ยนไปเดือนที่ถูกต้องและใส่กรอบกะพริบให้จริง — แต่ไม่มี
-   * อะไรพาสายตาไปถึงงานนั้น ปฏิทินเดือนหนึ่งสูงเกินหนึ่งหน้าจอเสมอ ถ้างานอยู่สัปดาห์ท้ายๆ ก็ตกอยู่ใต้
-   * ขอบจอ ผู้ใช้เห็นแค่ปฏิทินเปล่าๆ แล้วต้องไล่เลื่อนหาเองอยู่ดี = ปุ่มแทบไม่ได้ช่วยอะไร
-   * ⚠️ ต้องรอ FullCalendar เรนเดอร์เดือนใหม่ให้เสร็จก่อนถึงจะหา element เจอ และบางครั้งข้อมูลยังโหลด
-   * ไม่เสร็จด้วยซ้ำ — จึงวนหาซ้ำทุก 100ms แทนการ setTimeout ครั้งเดียวแบบเดาเวลา (เดาสั้นไปก็ไม่เจอ
-   * เดายาวไปก็รู้สึกหน่วง) เจอเมื่อไหร่หยุดทันที และเลิกหาเองหลัง ~3 วิ กันวนไม่จบถ้างานไม่อยู่ในเดือนนั้นจริง
-   * ⚠️ อ้างอิงจาก class ที่ eventClassNames ใส่ให้ (.fc-event-linked-highlight) — เป็นตัวเดียวที่
-   * ผูกกับ "งานที่ถูกไฮไลต์" อยู่แล้ว ไม่ต้องเพิ่ม data attribute ใหม่ให้ทุก event ทั้งปฏิทิน
-   */
-  useEffect(() => {
-    if (!highlightEventId) return undefined;
+    let moved = !validDate;
     let tries = 0;
+    let clearT = null;
     const timer = setInterval(() => {
-      const el = document.querySelector(".fc-event-linked-highlight");
+      tries += 1;
+      const api = calendarRef.current?.getApi?.();
+      if (!moved && api) { api.gotoDate(dateParam); moved = true; }
+      const el = moved ? document.querySelector(".fc-event-linked-highlight") : null;
       if (el) {
         clearInterval(timer);
         el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-      } else if (++tries > 30) {
+        clearT = setTimeout(() => setHighlightEventId(null), 6000);
+      } else if (tries > 100) {
         clearInterval(timer);
+        setHighlightEventId(null);
       }
-    }, 100);
-    return () => clearInterval(timer);
-  }, [highlightEventId]);
+    }, 150);
+    return () => { clearInterval(timer); if (clearT) clearTimeout(clearT); };
+  }, [searchParams]);
 
+  // ✅ (28 พ.ย. 2569 ผู้ใช้: "ทุกๆ ฟอร์มของ event มันไม่สมูท เวลาเลื่อนขึ้นลง จะแลคๆ หน่วงๆ")
+  //    ระหว่างเปิดฟอร์ม ไม่วาดปฏิทินด้านหลังใหม่ (หลายร้อยใบ = ฟอร์มกระตุก) — ปิดฟอร์มแล้วค่อยโหลด (ดู useQuietRefresh)
+  const refreshCalendarQuietly = useQuietRefresh(() => { fetchEventsFromDB(true); fetchDrafts(true); });
   // ✅ เรียลไทม์: งาน/แผนงาน/ใบมอบหมายเปลี่ยนจากที่ไหนก็ตาม → ปฏิทินอัปเดตเองทันที (โหลดเงียบ)
-  useRealtime("events", () => {
-    fetchEventsFromDB(true);
-    fetchDrafts(true);
-  });
+  useRealtime("events", () => refreshCalendarQuietly());
   useRealtime("lookups", () => { fetchLookupOptions(); });
 
   // ✅ สำรอง: รีเฟรชเงียบๆ ทุก 30 วินาที เผื่อช่องสัญญาณเรียลไทม์หลุด
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchEventsFromDB(true);
-      fetchDrafts(true);
-    }, 30000);
+    const interval = setInterval(() => refreshCalendarQuietly(), 30000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshCalendarQuietly]);
 
   useEffect(() => {
     const today = moment().format("YYYY-MM-DD");
@@ -1279,6 +1268,35 @@ function EventCalendar() {
   const [otNote, setOtNote] = useState("");
   /** วันที่ของช่องปฏิทินที่กดเปิดงานล่าสุด (งานหลายวัน = รู้ว่ากดที่วันไหน) — ใช้ตั้งวันที่ในฟอร์ม OT */
   const clickedDateRef = useRef("");
+
+  /**
+   * ✅ (28 พ.ย. 2569 ผู้ใช้: "อยากให้สามารถกดไปดูงานในตารางได้ด้วย เพื่อดูใน event จริงๆ ให้เช็คง่าย" — จากใบ OT)
+   *    ?event=<id>&date=YYYY-MM-DD&open=1 → นอกจากพาไปวันนั้น + ไฮไลต์ (effect ?event= ด้านบน) แล้ว เปิดหน้างานนั้นให้เลย
+   *    เหมือนกดการ์ดเอง — เช็คสิทธิ์ดูงานชุดเดียวกับ eventClick
+   * ⚠️ ต้องรอข้อมูลงานโหลดเข้าปฏิทินก่อน (getEventById คืน null จนกว่าจะโหลดเสร็จ — server ตื่นช้าได้) วนหาทุก 200ms สูงสุด ~15 วิ
+   * ⚠️ เรียกผ่าน ref = handleEditEvent ของ render ล่าสุด (มี events ที่โหลดแล้ว) ไม่ใช่ตัวที่ค้างจากตอน effect เริ่ม
+   */
+  const handleEditEventRef = useRef(null);
+  handleEditEventRef.current = handleEditEvent;
+  useEffect(() => {
+    const id = searchParams.get("event");
+    if (!id || searchParams.get("open") !== "1") return undefined;
+    const date = searchParams.get("date") || "";
+    let tries = 0;
+    const timer = setInterval(() => {
+      const fcEvent = calendarRef.current?.getApi()?.getEventById(id);
+      if (fcEvent) {
+        clearInterval(timer);
+        clickedDateRef.current = moment(date, "YYYY-MM-DD", true).isValid() ? date : "";
+        if (canViewEvent(fcEvent.extendedProps)) handleEditEventRef.current?.({ event: fcEvent });
+        else Swal.fire("❌ คุณไม่มีสิทธิ์ดูแผนงานนี้");
+      } else if (++tries > 75) {
+        clearInterval(timer);
+      }
+    }, 200);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const handleExportExcel = async () => {
     if (exportingExcel || filteredCalendarEvents.length === 0) return;
     setExportingExcel(true);
@@ -2727,9 +2745,10 @@ function EventCalendar() {
           {isSalesView
             ? <SalesViewToggle view={salesView} onView={setSalesView} />
             : <SalesViewToggle view={techView} onView={setTechView} accent="#dc2626" options={[
-              { k: "list", label: "รายการ", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
-              { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
-              { k: "split", label: "รายวัน", icon: <ViewSidebarRounded sx={{ fontSize: 18 }} /> },
+              // 🔁 (28 พ.ย. 2569 ผู้ใช้: "รายการหัวข้อใช้คำให้มันสื่อความหมายกว่านี้ ให้เข้าใจง่าย") ชื่อบอกว่าดูอะไร + คำอธิบายเมื่อชี้
+              { k: "list", label: "รายการงาน", hint: "รายการงานเรียงตามวัน — งานที่จะถึง · ต้องติดตาม · ที่ผ่านมา", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
+              { k: "calendar", label: "ปฏิทินทั้งเดือน", hint: "ปฏิทินทั้งเดือน — เห็นงานทุกวัน กดวันว่างเพื่อลงงาน ลากการ์ดเพื่อย้ายวัน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
+              { k: "split", label: "งานรายวัน", hint: "งานรายวัน — เลือกวันจากปฏิทินย่อ แล้วดูงานทั้งหมดของวันนั้น", icon: <ViewSidebarRounded sx={{ fontSize: 18 }} /> },
             ]} />}
         </div>
         {/* จอใหญ่: แถว 1 = มุมมอง ......... ปุ่มคำสั่ง · แถว 2 = ค้นหา + ตัวกรอง (ดู .ec-wide-toolbar ใน index.css) */}

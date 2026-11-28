@@ -139,7 +139,7 @@ export const SALES_FORM_CSS = `
 
   /* ✅ (8 ต.ค. 2569 ผู้ใช้: "ทำให้มันเต็มหน้าจอมือถือ") — มือถือเปิดเต็มจอ ไม่มีขอบมน ไม่เหลือพื้นหลังรอบๆ */
   @media (max-width: 600px) {
-    .swal2-container:has(.swal-sales-appt) { padding: 0 !important; }
+    .swal2-container:has(> .swal-sales-appt) { padding: 0 !important; }
     .swal-sales-appt.swal2-popup {
       width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important;
       margin: 0 !important; border-radius: 0 !important; box-shadow: none !important;

@@ -78,10 +78,11 @@ export default function OtDayInfo({ date, cfg, holidays, compact = false, note =
   const dow = DAY_TH[moment(date).day()];
   if (compact) {
     return (
-      <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ px: 0.25, color: TEXT_SUB }}>
-        <Box sx={{ display: "flex", color: t.color, mt: "1px", "& svg": { fontSize: 16 } }}>{t.icon}</Box>
-        <Typography sx={{ fontSize: "0.76rem", lineHeight: 1.45, color: TEXT_SUB }}>
-          <Box component="span" sx={{ fontWeight: 800, color: d.kind === "work" ? TEXT_MAIN : t.color }}>
+      // 🎨 (28 พ.ย. 2569 ผู้ใช้: "สีสัน การจัดวางต่างๆ") กล่องข้อมูลพื้นเทาอ่อน + จุดสีชนิดวัน (เดิมไอคอนสี + ตัวหนังสือสีปนกัน)
+      <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ px: 1.25, py: 0.85, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #eef2f7", color: TEXT_SUB }}>
+        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: t.color, flexShrink: 0, mt: "6px" }} />
+        <Typography sx={{ fontSize: "0.78rem", lineHeight: 1.5, color: TEXT_SUB }}>
+          <Box component="span" sx={{ fontWeight: 700, color: TEXT_MAIN }}>
             {d.kind === "public" ? `วันหยุดนักขัตฤกษ์ · ${d.label}` : t.tag}
           </Box>
           {" · "}{RULE[d.kind]}{note ? ` · ${note}` : ""}

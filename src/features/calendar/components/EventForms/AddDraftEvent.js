@@ -154,7 +154,7 @@ function injectAddDraftStyles() {
     /* ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้าจอมือถือให้แสดงเต็มหน้า ให้สวยงาม จัดวางให้ทำง่ายๆ")
        มือถือ: เต็มจอ ไม่มีขอบมน · ตัวเลือกเป็นตาราง 2–3 ช่องกดง่าย · ปุ่มล่างเต็มความกว้าง เว้นขอบล่างของ iPhone */
     @media(max-width:600px) {
-      .swal2-container:has(.swal-add-draft) { padding: 0 !important; }
+      .swal2-container:has(> .swal-add-draft) { padding: 0 !important; }
       .swal-add-draft.swal2-popup, .swal-add-draft.swal-add-draft-wide.swal2-popup {
         width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important;
         margin: 0 !important; border-radius: 0 !important;

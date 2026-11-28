@@ -62,7 +62,7 @@ export function jobInfoSectionHtml(v = {}, cls = "ae", disabled = false) {
         </div>
         <label class="ji-pending">
           <input type="checkbox" id="ji-infoPending" ${dis} ${v.infoPending ? "checked" : ""}>
-          ⏳ ข้อมูลยังไม่ครบ (รอข้อมูล)
+          ข้อมูลยังไม่ครบ (รอข้อมูล)
         </label>
         <div class="${cls}-field ji-note" id="ji-noteWrap" style="${v.infoPending ? "" : "display:none;"}">
           <input id="ji-infoPendingNote" type="text" ${dis} placeholder="ยังขาดอะไร เช่น รอเบอร์ผู้ติดต่อ / รอยืนยันวันเข้า" value="${esc(v.infoPendingNote)}">

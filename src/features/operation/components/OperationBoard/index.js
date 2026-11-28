@@ -20,6 +20,7 @@ import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
+import useQuietRefresh from "@/shared/hooks/useQuietRefresh";
 import Swal from "@/shared/ui/swal";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -2909,16 +2910,16 @@ const Operation = () => {
   // ✅ ขยายจากเดิมที่จำกัดเฉพาะ admin/manager ทุก 30s → ให้ทำงานกับช่างด้วย
   // เพื่อให้ผลอนุมัติ/ไม่อนุมัติคำขอปิดงาน render กลับไปหาช่างแบบ realtime
   // โดยไม่ต้องกดรีเฟรชเอง
+  // ✅ (28 พ.ย. 2569 "ฟอร์มของ event ไม่สมูท") ระหว่างเปิดฟอร์มแก้ไขงาน ไม่วาดบอร์ดใหม่ — ปิดฟอร์มแล้วค่อยโหลด (useQuietRefresh)
+  const refreshBoardQuietly = useQuietRefresh(() => fetchEventsFromDB(true));
   useEffect(() => {
-    if (!currentUser) return;
-    const interval = setInterval(() => {
-      fetchEventsFromDB(true); // silent refresh
-    }, 60000); // (11 ต.ค. 2569) 15→60 วิ ลดโหลดเซิร์ฟเวอร์
+    if (!currentUser) return undefined;
+    const interval = setInterval(() => refreshBoardQuietly(), 60000); // (11 ต.ค. 2569) 15→60 วิ ลดโหลดเซิร์ฟเวอร์
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, refreshBoardQuietly]);
 
   // ✅ เรียลไทม์: งานเปลี่ยน (อนุมัติปิดงาน/แก้สถานะ/มอบหมาย) → บอร์ดอัปเดตทันที ไม่ต้องรอรอบ 15 วินาทีข้างบน
-  useRealtime("events", () => { fetchEventsFromDB(true); });
+  useRealtime("events", () => refreshBoardQuietly());
   useRealtime("users", () => { fetchEmployee(); });
   useRealtime("lookups", () => { fetchLookupOptions(); });
 

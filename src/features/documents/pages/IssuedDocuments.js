@@ -15,9 +15,9 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import {
   Box, Stack, Typography, IconButton, Tooltip, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Skeleton,
-  Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert, CircularProgress,
+  Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert, CircularProgress, Checkbox,
 } from "@mui/material";
-import { RefreshRounded as Refresh, TuneRounded as Tune, DescriptionRounded as Description, EventAvailableRounded as EventAvailable, MoreVertRounded as MoreVert, EditNoteRounded as EditNote, OpenInNewRounded as OpenInNew, Inventory2Rounded as Inventory2, VisibilityRounded as Visibility, EditRounded as EditIcon, FiberNewRounded } from "@mui/icons-material";
+import { RefreshRounded as Refresh, TuneRounded as Tune, DescriptionRounded as Description, EventAvailableRounded as EventAvailable, MoreVertRounded as MoreVert, EditNoteRounded as EditNote, OpenInNewRounded as OpenInNew, Inventory2Rounded as Inventory2, VisibilityRounded as Visibility, VisibilityOffRounded as VisibilityOff, EditRounded as EditIcon, FiberNewRounded, DownloadRounded as Download, SwapHorizRounded as SwapHoriz, CloseRounded as CloseIcon } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import JobCalendarPicker from "@/shared/ui/JobCalendarPicker";
 import { useHolidays } from "@/features/ot/components/OtDayInfo";
@@ -39,6 +39,8 @@ import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import { useAuth } from "@/features/auth/AuthContext";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
+import { saveAs } from "file-saver";
+import { zipBlobs } from "@/shared/utils/zipStore";
 import { generateWorkNoticePdf } from "../utils/workNoticePdf";
 import { generateDeliveryNotePdf } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "../components/DocumentPreviewDialog";
@@ -128,6 +130,14 @@ const IssuedDocuments = () => {
    */
   const [issue, setIssue] = useState(null);
   const [issueBusy, setIssueBusy] = useState(false);
+  /**
+   * ✅ (28 พ.ย. 2569 ผู้ใช้: "ทำให้มี select เลือกเพื่อเลือกดาวน์โหลด หรือดำเนินการต่างๆ แบบหลายไฟล์ทีเดียว")
+   *    ติ๊กเลือกหลายใบ (ข้ามหน้า/ตัวกรองได้ — จำตาม id) → ดาวน์โหลด PDF (หลายใบ = ZIP ไฟล์เดียว) / เปลี่ยนสถานะทีเดียว
+   *    ใบที่ยกเลิกแล้วเลือกไม่ได้ (ดู/พิมพ์ไม่ได้ และเปลี่ยนสถานะไม่ได้)
+   */
+  const [selected, setSelected] = useState(() => new Map()); // id → row
+  const [bulk, setBulk] = useState(null); // { label, done, total } ระหว่างทำงาน
+  const [bulkMenu, setBulkMenu] = useState(null); // anchor ของเมนูเปลี่ยนสถานะ
   const holidays = useHolidays(null);
 
   // ✅ จอคอม 10 แถว / มือถือ 5 แถว ต่อหน้า — จอแคบแสดงเป็นการ์ดแนวตั้งซึ่งสูงกว่าแถวตารางหลายเท่า
@@ -165,6 +175,19 @@ const IssuedDocuments = () => {
   }, [page, PAGE_SIZE, appliedSearch, docType, status, from, to]);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      rows.forEach((r) => {
+        if (!next.has(r._id)) return;
+        changed = true;
+        if (r.status === "cancelled") next.delete(r._id); else next.set(r._id, r);
+      });
+      return changed ? next : prev;
+    });
+  }, [rows]);
 
   // ✅ เรียลไทม์: ออกเอกสาร/ยกเลิกเอกสารจากเครื่องอื่น → ทะเบียนอัปเดตทันที
   useRealtime("documents", () => { fetchRows(true); });
@@ -199,6 +222,19 @@ const IssuedDocuments = () => {
   // แทน ซึ่งเล็กกว่าหลายร้อยเท่าและสร้างไฟล์ใบเดิมออกมาได้ตรงกับที่ส่งลูกค้าไปเป๊ะๆ
   const openPreview = async (row) => {
     setMenu(null);
+    /**
+     * ✅ (28 พ.ย. 2569 ผู้ใช้: "หน้าเอกสาร ถ้ามีการกดยกเลิก ไม่ให้สามารถดู หรือพิมพ์เอกสารได้")
+     *    ใบที่ยกเลิกแล้วเปิดดู/พิมพ์/ส่งอีเมลไม่ได้ — กันเอาใบที่ไม่ใช้แล้วไปพิมพ์ส่งลูกค้าผิด (เลขที่ยังเก็บไว้ในทะเบียน)
+     */
+    if (row?.status === "cancelled") {
+      Swal.fire({
+        title: "เอกสารนี้ถูกยกเลิกแล้ว",
+        text: `ใบ ${row.docNumber || ""} ยกเลิกแล้ว จึงดูหรือพิมพ์ไม่ได้ — ถ้ายังต้องใช้ ให้ออกเอกสารใบใหม่`,
+        icon: "info",
+        confirmButtonColor: ACCENT,
+      });
+      return;
+    }
     const form = row?.formSnapshot;
     if (!form || Object.keys(form).length === 0) {
       Swal.fire({
@@ -231,6 +267,20 @@ const IssuedDocuments = () => {
 
   const changeStatus = async (row, next) => {
     setMenu(null);
+    // ยกเลิก = ดู/พิมพ์ใบนี้ไม่ได้อีก และย้อนกลับไม่ได้ — ถามก่อน
+    if (next === "cancelled") {
+      const ok = await Swal.fire({
+        title: `ยกเลิกใบ ${row.docNumber || ""}?`,
+        text: "ยกเลิกแล้วจะดู พิมพ์ หรือส่งอีเมลใบนี้ไม่ได้อีก และเปลี่ยนกลับไม่ได้ (เลขที่ยังถูกใช้ไปแล้ว) — ถ้าต้องการแก้เนื้อหา ใช้ \"แก้ไขเอกสาร\" หรือ \"ออกใบใหม่แทน\"",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "ยกเลิกใบนี้",
+        cancelButtonText: "ไม่ยกเลิก",
+        confirmButtonColor: "#dc2626",
+        reverseButtons: true,
+      });
+      if (!ok.isConfirmed) return;
+    }
     try {
       await IssuedDocumentService.update(row._id, { status: next });
       // ✅ อัปเดตในตารางทันทีโดยไม่ต้องโหลดใหม่ทั้งหน้า — แต่ยอดนับตามสถานะด้านบนต้องขอใหม่
@@ -238,6 +288,100 @@ const IssuedDocuments = () => {
       fetchRows();
     } catch (err) {
       Swal.fire({ title: "เปลี่ยนสถานะไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่", icon: "error" });
+    }
+  };
+
+  // ── เลือกหลายใบ ──
+  const selectable = (r) => r?.status !== "cancelled";
+  const toggleRow = (r) => setSelected((prev) => {
+    const next = new Map(prev);
+    if (next.has(r._id)) next.delete(r._id); else next.set(r._id, r);
+    return next;
+  });
+  const pageSelectable = rows.filter(selectable);
+  const pageAllOn = pageSelectable.length > 0 && pageSelectable.every((r) => selected.has(r._id));
+  const pageSomeOn = pageSelectable.some((r) => selected.has(r._id));
+  const togglePage = () => setSelected((prev) => {
+    const next = new Map(prev);
+    if (pageAllOn) pageSelectable.forEach((r) => next.delete(r._id));
+    else pageSelectable.forEach((r) => next.set(r._id, r));
+    return next;
+  });
+  const clearSelected = () => setSelected(new Map());
+
+  /** ดาวน์โหลด PDF ของใบที่เลือก — 1 ใบ = PDF · หลายใบ = ZIP ไฟล์เดียว (สร้างจาก formSnapshot เหมือนปุ่มดู) */
+  const bulkDownload = async () => {
+    const list = [...selected.values()].filter(selectable);
+    const ready = list.filter((r) => r.formSnapshot && Object.keys(r.formSnapshot).length);
+    const noData = list.length - ready.length;
+    if (!ready.length) {
+      Swal.fire({ title: "ดาวน์โหลดไม่ได้", text: "ใบที่เลือกไม่มีข้อมูลที่ใช้สร้างเอกสารเก็บไว้", icon: "info", confirmButtonColor: ACCENT });
+      return;
+    }
+    setBulk({ label: "กำลังสร้าง PDF", done: 0, total: ready.length });
+    const files = [];
+    let failed = 0;
+    for (const r of ready) {
+      try {
+        const gen = r.docType === "notice" ? generateWorkNoticePdf : generateDeliveryNotePdf;
+        // eslint-disable-next-line no-await-in-loop
+        const { url, blob, fileName } = await gen({ jsPDF, thSarabunFont, form: r.formSnapshot, mode: "blob" });
+        if (url) URL.revokeObjectURL(url);
+        files.push({ name: fileName || `${r.docNumber || "document"}.pdf`, blob });
+      } catch {
+        failed += 1;
+      }
+      setBulk((b) => (b ? { ...b, done: b.done + 1 } : b));
+    }
+    try {
+      if (files.length === 1) saveAs(files[0].blob, files[0].name);
+      else if (files.length > 1) {
+        setBulk((b) => (b ? { ...b, label: "กำลังรวมเป็น ZIP" } : b));
+        const zip = await zipBlobs(files);
+        saveAs(zip, `เอกสาร ${files.length} ใบ ${thaiDateNumeric(new Date()).replace(/\//g, "-")}.zip`);
+      }
+    } finally {
+      setBulk(null);
+    }
+    const skipped = [noData ? `ไม่มีข้อมูลสร้างเอกสาร ${noData} ใบ` : "", failed ? `สร้างไม่สำเร็จ ${failed} ใบ` : ""].filter(Boolean);
+    if (skipped.length) Swal.fire({ title: `ดาวน์โหลดแล้ว ${files.length} ใบ`, text: `ข้าม: ${skipped.join(" · ")}`, icon: "info", confirmButtonColor: ACCENT });
+  };
+
+  /** เปลี่ยนสถานะหลายใบ — เฉพาะใบที่ผู้ใช้มีสิทธิ์ (แอดมิน/คนออกใบ) · ยกเลิก = ถามก่อน */
+  const bulkStatus = async (next) => {
+    setBulkMenu(null);
+    const list = [...selected.values()].filter((r) => selectable(r) && r.status !== next);
+    const allowed = list.filter(canEditRow);
+    const denied = list.length - allowed.length;
+    if (!allowed.length) {
+      Swal.fire({ title: "ไม่มีใบที่เปลี่ยนได้", text: denied ? `ไม่มีสิทธิ์เปลี่ยนสถานะ ${denied} ใบ (เปลี่ยนได้เฉพาะใบที่ตัวเองออก)` : `ใบที่เลือกเป็น "${STATUS_META[next].label}" อยู่แล้ว`, icon: "info", confirmButtonColor: ACCENT });
+      return;
+    }
+    const ok = await Swal.fire({
+      title: `เปลี่ยนเป็น "${STATUS_META[next].label}" ${allowed.length} ใบ?`,
+      text: next === "cancelled"
+        ? "ยกเลิกแล้วจะดู พิมพ์ หรือส่งอีเมลใบเหล่านี้ไม่ได้อีก และเปลี่ยนกลับไม่ได้"
+        : [allowed.map((r) => r.docNumber).slice(0, 8).join(", ") + (allowed.length > 8 ? " …" : ""), denied ? `(ข้าม ${denied} ใบที่ไม่มีสิทธิ์)` : ""].filter(Boolean).join(" "),
+      icon: next === "cancelled" ? "warning" : "question",
+      showCancelButton: true,
+      confirmButtonText: next === "cancelled" ? "ยกเลิกใบเหล่านี้" : "เปลี่ยนสถานะ",
+      cancelButtonText: "ไม่ทำ",
+      confirmButtonColor: next === "cancelled" ? "#dc2626" : ACCENT,
+      reverseButtons: true,
+    });
+    if (!ok.isConfirmed) return;
+    setBulk({ label: "กำลังเปลี่ยนสถานะ", done: 0, total: allowed.length });
+    let failed = 0;
+    for (const r of allowed) {
+      // eslint-disable-next-line no-await-in-loop
+      try { await IssuedDocumentService.update(r._id, { status: next }); } catch { failed += 1; }
+      setBulk((b) => (b ? { ...b, done: b.done + 1 } : b));
+    }
+    setBulk(null);
+    clearSelected();
+    fetchRows(true);
+    if (failed || denied) {
+      Swal.fire({ title: `เปลี่ยนแล้ว ${allowed.length - failed} ใบ`, text: [failed ? `ไม่สำเร็จ ${failed} ใบ` : "", denied ? `ไม่มีสิทธิ์ ${denied} ใบ` : ""].filter(Boolean).join(" · "), icon: failed ? "warning" : "info", confirmButtonColor: ACCENT });
     }
   };
 
@@ -308,9 +452,15 @@ const IssuedDocuments = () => {
   const filterCount = (docType !== "all" ? 1 : 0) + (from ? 1 : 0) + (to ? 1 : 0);
   const RowActions = ({ r }) => (
     <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
-      <Tooltip title="ดูเอกสาร · พิมพ์ · ส่งอีเมล">
-        <IconButton size="small" onClick={(e) => { e.stopPropagation(); openPreview(r); }} sx={{ color: INK_2 }}><Visibility sx={{ fontSize: 19 }} /></IconButton>
-      </Tooltip>
+      {r.status === "cancelled" ? (
+        <Tooltip title="ยกเลิกแล้ว — ดู/พิมพ์ไม่ได้">
+          <span><IconButton size="small" disabled aria-label="ยกเลิกแล้ว ดูไม่ได้"><VisibilityOff sx={{ fontSize: 19, color: "#cbd5e1" }} /></IconButton></span>
+        </Tooltip>
+      ) : (
+        <Tooltip title="ดูเอกสาร · พิมพ์ · ส่งอีเมล">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); openPreview(r); }} sx={{ color: INK_2 }}><Visibility sx={{ fontSize: 19 }} /></IconButton>
+        </Tooltip>
+      )}
       {canEditRow(r) && (
         <IconButton size="small" aria-label="จัดการ" onClick={(e) => {
           e.stopPropagation();
@@ -418,6 +568,41 @@ const IssuedDocuments = () => {
 
       {error && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2 }}>{error}</Alert>}
 
+      {/* แถบทำงานกับใบที่เลือก — โผล่เมื่อเลือกอย่างน้อย 1 ใบ */}
+      {selected.size > 0 && (
+        <Stack direction="row" alignItems="center" spacing={1} useFlexGap
+          sx={{ mb: 1.25, px: { xs: 1.25, sm: 1.75 }, py: 1, flexWrap: "wrap", rowGap: 1, bgcolor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 3 }}>
+          <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#1e3a8a", mr: "auto" }}>
+            {bulk ? `${bulk.label} ${bulk.done}/${bulk.total}…` : `เลือกแล้ว ${selected.size} ใบ`}
+            {!bulk && [...selected.keys()].some((id) => !rows.some((r) => r._id === id)) && (
+              <Box component="span" sx={{ ml: 0.75, fontWeight: 600, fontSize: "0.74rem", color: "#3b5bdb" }}>(รวมหน้าอื่น)</Box>
+            )}
+          </Typography>
+          <Button size="small" variant="contained" disableElevation onClick={bulkDownload} disabled={Boolean(bulk)}
+            startIcon={bulk ? <CircularProgress size={14} color="inherit" /> : <Download />}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, bgcolor: ACCENT, backgroundImage: "none", "&:hover": { bgcolor: ACCENT_DARK } }}>
+            {selected.size > 1 ? `ดาวน์โหลด PDF (ZIP ${selected.size} ใบ)` : "ดาวน์โหลด PDF"}
+          </Button>
+          <Button size="small" onClick={(e) => setBulkMenu(e.currentTarget)} disabled={Boolean(bulk)} startIcon={<SwapHoriz />}
+            sx={{ ...OUTLINE_SX, height: 32, color: ACCENT_DARK, borderColor: "#bfdbfe" }}>
+            เปลี่ยนสถานะ
+          </Button>
+          <Button size="small" onClick={clearSelected} disabled={Boolean(bulk)} startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+            sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>
+            ล้างที่เลือก
+          </Button>
+        </Stack>
+      )}
+      <Menu open={Boolean(bulkMenu)} anchorEl={bulkMenu} onClose={() => setBulkMenu(null)} PaperProps={{ sx: { borderRadius: 2.5, minWidth: 220 } }}>
+        <Typography sx={{ px: 2, pt: 1, pb: 0.5, fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>เปลี่ยน {selected.size} ใบเป็น</Typography>
+        {STATUS_ORDER.map((st) => (
+          <MenuItem key={st} onClick={() => bulkStatus(st)} sx={{ fontSize: "0.86rem", color: st === "cancelled" ? "#b91c1c" : undefined }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_META[st].color, mr: 1.25, flexShrink: 0 }} />
+            {STATUS_META[st].label}
+          </MenuItem>
+        ))}
+      </Menu>
+
       {loading ? (
         <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
       ) : rows.length === 0 ? (
@@ -430,8 +615,10 @@ const IssuedDocuments = () => {
         <Panel>
           {rows.map((r, i) => (
             <Box key={r._id} onClick={() => openPreview(r)} role="button"
-              sx={{ px: 1.75, py: 1.5, borderTop: i ? `1px solid ${LINE}` : "none", cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1, "&:active": { bgcolor: SURFACE } }}>
+              sx={{ px: 1.75, py: 1.5, borderTop: i ? `1px solid ${LINE}` : "none", cursor: r.status === "cancelled" ? "default" : "pointer", opacity: r.status === "cancelled" ? 0.55 : 1, "&:active": { bgcolor: r.status === "cancelled" ? "transparent" : SURFACE } }}>
               <Stack direction="row" spacing={1} alignItems="center">
+                <Checkbox size="small" checked={selected.has(r._id)} disabled={!selectable(r)} onClick={(e) => e.stopPropagation()} onChange={() => toggleRow(r)}
+                  inputProps={{ "aria-label": `เลือก ${r.docNumber}` }} sx={{ p: 0.25, ml: -0.5 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography>
                 <RevisionTag r={r} />
                 <Box sx={{ flex: 1 }} />
@@ -457,9 +644,13 @@ const IssuedDocuments = () => {
       ) : (
         <Panel>
           <TableContainer sx={{ overflowX: "auto" }}>
-            <Table size="small" sx={{ minWidth: 880, tableLayout: "fixed" }}>
+            <Table size="small" sx={{ minWidth: 920, tableLayout: "fixed" }}>
               <TableHead sx={TABLE_HEAD_SX}>
                 <TableRow>
+                  <TableCell padding="checkbox" sx={{ width: 44 }}>
+                    <Checkbox size="small" checked={pageAllOn} indeterminate={!pageAllOn && pageSomeOn} disabled={!pageSelectable.length} onChange={togglePage}
+                      inputProps={{ "aria-label": "เลือกทุกใบในหน้านี้" }} />
+                  </TableCell>
                   <TableCell sx={{ width: 110 }}>เลขที่</TableCell>
                   <TableCell sx={{ width: 130 }}>ชนิด</TableCell>
                   <TableCell>โครงการ / เรื่อง</TableCell>
@@ -471,8 +662,13 @@ const IssuedDocuments = () => {
               </TableHead>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow key={r._id} hover onClick={() => openPreview(r)}
-                    sx={{ ...TABLE_ROW_SX, cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1 }}>
+                  <TableRow key={r._id} hover={r.status !== "cancelled"} onClick={() => openPreview(r)}
+                    selected={selected.has(r._id)}
+                    sx={{ ...TABLE_ROW_SX, cursor: r.status === "cancelled" ? "default" : "pointer", opacity: r.status === "cancelled" ? 0.55 : 1 }}>
+                    <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox size="small" checked={selected.has(r._id)} disabled={!selectable(r)} onChange={() => toggleRow(r)}
+                        inputProps={{ "aria-label": `เลือก ${r.docNumber}` }} />
+                    </TableCell>
                     <TableCell>
                       <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography>
                       <RevisionTag r={r} />
@@ -521,8 +717,11 @@ const IssuedDocuments = () => {
           </MenuItem>,
           <Divider key="d0" sx={{ my: 0.5 }} />,
         ]}
-        <Typography sx={{ px: 2, pt: 1, pb: 0.5, display: "block", fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>เปลี่ยนสถานะเป็น</Typography>
-        {STATUS_ORDER.map((s) => {
+        {/* ใบที่ยกเลิกแล้ว = จบ เปลี่ยนสถานะกลับไม่ได้ (ไม่งั้นกลับมาดู/พิมพ์ได้อีก) */}
+        {menu?.row?.status === "cancelled" ? (
+          <Typography sx={{ px: 2, py: 1, maxWidth: 280, fontSize: "0.78rem", color: MUTED }}>ใบนี้ยกเลิกแล้ว — ดู พิมพ์ หรือเปลี่ยนสถานะไม่ได้</Typography>
+        ) : <Typography sx={{ px: 2, pt: 1, pb: 0.5, display: "block", fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>เปลี่ยนสถานะเป็น</Typography>}
+        {menu?.row?.status !== "cancelled" && STATUS_ORDER.map((s) => {
           const meta = STATUS_META[s];
           const current = menu?.row?.status === s;
           return (

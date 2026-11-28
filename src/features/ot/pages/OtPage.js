@@ -20,7 +20,7 @@ import { Children, useCallback, useEffect, useMemo, useState } from "react";
 import { alpha } from "@mui/material/styles";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  Box, Stack, Typography, Button, Chip, TextField, InputAdornment, Skeleton, Alert, Pagination, IconButton,
+  Box, Stack, Typography, Button, TextField, InputAdornment, Skeleton, Alert, Pagination, IconButton,
   Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress,
   useMediaQuery, ButtonBase, Avatar,
 } from "@mui/material";
@@ -38,10 +38,11 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import OtFormDialog, { loadOtBasket } from "../components/OtFormDialog";
 import { useAuth } from "@/features/auth/AuthContext";
 import OtDetailDialog from "../components/OtDetailDialog";
+import HoursFigure from "../components/HoursFigure";
 import OtStatusBadge from "../components/OtStatusBadge";
 import { useHolidays } from "../components/OtDayInfo";
 import {
-  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel, lineJobs,
+  OT_ACCENT, OT_ACTION, OT_ACTION_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, STATUS_ORDER, otStatus, hoursText, money, periodLabel, lineJobs,
 } from "../otMeta";
 import { PAGE_SX } from "@/shared/ui/PageKit";
 import ExportExcelButton from "@/shared/ui/ExportExcelButton";
@@ -50,31 +51,71 @@ const DARK = "#334155";
 const PAGE_SIZE = 10;
 
 const peopleCount = (r) => new Set((r.lines || []).map((l) => l.person.userId)).size;
-/** วันที่ทำ OT ของใบ (ไม่ซ้ำ เรียงวัน) → "10, 17, 27 ต.ค. 2569" · ข้ามเดือน → "29, 30 ก.ย. 2569 · 2 ต.ค. 2569" */
-const otDatesText = (r) => {
-  const days = [...new Set((r.lines || []).map((l) => moment(l.date).format("YYYY-MM-DD")))].sort();
-  if (!days.length) return "—";
-  const byMonth = new Map();
-  days.forEach((d) => { const k = d.slice(0, 7); byMonth.set(k, [...(byMonth.get(k) || []), d]); });
-  return [...byMonth.values()].map((list) => {
-    const [, mon, year] = thaiDate(list[0]).split(" ");
-    return `${list.map((d) => Number(d.slice(8))).join(", ")} ${mon} ${year}`;
-  }).join(" · ");
-};
 /** ชั่วโมงแยกตามประเภท OT ของใบ → [{ type, hours }] */
 const byTypeOf = (r) => OT_TYPES.map((t) => ({ t, hours: (r.lines || []).filter((l) => l.type === t.value).reduce((s, l) => s + (l.hours || 0), 0) })).filter((x) => x.hours > 0);
+// 🎨 (28 พ.ย. 2569 ผู้ใช้: "การแสดงเวลารวมดูแปลกๆ มองยาก") ชื่อประเภทเต็ม ไม่ตัด "ทำงานวันห…" · ชั่วโมงชิดขวาตรงกันทุกแถว
 const TypeBreakdown = ({ r }) => (
-  <Stack spacing={0.3}>
-    {byTypeOf(r).map(({ t, hours }) => (
-      <Stack key={t.value} direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
-        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: t.color, flexShrink: 0 }} />
-        <Typography noWrap sx={{ fontSize: "0.78rem", color: TEXT_SUB, minWidth: 0 }}>{t.label}</Typography>
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_MAIN, ml: "auto !important", whiteSpace: "nowrap" }}>{hoursText(hours)}</Typography>
-      </Stack>
-    ))}
-  </Stack>
+  <Box sx={{ display: "inline-grid", gridTemplateColumns: "auto auto", columnGap: 1, rowGap: 0.2, alignItems: "baseline", textAlign: "left" }}>
+    {byTypeOf(r).map(({ t, hours }) => [
+      <Typography key={`${t.value}-l`} noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{t.label}</Typography>,
+      <Typography key={`${t.value}-h`} sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#334155", whiteSpace: "nowrap", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{hoursText(hours)}</Typography>,
+    ])}
+  </Box>
 );
-const otDayCount = (r) => new Set((r.lines || []).map((l) => moment(l.date).format("YYYY-MM-DD"))).size;
+const otDays = (r) => [...new Set((r.lines || []).map((l) => moment(l.date).format("YYYY-MM-DD")))].sort();
+/**
+ * หัวข้อวันที่ของใบ
+ * 🐛 (28 พ.ย. 2569 ผู้ใช้: "การแสดงแบบนี้จะเข้าใจผิดว่าทำงาน 10–27 ซึ่งมันกำกวม") ใช้ "วันแรก – วันสุดท้าย" เฉพาะวันที่ติดกันจริง
+ *    วันไม่ติดกัน = บอกเดือน + จำนวนวัน ("ต.ค. 2569 · 3 วัน") แล้วให้ชิปบอกว่าวันไหนบ้าง
+ */
+const otRangeText = (days) => {
+  if (!days.length) return "—";
+  const [f, l] = [days[0], days[days.length - 1]];
+  if (f === l) return thaiDate(f);
+  const [fd, fm, fy] = thaiDate(f).split(" ");
+  const [ld, lm, ly] = thaiDate(l).split(" ");
+  const contiguous = moment(l).diff(moment(f), "days") === days.length - 1;
+  if (contiguous) {
+    if (fy !== ly) return `${fd} ${fm} ${fy} – ${ld} ${lm} ${ly} (ติดกัน ${days.length} วัน)`;
+    return `${fm === lm ? `${fd} – ${ld} ${lm} ${ly}` : `${fd} ${fm} – ${ld} ${lm} ${ly}`} (ติดกัน ${days.length} วัน)`;
+  }
+  if (fm === lm && fy === ly) return `${fm} ${fy} · ${days.length} วัน`;
+  return `${fm}${fy !== ly ? ` ${fy}` : ""} – ${lm} ${ly} · ${days.length} วัน`;
+};
+const DOW = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+/**
+ * วันที่ทำ OT ของใบ — 🎨 (28 พ.ย. 2569 ผู้ใช้: "กรณีที่ลงหลายวันแบบนี้จัดวางให้สวยงาม และดูได้ง่าย")
+ *   เดิมเป็นข้อความยาว "4, 14, 15, 21, 22, 28, 29 พ.ย. 2569" อ่านยาก → ช่วงวันที่ตัวหนา + ชิปวันที่ (เสาร์/อาทิตย์สีอ่อนแดง)
+ *   + "7 วัน · 7 รายการ" · ข้ามเดือน ชิปบอกเดือนด้วย · เกิน 12 วัน ย่อ +N
+ */
+const DaysCell = ({ r, compact = false }) => {
+  const days = otDays(r);
+  const multiMonth = new Set(days.map((d) => d.slice(0, 7))).size > 1;
+  const shown = days.slice(0, compact ? 8 : 12);
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography noWrap sx={{ fontSize: compact ? "0.8rem" : "0.84rem", fontWeight: 700, color: TEXT_MAIN, lineHeight: 1.4 }}>{otRangeText(days)}</Typography>
+      {days.length > 1 && (
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px", mt: 0.5 }}>
+          {shown.map((d) => {
+            const dow = moment(d).day();
+            const off = dow === 0 || dow === 6;
+            return (
+              <Box key={d} component="span" title={`${DOW[dow]}. ${thaiDate(d)}`}
+                sx={{ minWidth: 24, height: 22, px: 0.5, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 1,
+                  fontSize: "0.7rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                  color: off ? "#b91c1c" : "#334155", bgcolor: off ? "#fef2f2" : "#f1f5f9", border: `1px solid ${off ? "#fee2e2" : "#e2e8f0"}` }}>
+                {multiMonth ? `${Number(d.slice(8))}/${Number(d.slice(5, 7))}` : Number(d.slice(8))}
+              </Box>
+            );
+          })}
+          {days.length > shown.length && <Box component="span" sx={{ fontSize: "0.7rem", fontWeight: 700, color: TEXT_SUB, alignSelf: "center" }}>+{days.length - shown.length}</Box>}
+        </Box>
+      )}
+      <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, mt: days.length > 1 ? 0.5 : 0 }}>{(r.lines || []).length} รายการ</Typography>
+    </Box>
+  );
+};
 /** งานที่อิง (ไม่ซ้ำ) — ประเภทงานคือคำแรกของชื่องาน ("PM · Fire Alarm · …") ใช้ทำสีชิป */
 const jobsList = (r) => [...new Set((r.lines || []).flatMap((l) => lineJobs(l).map((j) => j.jobTitle)).filter(Boolean))];
 const JobLine = ({ title, wrap = false }) => {
@@ -107,14 +148,13 @@ const RowCard = ({ r, onOpen }) => (
         <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{r.docNo} · {thaiDate(r.docDate)}</Typography>
       </Box>
       <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", lineHeight: 1, color: TEXT_MAIN }}>{hoursText(r.totalHours).replace(" ชม.", "")}</Typography>
-        <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>ชั่วโมง</Typography>
+        <HoursFigure hours={r.totalHours} size="1.3rem" />
+        <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>ชั่วโมงรวม</Typography>
       </Box>
     </Stack>
     <Box sx={{ mt: 1.25 }}><Jobs r={r} /></Box>
     <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${BORDER_MAIN}` }}>
-      <CalendarMonth sx={{ fontSize: 16, color: OT_ACCENT, flexShrink: 0 }} />
-      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: TEXT_MAIN, fontWeight: 600 }} noWrap>{otDatesText(r)}</Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}><DaysCell r={r} compact /></Box>
       <OtStatusBadge status={r.status} short />
     </Stack>
   </Box>
@@ -126,15 +166,17 @@ const RowCard = ({ r, onOpen }) => (
  */
 const RowTable = ({ rows, onOpen }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto" }}>
-    <Table size="small" sx={{ minWidth: 1080, tableLayout: "fixed", "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1, borderColor: BORDER_MAIN },
+    <Table size="small" sx={{ minWidth: 1120, tableLayout: "fixed", "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1, borderColor: BORDER_MAIN },
       "& td": { py: 1.25, borderColor: BORDER_MAIN, verticalAlign: "middle" }, "& tbody tr:last-of-type td": { borderBottom: 0 } }}>
+      {/* 🎨 (28 พ.ย. 2569 ผู้ใช้: "จุดไหนที่ควรเด่นสำหรับเมนูนี้") ชั่วโมงคือสิ่งที่ต้องเห็นก่อน — คอลัมน์ชั่วโมงตัวใหญ่ + แยกประเภทเล็กๆ ใต้ตัวเลข
+          (เดิมแยกประเภทเป็นอีกคอลัมน์ ตัดคำ "ทำงานวันห…" และตัวเลขซ้ำ 2 ที่) · สถานะกว้างพอไม่ตัดคำ */}
       <colgroup>
-        <col style={{ width: 140 }} /><col style={{ width: 160 }} /><col /><col style={{ width: 175 }} /><col style={{ width: 180 }} /><col style={{ width: 92 }} /><col style={{ width: 120 }} />
+        <col style={{ width: 150 }} /><col style={{ width: 170 }} /><col /><col style={{ width: 190 }} /><col style={{ width: 210 }} /><col style={{ width: 150 }} />
       </colgroup>
       <TableHead>
         <TableRow>
           <TableCell>เลขที่ / ยื่นเมื่อ</TableCell><TableCell>ผู้ยื่น</TableCell><TableCell>งานที่อิง</TableCell>
-          <TableCell>วันที่ทำ OT</TableCell><TableCell>แยกตามประเภท</TableCell><TableCell align="right">ชั่วโมงรวม</TableCell><TableCell>สถานะ</TableCell>
+          <TableCell>วันที่ทำ OT</TableCell><TableCell align="right">ชั่วโมง</TableCell><TableCell sx={{ pl: "24px !important" }}>สถานะ</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -155,15 +197,14 @@ const RowTable = ({ rows, onOpen }) => (
             </TableCell>
             <TableCell sx={{ minWidth: 0 }}><Jobs r={r} wrap /></TableCell>
             <TableCell>
-              <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: TEXT_MAIN, lineHeight: 1.4 }}>{otDatesText(r)}</Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{otDayCount(r)} วัน · {(r.lines || []).length} รายการ</Typography>
+              <DaysCell r={r} />
             </TableCell>
-            <TableCell><TypeBreakdown r={r} /></TableCell>
-            <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-              <Typography component="span" sx={{ fontWeight: 900, fontSize: "1.02rem" }}>{hoursText(r.totalHours).replace(" ชม.", "")}</Typography>
-              <Typography component="span" sx={{ ml: 0.5, fontSize: "0.74rem", color: TEXT_SUB }}>ชม.</Typography>
+            <TableCell align="right">
+              <HoursFigure hours={r.totalHours} size="1.15rem" />
+              {byTypeOf(r).length > 1 && <Box sx={{ mt: 0.4 }}><TypeBreakdown r={r} /></Box>}
+              {byTypeOf(r).length === 1 && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{byTypeOf(r)[0].t.label}</Typography>}
             </TableCell>
-            <TableCell><OtStatusBadge status={r.status} short /></TableCell>
+            <TableCell sx={{ pl: "24px !important" }}><OtStatusBadge status={r.status} short /></TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -178,15 +219,20 @@ const monthOf = (r) => r.period || moment(r.docDate).format("YYYY-MM");
  * แถบตัวเลขสรุปเป็นการ์ดเดียวเต็มแถว แบ่งช่องด้วยเส้นบาง (เดิมการ์ดแยกกว้างไม่เท่ากัน เหลือที่ว่างครึ่งจอ)
  * สีเหลือแค่จุดเล็กหน้าหัวข้อ
  */
-const Stat = ({ label, value, unit, tone, hint }) => (
+const Stat = ({ label, value, unit, hours, tone, hint }) => (
   <Box sx={{ minWidth: 0, px: { xs: 1.5, sm: 2 }, py: 1.4 }}>
     <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
       {tone && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: tone, flexShrink: 0 }} />}
       <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, fontWeight: 700 }} noWrap>{label}</Typography>
     </Stack>
-    <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: TEXT_MAIN, lineHeight: 1.25, mt: 0.25 }} noWrap>
-      {value}<Box component="span" sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 600, ml: 0.5 }}>{unit}</Box>
-    </Typography>
+    {hours != null ? (
+      // ✅ ชั่วโมง = ตัวเลข + หน่วยเล็กทุกส่วน ("54 ชม. 30 น.") — เดิมขึ้น "54 30 น. ชม."
+      <Box sx={{ mt: 0.25 }}><HoursFigure hours={hours} size="1.45rem" muted={!hours} /></Box>
+    ) : (
+      <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: TEXT_MAIN, lineHeight: 1.25, mt: 0.25 }} noWrap>
+        {value}<Box component="span" sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 600, ml: 0.5 }}>{unit}</Box>
+      </Typography>
+    )}
     {hint && <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }} noWrap>{hint}</Typography>}
   </Box>
 );
@@ -201,10 +247,15 @@ const StatRow = ({ children, sx }) => {
     </Box>
   );
 };
-const hNum = (h) => hoursText(h).replace(" ชม.", "");
+
+/** ปุ่มหลักของเมนู — น้ำเงินระบบ พื้นเรียบ (ธีมมือถือใส่ไล่สีให้ปุ่ม contained — ปิดไว้ให้เหมือนทุกจอ) */
+const PRIMARY_SX = {
+  flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap",
+  bgcolor: OT_ACTION, backgroundImage: "none", "&:hover": { bgcolor: OT_ACTION_DARK, backgroundImage: "none", boxShadow: "none" },
+};
 
 /** ── รายงานรายเดือน + ปิดรอบจ่าย ─────────────────────────────────────── */
-const ReportView = ({ reloadKey, canClose, onOpen }) => {
+const ReportView = ({ reloadKey, canClose, onOpen, isDesktop = true }) => {
   const [period, setPeriod] = useState(moment().format("YYYY-MM"));
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -244,7 +295,7 @@ const ReportView = ({ reloadKey, canClose, onOpen }) => {
           onClick={async () => { const { exportOtReport } = await import("../utils/otExcelExport"); exportOtReport(data); }} />
         {canClose && (
           <Button variant="contained" startIcon={<TaskAlt />} disabled={!data?.approvedCount} onClick={() => setConfirm(true)}
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
+            sx={PRIMARY_SX}>
             ปิดรอบ{data?.approvedCount ? ` (${data.approvedCount} ใบ)` : ""}
           </Button>
         )}
@@ -254,21 +305,59 @@ const ReportView = ({ reloadKey, canClose, onOpen }) => {
       {!data ? <Skeleton variant="rounded" height={240} /> : (
         <>
           <StatRow>
-            <Stat label="พนักงานที่มี OT" value={data.people.length} unit="คน" tone={OT_ACCENT} />
-            <Stat label="ชั่วโมงที่อนุมัติแล้ว" value={hNum(sum((p) => p.approved.hours + p.paid.hours))} unit="ชม." tone="#16a34a" />
-            <Stat label="รอปิดรอบ" value={hNum(sum((p) => p.approved.hours))} unit="ชม." tone="#d97706" hint={data.approvedCount ? `${data.approvedCount} ใบ พร้อมปิดรอบ` : "ไม่มีใบรอปิดรอบ"} />
-            <Stat label="ปิดรอบแล้ว" value={hNum(sum((p) => p.paid.hours))} unit="ชม." tone="#64748b" />
-            <Stat label="ยังไม่ผ่านอนุมัติ" value={hNum(sum((p) => p.waiting.hours))} unit="ชม." tone="#94a3b8" hint="ไม่นับในรอบนี้จนกว่าจะอนุมัติ" />
+            {/* 🎨 (28 พ.ย. 2569 ผู้ใช้: "หน้ามือถือ ให้ดูง่าย ข้อมูลไม่รก") มือถือ 4 ช่อง 2×2 (จำนวนคนบอกในรายชื่อด้านล่าง) */}
+            {isDesktop && <Stat label="พนักงานที่มี OT" value={data.people.length} unit="คน" tone={OT_ACTION} />}
+            <Stat label="ชั่วโมงที่อนุมัติแล้ว" hours={sum((p) => p.approved.hours + p.paid.hours)} tone="#16a34a" />
+            <Stat label="รอปิดรอบ" hours={sum((p) => p.approved.hours)} tone="#d97706" hint={data.approvedCount ? `${data.approvedCount} ใบ พร้อมปิดรอบ` : "ไม่มีใบรอปิดรอบ"} />
+            <Stat label="ปิดรอบแล้ว" hours={sum((p) => p.paid.hours)} tone="#64748b" />
+            <Stat label="ยังไม่ผ่านอนุมัติ" hours={sum((p) => p.waiting.hours)} tone="#94a3b8" hint="ไม่นับในรอบนี้จนกว่าจะอนุมัติ" />
           </StatRow>
           {!data.people.length ? (
             <Stack alignItems="center" sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}>
               <Inbox sx={{ fontSize: 40, color: "#cbd5e1" }} />
               <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>ไม่มี OT ในรอบนี้</Typography>
             </Stack>
+          ) : !isDesktop ? (
+            /* มือถือ: การ์ดรายคน — ชั่วโมงอนุมัติรวมตัวใหญ่ · แยกประเภทเฉพาะที่มี · รอปิดรอบ/ปิดรอบแล้ว/ยังไม่อนุมัติ บรรทัดล่าง (เดิมตารางกว้าง หัวคอลัมน์ทับกัน) */
+            <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflow: "hidden" }}>
+              <Stack direction="row" alignItems="center" sx={{ px: 1.5, py: 1, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER_MAIN}` }}>
+                <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: TEXT_SUB }}>พนักงาน {data.people.length} คน</Typography>
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_SUB }}>อนุมัติแล้ว</Typography>
+              </Stack>
+              {data.people.map((p, i) => {
+                const types = OT_TYPES.map((t) => ({ t, v: p.approved.byType[t.value]?.hours || 0 })).filter((x) => x.v > 0);
+                const extra = [
+                  p.approved.hours ? { k: "รอปิดรอบ", v: p.approved.hours, c: "#b45309" } : null,
+                  p.paid.hours ? { k: "ปิดรอบแล้ว", v: p.paid.hours, c: TEXT_SUB } : null,
+                  p.waiting.hours ? { k: "ยังไม่อนุมัติ", v: p.waiting.hours, c: "#94a3b8" } : null,
+                ].filter(Boolean);
+                return (
+                  <Box key={p.userId} sx={{ px: 1.5, py: 1.25, borderTop: i ? `1px solid ${BORDER_MAIN}` : 0 }}>
+                    <Stack direction="row" spacing={1.25} alignItems="center">
+                      <Avatar sx={{ width: 32, height: 32, fontSize: "0.8rem", fontWeight: 800, bgcolor: personColor(p.name), flexShrink: 0 }}>{personInitial(p.name)}</Avatar>
+                      <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: "0.9rem" }}>{p.name}</Typography>
+                      <HoursFigure hours={p.approved.hours + p.paid.hours} size="1.15rem" muted={!(p.approved.hours + p.paid.hours)} />
+                    </Stack>
+                    {(types.length > 0 || extra.length > 0) && (
+                      <Stack direction="row" spacing={1.5} useFlexGap sx={{ mt: 0.75, pl: 5.5, flexWrap: "wrap", rowGap: 0.4 }}>
+                        {types.map(({ t, v }) => (
+                          <Typography key={t.value} sx={{ fontSize: "0.74rem", color: TEXT_SUB, display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                            <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: t.color }} />{t.label} <b style={{ color: TEXT_MAIN }}>{hoursText(v)}</b>
+                          </Typography>
+                        ))}
+                        {extra.map((x) => (
+                          <Typography key={x.k} sx={{ fontSize: "0.74rem", color: x.c }}>{x.k} <b>{hoursText(x.v)}</b></Typography>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
           ) : (
             <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto" }}>
               <Table size="small" sx={{ minWidth: 880, tableLayout: "fixed", "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap", py: 1 },
-                "& td": { borderColor: BORDER_MAIN, py: 1.1, whiteSpace: "nowrap" }, "& th.grp": { color: OT_DARK, borderBottom: `2px solid ${alpha(OT_ACCENT, 0.35)}` } }}>
+                "& td": { borderColor: BORDER_MAIN, py: 1.1, whiteSpace: "nowrap" }, "& th.grp": { color: "#334155", borderBottom: `2px solid ${BORDER_MAIN}` } }}>
                 <colgroup>
                   <col style={{ width: 220 }} />{OT_TYPES.map((t) => <col key={t.value} />)}<col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 130 }} />
                 </colgroup>
@@ -337,7 +426,7 @@ const ReportView = ({ reloadKey, canClose, onOpen }) => {
                   return (
                     <ButtonBase key={d._id || d.docNo} onClick={() => d._id && onOpen?.(d._id)} sx={{
                       gap: 0.75, px: 1.1, py: 0.6, borderRadius: 2, fontFamily: "inherit", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`,
-                      "&:hover": { borderColor: OT_ACCENT, bgcolor: alpha(OT_ACCENT, 0.04) },
+                      "&:hover": { borderColor: OT_ACTION, bgcolor: alpha(OT_ACTION, 0.04) },
                     }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: st.color }} />
                       <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>{d.docNo}</Typography>
@@ -419,15 +508,31 @@ export default function OtPage({ view: viewProp = "mine" }) {
       .some((v) => String(v || "").toLowerCase().includes(needle)));
   }, [rows, q]);
   const liveHours = (list) => list.filter((r) => !["cancelled", "rejected"].includes(r.status)).reduce((t, r) => t + (r.totalHours || 0), 0);
+  /**
+   * ✅ (28 พ.ย. 2569 ผู้ใช้: "ตัวไหนปิดรอบแล้วให้แยกออกไปเลย ไม่ต้องมาแสดงหน้าแรกให้ดูงง" · "ให้แสดงแค่เดือนที่แล้วกับเดือนนี้พอ")
+   *    แท็บ "ใบ OT" = ใบเดือนนี้ + เดือนที่แล้ว ที่ยังไม่ปิดรอบ (สิ่งที่ต้องติดตาม)
+   *    แท็บ "ย้อนหลัง / ปิดรอบแล้ว" = ที่เหลือทั้งหมด (ปิดรอบแล้วทุกเดือน + ใบที่เก่ากว่าเดือนที่แล้ว) — ไม่มีใบไหนหายไป
+   *    ตัวเลขสรุปชั่วโมงของเดือนนี้ยังนับจากทุกใบ (base) — ใบปิดรอบก็เป็นชั่วโมงที่อนุมัติของเดือนนั้น
+   *    ⚠️ ใบรอตรวจ/รออนุมัติที่เก่ากว่านั้น ผู้ตรวจ/ผู้อนุมัติยังเห็นครบในแท็บ "รอดำเนินการ" (ไม่จำกัดเดือน)
+   */
+  const recentFrom = moment().subtract(1, "month").format("YYYY-MM");
+  const isHistory = (r) => r.status === "paid" || monthOf(r) < recentFrom;
+  const scoped = useMemo(() => (view === "closed" ? base.filter(isHistory) : view === "mine" ? base.filter((r) => !isHistory(r)) : base),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [base, view, recentFrom]);
+  const closedCount = useMemo(() => rows.filter(isHistory).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, recentFrom]);
+  const historyMatches = view === "mine" && q.trim() ? base.filter(isHistory).length : 0;
   const monthList = useMemo(() => {
     const m = new Map();
-    base.forEach((r) => { const k = monthOf(r); m.set(k, [...(m.get(k) || []), r]); });
+    scoped.forEach((r) => { const k = monthOf(r); m.set(k, [...(m.get(k) || []), r]); });
     return [...m.entries()].sort((x, y) => y[0].localeCompare(x[0]));
-  }, [base]);
+  }, [scoped]);
   const thisMonth = moment().format("YYYY-MM");
-  const inMonth = base;
+  const inMonth = scoped;
   const counts = useMemo(() => inMonth.reduce((c, r) => ({ ...c, [r.status]: (c[r.status] || 0) + 1 }), {}), [inMonth]);
-  const visible = status === "all" ? inMonth : inMonth.filter((r) => r.status === status);
+  const visible = status === "all" || view !== "mine" ? inMonth : inMonth.filter((r) => r.status === status);
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const cur = Math.min(page, pageCount);
   const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
@@ -453,14 +558,16 @@ export default function OtPage({ view: viewProp = "mine" }) {
   const openDetail = (id) => { setDetailId(id); navigate(`/ot/${id}`, { replace: Boolean(routeId), state: { fromView: view } }); };
   const closeDetail = () => {
     setDetailId(""); setNotice("");
-    if (routeId) navigate({ inbox: "/ot/approvals", report: "/ot/report", wages: "/ot/wages" }[view] || "/ot", { replace: true });
+    if (routeId) navigate({ inbox: "/ot/approvals", closed: "/ot/closed", report: "/ot/report", wages: "/ot/wages" }[view] || "/ot", { replace: true });
   };
 
   const tabs = [
+    // 🎨 (28 พ.ย. 2569 ผู้ใช้: "หน้ามือถือ ทำให้ดูง่าย ข้อมูลไม่รก") มือถือใช้ชื่อสั้น — แท็บอยู่ในจอเดียวไม่ต้องเลื่อน
     { to: "/ot", label: "ใบ OT", key: "mine" },
-    ...(canHandle ? [{ to: "/ot/approvals", label: `รอดำเนินการ${summary?.inbox ? ` (${summary.inbox})` : ""}`, key: "inbox" }] : []),
+    ...(canHandle ? [{ to: "/ot/approvals", label: "รอดำเนินการ", short: "รอดำเนินการ", count: summary?.inbox || 0, key: "inbox" }] : []),
+    { to: "/ot/closed", label: "ย้อนหลัง / ปิดรอบแล้ว", short: "ย้อนหลัง", key: "closed" },
     // 🔁 (27 ต.ค. 2569) ไม่มีเรื่องเงินในระบบ OT — เหลือรายงานชั่วโมงรายเดือน (เลิกหน้า "ค่าจ้างต่อชั่วโมง")
-    ...(canMoney ? [{ to: "/ot/report", label: "รายงานชั่วโมงรายเดือน", key: "report" }] : []),
+    ...(canMoney ? [{ to: "/ot/report", label: "รายงานชั่วโมงรายเดือน", short: "รายงาน", key: "report" }] : []),
   ];
 
   const inboxGroups = view === "inbox" ? [
@@ -474,7 +581,9 @@ export default function OtPage({ view: viewProp = "mine" }) {
     <Box sx={PAGE_SX}>
       {/* 🎨 (27 ต.ค. 2569 ผู้ใช้: "UX UI ดูยาก ไม่สวย ไม่ทันสมัย สีไม่เหมือน advance") หัวเพจ + แถบเมนูแบบเดียวกับหน้าใบ Advance */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
+        {/* 🎨 (28 พ.ย. 2569 ผู้ใช้: "การจัดวางจุดต่างๆ สีสันที่ใช้ ยังมองยาก…สวยงามมืออาชีพ")
+            ชื่อเมนู · Excel อยู่แถวเดียวกัน (มือถือเดิม Excel ลอยอยู่แถวของตัวเอง) · ปุ่มหลัก "ยื่นขอ OT" สีน้ำเงินระบบปุ่มเดียวที่เด่น */}
+        <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 2 }}>
           <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }} sx={{ flex: 1, minWidth: 0 }}>
             <Box sx={{ width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(OT_ACCENT, 0.12), color: OT_ACCENT, "& svg": { fontSize: { xs: 20, sm: 22 }, filter: "drop-shadow(0 2px 3px rgba(17,24,39,.15))" } }}>
               <AccessTime />
@@ -490,43 +599,68 @@ export default function OtPage({ view: viewProp = "mine" }) {
             <ExportExcelButton onClick={exportExcel} loading={exporting} disabled={loading || !visible.length} count={visible.length} />
           )}
           <Button variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
-            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: OT_ACCENT, whiteSpace: "nowrap", "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
+            sx={{ ...PRIMARY_SX, display: { xs: "none", sm: "inline-flex" } }}>
             {basketN ? `ฉบับร่าง OT (${basketN})` : "ยื่นขอ OT"}
           </Button>
         </Stack>
+        <Button fullWidth variant="contained" startIcon={<Add />} onClick={() => setForm({ open: true, request: null })}
+          sx={{ ...PRIMARY_SX, display: { xs: "flex", sm: "none" }, mt: 1.25, height: 42 }}>
+          {basketN ? `ฉบับร่าง OT (${basketN})` : "ยื่นขอ OT"}
+        </Button>
         <Box component="nav" aria-label="เมนู OT"
           sx={{ display: "flex", gap: { xs: 0.25, sm: 0.5 }, mt: { xs: 1.25, sm: 1.5 }, mb: { xs: -1.25, sm: -1.75 }, mx: { xs: -1.5, sm: -2 }, px: { xs: 1, sm: 1.5 },
             borderTop: `1px solid ${BORDER_MAIN}`, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
           {tabs.map((t) => {
             const on = view === t.key;
-            const c = t.key === "inbox" ? "#d97706" : t.key === "report" ? "#1d4ed8" : OT_ACCENT;
             return (
               <ButtonBase key={t.key} component={RouterLink} to={t.to} aria-current={on ? "page" : undefined}
-                sx={{ flexShrink: 0, px: { xs: 1.25, sm: 1.5 }, py: 1.1, fontFamily: "inherit", whiteSpace: "nowrap", fontSize: "0.84rem", fontWeight: on ? 800 : 600,
-                  color: on ? c : TEXT_SUB, borderBottom: `2px solid ${on ? c : "transparent"}`, mb: "-1px", "&:hover": { color: on ? c : TEXT_MAIN } }}>
-                {t.label}
+                sx={{ flexShrink: 0, gap: 0.75, px: { xs: 1.25, sm: 1.5 }, py: 1.1, fontFamily: "inherit", whiteSpace: "nowrap", fontSize: "0.84rem", fontWeight: on ? 800 : 600,
+                  color: on ? OT_ACTION : TEXT_SUB, borderBottom: `2px solid ${on ? OT_ACTION : "transparent"}`, mb: "-1px", "&:hover": { color: on ? OT_ACTION : TEXT_MAIN } }}>
+                {isDesktop ? t.label : t.short || t.label}
+                {t.count > 0 && (
+                  <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    bgcolor: "#fef3c7", color: "#92400e", fontSize: "0.7rem", fontWeight: 800 }}>{t.count}</Box>
+                )}
               </ButtonBase>
             );
           })}
         </Box>
       </Box>
 
-      {view === "report" && <ReportView reloadKey={reloadKey} canClose={can("disburseExpense")} onOpen={openDetail} />}
+      {view === "report" && <ReportView reloadKey={reloadKey} canClose={can("disburseExpense")} onOpen={openDetail} isDesktop={isDesktop} />}
 
-      {(view === "mine" || view === "inbox") && (
+      {(view === "mine" || view === "inbox" || view === "closed") && (
         <>
-          {view === "mine" && monthList.length > 0 && (
+          {view === "mine" && (monthList.length > 0 || closedCount > 0) && (
             <StatRow>
-              <Stat label={`ยื่นแล้ว · ${periodLabel(thisMonth)}`} value={hNum(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth)))} unit="ชม." tone={OT_ACCENT} hint="ไม่นับใบที่ยกเลิก/ตีกลับ" />
-              <Stat label={`อนุมัติแล้ว · ${periodLabel(thisMonth)}`} value={hNum(liveHours(inMonth.filter((r) => monthOf(r) === thisMonth).filter((r) => ["approved", "paid"].includes(r.status))))} unit="ชม." tone="#16a34a" />
-              <Stat label="รอตรวจสอบ / อนุมัติ" value={hNum(liveHours(inMonth.filter((r) => ["pending", "reviewed"].includes(r.status))))} unit="ชม." tone="#d97706" hint={`${(counts.pending || 0) + (counts.reviewed || 0)} ใบ`} />
+              <Stat label={isDesktop ? `ยื่นแล้ว · ${periodLabel(thisMonth)}` : "ยื่นแล้ว · เดือนนี้"} hours={liveHours(base.filter((r) => monthOf(r) === thisMonth))} tone={OT_ACTION} hint="ไม่นับใบที่ยกเลิก/ตีกลับ" />
+              {isDesktop && <Stat label={`อนุมัติแล้ว · ${periodLabel(thisMonth)}`} hours={liveHours(base.filter((r) => monthOf(r) === thisMonth).filter((r) => ["approved", "paid"].includes(r.status)))} tone="#16a34a" hint="รวมใบที่ปิดรอบแล้ว" />}
+              <Stat label={isDesktop ? "รอตรวจสอบ / อนุมัติ" : "รอตรวจ/อนุมัติ"} hours={liveHours(inMonth.filter((r) => ["pending", "reviewed"].includes(r.status)))} tone="#d97706" hint={`${(counts.pending || 0) + (counts.reviewed || 0)} ใบ`} />
               {(counts.rejected || 0) > 0
                 ? <Stat label="ถูกตีกลับ · ต้องแก้" value={counts.rejected} unit="ใบ" tone="#dc2626" hint="เปิดใบแล้วกดแก้ไข/ส่งใหม่" />
-                : <Stat label="ใบทั้งหมด" value={inMonth.length} unit="ใบ" tone="#94a3b8" />}
+                : isDesktop && <Stat label="ใบ OT · 2 เดือนล่าสุด" value={inMonth.length} unit="ใบ" tone="#94a3b8" hint={closedCount ? `ย้อนหลัง / ปิดรอบแล้ว ${closedCount} ใบ แยกไว้อีกแท็บ` : "เดือนนี้ + เดือนที่แล้ว"} />}
             </StatRow>
           )}
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "center" }} sx={{ mb: 1.5 }}>
-            {view === "mine" && (
+            {view === "mine" && !isDesktop && (
+              <Stack direction="row" spacing={0.75} sx={{ overflowX: "auto", pb: 0.25, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
+                {[{ value: "all", label: "ทั้งหมด", count: inMonth.length, color: "#475569" },
+                  ...STATUS_ORDER.filter((st) => st === status || (counts[st] || 0) > 0).map((st) => ({ value: st, label: otStatus(st).short || otStatus(st).label, count: counts[st] || 0, color: otStatus(st).color }))]
+                  .map((o) => {
+                    const on = status === o.value;
+                    return (
+                      <ButtonBase key={o.value} onClick={() => setStatus(o.value)} aria-pressed={on}
+                        sx={{ flexShrink: 0, gap: 0.75, height: 34, px: 1.5, borderRadius: 99, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 800 : 600,
+                          color: on ? OT_ACTION : "#334155", bgcolor: on ? "#eff6ff" : "#fff", border: `1px solid ${on ? "#bfdbfe" : BORDER_MAIN}` }}>
+                        {o.value !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: o.color }} />}
+                        {o.label}
+                        <Box component="span" sx={{ fontWeight: 800, color: on ? OT_ACTION : TEXT_SUB, fontVariantNumeric: "tabular-nums" }}>{o.count}</Box>
+                      </ButtonBase>
+                    );
+                  })}
+              </Stack>
+            )}
+            {view === "mine" && isDesktop && (
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <ViewTiles compact value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: [
                   { value: "all", label: "ทุกสถานะ", count: inMonth.length, unit: "ใบ", icon: <Apps />, color: "#475569" },
@@ -552,9 +686,15 @@ export default function OtPage({ view: viewProp = "mine" }) {
                 <Stack spacing={2.5}>
                   {inboxGroups.map((g) => (
                     <Box key={g.key}>
-                      <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
-                        <Typography sx={{ fontWeight: 800 }}>{g.title}</Typography>
-                        <Chip size="small" label={g.rows.length} sx={{ height: 20, fontWeight: 800 }} />
+                      {/* หัวกลุ่มแบบเดียวกับหัวเดือน — จุดสีสถานะ · ชื่อ · จำนวนใบ · เส้น · ชั่วโมงรวม */}
+                      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1 }}>
+                        <Stack direction="row" spacing={0.9} alignItems="center">
+                          <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: otStatus(g.key).color }} />
+                          <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN }}>{g.title}</Typography>
+                          <Box component="span" sx={{ px: 0.8, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: "#f1f5f9", color: "#334155", fontSize: "0.72rem", fontWeight: 800 }}>{g.rows.length} ใบ</Box>
+                        </Stack>
+                        <Box sx={{ flex: 1, height: 1, bgcolor: BORDER_MAIN }} />
+                        <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 700, whiteSpace: "nowrap" }}>{hoursText(liveHours(g.rows))}</Typography>
                       </Stack>
                       {renderRows(g.rows)}
                     </Box>
@@ -572,7 +712,7 @@ export default function OtPage({ view: viewProp = "mine" }) {
                       return (
                         <Box key={k}>
                           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1 }}>
-                            <Stack direction="row" spacing={0.75} alignItems="center"><CalendarMonth sx={{ fontSize: 20, color: OT_ACCENT }} />
+                            <Stack direction="row" spacing={0.75} alignItems="center"><CalendarMonth sx={{ fontSize: 19, color: "#94a3b8" }} />
                               <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN }}>{periodLabel(k)}{k === thisMonth ? " (เดือนนี้)" : ""}</Typography></Stack>
                             <Box sx={{ flex: 1, height: 1, bgcolor: BORDER_MAIN }} />
                             <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, fontWeight: 700 }}>{all.length} ใบ · {hoursText(liveHours(all))}</Typography>
@@ -590,13 +730,26 @@ export default function OtPage({ view: viewProp = "mine" }) {
                   </Stack>
                 )}
                 <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
-                  {visible.length} ใบ · รวม {hoursText(liveHours(visible))} (ไม่นับใบที่ยกเลิก/ตีกลับ)
+                  {/* มือถือ + เดือนเดียว = ยอดซ้ำกับหัวเดือนด้านบน → เหลือแค่ลิงก์ย้อนหลัง */}
+                  {(isDesktop || monthList.length > 1) && <>{visible.length} ใบ · รวม {hoursText(liveHours(visible))} (ไม่นับใบที่ยกเลิก/ตีกลับ)</>}
+                  {view === "mine" && closedCount > 0 && (
+                    <>{(isDesktop || monthList.length > 1) ? " · " : ""}<Box component={RouterLink} to="/ot/closed" sx={{ color: OT_ACTION, fontWeight: 700, textDecoration: "none" }}>ย้อนหลัง / ปิดรอบแล้ว {closedCount} ใบ ›</Box></>
+                  )}
                 </Typography>
               </>
             ) : (
               <Stack alignItems="center" spacing={1.25} sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}>
                 <AccessTime sx={{ fontSize: 40, color: "#cbd5e1" }} />
-                <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>{rows.length ? (inMonth.length ? "ไม่พบรายการตามตัวกรอง" : "ไม่พบรายการตามตัวกรอง") : "ยังไม่มีใบ OT"}</Typography>
+                <Typography sx={{ color: TEXT_SUB, fontWeight: 700 }}>
+                  {view === "closed" ? (q.trim() ? "ไม่พบรายการตามที่ค้นหา" : "ยังไม่มีใบที่ปิดรอบ")
+                    : rows.length ? (inMonth.length || q.trim() ? "ไม่พบรายการตามตัวกรอง" : "ไม่มีใบ OT เดือนนี้และเดือนที่แล้วที่ยังไม่ปิดรอบ") : "ยังไม่มีใบ OT"}
+                </Typography>
+                {/* ค้นหาแล้วไม่เจอในแท็บนี้ แต่มีในย้อนหลัง → บอกให้รู้ (ไม่ใช่ว่าไม่มีใบนั้น) */}
+                {view === "mine" && (historyMatches > 0 || (!q.trim() && closedCount > 0 && !inMonth.length)) && (
+                  <Button component={RouterLink} to="/ot/closed" size="small" sx={{ textTransform: "none", fontWeight: 800, color: OT_ACTION }}>
+                    {historyMatches > 0 ? `พบในย้อนหลัง / ปิดรอบแล้ว ${historyMatches} ใบ ›` : `ดูย้อนหลัง / ปิดรอบแล้ว ${closedCount} ใบ ›`}
+                  </Button>
+                )}
               </Stack>
             )}
         </>

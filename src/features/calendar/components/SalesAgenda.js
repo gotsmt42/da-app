@@ -142,10 +142,10 @@ export function SalesViewToggle({ view, onView, accent = ACCENT, options }) {
   return (
     <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#eef2f7", flexShrink: 0 }}>
       {(options || [
-        { k: "list", label: "รายการ", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
-        { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
+        { k: "list", label: "รายการนัด", hint: "รายการนัดเรียงตามวัน — ที่จะถึง · ต้องติดตาม · ที่ผ่านมา", icon: <ViewAgendaRounded sx={{ fontSize: 18 }} /> },
+        { k: "calendar", label: "ปฏิทินทั้งเดือน", hint: "ปฏิทินทั้งเดือน — เห็นนัดทุกวันในเดือน", icon: <CalendarMonthRounded sx={{ fontSize: 18 }} /> },
       ]).map((o) => (
-        <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.label} aria-label={o.label} aria-pressed={view === o.k}
+        <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.hint || o.label} aria-label={o.label} aria-pressed={view === o.k}
           sx={{
             gap: 0.6, height: 32, px: { xs: 1, sm: 1.5 }, borderRadius: "8px", fontSize: "0.8rem", fontWeight: 800,
             color: view === o.k ? accent : MUTED, bgcolor: view === o.k ? "#fff" : "transparent",

@@ -3,7 +3,7 @@
  *
  * ✅ (27 ต.ค. 2569 ผู้ใช้: "ให้ออกเอกสารเป็น PDF ด้วย") — รูปแบบเดียวกับใบเบิกของ/ใบขอซื้อ (โทนขาว-ดำ-เทา เส้นบาง)
  *    หัวกระดาษบริษัท → ชื่อเอกสาร + เลขที่/วันที่ → กล่องข้อมูล → ตารางรายการ (วันหยุดระบุชื่อ)
- *    → สรุปชั่วโมงตามประเภท → ประวัติ → ช่องลงนาม ผู้ขอ · ผู้ตรวจสอบ · ผู้อนุมัติ
+ *    → สรุปชั่วโมงตามประเภท + ไกด์อัตราคูณ → หมายเหตุ → ช่องลงนาม ผู้ขอ · ผู้ตรวจสอบ · ผู้อนุมัติ
  * ⚠️ ไม่มีเรื่องเงิน (ผู้ใช้: "ไม่ต้องใส่ค่าจ้าง ให้ทำแค่ชั่วโมงโอที อิงกับงาน")
  */
 import moment from "moment";
@@ -11,6 +11,18 @@ import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAss
 import { loadBoldFont, newDoc, wrapText } from "@/features/expenses/utils/expensePdf";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import { otStatus, typeMeta, hoursText, periodLabel, OT_TYPES, lineJobs, lineJobText } from "../otMeta";
+import OtService from "../services/OtService";
+
+/**
+ * ✅ (28 พ.ย. 2569 ผู้ใช้: "ในเอกสาร pdf อธิบายการคูณของวันทำงานต่างๆ ให้ด้วย เป็นไกด์ให้พนักงานดู จัดวางให้สวยงาม")
+ *    กล่อง "อัตราคูณ OT" ข้างตารางสรุปชั่วโมง: ประเภท ×อัตรา · ใช้เมื่อไหร่ — อัตราจากค่าที่ตั้งในระบบ (ตั้งค่าองค์กร)
+ *    ช่วงเวลาตามกติกาเดียวกับฟอร์ม (OtDayInfo.RULE / server hoursOf)
+ */
+const GUIDE = {
+  workdayOT: "ทำงานหลังเลิกงาน (หลัง 17:30) ของวันทำงาน",
+  holidayWork: "ทำงานในเวลางาน 08:30–17:30 ของวันหยุด",
+  holidayOT: "ทำงานหลัง 17:30 ของวันหยุด",
+};
 
 const W_PAGE = 210;
 const H_PAGE = 297;
@@ -154,6 +166,11 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
   });
   closeTable();
 
+  // อัตราคูณที่ใช้จริงในใบ → ค่าที่ตั้งในระบบ (ใบเก่าอาจคนละอัตรากับปัจจุบัน — ใช้ของใบก่อน)
+  let cfgMul = {};
+  try { cfgMul = (await OtService.config())?.multipliers || {}; } catch { /* ไม่มีค่าระบบ = ใช้ของในใบ */ }
+  const mulOf = (type) => lines.find((l) => l.type === type)?.multiplier || cfgMul[type] || "";
+
   // สรุปตามประเภท (แถวต่อท้ายตาราง)
   const sumRow = (label, value, strong) => {
     const h = 7.5;
@@ -165,12 +182,46 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
     doc.text(value, col("hrs").x + col("hrs").w / 2, y + 5.2, { align: "center" });
     y += h;
   };
-  if (y + 32 > BODY_LIMIT) { doc.addPage(); y = 16; }
+  if (y + 46 > BODY_LIMIT) { doc.addPage(); y = 16; }
+  const sumTop = y;
   OT_TYPES.forEach((t) => {
     const h = lines.filter((l) => l.type === t.value).reduce((s, l) => s + l.hours, 0);
     if (h) sumRow(t.label, hoursText(h).replace(" ชม.", ""));
   });
   sumRow("รวมชั่วโมง OT", hoursText(r.totalHours).replace(" ชม.", ""), true);
+  const sumBottom = y;
+
+  // กล่องไกด์ "อัตราคูณ OT" — ช่องว่างด้านซ้ายของตารางสรุป (กว้างถึงก่อนคอลัมน์ งาน/รายละเอียด)
+  {
+    const gx = L;
+    const gw = col("desc").x - L - 4;
+    const pad = 2.6;
+    const rowsG = OT_TYPES.map((t) => ({ label: `${t.label}${mulOf(t.value) ? ` ×${mulOf(t.value)}` : ""}`, text: GUIDE[t.value] || "" }));
+    size(10.5); bold(false);
+    const wrapped = rowsG.map((g) => ({ ...g, lines: wrapText(doc, T(g.text), gw - pad * 2).slice(0, 2) }));
+    size(9.5);
+    const note = wrapText(doc, T("ชั่วโมงในใบ = ชั่วโมงทำงานจริง (หักพักเที่ยง 12:00–13:00 แล้ว) · อัตราคูณใช้คิดค่าตอบแทนโดยฝ่ายบุคคล/บัญชี"), gw - pad * 2);
+    const gh = 7.5 + wrapped.reduce((t, g) => t + 4.8 + g.lines.length * 4.2 + 1.2, 0) + note.length * 3.9 + 3;
+    doc.setFillColor(248, 250, 252); doc.setDrawColor(...RULE); doc.setLineWidth(0.25);
+    const gTop = sumTop + 3; // เว้นจากขอบล่างตารางเล็กน้อย (ตารางสรุปด้านขวาต่อจากตารางพอดี)
+    doc.roundedRect(gx, gTop, gw, gh, 1.5, 1.5, "FD");
+    let gy = gTop + 5.2;
+    size(11.5); bold(true); color(INK);
+    doc.text("อัตราคูณ OT · วิธีนับชั่วโมง", gx + pad, gy);
+    gy += 2.3;
+    wrapped.forEach((g) => {
+      gy += 4.8;
+      size(11); bold(true); color(INK);
+      doc.text(T(g.label), gx + pad, gy);
+      size(10.5); bold(false); color(SUB);
+      g.lines.forEach((ln, i) => doc.text(ln, gx + pad, gy + 4.2 * (i + 1)));
+      gy += g.lines.length * 4.2 + 1.2;
+    });
+    gy += 3.4;
+    size(9.5); bold(false); color(FAINT);
+    note.forEach((ln, i) => doc.text(ln, gx + pad, gy + i * 3.9));
+    y = Math.max(sumBottom, gTop + gh);
+  }
   y += 6;
 
   // ── 4. หมายเหตุ + ประวัติ ──────────────────────────────────────────────
@@ -202,7 +253,7 @@ export async function generateOtPdf({ request: r, holidays = null, mode = "open"
     r.status === "rejected" && ["เหตุผลที่ตีกลับ", `${r.rejectReason || "-"}${r.rejectedBy?.name ? ` · โดย ${r.rejectedBy.name}` : ""}`],
     r.status === "cancelled" && ["ยกเลิกใบ", `${r.cancelReason || ""}${r.cancelledBy?.name ? ` · โดย ${r.cancelledBy.name}` : ""}`],
   ]);
-  section("ประวัติการดำเนินการ", (r.activityLog || []).map((a) => [thaiDateTime(a.timestamp), `${String(a.detail || "").replace(/(\d{4})-(\d{2})(?!-)/g, (m) => periodLabel(m))} — ${a.userName}`]));
+  // 🧹 (28 พ.ย. 2569 ผู้ใช้: "ในการออก pdf ไม่ต้องแสดงประวัติ") — เอกสารมีช่องลงนามผู้ขอ/ผู้ตรวจ/ผู้อนุมัติอยู่แล้ว · ประวัติดูในระบบ
 
   // ── 5. ลงนาม 3 ช่อง ────────────────────────────────────────────────────
   if (y > SIG_TOP - 2) doc.addPage();

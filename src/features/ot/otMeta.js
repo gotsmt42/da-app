@@ -8,6 +8,14 @@ import moment from "moment";
 // 🎨 (27 ต.ค. 2569 ผู้ใช้: "ไม่ให้สีเหมือน advance") สีประจำหมวด "บุคคล" ชุดเดียวกับไอคอนหมวดบนหน้าแรก (ฟ้าอมเขียว)
 export const OT_ACCENT = "#0891b2";
 export const OT_DARK = "#0e7490";
+/**
+ * 🎨 (28 พ.ย. 2569 ผู้ใช้: "การจัดวางจุดต่างๆ สีสันที่ใช้ ยังมองยาก…ให้เน้นสบายตา จุดไหนที่ควรเด่น…สวยงามมืออาชีพ")
+ *    ฟ้าอมเขียว (OT_ACCENT) = สีประจำเมนูเท่านั้น (ไอคอนหัวเพจ/หัวกล่อง แบบพื้นอ่อน)
+ *    ปุ่ม/ตัวเลือก/สิ่งที่กดได้ = น้ำเงินระบบ ชุดเดียวกับทั้งแอป (กฎสีหลัก #2563eb) — ไม่ใช้ไล่สี/พื้นสีทั้งกล่อง
+ */
+export const OT_ACTION = "#2563eb";
+export const OT_ACTION_DARK = "#1d4ed8";
+export const OT_ACTION_SOFT = "#eff6ff";
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
 export const BORDER_MAIN = "#e6e9ef";
@@ -38,12 +46,15 @@ export const baht = (n) => {
   const v = money(n);
   return `฿${v.toLocaleString("th-TH", { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
+/** 3.5 → { hh: 3, mm: 30 } (ปัดเป็นนาที) */
+export const hoursParts = (h) => {
+  const mins = Math.round((Number(h) || 0) * 60);
+  return { hh: Math.floor(mins / 60), mm: mins % 60 };
+};
 /** 3.5 → "3 ชม. 30 น." */
 export const hoursText = (h) => {
-  const mins = Math.round((Number(h) || 0) * 60);
-  const hh = Math.floor(mins / 60);
-  const mm = mins % 60;
-  if (!mins) return "0 ชม.";
+  const { hh, mm } = hoursParts(h);
+  if (!hh && !mm) return "0 ชม.";
   return [hh ? `${hh} ชม.` : "", mm ? `${mm} น.` : ""].filter(Boolean).join(" ");
 };
 

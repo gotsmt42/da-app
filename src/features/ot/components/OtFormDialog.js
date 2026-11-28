@@ -40,7 +40,7 @@ import JobTypeChip from "@/shared/ui/JobTypeChip";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import OtService, { errorText } from "../services/OtService";
 import {
-  OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, lineHours, hoursText, guessType, timeForType, crossesMidnight, lineJobs,
+  OT_ACCENT, OT_ACTION, OT_ACTION_DARK, OT_ACTION_SOFT, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, lineHours, hoursText, guessType, timeForType, crossesMidnight, lineJobs,
 } from "../otMeta";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 import OtDayInfo, { useHolidays } from "./OtDayInfo";
@@ -345,7 +345,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
       fullWidth maxWidth="md" fullScreen={isMobile} PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3, bgcolor: "#f8fafc" } }}>
       <DialogTitle sx={{ p: 0, bgcolor: "#fff" }}>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 2, sm: 2.5 }, py: 1.5, borderBottom: `1px solid ${BORDER_MAIN}` }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: OT_ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, bgcolor: alpha(OT_ACCENT, 0.12), color: OT_ACCENT, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <AccessTime sx={{ fontSize: 21 }} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -376,7 +376,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
       <DialogContent sx={{ px: { xs: 1.25, sm: 2.5 }, pt: "14px !important", pb: 1 }}>
         <DraftBanner draft={draft} />
         {basketMode && items.some((it) => jobsOf(it).length > 0) && (
-          <Alert severity="info" icon={false} sx={{ mb: 1.5, borderRadius: 2.5, bgcolor: "#ecfeff", color: OT_DARK, border: "1px solid #a5f3fc", "& .MuiAlert-message": { width: "100%" } }}>
+          <Alert severity="info" icon={false} sx={{ mb: 1.5, borderRadius: 2.5, bgcolor: OT_ACTION_SOFT, color: "#1e3a8a", border: "1px solid #dbeafe", "& .MuiAlert-message": { width: "100%" } }}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
               <Box sx={{ flex: 1, fontSize: "0.84rem" }}>
                 <b>ฉบับร่าง OT {items.filter((it) => jobsOf(it).length > 0).length} รายการ</b> — กด “บันทึกฉบับร่าง” แล้วไปกด “ขอ OT งานนี้” ที่งาน/วันอื่นต่อได้ ครบแล้วค่อยส่งขออนุมัติทีเดียว
@@ -408,7 +408,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
               <Box key={it.key} id={`ot-item-${it.key}`} sx={{ bgcolor: "#fff", border: `1px solid ${bad ? "#fca5a5" : BORDER_MAIN}`, borderRadius: 3, boxShadow: "none", overflow: "hidden", scrollMarginTop: 8 }}>
                 {/* หัวรายการ: เลขที่ · สรุปสั้น (วัน · ชั่วโมง) · คัดลอก/ลบ */}
                 <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1.5, py: 0.9, borderBottom: `1px solid ${BORDER_MAIN}`, bgcolor: "#fcfdfe" }}>
-                  <Box sx={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: OT_ACCENT, color: "#fff", fontWeight: 900, fontSize: "0.82rem" }}>{i + 1}</Box>
+                  <Box sx={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: "#eef2f7", color: TEXT_MAIN, fontWeight: 900, fontSize: "0.82rem" }}>{i + 1}</Box>
                   <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }} noWrap>
                     รายการที่ {i + 1}
                     <Box component="span" sx={{ ml: 1, fontWeight: 600, fontSize: "0.78rem", color: TEXT_SUB }}>
@@ -428,13 +428,14 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
                   <ButtonBase onClick={() => setPickerFor(it.key)} aria-label="เลือกวันและงานที่ทำ OT"
                     sx={{
                       gridColumn: "1 / -1", display: "flex", alignItems: "stretch", textAlign: "left", width: "100%", borderRadius: 2.5, overflow: "hidden", fontFamily: "inherit",
-                      border: `1.5px ${jobs.length ? "solid" : "dashed"} ${touched && !jobs.length ? "#f87171" : jobs.length ? alpha(OT_ACCENT, 0.45) : OT_ACCENT}`,
-                      bgcolor: jobs.length ? "#fff" : alpha(OT_ACCENT, 0.04),
+                      // 🎨 (28 พ.ย. 2569) กรอบเทาเรียบ — สิ่งที่เด่นคือปุ่ม "เลือกงาน" สีน้ำเงินปุ่มเดียว (เดิมพื้น/กรอบ/ปุ่มฟ้าอมเขียวทั้งกล่อง)
+                      border: `1.5px ${jobs.length ? "solid" : "dashed"} ${touched && !jobs.length ? "#f87171" : jobs.length ? BORDER_MAIN : "#cbd5e1"}`,
+                      bgcolor: "#fff",
                       transition: "border-color .12s, box-shadow .12s, background-color .12s",
-                      "&:hover": { borderColor: OT_ACCENT, bgcolor: jobs.length ? "#fff" : alpha(OT_ACCENT, 0.08), boxShadow: `0 4px 14px ${alpha(OT_ACCENT, 0.15)}` },
-                      "&:hover .pick-cta": { bgcolor: OT_DARK, color: "#fff" },
+                      "&:hover": { borderColor: alpha(OT_ACTION, 0.5), boxShadow: `0 4px 14px ${alpha(OT_ACTION, 0.1)}` },
+                      "&:hover .pick-cta": jobs.length ? { bgcolor: OT_ACTION_SOFT } : { bgcolor: OT_ACTION_DARK },
                     }}>
-                    <Stack alignItems="center" justifyContent="center" sx={{ width: 68, flexShrink: 0, py: 1, bgcolor: alpha(OT_ACCENT, 0.08), color: OT_DARK, borderRight: `1px solid ${alpha(OT_ACCENT, 0.18)}` }}>
+                    <Stack alignItems="center" justifyContent="center" sx={{ width: 68, flexShrink: 0, py: 1, bgcolor: "#f8fafc", color: TEXT_SUB, borderRight: `1px solid ${BORDER_MAIN}` }}>
                       <Typography component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, lineHeight: 1.2 }}>{DAY_SHORT[moment(it.date).day()]}</Typography>
                       <Typography component="span" sx={{ fontSize: "1.45rem", fontWeight: 900, lineHeight: 1.05, color: TEXT_MAIN }}>{moment(it.date).date()}</Typography>
                       <Typography component="span" sx={{ fontSize: "0.66rem", fontWeight: 700, lineHeight: 1.2 }}>{thaiDate(it.date).split(" ").slice(1).join(" ")}</Typography>
@@ -460,7 +461,10 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
                           {jobs.length > 5 && <Typography sx={{ gridColumn: "1 / -1", fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 700 }}>+ อีก {jobs.length - 4} งาน — กด “เปลี่ยน / เพิ่มงาน” เพื่อดูทั้งหมด</Typography>}
                         </Box>
                       ) : (
-                        <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: touched ? "#dc2626" : OT_DARK }}>ยังไม่ได้เลือกงาน — กดเพื่อเลือกจากปฏิทิน</Typography>
+                        <>
+                          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: touched ? "#dc2626" : TEXT_MAIN }}>ยังไม่ได้เลือกงาน</Typography>
+                          <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>เลือกวันและงานจากปฏิทิน</Typography>
+                        </>
                       )}
                     </Box>
                     <Stack justifyContent="center" sx={{ pr: 1.25, pl: 0.5, flexShrink: 0 }}>
@@ -468,8 +472,8 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
                         display: "inline-flex", alignItems: "center", gap: 0.6, px: { xs: 1, sm: 1.4 }, height: 36, borderRadius: 2, fontSize: "0.82rem", fontWeight: 800, whiteSpace: "nowrap",
                         transition: "background-color .12s, color .12s",
                         ...(jobs.length
-                          ? { color: OT_DARK, border: `1.5px solid ${alpha(OT_ACCENT, 0.5)}`, bgcolor: "#fff" }
-                          : { color: "#fff", bgcolor: OT_ACCENT, boxShadow: `0 2px 8px ${alpha(OT_ACCENT, 0.35)}` }),
+                          ? { color: OT_ACTION, border: "1px solid #bfdbfe", bgcolor: "#fff" }
+                          : { color: "#fff", bgcolor: OT_ACTION }),
                       }}>
                         <EditCalendar sx={{ fontSize: 19 }} />
                         <Box component="span" sx={{ display: { xs: jobs.length ? "none" : "inline", sm: "inline" } }}>{jobs.length ? "เปลี่ยน / เพิ่มงาน" : "เลือกงาน"}</Box>
@@ -480,9 +484,9 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
                   <Box sx={{ gridColumn: { xs: "span 3", md: "span 3" } }}><TimeField label="เลิก" value={it.end} onChange={(v) => setItem(it.key, { end: v })} error={h === null} /></Box>
                   {/* = ชั่วโมง OT (ผลลัพธ์ อ่านอย่างเดียว) — หน้าตาเหมือนช่องกรอก วางต่อจากเวลาเลิก */}
                   <Box sx={{ gridColumn: { xs: "span 3", md: "span 2" }, position: "relative", height: 40, px: 1.5, display: "flex", alignItems: "center", gap: 0.75,
-                    borderRadius: 1, border: `1px solid ${h === null ? "#f87171" : alpha(OT_ACCENT, 0.45)}`, bgcolor: "#fff" }}>
-                    <Typography component="span" sx={{ position: "absolute", top: -9, left: 9, px: 0.5, bgcolor: "#fff", fontSize: "0.72rem", color: TEXT_SUB, lineHeight: 1.4 }}>ชั่วโมง OT</Typography>
-                    <Typography component="span" sx={{ fontWeight: 900, fontSize: "1.08rem", color: h === null ? "#dc2626" : OT_DARK, whiteSpace: "nowrap" }}>{h === null ? "เวลาไม่ถูก" : hoursText(h)}</Typography>
+                    borderRadius: 1, border: `1px solid ${h === null ? "#f87171" : "#cbd5e1"}`, bgcolor: "#f8fafc" }}>
+                    <Typography component="span" sx={{ position: "absolute", top: -9, left: 9, px: 0.5, bgcolor: "#fff", borderRadius: 0.5, fontSize: "0.72rem", color: TEXT_SUB, lineHeight: 1.4 }}>ชั่วโมง OT</Typography>
+                    <Typography component="span" sx={{ fontWeight: 900, fontSize: "1.08rem", color: h === null ? "#dc2626" : TEXT_MAIN, whiteSpace: "nowrap" }}>{h === null ? "เวลาไม่ถูก" : hoursText(h)}</Typography>
                   </Box>
                   <TextField select size="small" label="ประเภท OT" value={it.type} onChange={(e) => setItem(it.key, { type: e.target.value, typeTouched: true })}
                     sx={{ gridColumn: { xs: "span 3", md: "span 4" }, "& .MuiSelect-select": { color: TEXT_MAIN, fontWeight: 700 } }}>
@@ -531,7 +535,7 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
           })}
         </Stack>
         <Button fullWidth variant="outlined" startIcon={<Add />} onClick={addItem}
-          sx={{ mt: 1.25, height: 44, textTransform: "none", fontWeight: 800, borderRadius: 2.5, borderStyle: "dashed", bgcolor: "#fff", color: OT_DARK, borderColor: alpha(OT_ACCENT, 0.5), "&:hover": { borderStyle: "dashed", borderColor: OT_ACCENT, bgcolor: alpha(OT_ACCENT, 0.04) } }}>
+          sx={{ mt: 1.25, height: 44, textTransform: "none", fontWeight: 800, borderRadius: 2.5, borderStyle: "dashed", bgcolor: "#fff", color: OT_ACTION, borderColor: "#cbd5e1", "&:hover": { borderStyle: "dashed", borderColor: alpha(OT_ACTION, 0.5), bgcolor: OT_ACTION_SOFT } }}>
           เพิ่มรายการที่ {items.length + 1}
         </Button>
 
@@ -571,17 +575,18 @@ export default function OtFormDialog({ open, request, presetJob = null, onClose,
         )}
         {/* เพิ่มรายการ — อยู่แถบล่างให้กดได้ตลอด ไม่ต้องเลื่อนลงไปหาปุ่มท้ายรายการ */}
         <Button variant="outlined" onClick={addItem} disabled={saving} startIcon={<Add />} aria-label={`เพิ่มรายการที่ ${items.length + 1}`}
-          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", color: OT_DARK, borderColor: alpha(OT_ACCENT, 0.5), minWidth: { xs: 44, sm: 0 }, px: { xs: 1.25, sm: 1.75 },
+          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", color: OT_ACTION, borderColor: "#bfdbfe", minWidth: { xs: 44, sm: 0 }, px: { xs: 1.25, sm: 1.75 },
+            "&:hover": { borderColor: alpha(OT_ACTION, 0.5), bgcolor: OT_ACTION_SOFT },
             "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.75 } } }}>
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มรายการ</Box>
         </Button>
         <Button onClick={() => onClose?.({ kept: basketMode, count: items.length })} disabled={saving}
-          sx={{ textTransform: "none", color: basketMode ? OT_DARK : TEXT_SUB, fontWeight: basketMode ? 800 : 500, display: { xs: error || !basketMode ? "none" : "inline-flex", sm: "inline-flex" } }}>
+          sx={{ textTransform: "none", color: basketMode ? OT_ACTION : TEXT_SUB, fontWeight: basketMode ? 800 : 500, display: { xs: error || !basketMode ? "none" : "inline-flex", sm: "inline-flex" } }}>
           {basketMode ? "บันทึกฉบับร่าง" : "ยกเลิก"}
         </Button>
         <Button variant="contained" onClick={submit} disabled={saving}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : editing && !resubmit ? <Save /> : <Send />}
-          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5, boxShadow: "none", whiteSpace: "nowrap", bgcolor: OT_ACCENT, "&:hover": { bgcolor: OT_DARK, boxShadow: "none" } }}>
+          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5, boxShadow: "none", whiteSpace: "nowrap", bgcolor: OT_ACTION, backgroundImage: "none", "&:hover": { bgcolor: OT_ACTION_DARK, boxShadow: "none" } }}>
           {saving ? "กำลังบันทึก..." : resubmit ? "ส่งใหม่" : editing ? "บันทึก" : "ส่งขออนุมัติ"}
         </Button>
       </DialogActions>
